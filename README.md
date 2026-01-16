@@ -1,4 +1,4 @@
-# frnm
+# oud
 
 Minimal curses editor for Renaissance lute tablature.
 
@@ -36,4 +36,3 @@ python3 app.py examples/example.ft3
 :play [bar]     play from bar (1-based)
 :lilypond [path] export lilypond
 ```
-
