@@ -1,0 +1,19 @@
+[settings]
+charstyle = "standard"
+countdots = "off"
+flagstyle = "thin"
+fontstyle = "modern"
+grid = "off"
+key = "C"
+keys = "vim+arrows"
+linelen = 80
+measures = "five"
+midipatch = 0
+showdur = "off"
+showextras = "off"
+showtactus = "off"
+spacing = 12
+staffthick = 1
+strings = 7
+style = "italian"
+tuning = "C4D4E4F4G4c3f3a2d2g2"

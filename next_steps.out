@@ -1,0 +1,16 @@
+...................................................                      [100%]
+51 passed in 0.27s
+F841 Local variable `bars_per_screen` is assigned to but never used
+   --> render.py:444:5
+    |
+442 |     bar_gap = 2
+443 |     usable_width = max(0, width - left_margin)
+444 |     bars_per_screen = max(1, usable_width // (bar_width + bar_gap))
+    |     ^^^^^^^^^^^^^^^
+445 |
+446 |     include_meta = True
+    |
+help: Remove assignment to unused variable `bars_per_screen`
+
+Found 1 error.
+No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
