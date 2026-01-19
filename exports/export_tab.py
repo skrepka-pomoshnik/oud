@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
-from model import Piece
-from render_utils import (
+from core.model import Piece
+from core.render_utils import (
     bar_cells,
     bar_cells_from_chords,
     chord_positions,
@@ -29,7 +27,7 @@ def _parse_time_signature(value: str) -> tuple[int, int, str]:
     return 0, 0, ""
 
 
-def _tactus_row(bar_width: int, beats: int) -> List[str]:
+def _tactus_row(bar_width: int, beats: int) -> list[str]:
     row = [" " for _ in range(bar_width)]
     if beats <= 0:
         return row
@@ -38,6 +36,8 @@ def _tactus_row(bar_width: int, beats: int) -> List[str]:
         if 0 <= pos < bar_width:
             row[pos] = "|"
     return row
+
+
 def _bar_number_for_index(
     piece: Piece, bar_index: int, measures: str, countdots: str
 ) -> str | None:
@@ -57,11 +57,11 @@ def _bar_number_for_index(
 
 
 def _bar_durations(
-    durations: Dict[Tuple[int, int, int], int],
+    durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
     bar_width: int,
-) -> List[str]:
+) -> list[str]:
     row = [" " for _ in range(bar_width)]
     for col in range(bar_width):
         found = None
@@ -77,11 +77,11 @@ def _bar_durations(
 
 
 def _bar_flags(
-    durations: Dict[Tuple[int, int, int], int],
+    durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
     bar_width: int,
-) -> List[str]:
+) -> list[str]:
     row = [" " for _ in range(bar_width)]
     for col in range(bar_width):
         found = None
@@ -97,10 +97,10 @@ def _bar_flags(
 
 
 def _bar_annotations(
-    annotations: Dict[Tuple[int, int], str],
+    annotations: dict[tuple[int, int], str],
     bar_index: int,
     bar_width: int,
-) -> List[str]:
+) -> list[str]:
     row = [" " for _ in range(bar_width)]
     for col in range(bar_width):
         key = (bar_index, col)
@@ -112,10 +112,10 @@ def _bar_annotations(
 
 
 def _bar_ornaments(
-    ornaments: Dict[Tuple[int, int], str],
+    ornaments: dict[tuple[int, int], str],
     bar_index: int,
     bar_width: int,
-) -> List[str]:
+) -> list[str]:
     row = [" " for _ in range(bar_width)]
     for col in range(bar_width):
         key = (bar_index, col)
@@ -125,13 +125,13 @@ def _bar_ornaments(
 
 
 def _bar_span_row(
-    spans: List[Tuple[int, int, int]],
+    spans: list[tuple[int, int, int]],
     bar_index: int,
     bar_width: int,
     start_char: str,
     end_char: str,
     fill_char: str,
-) -> List[str]:
+) -> list[str]:
     row = [" " for _ in range(bar_width)]
     for b, start, end in spans:
         if b != bar_index:
@@ -145,66 +145,69 @@ def _bar_span_row(
     return row
 
 
-def export_tab(
+def export_tab(  # noqa: PLR0912
     piece: Piece,
-    overrides: Dict[Tuple[int, int, int], str],
-    durations: Dict[Tuple[int, int, int], int],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: Dict[str, str | None] | None = None,
-    ornaments: Dict[Tuple[int, int], str] | None = None,
-    annotations: Dict[Tuple[int, int], str] | None = None,
-    slurs: List[Tuple[int, int, int]] | None = None,
-    ties: List[Tuple[int, int, int]] | None = None,
-    holds: List[Tuple[int, int, int]] | None = None,
+    settings: dict[str, str] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+    annotations: dict[tuple[int, int], str] | None = None,
+    slurs: list[tuple[int, int, int]] | None = None,
+    ties: list[tuple[int, int, int]] | None = None,
+    holds: list[tuple[int, int, int]] | None = None,
 ) -> str:
-    lines: List[str] = []
-    style = (settings or {}).get("style", "french")
-    french_c = (settings or {}).get("frenchc", "normal")
-    french_e = (settings or {}).get("frenche", "normal")
+    lines: list[str] = []
+    settings_map = settings or {}
+    style = settings_map.get("style") or "french"
+    french_c = settings_map.get("frenchc") or "normal"
+    french_e = settings_map.get("frenche") or "normal"
     lines.append(f"# TITLE: {piece.title or ''}")
+    lines.append(f"# SUBTITLE: {piece.subtitle or ''}")
     lines.append(f"# AUTHOR: {piece.author or ''}")
     lines.append(f"# COMPOSER: {piece.composer or ''}")
+    lines.append(f"# FOOTNOTE: {piece.footnote or ''}")
     lines.append(f"# STRINGS: {piece.strings}")
-    if settings:
-        if settings.get("style"):
-            lines.append(f"# STYLE: {settings['style']}")
-        if settings.get("flagstyle"):
-            lines.append(f"# FLAGSTYLE: {settings['flagstyle']}")
-        if settings.get("measures"):
-            lines.append(f"# MEASURES: {settings['measures']}")
-        if settings.get("tuning"):
-            lines.append(f"# TUNING: {settings['tuning']}")
-        if settings.get("time"):
-            _beats, _unit, sig_label = _parse_time_signature(settings["time"])
+    if settings_map:
+        if settings_map.get("style"):
+            lines.append(f"# STYLE: {settings_map['style']}")
+        if settings_map.get("flagstyle"):
+            lines.append(f"# FLAGSTYLE: {settings_map['flagstyle']}")
+        if settings_map.get("measures"):
+            lines.append(f"# MEASURES: {settings_map['measures']}")
+        if settings_map.get("tuning"):
+            lines.append(f"# TUNING: {settings_map['tuning']}")
+        if settings_map.get("time"):
+            _beats, _unit, sig_label = _parse_time_signature(settings_map["time"])
             if sig_label:
                 lines.append(f"# TIME: {sig_label}")
-        if settings.get("key"):
-            lines.append(f"# KEY: {settings['key']}")
-        if settings.get("countdots"):
-            lines.append(f"# COUNTDOTS: {settings['countdots']}")
-        if settings.get("spacing"):
-            lines.append(f"# SPACING: {settings['spacing']}")
-        if settings.get("linelen"):
-            lines.append(f"# LINELEN: {settings['linelen']}")
-        if settings.get("staffthick"):
-            lines.append(f"# STAFFTHICK: {settings['staffthick']}")
-        if settings.get("fontstyle"):
-            lines.append(f"# FONTSTYLE: {settings['fontstyle']}")
-        if settings.get("charstyle"):
-            lines.append(f"# CHARSTYLE: {settings['charstyle']}")
-        if settings.get("midipatch"):
-            lines.append(f"# MIDIPATCH: {settings['midipatch']}")
-        if settings.get("grid"):
-            lines.append(f"# GRID: {settings['grid']}")
+        if settings_map.get("key"):
+            lines.append(f"# KEY: {settings_map['key']}")
+        if settings_map.get("countdots"):
+            lines.append(f"# COUNTDOTS: {settings_map['countdots']}")
+        if settings_map.get("spacing"):
+            lines.append(f"# SPACING: {settings_map['spacing']}")
+        if settings_map.get("linelen"):
+            lines.append(f"# LINELEN: {settings_map['linelen']}")
+        if settings_map.get("staffthick"):
+            lines.append(f"# STAFFTHICK: {settings_map['staffthick']}")
+        if settings_map.get("fontstyle"):
+            lines.append(f"# FONTSTYLE: {settings_map['fontstyle']}")
+        if settings_map.get("charstyle"):
+            lines.append(f"# CHARSTYLE: {settings_map['charstyle']}")
+        if settings_map.get("midipatch"):
+            lines.append(f"# MIDIPATCH: {settings_map['midipatch']}")
+        if settings_map.get("grid"):
+            lines.append(f"# GRID: {settings_map['grid']}")
     lines.append("")
 
     reverse_strings = (
         style == "italian"
-        and (settings or {}).get("italianorient", "normal") == "reverse"
+        and (settings_map.get("italianorient") or "normal") == "reverse"
     )
     for b_idx, bar in enumerate(piece.bars):
-        measures = settings.get("measures", "start") if settings else "start"
-        countdots = settings.get("countdots", "off") if settings else "off"
+        measures = settings_map.get("measures") or "start"
+        countdots = settings_map.get("countdots") or "off"
         number = _bar_number_for_index(piece, b_idx, measures, countdots)
         if number is not None:
             lines.append(f"Bar {number}")
@@ -212,7 +215,8 @@ def export_tab(
             lines.append(f"Barline: {bar.barline}")
         if bar.repeat:
             lines.append(f"Repeat: {bar.repeat}")
-        beats, _unit, _sig = _parse_time_signature(settings.get("time", "C") if settings else "C")
+        time_value = settings_map.get("time") or "C"
+        beats, _unit, _sig = _parse_time_signature(time_value)
         tactus = _tactus_row(bar_width, beats)
         lines.append("Tactus: " + "".join(tactus))
         if annotations:
@@ -259,24 +263,25 @@ def export_tab(
 
 def export_ascii(
     piece: Piece,
-    overrides: Dict[Tuple[int, int, int], str],
-    durations: Dict[Tuple[int, int, int], int],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: Dict[str, str | None] | None = None,
-    ornaments: Dict[Tuple[int, int], str] | None = None,
-    annotations: Dict[Tuple[int, int], str] | None = None,
-    slurs: List[Tuple[int, int, int]] | None = None,
-    ties: List[Tuple[int, int, int]] | None = None,
-    holds: List[Tuple[int, int, int]] | None = None,
+    settings: dict[str, str] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+    annotations: dict[tuple[int, int], str] | None = None,
+    slurs: list[tuple[int, int, int]] | None = None,
+    ties: list[tuple[int, int, int]] | None = None,
+    holds: list[tuple[int, int, int]] | None = None,
 ) -> str:
-    lines: List[str] = []
+    lines: list[str] = []
     default_duration = 4
-    style = (settings or {}).get("style", "french")
-    french_c = (settings or {}).get("frenchc", "normal")
-    french_e = (settings or {}).get("frenche", "normal")
+    settings_map = settings or {}
+    style = settings_map.get("style") or "french"
+    french_c = settings_map.get("frenchc") or "normal"
+    french_e = settings_map.get("frenche") or "normal"
     reverse_strings = (
         style == "italian"
-        and (settings or {}).get("italianorient", "normal") == "reverse"
+        and (settings_map.get("italianorient") or "normal") == "reverse"
     )
     for b_idx, bar in enumerate(piece.bars):
         cells = (
@@ -331,15 +336,15 @@ def export_ascii(
 def export_tab_to_file(
     path: str,
     piece: Piece,
-    overrides: Dict[Tuple[int, int, int], str],
-    durations: Dict[Tuple[int, int, int], int],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: Dict[str, str | None] | None = None,
-    ornaments: Dict[Tuple[int, int], str] | None = None,
-    annotations: Dict[Tuple[int, int], str] | None = None,
-    slurs: List[Tuple[int, int, int]] | None = None,
-    ties: List[Tuple[int, int, int]] | None = None,
-    holds: List[Tuple[int, int, int]] | None = None,
+    settings: dict[str, str] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+    annotations: dict[tuple[int, int], str] | None = None,
+    slurs: list[tuple[int, int, int]] | None = None,
+    ties: list[tuple[int, int, int]] | None = None,
+    holds: list[tuple[int, int, int]] | None = None,
 ) -> None:
     content = export_tab(
         piece,

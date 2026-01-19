@@ -2,12 +2,26 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Dict
 
-DEFAULT_SETTINGS: Dict[str, str] = {
+
+def _resolve_config_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    cwd_path = Path.cwd() / path
+    if cwd_path.exists():
+        return cwd_path
+    config_home = Path.home() / ".config" / "oud" / path
+    if config_home.exists():
+        return config_home
+    return cwd_path
+
+DEFAULT_SETTINGS: dict[str, str] = {
     "style": "french",
     "measures": "start",
-    "tuning": "",
+    "measuresstep": "1",
+    "tuning": "g2c3f3a3d4g4",
+    "tuninglabels": "relative",
     "strings": "6",
     "flagstyle": "standard",
     "time": "C",
@@ -15,12 +29,17 @@ DEFAULT_SETTINGS: Dict[str, str] = {
     "countdots": "off",
     "keys": "vim+arrows",
     "spacing": "12",
+    "spacingmode": "packed",
+    "maxbars": "0",
     "linelen": "80",
+    "flagredundant": "on",
     "staffthick": "1",
     "fontstyle": "modern",
     "charstyle": "standard",
     "midipatch": "24",
+    "midigate": "85",
     "tempo": "90",
+    "soundfont": "",
     "grid": "off",
     "showdur": "off",
     "showextras": "off",
@@ -31,9 +50,9 @@ DEFAULT_SETTINGS: Dict[str, str] = {
 }
 
 
-def load_settings(path: str) -> Dict[str, str]:
-    data: Dict[str, str] = dict(DEFAULT_SETTINGS)
-    file_path = Path(path)
+def load_settings(path: str) -> dict[str, str]:
+    data: dict[str, str] = dict(DEFAULT_SETTINGS)
+    file_path = _resolve_config_path(path)
     if not file_path.exists():
         return data
     try:
@@ -52,8 +71,10 @@ def load_settings(path: str) -> Dict[str, str]:
     return data
 
 
-def save_settings(path: str, settings: Dict[str, str]) -> None:
-    file_path = Path(path)
+def save_settings(path: str, settings: dict[str, str]) -> None:
+    file_path = _resolve_config_path(path)
+    if file_path.parent:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["[settings]"]
     for key in sorted(settings.keys()):
         value = settings[key]

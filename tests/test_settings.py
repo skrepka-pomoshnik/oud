@@ -14,6 +14,7 @@ def test_save_and_load_settings(tmp_path) -> None:
         "countdots": "on",
         "keys": "vim",
         "spacing": "10",
+        "spacingmode": "spread",
         "linelen": "70",
         "staffthick": "2",
         "fontstyle": "renaissance",
@@ -40,6 +41,7 @@ def test_save_and_load_settings(tmp_path) -> None:
     assert loaded["countdots"] == "on"
     assert loaded["keys"] == "vim"
     assert loaded["spacing"] == "10"
+    assert loaded["spacingmode"] == "spread"
     assert loaded["linelen"] == "70"
     assert loaded["staffthick"] == "2"
     assert loaded["fontstyle"] == "renaissance"

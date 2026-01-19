@@ -3,10 +3,10 @@ from __future__ import annotations
 import math
 import shutil
 import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
 
-from model import Bar, Chord, Note, Piece
+from core.model import Bar, Chord, Note, Piece
 
 TICKS_PER_QUARTER = 480
 
@@ -30,12 +30,12 @@ def _duration_ticks(denom: int, dotted: bool) -> int:
     base = TICKS_PER_QUARTER * 4
     ticks = max(1, base // max(1, denom))
     if dotted:
-        ticks = int(math.ceil(ticks * 1.5))
+        ticks = math.ceil(ticks * 1.5)
     return ticks
 
 
-def _parse_tuning(tuning: str) -> List[int]:
-    pitches: List[int] = []
+def _parse_tuning(tuning: str) -> list[int]:
+    pitches: list[int] = []
     idx = 0
     text = tuning.strip()
     while idx < len(text):
@@ -51,10 +51,7 @@ def _parse_tuning(tuning: str) -> List[int]:
             while idx < len(text) and text[idx].isdigit():
                 idx += 1
             octave = text[start:idx]
-            if not octave:
-                octave_num = 3
-            else:
-                octave_num = int(octave)
+            octave_num = 3 if not octave else int(octave)
             semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
                 note, 0
             )
@@ -67,10 +64,11 @@ def _parse_tuning(tuning: str) -> List[int]:
                 pitches.append(midi)
         else:
             idx += 1
+    pitches.reverse()
     return pitches
 
 
-def _default_tuning(strings: int) -> List[int]:
+def _default_tuning(strings: int) -> list[int]:
     defaults = [
         "g4",
         "d4",
@@ -103,16 +101,17 @@ def _collect_manual_chords(
     bar_index: int,
     strings: int,
     bar_width: int,
-    overrides: Dict[Tuple[int, int, int], str],
-    durations: Dict[Tuple[int, int, int], int],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
     style: str,
     default_duration: int,
-) -> List[tuple[int, int, List[Note]]]:
-    columns = sorted({col for (b, _s, col) in overrides.keys() if b == bar_index})
-    events: List[tuple[int, List[Note]]] = []
+    dotted: set[tuple[int, int]] | None,
+) -> list[tuple[int, int, list[Note]]]:
+    columns = sorted({col for (b, _s, col) in overrides if b == bar_index})
+    events: list[tuple[int, int, list[Note]]] = []
     current_time = 0
     for col in columns:
-        notes: List[Note] = []
+        notes: list[Note] = []
         for s_idx in range(strings):
             key = (bar_index, s_idx, col)
             if key not in overrides:
@@ -129,17 +128,18 @@ def _collect_manual_chords(
             if key in durations:
                 denom = durations[key]
                 break
-        duration = _duration_ticks(denom, False)
+        is_dotted = dotted is not None and (bar_index, col) in dotted
+        duration = _duration_ticks(denom, is_dotted)
         events.append((current_time, duration, notes))
         current_time += duration
     return events
 
 
 def _chord_positions(
-    chords: List[Chord], bar_width: int, default_duration: int
-) -> List[int]:
-    denoms: List[int] = []
-    dotted: List[bool] = []
+    chords: list[Chord], bar_width: int, default_duration: int
+) -> list[int]:
+    denoms: list[int] = []
+    dotted: list[bool] = []
     for chord in chords:
         denom = _note_type_to_denom(chord.note_type) or default_duration
         denoms.append(denom)
@@ -148,7 +148,7 @@ def _chord_positions(
         return []
     max_denom = max(denoms)
     base = max_denom * 2
-    units: List[int] = []
+    units: list[int] = []
     for denom, dot in zip(denoms, dotted, strict=False):
         u = max(1, base // denom)
         if dot:
@@ -157,7 +157,7 @@ def _chord_positions(
     total = sum(units)
     if total <= 0:
         return []
-    positions: List[int] = []
+    positions: list[int] = []
     cum = 0
     for u in units:
         pos = min(bar_width - 1, (cum * (bar_width - 1)) // total)
@@ -167,16 +167,16 @@ def _chord_positions(
 
 
 def _apply_overrides(
-    notes: List[Note],
-    overrides: Dict[Tuple[int, int, int], str],
+    notes: list[Note],
+    overrides: dict[tuple[int, int, int], str],
     bar_index: int,
     col: int,
     style: str,
     strings: int,
-) -> List[Note]:
+) -> list[Note]:
     if not overrides:
         return notes
-    by_string: Dict[int, Note] = {note.string: note for note in notes}
+    by_string: dict[int, Note] = {note.string: note for note in notes}
     for s_idx in range(strings):
         key = (bar_index, s_idx, col)
         if key not in overrides:
@@ -192,13 +192,14 @@ def _bar_chord_events(
     bar: Bar,
     bar_index: int,
     strings: int,
-    overrides: Dict[Tuple[int, int, int], str],
-    durations: Dict[Tuple[int, int, int], int],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
     bar_width: int,
     style: str,
     default_duration: int,
-) -> List[tuple[int, int, List[Note]]]:
-    events: List[tuple[int, int, List[Note]]] = []
+    dotted: set[tuple[int, int]] | None,
+) -> list[tuple[int, int, list[Note]]]:
+    events: list[tuple[int, int, list[Note]]] = []
     if not bar.chords:
         manual = _collect_manual_chords(
             bar_index,
@@ -208,6 +209,7 @@ def _bar_chord_events(
             durations,
             style,
             default_duration,
+            dotted,
         )
         for start, duration, notes in manual:
             events.append((start, duration, notes))
@@ -216,7 +218,8 @@ def _bar_chord_events(
     positions = _chord_positions(bar.chords, bar_width, default_duration)
     for chord, col in zip(bar.chords, positions, strict=False):
         denom = _note_type_to_denom(chord.note_type) or default_duration
-        duration = _duration_ticks(denom, chord.dotted)
+        is_dotted = chord.dotted or (dotted is not None and (bar_index, col) in dotted)
+        duration = _duration_ticks(denom, is_dotted)
         if chord.notes:
             notes = _apply_overrides(chord.notes, overrides, bar_index, col, style, strings)
             events.append((time, duration, notes))
@@ -256,7 +259,7 @@ def _vlq(value: int) -> bytes:
     return bytes(out)
 
 
-def _write_track(events: List[tuple[int, bytes]]) -> bytes:
+def _write_track(events: list[tuple[int, bytes]]) -> bytes:
     events.sort(key=lambda item: item[0])
     data = bytearray()
     last_time = 0
@@ -274,12 +277,13 @@ def _write_track(events: List[tuple[int, bytes]]) -> bytes:
 def export_midi(
     path: str,
     piece: Piece,
-    overrides: Dict[Tuple[int, int, int], str],
-    durations: Dict[Tuple[int, int, int], int],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: Dict[str, str | None] | None = None,
+    settings: dict[str, str] | None = None,
     bpm: int = 90,
     start_bar: int = 0,
+    dotted: set[tuple[int, int]] | None = None,
 ) -> str:
     settings = settings or {}
     tuning = settings.get("tuning", "") or ""
@@ -287,8 +291,13 @@ def export_midi(
     if len(pitches) < piece.strings:
         pitches.extend(_default_tuning(piece.strings)[len(pitches) :])
     program = int(settings.get("midipatch", "0") or "0")
-    style = settings.get("style", "french")
-    events: List[tuple[int, bytes]] = []
+    style = settings.get("style") or "french"
+    gate_text = settings.get("midigate", "85")
+    gate_percent = 85
+    if gate_text.isdigit():
+        gate_percent = max(10, min(100, int(gate_text)))
+    gate = gate_percent / 100.0
+    events: list[tuple[int, bytes]] = []
     events.append((0, _meta_tempo(bpm)))
     events.append((0, _program_change(0, program)))
 
@@ -306,18 +315,20 @@ def export_midi(
             bar_width,
             style,
             default_duration,
+            dotted=dotted,
         )
         if not chord_events:
             continue
         max_end = 0
         for start, duration, notes in chord_events:
+            note_len = max(1, int(duration * gate))
             for note in notes:
                 s_idx = note.string - 1
                 if s_idx < 0 or s_idx >= len(pitches):
                     continue
                 pitch = pitches[s_idx] + note.fret
                 events.append((current_time + start, _note_on(0, pitch, 80)))
-                events.append((current_time + start + duration, _note_off(0, pitch, 64)))
+                events.append((current_time + start + note_len, _note_off(0, pitch, 64)))
             max_end = max(max_end, start + duration)
         current_time += max_end
 
@@ -329,13 +340,58 @@ def export_midi(
     return f"Wrote {path}"
 
 
-def play_midi(path: str) -> str:
-    player = shutil.which("timidity") or shutil.which("fluidsynth")
+def _midi_command(
+    path: str,
+    soundfont: str | None,
+    platform: str,
+    fluidsynth: str | None,
+    timidity: str | None,
+    opener: str | None,
+) -> list[str] | None:
+    soundfont_path = None
+    if soundfont:
+        soundfont_path = str(Path(soundfont).expanduser())
+    if fluidsynth and (soundfont_path or platform == "darwin"):
+        player = fluidsynth
+    else:
+        player = timidity or fluidsynth
     if player is None:
-        return "No MIDI player found (timidity/fluidsynth)"
-    cmd = [player, path]
+        if platform == "darwin" and opener:
+            return [opener, path]
+        return None
+    if player.endswith("fluidsynth"):
+        cmd = [player]
+        cmd.append("-q")
+        if platform == "darwin":
+            cmd += ["-a", "coreaudio"]
+        if soundfont_path:
+            cmd += ["-ni", soundfont_path]
+        cmd.append(path)
+        return cmd
+    return [player, path]
+
+
+def play_midi(
+    path: str,
+    soundfont: str | None = None,
+) -> tuple[str, subprocess.Popen[bytes] | None]:
+    cmd = _midi_command(
+        path=path,
+        soundfont=soundfont,
+        platform=sys.platform,
+        fluidsynth=shutil.which("fluidsynth"),
+        timidity=shutil.which("timidity"),
+        opener=shutil.which("open") if sys.platform == "darwin" else None,
+    )
+    if cmd is None:
+        return "No MIDI player found (timidity/fluidsynth/open)", None
     try:
-        subprocess.Popen(cmd)
+        proc = subprocess.Popen(  # noqa: S603
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except OSError as exc:
-        return f"Failed to play MIDI: {exc}"
-    return f"Playing {path}"
+        return f"Failed to play MIDI: {exc}", None
+    return f"Playing {path}", proc

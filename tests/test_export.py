@@ -1,5 +1,5 @@
-from export_tab import export_ascii, export_tab
-from model import Bar, Piece
+from core.model import Bar, Piece
+from exports.export_tab import export_ascii, export_tab, export_tab_to_file
 
 
 def test_export_tab_includes_headers_and_durations() -> None:
@@ -76,3 +76,12 @@ def test_export_ascii_basic() -> None:
     overrides = {(0, 0, 0): "a"}
     text = export_ascii(piece, overrides, durations={}, bar_width=4, settings={})
     assert "6|a" in text
+
+
+def test_export_tab_to_file_writes_content(tmp_path) -> None:
+    piece = Piece(title="T", bars=[Bar()], strings=6)
+    path = tmp_path / "out.tab"
+    export_tab_to_file(str(path), piece, overrides={}, durations={}, bar_width=4, settings={})
+    content = path.read_text(encoding="utf-8")
+    assert content
+    assert "# TITLE: T" in content

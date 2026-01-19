@@ -2,9 +2,24 @@ from __future__ import annotations
 
 import gzip
 import re
-from typing import Optional
 
-from model import Bar, Chord, Note, Piece
+from core.model import Bar, Chord, Note, Piece
+
+
+def _strip_rtf(text: str) -> str:
+    if "\\rtf" not in text:
+        return text.strip()
+    cleaned = re.sub(r"{\\fonttbl.*?}", " ", text, flags=re.S)
+    cleaned = re.sub(r"{\\colortbl.*?}", " ", cleaned, flags=re.S)
+    cleaned = re.sub(r"\\'[0-9a-fA-F]{2}", "", cleaned)
+    cleaned = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", cleaned)
+    cleaned = re.sub(r"\\[{}]", "", cleaned)
+    cleaned = cleaned.replace("{", " ").replace("}", " ")
+    cleaned = re.sub(r"[\x00-\x1f]+", " ", cleaned)
+    cleaned = cleaned.replace("~", " ")
+    cleaned = re.sub(r"\\+", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
 
 
 def read_ft3(path: str) -> bytes:
@@ -19,7 +34,7 @@ def read_ft3(path: str) -> bytes:
         return f.read()
 
 
-def extract_text(data: bytes, marker: bytes) -> tuple[Optional[str], Optional[int]]:
+def extract_text(data: bytes, marker: bytes) -> tuple[str | None, int | None]:
     pos = data.find(marker)
     if pos == -1:
         return None, None
@@ -36,7 +51,7 @@ def at_next_note(s: int, f: int) -> bool:
     return on_string and (on_fret or on_diapason)
 
 
-def parse_bar(bar_data: bytes) -> Bar:
+def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912
     bar = Bar()
     bar.time_sig = parse_time_signature(bar_data)
     ptr = 32
@@ -92,12 +107,19 @@ def parse_bar(bar_data: bytes) -> Bar:
 def load_ft3(path: str) -> Piece:
     data = read_ft3(path)
 
-    title, pos = extract_text(data, b"CPiece")
-    author, pos = extract_text(data[pos:], b"") if pos else (None, None)
-    composer, _ = extract_text(data[pos:], b"") if pos else (None, None)
+    title, _pos = extract_text(data, b"CPiece")
+    if title:
+        title = _strip_rtf(title)
+    author = None
+    composer = None
 
     bars = [parse_bar(chunk) for chunk in re.split(b"\x03\x80", data)]
-    return Piece(title=title, author=author, composer=composer, bars=bars, strings=6)
+    max_string = 0
+    for bar in bars:
+        for note in bar.notes:
+            max_string = max(max_string, note.string + 1)
+    strings = max(6, max_string) if max_string else 6
+    return Piece(title=title, author=author, composer=composer, bars=bars, strings=strings)
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:

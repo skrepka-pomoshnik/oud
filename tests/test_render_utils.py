@@ -1,4 +1,4 @@
-from render_utils import format_fret
+from core.render_utils import format_fret
 
 
 def test_format_fret_french_excludes_j() -> None:

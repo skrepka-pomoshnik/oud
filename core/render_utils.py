@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
-from model import Bar
+from core.model import Bar
 
 
-def format_fret(
+def format_fret(  # noqa: PLR0911
     style: str,
     fret: int,
     french_c: str = "normal",
@@ -35,7 +33,7 @@ def bar_cells(
     style: str,
     french_c: str = "normal",
     french_e: str = "normal",
-) -> List[List[str]]:
+) -> list[list[str]]:
     cells = [["-" for _ in range(bar_width)] for _ in range(strings)]
     next_col = [0 for _ in range(strings)]
 
@@ -75,10 +73,10 @@ def note_type_to_denom(note_type: int) -> int | None:
 
 def chord_positions(
     bar: Bar, bar_width: int, default_duration: int
-) -> List[tuple[int, int, bool]]:
+) -> list[tuple[int, int, bool]]:
     chords = bar.chords or []
-    denoms: List[int] = []
-    dotted: List[bool] = []
+    denoms: list[int] = []
+    dotted: list[bool] = []
     for chord in chords:
         denom = note_type_to_denom(chord.note_type) or default_duration
         denoms.append(denom)
@@ -87,7 +85,7 @@ def chord_positions(
         return []
     max_denom = max(denoms)
     base = max_denom * 2
-    units: List[int] = []
+    units: list[int] = []
     for denom, dot in zip(denoms, dotted, strict=False):
         u = max(1, base // denom)
         if dot:
@@ -96,7 +94,7 @@ def chord_positions(
     total = sum(units)
     if total <= 0:
         return []
-    positions: List[tuple[int, int, bool]] = []
+    positions: list[tuple[int, int, bool]] = []
     cum = 0
     for denom, dot, u in zip(denoms, dotted, units, strict=False):
         pos = min(bar_width - 1, (cum * (bar_width - 1)) // total)
@@ -113,7 +111,7 @@ def bar_cells_from_chords(
     style: str,
     french_c: str = "normal",
     french_e: str = "normal",
-) -> List[List[str]]:
+) -> list[list[str]]:
     cells = [["-" for _ in range(bar_width)] for _ in range(strings)]
     positions = chord_positions(bar, bar_width, default_duration)
     if not positions:
@@ -164,7 +162,7 @@ def flag_count(denom: int) -> int:
     return count
 
 
-def flag_row(positions: List[tuple[int, int, bool]], bar_width: int) -> List[str]:
+def flag_row(positions: list[tuple[int, int, bool]], bar_width: int) -> list[str]:
     row = [" " for _ in range(bar_width)]
     for col, denom, dotted in positions:
         row[col] = "I"
@@ -181,25 +179,29 @@ def flag_row(positions: List[tuple[int, int, bool]], bar_width: int) -> List[str
 
 
 def flag_positions_from_durations(
-    durations: Dict[Tuple[int, int, int], int],
+    durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
     bar_width: int,
     default_duration: int,
-) -> List[tuple[int, int, bool]]:
-    positions: List[tuple[int, int, bool]] = []
+    dotted: set[tuple[int, int]] | None = None,
+) -> list[tuple[int, int, bool]]:
+    positions: list[tuple[int, int, bool]] = []
     last: int | None = None
     for col in range(bar_width):
         found = None
+        explicit = False
         for s_idx in range(strings):
             key = (bar_index, s_idx, col)
             if key in durations:
+                explicit = True
                 denom = durations[key]
                 if found is None or denom > found:
                     found = denom
         if found is None:
             found = default_duration
-        if found != last:
-            positions.append((col, found, False))
+        if found != last or explicit:
+            is_dotted = dotted is not None and (bar_index, col) in dotted
+            positions.append((col, found, is_dotted))
             last = found
     return positions

@@ -61,9 +61,9 @@ def parse_bar(bar_data):
 
 
 def at_next_note(s, f):
-    on_fret = 0x30 <= f <= 0x3E  # Фреты a-p
-    on_diapason = 0x61 <= f <= 0x66  # Фреты a-f на басах
-    on_string = 0x02 <= s <= 0x08  # Струны 2-8
+    on_fret = 0x30 <= f <= 0x3E  # Frets a-p
+    on_diapason = 0x61 <= f <= 0x66  # Frets a-f on basses
+    on_string = 0x02 <= s <= 0x08  # Strings 2-8
     
     return on_string and (on_fret or on_diapason)
 

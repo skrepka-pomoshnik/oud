@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 
-from ft3 import load_ft3
-from tab_parser import load_tab
+from core.ft3 import load_ft3
+from core.tab_parser import load_tab
 
 
 def main() -> int:
@@ -11,10 +11,7 @@ def main() -> int:
     parser.add_argument("path", help="Path to .ft3 or .ft3.gz")
     args = parser.parse_args()
 
-    if args.path.lower().endswith(".tab"):
-        piece = load_tab(args.path)
-    else:
-        piece = load_ft3(args.path)
+    piece = load_tab(args.path) if args.path.lower().endswith(".tab") else load_ft3(args.path)
     print(f"Title: {piece.title}")
     print(f"Author: {piece.author}")
     print(f"Composer: {piece.composer}")

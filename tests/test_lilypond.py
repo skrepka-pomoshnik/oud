@@ -1,5 +1,5 @@
-from lilypond import export_lilypond
-from model import Bar, Chord, Note, Piece
+from core.model import Bar, Chord, Note, Piece
+from exports.lilypond import export_lilypond
 
 
 def test_export_lilypond_writes_tabstaff(tmp_path) -> None:

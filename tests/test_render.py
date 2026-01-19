@@ -1,13 +1,15 @@
-from render import (
+from core.model import Bar, Chord, Note, Piece
+from core.render_utils import chord_positions, flag_row
+from ui.render import (
     _bar_durations,
     _bar_flags,
     _bar_number_for_index,
+    _flag_positions_all,
     _layout_rows,
     _parse_time_signature,
     _tactus_row,
     build_bar_view,
 )
-from render_utils import chord_positions, flag_row
 
 
 def test_bar_durations_prefers_smallest_division() -> None:
@@ -19,6 +21,18 @@ def test_bar_durations_prefers_smallest_division() -> None:
     row = _bar_durations(durations, bar_index=0, strings=6, bar_width=4, default_duration=4)
     assert row[0] == "4"
     assert row[1] == "8"
+
+
+def test_bar_durations_show_all_when_redundant_disabled() -> None:
+    row = _bar_durations(
+        durations={},
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        hide_redundant=False,
+    )
+    assert row == ["4", "4", "4", "4"]
 
 
 def test_bar_flags_mapping() -> None:
@@ -33,9 +47,31 @@ def test_bar_flags_mapping() -> None:
     assert row[2] == "W"
 
 
+def test_bar_flags_show_all_when_redundant_disabled() -> None:
+    row = _bar_flags(
+        durations={},
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        hide_redundant=False,
+    )
+    assert row == ["0", "0", "0", "0"]
+
+
+def test_flag_positions_all_returns_each_column() -> None:
+    positions = _flag_positions_all(
+        durations={},
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+    )
+    assert positions == [(0, 4, False), (1, 4, False), (2, 4, False), (3, 4, False)]
+
+
 def test_build_bar_view_shows_override_on_string() -> None:
     overrides = {(0, 0, 0): "1"}
-    from model import Bar
     bar = Bar()
     view = build_bar_view(
         bar=bar,
@@ -57,7 +93,6 @@ def test_build_bar_view_shows_override_on_string() -> None:
 
 
 def test_build_bar_view_shows_flags_and_durations() -> None:
-    from model import Bar
     bar = Bar()
     view = build_bar_view(
         bar=bar,
@@ -79,7 +114,6 @@ def test_build_bar_view_shows_flags_and_durations() -> None:
 
 
 def test_chord_positions_spread() -> None:
-    from model import Bar, Chord, Note
     bar = Bar()
     chord1 = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
     chord2 = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])
@@ -98,7 +132,6 @@ def test_flag_row_marks_positions() -> None:
 
 
 def test_build_bar_view_shows_annotations_and_ornaments() -> None:
-    from model import Bar
     bar = Bar()
     view = build_bar_view(
         bar=bar,
@@ -120,7 +153,6 @@ def test_build_bar_view_shows_annotations_and_ornaments() -> None:
 
 
 def test_build_bar_view_shows_slur_tie_hold() -> None:
-    from model import Bar
     bar = Bar()
     view = build_bar_view(
         bar=bar,
@@ -143,17 +175,18 @@ def test_build_bar_view_shows_slur_tie_hold() -> None:
 
 
 def test_bar_number_for_index() -> None:
-    from model import Bar, Piece
     b0 = Bar()
     b1 = Bar()
     b1.repeat = "."
     piece = Piece(bars=[b0, b1, Bar(), Bar(), Bar(), Bar()])
-    assert _bar_number_for_index(piece, 0, "start", "off") == "1"
-    assert _bar_number_for_index(piece, 3, "start", "off") is None
-    assert _bar_number_for_index(piece, 3, "every", "off") == "4"
-    assert _bar_number_for_index(piece, 4, "five", "off") == "5"
-    assert _bar_number_for_index(piece, 5, "five", "off") is None
-    assert _bar_number_for_index(piece, 1, "every", "on") == "3"
+    assert _bar_number_for_index(piece, 0, "start", "off", 1) == "[1]"
+    assert _bar_number_for_index(piece, 3, "start", "off", 1) is None
+    assert _bar_number_for_index(piece, 3, "every", "off", 1) == "[4]"
+    assert _bar_number_for_index(piece, 4, "five", "off", 1) == "[5]"
+    assert _bar_number_for_index(piece, 5, "five", "off", 1) is None
+    assert _bar_number_for_index(piece, 1, "every", "on", 1) == "[3]"
+    assert _bar_number_for_index(piece, 4, "every", "off", 2) == "[5]"
+    assert _bar_number_for_index(piece, 2, "every", "off", 2) == "[3]"
 
 
 def test_parse_time_signature() -> None:

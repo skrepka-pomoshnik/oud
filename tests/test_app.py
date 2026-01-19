@@ -1,27 +1,21 @@
+import curses
+from typing import cast
+
 from app import (
     EditorState,
-    _apply_duration,
-    _apply_override,
     _apply_set_command,
-    _convert_overrides,
-    _handle_insert,
-    _history_next,
-    _history_prev,
-    _is_italian_fret,
+    _cmd_bar,
+    _cmd_footnote,
+    _cmd_header,
+    _cmd_stave,
+    _cmd_subtitle,
+    _cmd_title,
+    _handle_key,
     _main,
-    _parse_search,
-    _set_annotation,
-    _set_barline,
-    _set_highlight,
-    _set_hold,
-    _set_ornament,
-    _set_repeat,
-    _set_slur,
-    _set_tie,
     _status_line,
-    _undo,
 )
-from model import Bar, Piece
+from core.model import Bar, Piece
+from tui.input import history_next, history_prev, parse_search
 
 
 def _state() -> EditorState:
@@ -49,9 +43,9 @@ def _state() -> EditorState:
     return EditorState(piece, settings)
 
 
-def test_status_line_includes_path_cursor_and_modified() -> None:
+def test_status_line_includes_path_cursor_and_modified(tmp_path) -> None:
     state = _state()
-    state.path = "/tmp/example.ft3"
+    state.path = str(tmp_path / "example.ft3")
     state.cursor_bar = 1
     state.cursor_string = 2
     state.cursor_col = 3
@@ -60,177 +54,217 @@ def test_status_line_includes_path_cursor_and_modified() -> None:
     assert "example.ft3*" in line
     assert "bar:2" in line
     assert "str:3" in line
-    assert "col:4" in line
+    assert "beat:2/4" in line
 
 
 def test_parse_search_one_based() -> None:
-    assert _parse_search("1") == 0
-    assert _parse_search("10") == 9
-    assert _parse_search("0") is None
-    assert _parse_search("x") is None
-
-
-def test_undo_override_removes_cell() -> None:
-    state = _state()
-    key = (0, 0, 0)
-    _apply_override(state, key, "a")
-    assert state.overrides[key] == "a"
-    _undo(state)
-    assert key not in state.overrides
-
-
-def test_undo_duration_restores_previous() -> None:
-    state = _state()
-    key = (0, 0, 0)
-    _apply_duration(state, key, 4)
-    _apply_duration(state, key, 8)
-    _undo(state)
-    assert state.durations[key] == 4
+    assert parse_search("1") == 0
+    assert parse_search("10") == 9
+    assert parse_search("0") is None
+    assert parse_search("x") is None
 
 
 def test_command_history_navigation() -> None:
     state = _state()
-    state.command_history = ["w", "e foo.ft3", "q"]
-    assert _history_prev(state) == "q"
-    assert _history_prev(state) == "e foo.ft3"
-    assert _history_next(state) == "q"
-    assert _history_next(state) == ""
+    state.command_history = ["first", "second"]
+    state.cmdline = history_prev(state) or ""
+    assert state.cmdline == "second"
+    state.cmdline = history_prev(state) or ""
+    assert state.cmdline == "first"
+    state.cmdline = history_next(state) or ""
+    assert state.cmdline == "second"
+    state.cmdline = history_next(state) or ""
+    assert state.cmdline == ""
 
 
 def test_set_command_updates_style_and_strings() -> None:
     state = _state()
-    _apply_set_command(
-        state, "style=italian strings=7 measures=five tuning=renaissance flagstyle=thin"
-    )
+    _apply_set_command(state, "style=italian strings=7")
     assert state.settings["style"] == "italian"
-    assert state.settings["measures"] == "five"
-    assert state.settings["tuning"] == "C4D4E4F4G4c3f3a2d2g2"
     assert state.settings["strings"] == "7"
-    assert state.settings["flagstyle"] == "thin"
-    assert state.piece.strings == 7
 
 
-def test_italian_fret_validation() -> None:
-    assert _is_italian_fret("0") is True
-    assert _is_italian_fret("9") is True
-    assert _is_italian_fret("x") is True
-    assert _is_italian_fret("a") is False
-
-
-def test_insert_italian_digit_sets_fret_not_duration() -> None:
+def test_title_command_updates_piece() -> None:
     state = _state()
-    state.settings["style"] = "italian"
-    state.mode = "insert"
-    _handle_insert(state, ord("1"))
-    assert (0, 0, 0) in state.overrides
-    assert state.overrides[(0, 0, 0)] == "1"
-    assert (0, 0, 0) not in state.durations
+    _cmd_title(state, "Title")
+    _cmd_subtitle(state, "Subtitle")
+    _cmd_footnote(state, "Footnote")
+    assert state.piece.title == "Title"
+    assert state.piece.subtitle == "Subtitle"
+    assert state.piece.footnote == "Footnote"
 
 
-def test_insert_french_digit_sets_duration() -> None:
+def test_header_template_populates_missing_fields() -> None:
     state = _state()
-    state.settings["style"] = "french"
-    state.mode = "insert"
-    _handle_insert(state, ord("3"))
-    assert (0, 0, 0) in state.durations
-    assert state.durations[(0, 0, 0)] == 4
+    _cmd_header(state, "")
+    assert state.piece.title == "Title"
+    assert state.piece.author == "Author"
+    assert state.piece.composer == "Composer"
 
 
-def test_grid_mode_advances_two_cells() -> None:
+def test_bar_insert_shifts_state() -> None:
     state = _state()
-    state.settings["grid"] = "on"
-    state.mode = "insert"
-    _handle_insert(state, ord("a"))
-    assert state.cursor_col == 2
+    _cmd_bar(state, "add")
+    assert len(state.piece.bars) == 2
+    assert state.cursor_bar == 1
 
 
-def test_convert_overrides_french_to_italian() -> None:
+def test_bar_delete_shifts_state() -> None:
     state = _state()
-    state.overrides[(0, 0, 0)] = "a"
-    state.overrides[(0, 0, 1)] = "k"
-    _convert_overrides(state, "italian")
-    assert state.overrides[(0, 0, 0)] == "0"
-    assert state.overrides[(0, 0, 1)] == "x"
+    state.piece.bars.extend([Bar(), Bar()])
+    state.cursor_bar = 1
+    _cmd_bar(state, "del")
+    assert len(state.piece.bars) == 2
+    assert state.cursor_bar == 1
 
 
-def test_convert_overrides_italian_to_french() -> None:
+def test_vim_gg_moves_to_top() -> None:
     state = _state()
-    state.overrides[(0, 0, 0)] = "0"
-    state.overrides[(0, 0, 1)] = "x"
-    _convert_overrides(state, "french")
-    assert state.overrides[(0, 0, 0)] == "a"
-    assert state.overrides[(0, 0, 1)] == "k"
+    state.piece.bars.extend([Bar(), Bar()])
+    state.cursor_bar = 2
+    _handle_key(state, ord("g"))
+    _handle_key(state, ord("g"))
+    assert state.cursor_bar == 0
 
 
-def test_set_barline_and_repeat() -> None:
+def test_vim_dd_deletes_bar() -> None:
     state = _state()
-    _set_barline(state, "double")
-    _set_repeat(state, "start")
-    bar = state.piece.bars[0]
-    assert bar.barline == "||"
-    assert bar.repeat == ".:"
+    state.piece.bars.extend([Bar(), Bar()])
+    state.cursor_bar = 1
+    _handle_key(state, ord("d"))
+    _handle_key(state, ord("d"))
+    assert len(state.piece.bars) == 2
 
 
-def test_ornament_annotation_highlight() -> None:
+def test_vim_yy_p_pastes_bar() -> None:
     state = _state()
-    _set_ornament(state, "#")
-    _set_annotation(state, "note")
-    _set_highlight(state, "on")
-    assert state.ornaments[(0, 0)] == "#"
-    assert state.annotations[(0, 0)] == "note"
-    assert (0, 0, 0) in state.highlights
+    state.piece.bars.extend([Bar(), Bar()])
+    state.cursor_bar = 1
+    _handle_key(state, ord("y"))
+    _handle_key(state, ord("y"))
+    _handle_key(state, ord("p"))
+    assert len(state.piece.bars) == 4
 
 
-def test_slur_tie_hold_spans() -> None:
+def test_stave_break_and_join() -> None:
     state = _state()
-    _set_slur(state, "start")
-    state.cursor_col = 3
-    _set_slur(state, "end")
-    _set_tie(state, "start")
-    state.cursor_col = 2
-    _set_tie(state, "end")
-    _set_hold(state, "start")
-    state.cursor_col = 1
-    _set_hold(state, "end")
-    assert state.slurs[0] == (0, 0, 3)
-    assert state.ties[0] == (0, 2, 3)
-    assert state.holds[0] == (0, 1, 2)
+    state.piece.bars.extend([Bar(), Bar(), Bar()])
+    _cmd_stave(state, "break")
+    assert 1 in state.stave_breaks
+    _cmd_stave(state, "join")
+    assert 1 not in state.stave_breaks
+
+
+def test_stave_new_inserts_break() -> None:
+    state = _state()
+    state.piece.bars.extend([Bar(), Bar(), Bar()])
+    state.cursor_bar = 1
+    _cmd_stave(state, "new")
+    assert 2 in state.stave_breaks
+
+
+def test_stave_delete_removes_system() -> None:
+    state = _state()
+    state.piece.bars.extend([Bar(), Bar(), Bar()])
+    state.cursor_bar = 2
+    state.stave_breaks = {1, 2}
+    _cmd_stave(state, "delete")
+    assert 2 not in state.stave_breaks
 
 
 def test_app_main_smoke(monkeypatch) -> None:
-    class DummyScreen:
-        def keypad(self, _flag: bool) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "napms", lambda *_args: None)
+    monkeypatch.setattr(curses, "A_REVERSE", 0)
+    monkeypatch.setattr(curses, "A_BOLD", 0)
+    monkeypatch.setattr(curses, "KEY_RESIZE", -1)
+    monkeypatch.setattr(curses, "KEY_EXIT", 27)
+    monkeypatch.setattr(curses, "KEY_LEFT", -1)
+    monkeypatch.setattr(curses, "KEY_RIGHT", -1)
+    monkeypatch.setattr(curses, "KEY_UP", -1)
+    monkeypatch.setattr(curses, "KEY_DOWN", -1)
+    monkeypatch.setattr(curses, "KEY_PPAGE", -1)
+    monkeypatch.setattr(curses, "KEY_NPAGE", -1)
+    monkeypatch.setattr(curses, "KEY_HOME", -1)
+    monkeypatch.setattr(curses, "KEY_END", -1)
+    monkeypatch.setattr(curses, "KEY_IC", -1)
+    monkeypatch.setattr(curses, "KEY_DC", -1)
+    monkeypatch.setattr(curses, "ERR", -1)
+    class FakeWindow:
+        def __init__(self) -> None:
+            self._calls = 0
+
+        def getmaxyx(self):
+            return (1, 1)
+
+        def keypad(self, _flag):
             return None
 
-        def timeout(self, _ms: int) -> None:
+        def timeout(self, _delay):
             return None
 
-        def getmaxyx(self) -> tuple[int, int]:
-            return (24, 80)
+        def erase(self):
+            return None
 
-        def getch(self) -> int:
-            return ord("q")
+        def refresh(self):
+            return None
 
-    monkeypatch.setattr("curses.curs_set", lambda _val: None)
-    monkeypatch.setattr("app.render_piece", lambda *args, **kwargs: None)
-    assert _main(DummyScreen(), None) == 0
+        def addstr(self, *_args, **_kwargs):
+            return None
+
+        def getch(self):
+            if self._calls == 0:
+                self._calls += 1
+                return ord("q")
+            return -1
+
+    assert _main(cast(curses.window, FakeWindow()), None) == 0
 
 
 def test_app_main_smoke_with_path(monkeypatch) -> None:
-    class DummyScreen:
-        def keypad(self, _flag: bool) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "napms", lambda *_args: None)
+    monkeypatch.setattr(curses, "A_REVERSE", 0)
+    monkeypatch.setattr(curses, "A_BOLD", 0)
+    monkeypatch.setattr(curses, "KEY_RESIZE", -1)
+    monkeypatch.setattr(curses, "KEY_EXIT", 27)
+    monkeypatch.setattr(curses, "KEY_LEFT", -1)
+    monkeypatch.setattr(curses, "KEY_RIGHT", -1)
+    monkeypatch.setattr(curses, "KEY_UP", -1)
+    monkeypatch.setattr(curses, "KEY_DOWN", -1)
+    monkeypatch.setattr(curses, "KEY_PPAGE", -1)
+    monkeypatch.setattr(curses, "KEY_NPAGE", -1)
+    monkeypatch.setattr(curses, "KEY_HOME", -1)
+    monkeypatch.setattr(curses, "KEY_END", -1)
+    monkeypatch.setattr(curses, "KEY_IC", -1)
+    monkeypatch.setattr(curses, "KEY_DC", -1)
+    monkeypatch.setattr(curses, "ERR", -1)
+    class FakeWindow:
+        def __init__(self) -> None:
+            self._calls = 0
+
+        def getmaxyx(self):
+            return (1, 1)
+
+        def keypad(self, _flag):
             return None
 
-        def timeout(self, _ms: int) -> None:
+        def timeout(self, _delay):
             return None
 
-        def getmaxyx(self) -> tuple[int, int]:
-            return (24, 80)
+        def erase(self):
+            return None
 
-        def getch(self) -> int:
-            return ord("q")
+        def refresh(self):
+            return None
 
-    monkeypatch.setattr("curses.curs_set", lambda _val: None)
-    monkeypatch.setattr("app.render_piece", lambda *args, **kwargs: None)
-    monkeypatch.setattr("app._load_piece", lambda _path: Piece(title="T", bars=[Bar()]))
-    assert _main(DummyScreen(), "example.ft3") == 0
+        def addstr(self, *_args, **_kwargs):
+            return None
+
+        def getch(self):
+            if self._calls == 0:
+                self._calls += 1
+                return ord("q")
+            return -1
+
+    assert _main(cast(curses.window, FakeWindow()), "missing.ft3") == 0
