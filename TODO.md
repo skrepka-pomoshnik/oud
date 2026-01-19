@@ -26,6 +26,8 @@ P2 (Core Features)
 - [ ] LilyPond export: headers, tuning, time sig, barlines, repeats.
 - [ ] LilyPond export: ornaments/slurs/ties/holds mapping or omit.
 - [ ] Bass course entry: slash shorthand (/ // ///) and numeric bass labels (7-13 or 1-7).
+- [ ] Inline bass display: show extra courses as in-place rows (e.g. `---` / `-a-` under staff) instead of full extra lines.
+- [ ] Inline bass labels: numeric (preferred) and slash styles, editable rows.
 - [ ] Flag styles: English grid beams vs continental single flags.
 - [ ] Tuning presets for 7-13 course lutes and baroque tunings; show in header.
 - [ ] Ornaments: left-hand signs, right-hand arpeggio/separee, fingering signs, rest/dynamics/fermata/coda/repeats.

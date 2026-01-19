@@ -29,7 +29,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "countdots": "off",
     "keys": "vim+arrows",
     "spacing": "12",
-    "spacingmode": "packed",
+    "spacingmode": "auto",
     "maxbars": "0",
     "linelen": "80",
     "flagredundant": "on",

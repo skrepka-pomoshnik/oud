@@ -1,4 +1,4 @@
-from ui.render import _parse_time_signature, _tactus_row, _tuning_labels
+from ui.render import _inline_bass_row, _parse_time_signature, _tactus_row, _tuning_labels
 
 
 def test_parse_time_signature() -> None:
@@ -22,3 +22,14 @@ def test_tuning_labels_relative_and_absolute() -> None:
     absolute = _tuning_labels(tuning, 6, show_octaves=True)
     assert relative == ["g", "d", "a", "f", "c", "g"]
     assert absolute == ["g4", "d4", "a3", "f3", "c3", "g2"]
+
+
+def test_inline_bass_row_renders_dashes() -> None:
+    row = ["-", "-", "a", "-", "-", "-", "b", "-"]
+    inline = _inline_bass_row(row)
+    assert inline[1] == "-"
+    assert inline[2] == "a"
+    assert inline[3] == "-"
+    assert inline[5] == "-"
+    assert inline[6] == "b"
+    assert inline[7] == "-"

@@ -30,6 +30,7 @@ class EditorState:
         self.command_history_index: int | None = None
         self.settings = settings
         self.replace_once = False
+        self.insert_prefix = ""
         self.ascii_preview = False
         self.ornaments: dict[tuple[int, int], str] = {}
         self.annotations: dict[tuple[int, int], str] = {}
@@ -42,6 +43,7 @@ class EditorState:
         self._tie_start: tuple[int, int] | None = None
         self._hold_start: tuple[int, int] | None = None
         self.help_offset = 0
+        self.info_offset = 0
         self.screen_width = 0
         self.screen_height = 0
         self.midi_proc: subprocess.Popen[bytes] | None = None

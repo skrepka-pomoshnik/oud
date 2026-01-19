@@ -964,6 +964,36 @@ def _redo(state: EditorState) -> None:
     state.message = "Redone"
 
 def _handle_insert(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0912
+    def apply_duration(dur: int) -> bool:
+        state.current_duration = dur
+        _advance_if_overflow(state, dur)
+        if 0 <= state.cursor_bar < len(state.piece.bars):
+            _flatten_chords_to_grid(state, state.cursor_bar)
+        bar = state.cursor_bar
+        if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
+            bar_obj = state.piece.bars[bar]
+            idx = chord_index_at_col(bar_obj, state.bar_width, state.cursor_col)
+            note_type = denom_to_note_type(dur)
+            if idx is not None and note_type is not None:
+                prev_chords = copy.deepcopy(bar_obj.chords)
+                bar_obj.chords[idx].note_type = note_type
+                _record_action(
+                    state,
+                    UndoAction(
+                        kind="chords",
+                        data={"bar": bar, "prev": prev_chords, "new": bar_obj.chords},
+                    ),
+                )
+                state.modified = True
+            else:
+                cell = _cursor_key(state)
+                _apply_duration(state, cell, dur)
+        else:
+            cell = _cursor_key(state)
+            _apply_duration(state, cell, dur)
+        state.message = f"Duration {dur}"
+        return True
+
     if key == ord(" "):
         if 0 <= state.cursor_bar < len(state.piece.bars):
             _flatten_chords_to_grid(state, state.cursor_bar)
@@ -1040,36 +1070,19 @@ def _handle_insert(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0
         return True
 
     style = state.settings.get("style", "french")
+    if key == ord(";"):
+        state.insert_prefix = ";"
+        return True
+    if state.insert_prefix == ";":
+        state.insert_prefix = ""
+        if ord("1") <= key <= ord("7") and style == "italian":
+            digit = int(chr(key))
+            dur = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 6: 32, 7: 64}.get(digit)
+            if dur is not None:
+                return apply_duration(dur)
     dur = duration_value(key, style)
     if dur is not None:
-        state.current_duration = dur
-        _advance_if_overflow(state, dur)
-        if 0 <= state.cursor_bar < len(state.piece.bars):
-            _flatten_chords_to_grid(state, state.cursor_bar)
-        bar = state.cursor_bar
-        if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
-            bar_obj = state.piece.bars[bar]
-            idx = chord_index_at_col(bar_obj, state.bar_width, state.cursor_col)
-            note_type = denom_to_note_type(dur)
-            if idx is not None and note_type is not None:
-                prev_chords = copy.deepcopy(bar_obj.chords)
-                bar_obj.chords[idx].note_type = note_type
-                _record_action(
-                    state,
-                    UndoAction(
-                        kind="chords",
-                        data={"bar": bar, "prev": prev_chords, "new": bar_obj.chords},
-                    ),
-                )
-                state.modified = True
-            else:
-                cell = _cursor_key(state)
-                _apply_duration(state, cell, dur)
-        else:
-            cell = _cursor_key(state)
-            _apply_duration(state, cell, dur)
-        state.message = f"Duration {dur}"
-        return True
+        return apply_duration(dur)
 
     if 32 <= key <= 126:
         ch = chr(key).lower()
@@ -1146,10 +1159,9 @@ def _status_line(state: EditorState) -> str:
         )
         beat_text = f"beat:{beat_index}/{beats}"
     style = state.settings.get("style", "french")
-    flagstyle = state.settings.get("flagstyle", "standard")
     return (
         f"{name}{mod}  bar:{bar} str:{string} {beat_text}  "
-        f"dur:{state.current_duration}  style:{style} flag:{flagstyle}"
+        f"dur:{state.current_duration}  style:{style}"
     )
 
 
@@ -1995,6 +2007,17 @@ def _handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0
             state.cursor_col = 0
             state.pending_key = ""
             return True
+        if state.pending_key == "g" and key == ord("j"):
+            if state.piece.strings < 13:
+                state.piece.strings += 1
+                state.cursor_string = state.piece.strings - 1
+                state.settings["strings"] = str(state.piece.strings)
+                state.modified = True
+                state.message = "Bass string added"
+            else:
+                state.message = "Max strings 13"
+            state.pending_key = ""
+            return True
         if state.pending_key == "d" and key == ord("d"):
             _yank_bar(state, state.cursor_bar)
             _delete_bar(state, state.cursor_bar)
@@ -2049,6 +2072,12 @@ def _handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0
         return True
     if key in (ord("i"), curses.KEY_ENTER, 10, 13):
         state.mode = "insert"
+        state.count_prefix = ""
+        state.pending_key = ""
+        return True
+    if key == ord("I"):
+        state.mode = "info"
+        state.info_offset = 0
         state.count_prefix = ""
         state.pending_key = ""
         return True
@@ -2355,6 +2384,17 @@ def _handle_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911
             state.help_offset = max(0, state.help_offset - 1)
             return True
         return True
+    if state.mode == "info":
+        if key in (ord("q"), ord("Q"), 27):
+            state.mode = "normal"
+            return True
+        if key in (ord("j"), curses.KEY_DOWN):
+            state.info_offset += 1
+            return True
+        if key in (ord("k"), curses.KEY_UP):
+            state.info_offset = max(0, state.info_offset - 1)
+            return True
+        return True
     return _handle_normal(state, key)
 
 
@@ -2480,7 +2520,7 @@ def _main(stdscr: curses.window, path: str | None) -> int:  # noqa: PLR0912
             if state.ascii_preview
             else None,
             state.stave_breaks,
-            state.help_offset,
+            state.help_offset if state.mode != "info" else state.info_offset,
         )
 
         key = stdscr.getch()

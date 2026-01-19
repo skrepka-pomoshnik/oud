@@ -194,8 +194,8 @@ def apply_set_command(state: EditorState, args: str, config_path: str) -> None: 
             except ValueError:
                 state.message = f"Invalid {key} value"
                 continue
-            if count < 4 or count > 7:
-                state.message = "Strings must be 4-7"
+            if count < 4 or count > 13:
+                state.message = "Strings must be 4-13"
                 continue
             state.piece.strings = count
             state.cursor_string = min(state.cursor_string, count - 1)
@@ -534,6 +534,11 @@ def cmd_source(state: EditorState, args: str) -> None:
         state.message = "Missing less"
         return
     subprocess.run([viewer, target], check=False)  # noqa: S603
+
+
+def cmd_info(state: EditorState, _args: str) -> None:
+    state.mode = "info"
+    state.info_offset = 0
 
 
 def cmd_bar(state: EditorState, args: str) -> None:
@@ -939,6 +944,7 @@ def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:
         "highlight": lambda s, a: cmd_highlight(s, a),
         "midicmd": lambda s, a: cmd_midicmd(s, a),
         "source": lambda s, a: cmd_source(s, a),
+        "info": lambda s, a: cmd_info(s, a),
         "bar": lambda s, a: cmd_bar(s, a),
         "chord": lambda s, a: cmd_chord(s, a),
         "stave": lambda s, a: cmd_stave(s, a),

@@ -30,3 +30,14 @@ def test_load_ft3_strips_rtf_title(tmp_path) -> None:
         f.write(payload)
     piece = load_ft3(str(path))
     assert piece.title == "Test Title"
+
+
+def test_load_ft3_cpiece_length_prefix(tmp_path) -> None:
+    rtf = "{\\rtf1\\ansi Fancy}"
+    raw = bytes([0x00, 0x00, 0x00, 0x7C]) + rtf.encode("utf-8")
+    payload = b"CPiece" + len(raw).to_bytes(4, "little") + raw + b"\x03\x80"
+    path = tmp_path / "rtf_len.ft3.gz"
+    with gzip.open(path, "wb") as f:
+        f.write(payload)
+    piece = load_ft3(str(path))
+    assert piece.title == "Fancy"

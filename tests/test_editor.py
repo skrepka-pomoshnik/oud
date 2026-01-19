@@ -156,6 +156,15 @@ def test_insert_italian_ctrl_duration_sets_duration() -> None:
     assert (0, 0, 0) not in state.overrides
 
 
+def test_insert_italian_semicolon_duration_sets_duration() -> None:
+    state = _state()
+    state.settings["style"] = "italian"
+    state.mode = "insert"
+    _handle_insert(state, ord(";"))
+    _handle_insert(state, ord("4"))
+    assert state.durations[(0, 0, 0)] == 8
+
+
 def test_insert_french_digit_sets_duration() -> None:
     state = _state()
     state.settings["style"] = "french"
@@ -332,3 +341,12 @@ def test_normal_mode_counts_move_right() -> None:
     _handle_key(state, ord("3"))
     _handle_key(state, ord("l"))
     assert state.cursor_col == 3
+
+
+def test_gj_adds_bass_string() -> None:
+    state = _state()
+    start_strings = state.piece.strings
+    _handle_key(state, ord("g"))
+    _handle_key(state, ord("j"))
+    assert state.piece.strings == start_strings + 1
+    assert state.cursor_string == state.piece.strings - 1

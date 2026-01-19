@@ -9,8 +9,10 @@ from core.render_utils import (
     chord_positions,
     duration_display,
     duration_flag,
+    flag_count,
     flag_positions_from_durations,
     flag_row,
+    note_type_to_denom,
 )
 
 
@@ -69,6 +71,19 @@ def _tuning_labels(tuning: str, strings: int, *, show_octaves: bool) -> list[str
     return labels
 
 
+def _inline_bass_row(row: list[str]) -> list[str]:
+    inline = [" " for _ in row]
+    for idx, ch in enumerate(row):
+        if ch in ("-", " "):
+            continue
+        inline[idx] = ch
+        if idx - 1 >= 0 and inline[idx - 1] == " ":
+            inline[idx - 1] = "-"
+        if idx + 1 < len(inline) and inline[idx + 1] == " ":
+            inline[idx + 1] = "-"
+    return inline
+
+
 def _scale_col(col: int, src_width: int, dest_width: int) -> int:
     if dest_width <= 1:
         return 0
@@ -114,13 +129,43 @@ def _bar_display_width(
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     default_duration: int,
+    dotted: set[tuple[int, int]] | None = None,
 ) -> int:
+    max_string = 5
+    for (b, s, _c) in overrides:
+        if b == bar_index:
+            max_string = max(max_string, s)
+    for (b, s, _c) in durations:
+        if b == bar_index:
+            max_string = max(max_string, s)
+    strings = max_string + 1
+    max_slash = 0
+    max_dot = 0
+    if bar.chords:
+        for chord in bar.chords:
+            denom = note_type_to_denom(chord.note_type) or default_duration
+            max_slash = max(max_slash, flag_count(denom))
+            max_dot = max(max_dot, 1 if chord.dotted else 0)
+    else:
+        for col in _bar_note_columns(overrides, durations, bar_index=bar_index):
+            found = None
+            for s_idx in range(strings):
+                key = (bar_index, s_idx, col)
+                if key in durations:
+                    denom = durations[key]
+                    if found is None or denom > found:
+                        found = denom
+            denom = found or default_duration
+            max_slash = max(max_slash, flag_count(denom))
+            if dotted is not None and (bar_index, col) in dotted:
+                max_dot = 1
     if bar.chords:
         count = len(chord_positions(bar, bar_width, default_duration))
     else:
         count = len(_bar_note_columns(overrides, durations, bar_index=bar_index))
     count = max(1, count)
-    return max(3, (count * 2) + 1)
+    min_flag_width = 2 + max_slash + max_dot
+    return max(3, (count * 2) + 1, min_flag_width)
 
 
 def _bars_fit(
@@ -132,6 +177,7 @@ def _bars_fit(
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     default_duration: int,
+    dotted: set[tuple[int, int]] | None = None,
     max_chords: int = 0,
 ) -> int:
     used = 0
@@ -146,6 +192,7 @@ def _bars_fit(
             overrides,
             durations,
             default_duration,
+            dotted,
         )
         if bar.chords:
             chord_count = len(chord_positions(bar, bar_width, default_duration))
@@ -548,12 +595,14 @@ def _help_lines() -> list[str]:
         "Bar  w / b / , / .                      Delete  dd (bar)",
         "Undo u / Redo ^R                         Bar     o/O  +/-",
         "Top  gg / g                             Help    ? / F1",
+        "Info I                                   Flags f (cycle style)",
+        "Add  gj (bass string)",
         "Flags f (cycle style)                   Letters F (c), E (e)",
         "End  G / $                              Command : / Search /",
         "",
         "INSERT MODE",
         "Frets: french a-p, italian 0-9/x",
-        "Durations: 1 2 4 8 6 3 (french) or Ctrl+1..7 (italian), . toggles dot",
+        "Durations: 1 2 4 8 6 3 (french) or Ctrl+1..7 / ;1..7 (italian)",
         "Barline: | sets thin barline",
         "Esc returns to normal",
         "",
@@ -562,6 +611,7 @@ def _help_lines() -> list[str]:
         ":wq/:x           write + quit     :q!               quit without save",
         ":e <path>        open             :source [path]    view file with less",
         ":time <sig>      set time sig     :verify           check measure length",
+        ":info             show info page",
         ":undo             undo             :redo             redo",
         ":title <text>     set title        :author <text>     set author",
         ":subtitle <text>  set subtitle     :composer <text>   set composer",
@@ -607,6 +657,61 @@ def _render_help(
     _safe_addstr(stdscr, height - 1, 0, _clean_text(status), status_attr)
 
 
+def _info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
+    def line(label: str, value: str | None) -> str:
+        return f"{label:<14}{value or ''}"
+
+    fields = [
+        line("Title:", piece.title),
+        line("Subtitle:", piece.subtitle),
+        line("Author:", piece.author),
+        line("Composer:", piece.composer),
+        line("Footnote:", piece.footnote),
+        line("Bars:", str(len(piece.bars))),
+        line("Strings:", str(piece.strings)),
+        line("Style:", settings.get("style")),
+        line("Tuning:", settings.get("tuning")),
+        line("Time:", settings.get("time")),
+        line("Key:", settings.get("key")),
+        line("Spacing:", settings.get("spacingmode")),
+        line("Flagstyle:", settings.get("flagstyle")),
+        line("Grid:", settings.get("grid")),
+        line("ShowDur:", settings.get("showdur")),
+        line("ShowExtras:", settings.get("showextras")),
+        line("ShowTactus:", settings.get("showtactus")),
+        line("Measures:", settings.get("measures")),
+        line("MeasuresStep:", settings.get("measuresstep")),
+        line("MidiPatch:", settings.get("midipatch")),
+        line("MidiGate:", settings.get("midigate")),
+        line("Tempo:", settings.get("tempo")),
+        line("Soundfont:", settings.get("soundfont")),
+        line("TuneLabels:", settings.get("tuninglabels")),
+        line("ItalianOrient:", settings.get("italianorient")),
+        line("French c:", settings.get("frenchc")),
+        line("French e:", settings.get("frenche")),
+        line("FlagRedundant:", settings.get("flagredundant")),
+    ]
+    return ["INFO", ""] + fields + ["", "q/esc to close"]
+
+
+def _render_info(
+    stdscr: curses.window,
+    status: str,
+    status_attr: int,
+    info_offset: int,
+    piece: Piece,
+    settings: dict[str, str],
+) -> None:
+    height, _width = stdscr.getmaxyx()
+    lines = _info_lines(piece, settings)
+    max_lines = max(0, height - 1)
+    max_offset = max(0, len(lines) - max_lines)
+    offset = min(max(0, info_offset), max_offset)
+    for idx, line in enumerate(lines[offset : offset + max_lines]):
+        _safe_addstr(stdscr, idx, 0, _clean_text(line))
+    _safe_addstr(stdscr, height - 1, 0, _clean_text(status), status_attr)
+
+
 def render_piece(  # noqa: PLR0912
     stdscr: curses.window,
     piece: Piece,
@@ -640,6 +745,10 @@ def render_piece(  # noqa: PLR0912
 
     status_attr = curses.A_REVERSE
 
+    if mode == "info":
+        _render_info(stdscr, status_line, status_attr, help_offset, piece, settings)
+        stdscr.refresh()
+        return
     if ascii_lines is not None:
         _render_ascii_preview(stdscr, ascii_lines, status_line, mode, status_attr)
         stdscr.refresh()
@@ -695,6 +804,7 @@ def render_piece(  # noqa: PLR0912
             overrides,
             durations,
             default_duration,
+            dotted,
             max_chords=max_chords,
         )
     else:
@@ -709,6 +819,9 @@ def render_piece(  # noqa: PLR0912
     for sys_idx in range(systems):
         row_start = header_row + 1 + sys_idx * block_h
         rows = _layout_block_rows(strings, include_meta, show_dur, show_extras, show_tactus)
+        # Clear the system block to avoid stale characters after reflow/resizes.
+        for clear_row in range(row_start, row_start + block_h):
+            _safe_addstr(stdscr, clear_row, 0, " " * max_width)
         bar_start = bar_offset
         for _ in range(sys_idx):
             bar_start = _next_system_start(piece.bars, bar_start, bars_per_line, stave_breaks)
@@ -716,6 +829,38 @@ def render_piece(  # noqa: PLR0912
             break
         bar_end = _next_system_start(piece.bars, bar_start, bars_per_line, stave_breaks)
         bar_end = min(total_bars, bar_end)
+        bar_indices = list(range(bar_start, bar_end))
+        bar_widths: list[int] = []
+        if spacing_mode == "auto":
+            for abs_bar in bar_indices:
+                bar_widths.append(
+                    _bar_display_width(
+                        piece.bars[abs_bar],
+                        abs_bar,
+                        bar_width,
+                        overrides,
+                        durations,
+                        default_duration,
+                        dotted,
+                    )
+                )
+
+            def total_bar_width(widths: list[int]) -> int:
+                return sum(widths) + bar_gap * max(0, len(widths) - 1)
+
+            target_width = max(0, usable_width - 1)
+            total_width = total_bar_width(bar_widths)
+            extra = max(0, target_width - total_width)
+            idx = 0
+            while extra > 0 and bar_widths:
+                bar_widths[idx] += 1
+                extra -= 1
+                idx = (idx + 1) % len(bar_widths)
+            total_width = total_bar_width(bar_widths)
+            if bar_widths and total_width < target_width:
+                bar_widths[-1] += target_width - total_width
+            elif bar_widths and total_width > target_width:
+                bar_widths[-1] = max(3, bar_widths[-1] - (total_width - target_width))
         for s_idx in range(strings):
             actual = strings - 1 - s_idx if reverse_strings else s_idx
             if actual < len(tuning_labels):
@@ -783,14 +928,7 @@ def render_piece(  # noqa: PLR0912
                         cells[s_idx][col] = overrides[key]
             display_width = bar_width
             if spacing_mode == "auto":
-                display_width = _bar_display_width(
-                    bar,
-                    abs_bar,
-                    bar_width,
-                    overrides,
-                    durations,
-                    default_duration,
-                )
+                display_width = bar_widths[local_idx]
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
                 _safe_addstr(stdscr, meta_row, bar_x - 2, repeat)
@@ -927,8 +1065,12 @@ def render_piece(  # noqa: PLR0912
                 actual = strings - 1 - s_idx if reverse_strings else s_idx
                 y = row_start + (rows["staff"] or 0) + s_idx
                 row_cells = cells[actual]
+                fill_char = "-"
+                if actual >= 6:
+                    row_cells = _inline_bass_row(row_cells)
+                    fill_char = " "
                 if spacing_mode == "auto":
-                    row_cells = _scale_row(row_cells, display_width, "-")
+                    row_cells = _scale_row(row_cells, display_width, fill_char)
                 row_text = "".join(row_cells)
                 _safe_addstr(stdscr, y, bar_x, row_text)
                 _safe_addstr(stdscr, y, bar_x + display_width, barline)

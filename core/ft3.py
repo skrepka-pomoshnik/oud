@@ -39,6 +39,23 @@ def extract_text(data: bytes, marker: bytes) -> tuple[str | None, int | None]:
     if pos == -1:
         return None, None
     pos += len(marker)
+    if marker == b"CPiece":
+        start = data.find(b"{\\rtf", pos)
+        if start != -1:
+            end = data.find(b"}\r\n~", start)
+            if end != -1:
+                raw = data[start : end + 1]
+                text = raw.decode("utf-8", errors="ignore")
+                return text, end + 1
+        if pos + 4 <= len(data):
+            length = int.from_bytes(data[pos : pos + 4], "little")
+            if 0 < length <= len(data) - (pos + 4):
+                raw = data[pos + 4 : pos + 4 + length]
+                start = raw.find(b"{")
+                if start != -1:
+                    raw = raw[start:]
+                text = raw.decode("utf-8", errors="ignore")
+                return text, pos + 4 + length
     length = data[pos]
     text = data[pos + 1 : pos + 1 + length].decode("utf-8", errors="ignore")
     return text, pos + 1 + length
@@ -79,7 +96,11 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912
 
             if bar_data[ptr] < 8:
                 string = bar_data[ptr] - 1
-                fret = bar_data[ptr + 1] - 0x30
+                fret_byte = bar_data[ptr + 1]
+                if 0x61 <= fret_byte <= 0x7A:
+                    fret = fret_byte - 0x61
+                else:
+                    fret = fret_byte - 0x30
             elif bar_data[ptr] == 8:
                 if bar_data[ptr + 4] == 0x00:
                     string = 7
