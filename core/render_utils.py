@@ -72,7 +72,7 @@ def note_type_to_denom(note_type: int) -> int | None:
 
 
 def chord_positions(
-    bar: Bar, bar_width: int, default_duration: int
+    bar: Bar, bar_width: int, default_duration: int,
 ) -> list[tuple[int, int, bool]]:
     chords = bar.chords or []
     denoms: list[int] = []

@@ -18,10 +18,11 @@ from editor.ops import (
 def test_duration_value_maps_french_keys() -> None:
     assert duration_value(ord("1"), "french") == 1
     assert duration_value(ord("2"), "french") == 2
-    assert duration_value(ord("4"), "french") == 4
-    assert duration_value(ord("8"), "french") == 8
-    assert duration_value(ord("6"), "french") == 16
-    assert duration_value(ord("3"), "french") == 32
+    assert duration_value(ord("3"), "french") == 4
+    assert duration_value(ord("4"), "french") == 8
+    assert duration_value(ord("5"), "french") == 16
+    assert duration_value(ord("6"), "french") == 32
+    assert duration_value(ord("7"), "french") == 64
 
 
 def test_duration_value_italian_ctrl_keys() -> None:

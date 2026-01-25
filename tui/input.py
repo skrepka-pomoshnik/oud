@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import curses
 import os
+from pathlib import Path
 
+from editor.keymap import command_bindings, search_bindings
 from editor.state import EditorState
+from tui.commands import command_names, no_space_commands, path_commands
 
 
 def history_prev(state: EditorState) -> str | None:
@@ -22,7 +24,7 @@ def history_next(state: EditorState) -> str | None:
     if state.command_history_index is None:
         return ""
     state.command_history_index = min(
-        len(state.command_history), state.command_history_index + 1
+        len(state.command_history), state.command_history_index + 1,
     )
     if state.command_history_index >= len(state.command_history):
         state.command_history_index = None
@@ -30,116 +32,81 @@ def history_next(state: EditorState) -> str | None:
     return state.command_history[state.command_history_index]
 
 
-def complete_command(state: EditorState) -> bool:  # noqa: PLR0911
+def complete_command(state: EditorState) -> bool:  # noqa: PLR0911, C901
     cmdline = state.cmdline
-    commands = [
-        "e",
-        "w",
-        "wa",
-        "ascii",
-        "midi",
-        "play",
-        "lilypond",
-        "pdf",
-        "print",
-        "set",
-        "convert",
-        "time",
-        "timesig",
-        "verify",
-        "title",
-        "author",
-        "composer",
-        "subtitle",
-        "footnote",
-        "header",
-        "undo",
-        "redo",
-        "orn",
-        "annot",
-        "highlight",
-        "midicmd",
-        "source",
-        "bar",
-        "chord",
-        "stave",
-        "slur",
-        "tie",
-        "hold",
-        "barline",
-        "repeat",
-        "tool",
-        "q",
-        "quit",
-    ]
+    commands = command_names()
     if " " not in cmdline:
         matches = [cmd for cmd in commands if cmd.startswith(cmdline)]
         if not matches:
             return True
         if len(matches) == 1:
             match = matches[0]
-            state.cmdline = match + (" " if match not in ("q", "quit") else "")
+            state.cmdline = match + (" " if match not in no_space_commands() else "")
             return True
         state.message = "Matches: " + " ".join(matches)
         return True
 
     cmd, rest = cmdline.split(" ", 1)
-    if cmd not in ("e", "w", "wa", "midi", "lilypond"):
+    if cmd not in path_commands():
         return True
-    expanded = os.path.expanduser(rest)
-    base_dir = os.path.dirname(expanded) or "."
-    base_prefix = os.path.basename(expanded)
+    expanded = Path(rest).expanduser()
+    base_dir = expanded.parent
+    base_prefix = expanded.name
+    if base_prefix.startswith("."):
+        return True
     try:
-        entries = sorted(os.listdir(base_dir))
+        entries = sorted(base_dir.iterdir())
     except OSError:
         return True
     matches: list[str] = []
     display_matches: list[str] = []
     for entry in entries:
-        if not entry.startswith(base_prefix):
+        if entry.name.startswith("."):
             continue
-        path = os.path.join(base_dir, entry)
-        matches.append(path)
-        display_matches.append(path + os.sep if os.path.isdir(path) else path)
+        if not entry.name.startswith(base_prefix):
+            continue
+        path = base_dir / entry.name
+        matches.append(str(path))
+        display_matches.append(str(path) + os.sep if path.is_dir() else str(path))
     if not matches:
         return True
     if len(matches) == 1:
         path = matches[0]
-        if os.path.isdir(path):
+        if Path(path).is_dir():
             path = path + os.sep
         state.cmdline = f"{cmd} {path}"
         return True
     common = os.path.commonprefix(matches)
-    if common and common != expanded:
+    if common and common != str(expanded):
         state.cmdline = f"{cmd} {common}"
         return True
     state.message = "Matches: " + " ".join(display_matches[:8])
     return True
 
 
-def handle_command(state: EditorState, key: int, apply_command) -> bool:  # noqa: PLR0911
-    if key in (27,):  # ESC
+def handle_command(state: EditorState, key: int, apply_command) -> bool:  # noqa: PLR0911, C901
+    bindings = command_bindings(state)
+    if key in bindings.escape:
         state.mode = "normal"
         state.cmdline = ""
         state.command_history_index = None
         return True
-    key_tab = getattr(curses, "KEY_TAB", 9)
-    if key in (key_tab, 9):
+    if key in bindings.tab:
         return complete_command(state)
-    if key in (curses.KEY_BACKSPACE, 127, 8):
+    if key in bindings.backspace:
         state.cmdline = state.cmdline[:-1]
         return True
-    if key == curses.KEY_UP:
+    if key in bindings.history_up:
         prev = history_prev(state)
         if prev is not None:
             state.cmdline = prev
         return True
-    if key == curses.KEY_DOWN:
+    if key in bindings.history_down:
         nxt = history_next(state)
         if nxt is not None:
             state.cmdline = nxt
         return True
-    if key in (curses.KEY_ENTER, 10, 13):
+    if key in bindings.enter:
         cmd = state.cmdline
         state.cmdline = ""
         state.mode = "normal"
@@ -166,14 +133,15 @@ def parse_search(text: str) -> int | None:
 
 
 def handle_search(state: EditorState, key: int) -> bool:
-    if key in (27,):  # ESC
+    bindings = search_bindings(state)
+    if key in bindings.escape:
         state.mode = "normal"
         state.searchline = ""
         return True
-    if key in (curses.KEY_BACKSPACE, 127, 8):
+    if key in bindings.backspace:
         state.searchline = state.searchline[:-1]
         return True
-    if key in (curses.KEY_ENTER, 10, 13):
+    if key in bindings.enter:
         target = parse_search(state.searchline)
         state.searchline = ""
         state.mode = "normal"

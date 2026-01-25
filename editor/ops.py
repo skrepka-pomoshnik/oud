@@ -17,10 +17,10 @@ def duration_value(key: int, style: str) -> int | None:
     french_map = {
         ord("1"): 1,
         ord("2"): 2,
-        ord("4"): 4,
-        ord("8"): 8,
-        ord("6"): 16,
-        ord("3"): 32,
+        ord("3"): 4,
+        ord("4"): 8,
+        ord("5"): 16,
+        ord("6"): 32,
         ord("7"): 64,
     }
     letter_map = {
@@ -98,7 +98,7 @@ def chord_index_at_col(bar: Bar, bar_width: int, col: int) -> int | None:
         return None
     default_duration = 4
     for idx, (pos, _denom, _dot) in enumerate(
-        chord_positions(bar, bar_width, default_duration)
+        chord_positions(bar, bar_width, default_duration),
     ):
         if pos == col:
             return idx

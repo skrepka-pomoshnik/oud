@@ -2,73 +2,56 @@ from core.model import Bar, Piece
 from exports.export_tab import export_ascii, export_tab, export_tab_to_file
 
 
-def test_export_tab_includes_headers_and_durations() -> None:
+def test_export_tab_includes_headers_and_chords() -> None:
     piece = Piece(title="T", author="A", composer="C", bars=[Bar()], strings=6)
     overrides = {(0, 0, 0): "a"}
     durations = {(0, 0, 0): 4, (0, 1, 0): 2}
     settings = {
         "style": "french",
-        "measures": "start",
         "tuning": "a4b4",
-        "flagstyle": "standard",
         "time": "C",
-        "key": "C",
-        "countdots": "off",
-        "spacing": "12",
-        "linelen": "80",
-        "staffthick": "1",
-        "fontstyle": "modern",
-        "charstyle": "standard",
-        "midipatch": "0",
-        "grid": "off",
     }
-    text = export_tab(piece, overrides, durations, bar_width=4, settings=settings)
-    assert "# TITLE: T" in text
-    assert "# AUTHOR: A" in text
-    assert "# STYLE: french" in text
-    assert "# FLAGSTYLE: standard" in text
-    assert "# TIME: C" in text
-    assert "# KEY: C" in text
-    assert "# COUNTDOTS: off" in text
-    assert "# SPACING: 12" in text
-    assert "# LINELEN: 80" in text
-    assert "# STAFFTHICK: 1" in text
-    assert "# FONTSTYLE: modern" in text
-    assert "# CHARSTYLE: standard" in text
-    assert "# MIDIPATCH: 0" in text
-    assert "# GRID: off" in text
-    assert "Tactus:" in text
-    assert "Flag: 0" in text
-    assert "Dur: 4" in text
-    assert "6|a" in text
+    text = export_tab(
+        piece,
+        overrides,
+        durations,
+        bar_width=4,
+        settings=settings,
+        dotted=set(),
+    )
+    assert "-tuning a4b4" in text
+    assert "{T/C}" in text
+    assert "{A}" in text
+    assert "b" in text
+    assert "Sc" in text
+    assert any(line.startswith("0") for line in text.splitlines())
+    assert any(line.endswith("a") for line in text.splitlines())
 
 
-def test_export_bar_numbers_respect_measures_setting() -> None:
-    piece = Piece(title="T", bars=[Bar(), Bar(), Bar(), Bar(), Bar()], strings=6)
-    settings = {"measures": "five", "countdots": "off"}
-    text = export_tab(piece, overrides={}, durations={}, bar_width=4, settings=settings)
-    assert "Bar 5" in text
-    assert "Bar 1" not in text
+def test_export_tab_writes_bar_markers() -> None:
+    piece = Piece(title="T", bars=[Bar(), Bar(), Bar()], strings=6)
+    text = export_tab(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=4,
+        settings={},
+        dotted=set(),
+    )
+    assert text.splitlines().count("b") == 3
 
 
-def test_export_countdots_affects_bar_numbers() -> None:
-    b0 = Bar()
-    b1 = Bar()
-    b1.repeat = "."
-    piece = Piece(title="T", bars=[b0, b1, Bar()], strings=6)
-    settings = {"measures": "every", "countdots": "on"}
-    text = export_tab(piece, overrides={}, durations={}, bar_width=4, settings=settings)
-    assert "Bar 3" in text
-
-
-def test_export_barline_and_repeat() -> None:
-    bar = Bar()
-    bar.barline = "||"
-    bar.repeat = ".:"
-    piece = Piece(title="T", bars=[bar], strings=6)
-    text = export_tab(piece, overrides={}, durations={}, bar_width=4, settings={})
-    assert "Barline: ||" in text
-    assert "Repeat: .:" in text
+def test_export_tab_includes_end_marker() -> None:
+    piece = Piece(title="T", bars=[Bar()], strings=6)
+    text = export_tab(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=4,
+        settings={},
+        dotted=set(),
+    )
+    assert text.rstrip().endswith("e")
 
 
 def test_export_ascii_basic() -> None:
@@ -81,7 +64,15 @@ def test_export_ascii_basic() -> None:
 def test_export_tab_to_file_writes_content(tmp_path) -> None:
     piece = Piece(title="T", bars=[Bar()], strings=6)
     path = tmp_path / "out.tab"
-    export_tab_to_file(str(path), piece, overrides={}, durations={}, bar_width=4, settings={})
+    export_tab_to_file(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=4,
+        settings={},
+        dotted=set(),
+    )
     content = path.read_text(encoding="utf-8")
     assert content
-    assert "# TITLE: T" in content
+    assert "b" in content

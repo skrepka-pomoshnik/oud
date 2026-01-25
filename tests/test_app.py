@@ -1,21 +1,18 @@
 import curses
 from typing import cast
 
-from app import (
-    EditorState,
-    _apply_set_command,
-    _cmd_bar,
-    _cmd_footnote,
-    _cmd_header,
-    _cmd_stave,
-    _cmd_subtitle,
-    _cmd_title,
-    _handle_key,
-    _main,
-    _status_line,
-)
 from core.model import Bar, Piece
+from editor.actions import handle_insert, handle_normal
+from editor.command_ops import cmd_bar, cmd_stave
+from editor.commands import cmd_footnote, cmd_header_template, cmd_subtitle, cmd_title
+from editor.state import EditorState
+from editor.status import status_line
+from tui.commands import apply_command, apply_set_command
+from tui.controller import handle_key
+from tui.input import handle_command as handle_command_input
+from tui.input import handle_search as handle_search_input
 from tui.input import history_next, history_prev, parse_search
+from tui.loop import run_loop
 
 
 def _state() -> EditorState:
@@ -50,7 +47,7 @@ def test_status_line_includes_path_cursor_and_modified(tmp_path) -> None:
     state.cursor_string = 2
     state.cursor_col = 3
     state.modified = True
-    line = _status_line(state)
+    line = status_line(state)
     assert "example.ft3*" in line
     assert "bar:2" in line
     assert "str:3" in line
@@ -77,18 +74,18 @@ def test_command_history_navigation() -> None:
     assert state.cmdline == ""
 
 
-def test_set_command_updates_style_and_strings() -> None:
+def test_set_command_updates_style_and_strings(tmp_path) -> None:
     state = _state()
-    _apply_set_command(state, "style=italian strings=7")
+    apply_set_command(state, "style=italian strings=7", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "italian"
     assert state.settings["strings"] == "7"
 
 
 def test_title_command_updates_piece() -> None:
     state = _state()
-    _cmd_title(state, "Title")
-    _cmd_subtitle(state, "Subtitle")
-    _cmd_footnote(state, "Footnote")
+    cmd_title(state, "Title")
+    cmd_subtitle(state, "Subtitle")
+    cmd_footnote(state, "Footnote")
     assert state.piece.title == "Title"
     assert state.piece.subtitle == "Subtitle"
     assert state.piece.footnote == "Footnote"
@@ -96,7 +93,7 @@ def test_title_command_updates_piece() -> None:
 
 def test_header_template_populates_missing_fields() -> None:
     state = _state()
-    _cmd_header(state, "")
+    cmd_header_template(state, "")
     assert state.piece.title == "Title"
     assert state.piece.author == "Author"
     assert state.piece.composer == "Composer"
@@ -104,7 +101,7 @@ def test_header_template_populates_missing_fields() -> None:
 
 def test_bar_insert_shifts_state() -> None:
     state = _state()
-    _cmd_bar(state, "add")
+    cmd_bar(state, "add")
     assert len(state.piece.bars) == 2
     assert state.cursor_bar == 1
 
@@ -113,17 +110,30 @@ def test_bar_delete_shifts_state() -> None:
     state = _state()
     state.piece.bars.extend([Bar(), Bar()])
     state.cursor_bar = 1
-    _cmd_bar(state, "del")
+    cmd_bar(state, "del")
     assert len(state.piece.bars) == 2
     assert state.cursor_bar == 1
+
+
+def _dispatch(state: EditorState, key: int) -> bool:
+    return handle_key(
+        state,
+        key,
+        handle_insert=handle_insert,
+        handle_normal=handle_normal,
+        handle_command=lambda s, k: handle_command_input(
+            s, k, lambda st, cmd: apply_command(st, cmd, state.config_path),
+        ),
+        handle_search=handle_search_input,
+    )
 
 
 def test_vim_gg_moves_to_top() -> None:
     state = _state()
     state.piece.bars.extend([Bar(), Bar()])
     state.cursor_bar = 2
-    _handle_key(state, ord("g"))
-    _handle_key(state, ord("g"))
+    _dispatch(state, ord("g"))
+    _dispatch(state, ord("g"))
     assert state.cursor_bar == 0
 
 
@@ -131,8 +141,8 @@ def test_vim_dd_deletes_bar() -> None:
     state = _state()
     state.piece.bars.extend([Bar(), Bar()])
     state.cursor_bar = 1
-    _handle_key(state, ord("d"))
-    _handle_key(state, ord("d"))
+    _dispatch(state, ord("d"))
+    _dispatch(state, ord("d"))
     assert len(state.piece.bars) == 2
 
 
@@ -140,18 +150,18 @@ def test_vim_yy_p_pastes_bar() -> None:
     state = _state()
     state.piece.bars.extend([Bar(), Bar()])
     state.cursor_bar = 1
-    _handle_key(state, ord("y"))
-    _handle_key(state, ord("y"))
-    _handle_key(state, ord("p"))
+    _dispatch(state, ord("y"))
+    _dispatch(state, ord("y"))
+    _dispatch(state, ord("p"))
     assert len(state.piece.bars) == 4
 
 
 def test_stave_break_and_join() -> None:
     state = _state()
     state.piece.bars.extend([Bar(), Bar(), Bar()])
-    _cmd_stave(state, "break")
+    cmd_stave(state, "break")
     assert 1 in state.stave_breaks
-    _cmd_stave(state, "join")
+    cmd_stave(state, "join")
     assert 1 not in state.stave_breaks
 
 
@@ -159,7 +169,7 @@ def test_stave_new_inserts_break() -> None:
     state = _state()
     state.piece.bars.extend([Bar(), Bar(), Bar()])
     state.cursor_bar = 1
-    _cmd_stave(state, "new")
+    cmd_stave(state, "new")
     assert 2 in state.stave_breaks
 
 
@@ -168,7 +178,7 @@ def test_stave_delete_removes_system() -> None:
     state.piece.bars.extend([Bar(), Bar(), Bar()])
     state.cursor_bar = 2
     state.stave_breaks = {1, 2}
-    _cmd_stave(state, "delete")
+    cmd_stave(state, "delete")
     assert 2 not in state.stave_breaks
 
 
@@ -218,7 +228,14 @@ def test_app_main_smoke(monkeypatch) -> None:
                 return ord("q")
             return -1
 
-    assert _main(cast(curses.window, FakeWindow()), None) == 0
+    assert run_loop(
+        cast(curses.window, FakeWindow()),
+        None,
+        config_path="config.toml",
+        handle_insert=handle_insert,
+        handle_normal=handle_normal,
+        apply_command=apply_command,
+    ) == 0
 
 
 def test_app_main_smoke_with_path(monkeypatch) -> None:
@@ -267,4 +284,11 @@ def test_app_main_smoke_with_path(monkeypatch) -> None:
                 return ord("q")
             return -1
 
-    assert _main(cast(curses.window, FakeWindow()), "missing.ft3") == 0
+    assert run_loop(
+        cast(curses.window, FakeWindow()),
+        "missing.ft3",
+        config_path="config.toml",
+        handle_insert=handle_insert,
+        handle_normal=handle_normal,
+        apply_command=apply_command,
+    ) == 0

@@ -2,6 +2,10 @@
 
 Minimal curses editor for Renaissance lute tablature.
 
+## Credits
+
+Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
+
 ## Run
 
 ```

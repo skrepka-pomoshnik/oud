@@ -1,21 +1,37 @@
 line-length = 100
-target-version = "py313"
+target-version = "py310"
 
 [lint]
 select = [
+  "C90",
   "E",
   "F",
   "I",
   "B",
   "C4",
+  "ERA",
   "A",
+  "ARG",
+  "COM",
+  "DTZ",
+  "FBT",
+  "G",
+  "ISC",
+  "N",
+  "PERF",
+  "PIE",
+  "PTH",
   "S",
   "PL",
   "RUF",
+  "RET",
+  "TID",
+  "TRY",
   "UP",
   "SIM",
 ]
 ignore = [
+  "FBT",
   "PLR0913",
   "PLR0915",
   "PLR2004",

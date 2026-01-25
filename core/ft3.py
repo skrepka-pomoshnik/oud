@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import re
+from pathlib import Path
 
 from core.model import Bar, Chord, Note, Piece
 
@@ -23,7 +24,7 @@ def _strip_rtf(text: str) -> str:
 
 
 def read_ft3(path: str) -> bytes:
-    with open(path, "rb") as f:
+    with Path(path).open("rb") as f:
         magic = f.read(2)
         f.seek(0)
 
@@ -68,7 +69,7 @@ def at_next_note(s: int, f: int) -> bool:
     return on_string and (on_fret or on_diapason)
 
 
-def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912
+def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
     bar = Bar()
     bar.time_sig = parse_time_signature(bar_data)
     ptr = 32
@@ -97,10 +98,7 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912
             if bar_data[ptr] < 8:
                 string = bar_data[ptr] - 1
                 fret_byte = bar_data[ptr + 1]
-                if 0x61 <= fret_byte <= 0x7A:
-                    fret = fret_byte - 0x61
-                else:
-                    fret = fret_byte - 0x30
+                fret = fret_byte - 0x61 if 0x61 <= fret_byte <= 0x7A else fret_byte - 0x30
             elif bar_data[ptr] == 8:
                 if bar_data[ptr + 4] == 0x00:
                     string = 7

@@ -1,0 +1,11 @@
+Lutemusic plugin
+
+Keys
+  j/k     move selection
+  h       back
+  l/Enter open
+  d       download
+  /       search
+  gg      top
+  G       bottom
+  q       close

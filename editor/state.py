@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from core.model import Bar, Piece
+from editor.keycodes import DEFAULT_KEYCODES, KeyCodes
+
+if TYPE_CHECKING:
+    from core.plugin_model import RemoteTab
 
 
 class EditorState:
-    def __init__(self, piece: Piece, settings: dict[str, str]) -> None:
+    def __init__(
+        self,
+        piece: Piece,
+        settings: dict[str, str],
+        *,
+        config_path: str = "config.toml",
+        keycodes: KeyCodes | None = None,
+    ) -> None:
         self.piece = piece
         self.cursor_bar = 0
         self.cursor_string = 0
@@ -49,8 +61,22 @@ class EditorState:
         self.midi_proc: subprocess.Popen[bytes] | None = None
         self.count_prefix = ""
         self.pending_key = ""
+        self.pending_quit = False
         self.yanked_bar: YankedBar | None = None
         self.stave_breaks: set[int] = set()
+        self.config_path = config_path
+        self.keycodes = keycodes or DEFAULT_KEYCODES
+        self.plugin_items: list[RemoteTab] = []
+        self.plugin_index = 0
+        self.plugin_offset = 0
+        self.plugin_title = "Plugins"
+        self.plugin_stack: list[tuple[str, list[RemoteTab], int, int, str | None]] = []
+        self.plugin_name: str | None = None
+        self.plugin_query = ""
+        self.plugin_query_active = False
+        self.plugin_pending = ""
+        self.suspend_tui: Callable[[], None] | None = None
+        self.resume_tui: Callable[[], None] | None = None
 
     def clamp(self) -> None:
         bar_count = max(1, len(self.piece.bars))

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-import tomllib
+import importlib
 from pathlib import Path
+from types import ModuleType
+
+try:
+    tomllib: ModuleType = importlib.import_module("tomllib")
+except ModuleNotFoundError:  # pragma: no cover - fallback for Python < 3.11
+    tomllib = importlib.import_module("tomli")
 
 
 def _resolve_config_path(path: str) -> Path:
@@ -18,8 +24,8 @@ def _resolve_config_path(path: str) -> Path:
 
 DEFAULT_SETTINGS: dict[str, str] = {
     "style": "french",
-    "measures": "start",
-    "measuresstep": "1",
+    "measures": "every",
+    "measuresstep": "10",
     "tuning": "g2c3f3a3d4g4",
     "tuninglabels": "relative",
     "strings": "6",
@@ -40,6 +46,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "midigate": "85",
     "tempo": "90",
     "soundfont": "",
+    "bassstrings": "",
     "grid": "off",
     "showdur": "off",
     "showextras": "off",
@@ -73,11 +80,13 @@ def load_settings(path: str) -> dict[str, str]:
 
 def save_settings(path: str, settings: dict[str, str]) -> None:
     file_path = _resolve_config_path(path)
+    merged = load_settings(path)
+    merged.update(settings)
     if file_path.parent:
         file_path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["[settings]"]
-    for key in sorted(settings.keys()):
-        value = settings[key]
+    for key in sorted(merged.keys()):
+        value = merged[key]
         if value == "":
             continue
         if value.isdigit():

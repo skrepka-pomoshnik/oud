@@ -31,7 +31,7 @@ def _parse_tuning(tuning: str) -> list[int]:
             octave = text[start:idx]
             octave_num = int(octave) if octave else 3
             semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-                note, 0
+                note, 0,
             )
             if accidental in ("+", "#"):
                 semis += 1
@@ -119,7 +119,7 @@ def _duration_token(denom: int, dotted: bool) -> str:
     return token
 
 
-def _collect_override_chords(
+def _collect_override_chords(  # noqa: C901
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_index: int,
@@ -155,7 +155,7 @@ def _collect_override_chords(
     return events
 
 
-def export_lilypond(  # noqa: PLR0912
+def export_lilypond(  # noqa: PLR0912, C901
     path: str,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
@@ -168,6 +168,7 @@ def export_lilypond(  # noqa: PLR0912
     ties: list[tuple[int, int, int]] | None = None,
     holds: list[tuple[int, int, int]] | None = None,
 ) -> str:
+    _ = (bar_width, ornaments, annotations, slurs, ties, holds)
     settings = settings or {}
     title = piece.title or "Untitled"
     composer = piece.composer or piece.author or ""
@@ -227,7 +228,7 @@ def export_lilypond(  # noqa: PLR0912
                     body.append(f"  <{chord_text}>{dur}")
         else:
             events = _collect_override_chords(
-                overrides, durations, b_idx, piece.strings, style, default_duration
+                overrides, durations, b_idx, piece.strings, style, default_duration,
             )
             if not events:
                 body.append("  r4")
@@ -273,7 +274,7 @@ def export_lilypond(  # noqa: PLR0912
             "",
             *layout,
             "",
-        ]
+        ],
     )
     Path(path).write_text(content, encoding="utf-8")
     return f"Wrote {path}"

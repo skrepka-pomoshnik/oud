@@ -1,6 +1,6 @@
 from core.model import Bar, Chord, Note, Piece
 from core.render_utils import chord_positions, flag_row
-from ui.render import (
+from core.view_model import (
     _bar_durations,
     _bar_flags,
     _bar_number_for_index,

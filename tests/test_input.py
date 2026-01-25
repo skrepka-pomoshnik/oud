@@ -1,7 +1,7 @@
 import os
 
-from app import EditorState
 from core.model import Bar, Piece
+from editor.state import EditorState
 from tui.input import complete_command
 
 
@@ -41,3 +41,12 @@ def test_complete_command_directory(tmp_path) -> None:
     state.cmdline = f"e {os.fspath(subdir)}"
     complete_command(state)
     assert state.cmdline.endswith(os.sep)
+
+
+def test_complete_command_ignores_hidden_entries(tmp_path) -> None:
+    (tmp_path / ".hidden.tab").write_text("data", encoding="utf-8")
+    (tmp_path / "visible.tab").write_text("data", encoding="utf-8")
+    state = _state()
+    state.cmdline = f"e {tmp_path}{os.sep}."
+    complete_command(state)
+    assert state.cmdline == f"e {tmp_path}{os.sep}."

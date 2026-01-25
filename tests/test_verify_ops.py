@@ -1,0 +1,42 @@
+from core.model import Bar, Chord, Note, Piece
+from editor.state import EditorState
+from editor.verify_ops import bar_duration_sum, verify_bar
+
+
+def _state() -> EditorState:
+    piece = Piece(title="T", bars=[Bar()], strings=6)
+    settings = {"style": "french", "time": "C"}
+    return EditorState(piece, settings)
+
+
+def test_bar_duration_sum_chords() -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(note_type=4, dotted=True, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=8, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+    ]
+    total = bar_duration_sum(state, 0, default_duration=4)
+    assert total == 1.5 + 0.0625
+
+
+def test_bar_duration_sum_durations() -> None:
+    state = _state()
+    state.bar_width = 4
+    state.durations[(0, 0, 0)] = 4
+    state.durations[(0, 0, 2)] = 8
+    total = bar_duration_sum(state, 0, default_duration=4)
+    assert total == 2.5
+
+
+def test_verify_bar_messages() -> None:
+    state = _state()
+    state.settings["time"] = "bad"
+    assert verify_bar(state, 0) == "No valid time signature"
+    state.settings["time"] = "4/4"
+    state.piece.bars[0].chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
+        for _ in range(4)
+    ]
+    assert verify_bar(state, 0) == "Measure ok"
+    state.piece.bars[0].chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]
+    assert verify_bar(state, 0).startswith("Underfull")

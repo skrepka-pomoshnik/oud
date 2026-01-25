@@ -53,7 +53,7 @@ def _parse_tuning(tuning: str) -> list[int]:
             octave = text[start:idx]
             octave_num = 3 if not octave else int(octave)
             semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-                note, 0
+                note, 0,
             )
             if accidental in ("+", "#"):
                 semis += 1
@@ -107,6 +107,7 @@ def _collect_manual_chords(
     default_duration: int,
     dotted: set[tuple[int, int]] | None,
 ) -> list[tuple[int, int, list[Note]]]:
+    _ = bar_width
     columns = sorted({col for (b, _s, col) in overrides if b == bar_index})
     events: list[tuple[int, int, list[Note]]] = []
     current_time = 0
@@ -136,7 +137,7 @@ def _collect_manual_chords(
 
 
 def _chord_positions(
-    chords: list[Chord], bar_width: int, default_duration: int
+    chords: list[Chord], bar_width: int, default_duration: int,
 ) -> list[int]:
     denoms: list[int] = []
     dotted: list[bool] = []
