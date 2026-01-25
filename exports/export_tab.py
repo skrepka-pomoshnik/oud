@@ -21,12 +21,13 @@ def export_tab(  # noqa: PLR0912, C901
     bar_width: int,
     settings: dict[str, str] | None = None,
     dotted: set[tuple[int, int]] | None = None,
-    _ornaments: dict[tuple[int, int], str] | None = None,
-    _annotations: dict[tuple[int, int], str] | None = None,
-    _slurs: list[tuple[int, int, int]] | None = None,
-    _ties: list[tuple[int, int, int]] | None = None,
-    _holds: list[tuple[int, int, int]] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+    annotations: dict[tuple[int, int], str] | None = None,
+    slurs: list[tuple[int, int, int]] | None = None,
+    ties: list[tuple[int, int, int]] | None = None,
+    holds: list[tuple[int, int, int]] | None = None,
 ) -> str:
+    _ = (ornaments, annotations, slurs, ties, holds)
     settings_map = settings or {}
     style = settings_map.get("style") or piece.style or "french"
     french_c = settings_map.get("frenchc") or "normal"

@@ -16,7 +16,7 @@ python3 app.py examples/example.ft3
 
 - `h/j/k/l` move
 - `i` insert mode, `esc` normal mode
-- `r` replace one cell
+- `r` rest (insert), `R` replace one cell
 - `:` command mode, `?` help
 - `x` delete note (normal mode), space clears in insert mode
 - `o/O` add bar after/before, `+/-` delete bar
@@ -52,6 +52,7 @@ python3 app.py examples/example.ft3
 :midicmd [path] show midi command
 :source [path]  view file with less
 :set maxbars=.. limit bars per system
+:set measures=every measuresstep=10
 ```
 
 ## Tuning order
@@ -76,3 +77,7 @@ Set your SoundFont in `config.toml`:
 soundfont = "/Users/s/Library/Audio/Sounds/Banks/SC-55 SoundFont v1.2b.sf2"
 midipatch = 24
 ```
+
+## Rest rendering
+
+Rests are shown as `_.` in the staff.

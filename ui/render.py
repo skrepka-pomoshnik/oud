@@ -246,7 +246,7 @@ def render_piece(  # noqa: PLR0912, C901
 ) -> None:
     stdscr.erase()
     height, width = stdscr.getmaxyx()
-    strings = piece.strings
+    total_strings = piece.strings
 
     status_attr = A_REVERSE
 
@@ -300,15 +300,21 @@ def render_piece(  # noqa: PLR0912, C901
         and settings.get("italianorient", "normal") == "reverse"
     )
     show_octaves = settings.get("tuninglabels", "relative") == "absolute"
-    bass_tokens = parse_bass_strings(settings.get("bassstrings", ""))
     used_bass = _bass_strings_used(piece, overrides)
+    bass_tokens = parse_bass_strings(settings.get("bassstrings", ""))
+    base_strings = min(6, total_strings)
+    display_indices = list(range(base_strings))
+    for idx in sorted(used_bass):
+        if idx >= base_strings and idx < total_strings:
+            display_indices.append(idx)
+    display_strings = len(display_indices)
     tuning_labels = _tuning_labels(
         settings.get("tuning", ""),
-        strings,
+        total_strings,
         show_octaves=show_octaves,
         bass=bass_tokens or None if used_bass else None,
     )
-    block_h = _block_height(include_meta, strings, show_dur, show_extras, show_tactus)
+    block_h = _block_height(include_meta, display_strings, show_dur, show_extras, show_tactus)
     available = max(0, height - 2 - 1)
     systems = max(1, available // block_h)
     if spacing_mode == "auto":
@@ -339,7 +345,7 @@ def render_piece(  # noqa: PLR0912, C901
 
     for sys_idx in range(systems):
         row_start = header_row + 1 + sys_idx * block_h
-        rows = _layout_block_rows(strings, include_meta, show_dur, show_extras, show_tactus)
+        rows = _layout_block_rows(display_strings, include_meta, show_dur, show_extras, show_tactus)
         # Clear the system block to avoid stale characters after reflow/resizes.
         for clear_row in range(row_start, row_start + block_h):
             _safe_addstr(stdscr, clear_row, 0, " " * max_width)
@@ -382,18 +388,19 @@ def render_piece(  # noqa: PLR0912, C901
                 bar_widths[-1] += target_width - total_width
             elif bar_widths and total_width > target_width:
                 bar_widths[-1] = max(3, bar_widths[-1] - (total_width - target_width))
-        for s_idx in range(strings):
-            actual = strings - 1 - s_idx if reverse_strings else s_idx
+        for display_idx in range(display_strings):
+            if reverse_strings:
+                actual = display_indices[display_strings - 1 - display_idx]
+            else:
+                actual = display_indices[display_idx]
             if actual < len(tuning_labels):
                 label_value = tuning_labels[actual]
             else:
-                label_value = str(strings - actual)
-            if actual >= 6 and actual not in used_bass:
-                label_value = ""
+                label_value = str(total_strings - actual)
             if len(label_value) > 2:
                 label_value = label_value[:2]
             label = f"{label_value:>2}"
-            _safe_addstr(stdscr, row_start + (rows["staff"] or 0) + s_idx, 0, label)
+            _safe_addstr(stdscr, row_start + (rows["staff"] or 0) + display_idx, 0, label)
 
         bar_x = left_margin
         for local_idx, bar in enumerate(piece.bars[bar_start:bar_end]):
@@ -404,7 +411,7 @@ def render_piece(  # noqa: PLR0912, C901
             cells = (
                 bar_cells_from_chords(
                     bar,
-                    strings,
+                    total_strings,
                     bar_width,
                     default_duration,
                     style,
@@ -414,7 +421,7 @@ def render_piece(  # noqa: PLR0912, C901
                 if bar.chords
                 else bar_cells(
                     bar,
-                    strings,
+                    total_strings,
                     bar_width,
                     style,
                     french_c=french_c,
@@ -444,7 +451,7 @@ def render_piece(  # noqa: PLR0912, C901
             slur_cells = _bar_span_row(slurs, abs_bar, bar_width, "(", ")", "~")
             tie_cells = _bar_span_row(ties, abs_bar, bar_width, "[", "]", "-")
             hold_cells = _bar_span_row(holds, abs_bar, bar_width, "<", ">", "_")
-            _apply_overrides(cells, overrides, abs_bar, strings, bar_width)
+            _apply_overrides(cells, overrides, abs_bar, total_strings, bar_width)
             display_width = bar_width
             if spacing_mode == "auto":
                 display_width = bar_widths[local_idx]
@@ -544,7 +551,7 @@ def render_piece(  # noqa: PLR0912, C901
                     flag_positions = flag_positions_from_durations(
                         durations,
                         abs_bar,
-                        strings,
+                        total_strings,
                         bar_width,
                         default_duration,
                         dotted=dotted,
@@ -554,7 +561,7 @@ def render_piece(  # noqa: PLR0912, C901
                     flag_positions = _flag_positions_all(
                         durations,
                         abs_bar,
-                        strings,
+                        total_strings,
                         bar_width,
                         default_duration,
                         dotted=dotted,
@@ -572,7 +579,7 @@ def render_piece(  # noqa: PLR0912, C901
                     dur_cells = _bar_durations(
                         durations,
                         abs_bar,
-                        strings,
+                        total_strings,
                         bar_width,
                         default_duration,
                         hide_redundant=hide_redundant,
@@ -580,28 +587,28 @@ def render_piece(  # noqa: PLR0912, C901
                     if spacing_mode == "auto":
                         dur_cells = _scale_row(dur_cells, display_width, " ")
                     _safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
-            for s_idx in range(strings):
-                actual = strings - 1 - s_idx if reverse_strings else s_idx
-                y = row_start + (rows["staff"] or 0) + s_idx
+            cursor_display_index = cursor_string if cursor_string < display_strings else None
+            for display_idx in range(display_strings):
+                if reverse_strings:
+                    actual = display_indices[display_strings - 1 - display_idx]
+                else:
+                    actual = display_indices[display_idx]
+                y = row_start + (rows["staff"] or 0) + display_idx
                 row_cells = cells[actual]
                 fill_char = "-"
                 if actual >= 6:
-                    if actual in used_bass:
-                        row_cells = _inline_bass_row(row_cells)
-                        fill_char = " "
-                    else:
-                        row_cells = [" " for _ in row_cells]
-                        fill_char = " "
+                    row_cells = _inline_bass_row(row_cells)
+                    fill_char = " "
                 if spacing_mode == "auto":
                     row_cells = _scale_row(row_cells, display_width, fill_char)
                 row_text = "".join(row_cells)
                 _safe_addstr(stdscr, y, bar_x, row_text)
-                if actual < 6 or actual in used_bass:
-                    _safe_addstr(stdscr, y, bar_x + display_width, barline)
+                _safe_addstr(stdscr, y, bar_x + display_width, barline)
 
                 if (
                     abs_bar == cursor_bar
-                    and s_idx == cursor_string
+                    and cursor_display_index is not None
+                    and display_idx == cursor_display_index
                     and 0 <= cursor_col < bar_width
                 ):
                     cell_x = bar_x + _scale_col(cursor_col, bar_width, display_width)
@@ -628,11 +635,18 @@ def render_piece(  # noqa: PLR0912, C901
             else:
                 bar_x += bar_width + bar_gap
 
-    actual_cursor_string = strings - 1 - cursor_string if reverse_strings else cursor_string
+    if display_strings > 0:
+        cursor_index = min(cursor_string, display_strings - 1)
+        if reverse_strings:
+            actual_cursor_string = display_indices[display_strings - 1 - cursor_index]
+        else:
+            actual_cursor_string = display_indices[cursor_index]
+    else:
+        actual_cursor_string = cursor_string
     dur_key = (cursor_bar, actual_cursor_string, cursor_col)
     dur_text = durations.get(dur_key)
     if dur_text is None:
-        for s_idx in range(strings):
+        for s_idx in range(total_strings):
             alt_key = (cursor_bar, s_idx, cursor_col)
             if alt_key in durations:
                 dur_text = durations[alt_key]

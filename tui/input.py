@@ -32,7 +32,7 @@ def history_next(state: EditorState) -> str | None:
     return state.command_history[state.command_history_index]
 
 
-def complete_command(state: EditorState) -> bool:  # noqa: PLR0911, C901
+def complete_command(state: EditorState) -> bool:  # noqa: PLR0911, C901, PLR0912
     cmdline = state.cmdline
     commands = command_names()
     if " " not in cmdline:
@@ -48,6 +48,8 @@ def complete_command(state: EditorState) -> bool:  # noqa: PLR0911, C901
 
     cmd, rest = cmdline.split(" ", 1)
     if cmd not in path_commands():
+        return True
+    if rest.rstrip().endswith(os.sep + ".") or rest.strip() in (".", "./"):
         return True
     expanded = Path(rest).expanduser()
     base_dir = expanded.parent

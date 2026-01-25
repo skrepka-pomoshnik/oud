@@ -20,10 +20,11 @@ Technical overview of the oud codebase.
 - `tui/`                  Input + viewport adapters (curses oriented).
 - `ui/`                   Rendering and ASCII layout helpers.
 - `exports/`              Exporters (tab/ly/midi).
+- `plugins/`              Plugin implementations (self-contained modules).
 - `settings.py`           Config load/save + defaults.
 - `config.toml`           Local config (user settings).
 - `tests/`                Pytest suite.
-- `scripts/`              Quality scripts.
+- `scripts/`              Quality scripts (e.g. `scripts/quality.sh`).
 
 ## Editor Layering
 - **State**: `editor/state.py` stores cursor, piece, durations, overrides, etc.
@@ -32,7 +33,6 @@ Technical overview of the oud codebase.
 - **Undo**: `editor/undo_ops.py` applies undo/redo actions.
 - **Load**: `editor/load_ops.py` loads pieces and parsed data from disk.
 - **Verify**: `editor/verify_ops.py` validates bar duration vs time signature.
-- **Undo**: `editor/undo_ops.py` applies undo/redo actions.
 - **Keymap**: `editor/keymap.py` centralizes movement keys (vim/casual).
 
 ## TUI Layering

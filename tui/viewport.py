@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from editor.layout import bars_per_line, system_index, system_start_index
 from editor.state import EditorState
-from ui.render import _block_height
+from ui.render import _bass_strings_used, _block_height
 
 
 def rows_per_screen(state: EditorState, height: int) -> int:
@@ -10,7 +10,15 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     show_dur = state.settings.get("showdur", "off") == "on"
     show_extras = state.settings.get("showextras", "off") == "on"
     show_tactus = state.settings.get("showtactus", "off") == "on"
-    block_h = _block_height(include_meta, state.piece.strings, show_dur, show_extras, show_tactus)
+    used_bass = _bass_strings_used(state.piece, state.overrides)
+    total_strings = state.piece.strings
+    base_strings = min(6, total_strings)
+    display_indices = list(range(base_strings))
+    for idx in sorted(used_bass):
+        if idx >= base_strings and idx < total_strings:
+            display_indices.append(idx)
+    display_strings = len(display_indices)
+    block_h = _block_height(include_meta, display_strings, show_dur, show_extras, show_tactus)
     available = max(0, height - 2 - 1)
     return max(1, available // block_h)
 

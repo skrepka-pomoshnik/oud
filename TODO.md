@@ -20,7 +20,6 @@ P2 (Core Features)
 - [ ] Cursor helpers: centralize clamp/offset logic in controller utils.
 - [ ] Message constants: reduce inline strings, standardize status wording.
 - [ ] Declarative layout map: define screen regions and row offsets in one place.
-- [ ] Plugin protocol: generic plugin interface (root_items/open/download/help_path).
 - [ ] TUI test coverage: ui/tui modules at 100% coverage (render + input + commands). (started: tui/controller tests)
 - [ ] Playback animation: highlight current bar/column while MIDI is playing.
 - [ ] Vim keyset parity.
@@ -39,9 +38,11 @@ P2 (Core Features)
 - [ ] Merge/split staves into separate voices.
 - [ ] Transpose tablature up/down; convert between tunings.
 - [ ] Double/halve rhythm values; normalize rhythm signs to barlines/intervals.
+- [ ] Reprise support: repeat/da capo markers and render cues.
+- [ ] MusicXML import/export support (see refs).
 
 P3 (Advanced + Parity)
-- [ ] MusicXML import/export support (see refs).
+- [ ] Plugin protocol: generic plugin interface (root_items/open/download/help_path).
 - [ ] Export tablature as graphics in multiple formats.
 - [ ] Export tablature/transcription to MEI.
 - [ ] Add German/Spanish tab support.
@@ -59,8 +60,5 @@ P3 (Advanced + Parity)
 - [ ] Playback window: play piece/selection/stave with instrument + tempo defaults.
 
 P4 (Optional / Nice-to-have)
-- [ ] Plugin menu: quick selector (e.g., `p`) for plugin actions.
-- [ ] Plugin: browse lute tabs from lutemusic.org / gerbode.net.
-- [ ] Lutemusic parser: composer/source/tab index scraping for supported files only.
 - [ ] Mouse support.
 - [ ] GUI backend: Qt adapter using renderer ops + controller actions.
