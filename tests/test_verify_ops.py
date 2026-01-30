@@ -1,6 +1,6 @@
-from core.model import Bar, Chord, Note, Piece
-from editor.state import EditorState
-from editor.verify_ops import bar_duration_sum, verify_bar
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.editor.state import EditorState
+from oud.editor.verify_ops import bar_duration_sum, verify_bar
 
 
 def _state() -> EditorState:

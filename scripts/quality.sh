@@ -8,14 +8,29 @@ STATUS=0
 
 {
   echo "== ruff check =="
-  ruff check --fix . || STATUS=1
-  ruff check . || STATUS=1
+  if command -v ruff >/dev/null 2>&1; then
+    ruff check --fix . || STATUS=1
+    ruff check . || STATUS=1
+  else
+    echo "ruff not found"
+    STATUS=1
+  fi
   echo
   echo "== ty check =="
-  ty check . || STATUS=1
+  if command -v ty >/dev/null 2>&1; then
+    ty check . || STATUS=1
+  else
+    echo "ty not found"
+    STATUS=1
+  fi
   echo
   echo "== pytest =="
-  python3 -m pytest --cov --cov-fail-under=70 || STATUS=1
+  if python3 -m pytest --version >/dev/null 2>&1; then
+    python3 -m pytest --cov --cov-fail-under=70 || STATUS=1
+  else
+    echo "pytest not found"
+    STATUS=1
+  fi
 } 2>&1 | tee -a "${LOG_FILE}"
 
 exit "${STATUS}"

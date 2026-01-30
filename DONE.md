@@ -2,6 +2,12 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-01-30
+- Moved all code into `oud/` package with root wrappers for `app.py` and `cli.py`.
+- Updated imports/tests for `oud.*` package layout and plugin pathing.
+- Folded `about_project.md` into `README.md` and removed the standalone file.
+- Added TODO/DONE to `.gitignore`.
+
 ## 2025-02-14
 - Moved help/info key handling into `tui/controller.py`.
 - Added help/info bindings in `editor/keymap.py`.

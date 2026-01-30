@@ -1,7 +1,7 @@
-from core.model import Bar, Piece
-from core.plugin_model import RemoteTab
-from editor.state import EditorState
-from tui.controller import handle_key
+from oud.core.model import Bar, Piece
+from oud.core.plugin_model import RemoteTab
+from oud.editor.state import EditorState
+from oud.tui.controller import handle_key
 
 
 def _state() -> EditorState:

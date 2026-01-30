@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from exports.midi import _midi_command
+from oud.exports.midi import _midi_command
 
 
 def test_midi_command_fluidsynth_with_soundfont_darwin() -> None:

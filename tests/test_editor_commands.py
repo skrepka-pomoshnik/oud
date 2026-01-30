@@ -1,5 +1,5 @@
-from core.model import Bar, Piece
-from editor.commands import (
+from oud.core.model import Bar, Piece
+from oud.editor.commands import (
     cmd_author,
     cmd_composer,
     cmd_footnote,
@@ -7,7 +7,7 @@ from editor.commands import (
     cmd_subtitle,
     cmd_title,
 )
-from editor.state import EditorState
+from oud.editor.state import EditorState
 
 
 def _state() -> EditorState:

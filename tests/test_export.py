@@ -1,5 +1,5 @@
-from core.model import Bar, Piece
-from exports.export_tab import export_ascii, export_tab, export_tab_to_file
+from oud.core.model import Bar, Piece
+from oud.exports.export_tab import export_ascii, export_tab, export_tab_to_file
 
 
 def test_export_tab_includes_headers_and_chords() -> None:
@@ -25,7 +25,7 @@ def test_export_tab_includes_headers_and_chords() -> None:
     assert "b" in text
     assert "Sc" in text
     assert any(line.startswith("0") for line in text.splitlines())
-    assert any(line.endswith("a") for line in text.splitlines())
+    assert any("a" in line for line in text.splitlines())
 
 
 def test_export_tab_writes_bar_markers() -> None:

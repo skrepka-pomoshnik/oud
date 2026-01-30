@@ -1,6 +1,6 @@
-from core.model import Bar, Piece
-from editor.navigation import move_left, move_right
-from editor.state import EditorState
+from oud.core.model import Bar, Piece
+from oud.editor.navigation import move_left, move_right
+from oud.editor.state import EditorState
 
 
 def _state() -> EditorState:

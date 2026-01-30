@@ -1,7 +1,7 @@
 import sys
 
 import cli
-from core.model import Bar, Piece
+from oud.core.model import Bar, Piece
 
 
 def test_cli_main_tab(monkeypatch, capsys) -> None:

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.model import Bar, Chord, Note, Piece
-from editor.bar_ops import snapshot_bar
-from editor.state import EditorState, UndoAction
-from editor.undo_ops import apply_action, redo, undo
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.editor.bar_ops import snapshot_bar
+from oud.editor.state import EditorState, UndoAction
+from oud.editor.undo_ops import apply_action, redo, undo
 
 
 def _state() -> EditorState:

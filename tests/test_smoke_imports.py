@@ -6,19 +6,19 @@ def test_import_app_module() -> None:
 
 
 def test_import_render_module() -> None:
-    __import__("ui.render")
+    __import__("oud.ui.render")
 
 
 def test_import_export_tab_module() -> None:
-    __import__("exports.export_tab")
+    __import__("oud.exports.export_tab")
 
 
 def test_import_lilypond_module() -> None:
-    __import__("exports.lilypond")
+    __import__("oud.exports.lilypond")
 
 
 def test_import_midi_module() -> None:
-    __import__("exports.midi")
+    __import__("oud.exports.midi")
 
 
 def test_compile_all() -> None:

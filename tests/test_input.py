@@ -1,8 +1,8 @@
 import os
 
-from core.model import Bar, Piece
-from editor.state import EditorState
-from tui.input import complete_command
+from oud.core.model import Bar, Piece
+from oud.editor.state import EditorState
+from oud.tui.input import complete_command
 
 
 def _state() -> EditorState:

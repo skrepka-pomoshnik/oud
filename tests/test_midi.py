@@ -1,5 +1,5 @@
-from core.model import Bar, Chord, Note, Piece
-from exports.midi import (
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.exports.midi import (
     _bar_chord_events,
     _collect_manual_chords,
     _duration_ticks,

@@ -1,5 +1,5 @@
-from core.model import Bar, Chord, Note
-from editor.ops import (
+from oud.core.model import Bar, Chord, Note
+from oud.editor.ops import (
     chord_index_at_col,
     delete_chord,
     denom_to_note_type,
@@ -41,10 +41,15 @@ def test_denom_to_note_type() -> None:
 
 def test_fret_conversions() -> None:
     assert is_french_fret("a")
+    assert is_french_fret("r")
+    assert is_french_fret("s")
+    assert is_french_fret("t")
     assert not is_french_fret("z")
     assert french_to_fret("c") == 2
+    assert french_to_fret("r") == 16
     assert french_to_fret("z") is None
     assert fret_to_french(2) == "c"
+    assert fret_to_french(16) == "r"
     assert fret_to_french(99) is None
     assert is_italian_fret("0")
     assert is_italian_fret("x")

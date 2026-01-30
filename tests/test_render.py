@@ -1,9 +1,11 @@
-from core.model import Bar, Chord, Note, Piece
-from core.render_utils import chord_positions, flag_row
-from core.view_model import (
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.render_utils import chord_positions, flag_row
+from oud.core.view_model import (
     _bar_durations,
     _bar_flags,
     _bar_number_for_index,
+    _bar_span_row,
+    _filter_redundant_positions,
     _flag_positions_all,
     _layout_rows,
     _parse_time_signature,
@@ -113,6 +115,21 @@ def test_build_bar_view_shows_flags_and_durations() -> None:
     assert view["dur"][0].startswith("4")
 
 
+def test_bar_durations_hide_redundant_until_change() -> None:
+    durations = {(0, 0, 0): 4, (0, 0, 1): 4, (0, 0, 2): 8}
+    row = _bar_durations(
+        durations,
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        hide_redundant=True,
+    )
+    assert row[0] == "4"
+    assert row[1] == " "
+    assert row[2] == "8"
+
+
 def test_chord_positions_spread() -> None:
     bar = Bar()
     chord1 = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
@@ -129,6 +146,17 @@ def test_flag_row_marks_positions() -> None:
     assert flags[0] == "I"
     assert flags[3] == "I"
     assert flags[4] == "\\"
+
+
+def test_flag_positions_filter_redundant() -> None:
+    positions = [(0, 4, False), (1, 4, False), (2, 8, False), (3, 8, True)]
+    filtered = _filter_redundant_positions(positions)
+    assert filtered == [(0, 4, False), (2, 8, False), (3, 8, True)]
+
+
+def test_bar_span_row_marks_spans() -> None:
+    row = _bar_span_row([(0, 1, 3)], bar_index=0, bar_width=5, start_char="(", end_char=")", fill_char="~")
+    assert row == [" ", "(", "~", ")", " "]
 
 
 def test_build_bar_view_shows_annotations_and_ornaments() -> None:

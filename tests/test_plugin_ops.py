@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.model import Bar, Piece
-from core.plugin_model import RemoteTab
-from editor.plugin_ops import enter_plugin_mode, handle_plugin_key
-from editor.state import EditorState
+from oud.core.model import Bar, Piece
+from oud.core.plugin_model import RemoteTab
+from oud.editor.plugin_ops import enter_plugin_mode, handle_plugin_key
+from oud.editor.state import EditorState
 
 
 def _state() -> EditorState:
@@ -26,7 +26,7 @@ def test_handle_plugin_key_selects_index_item(monkeypatch) -> None:
     state = _state()
     enter_plugin_mode(state)
     items = [RemoteTab(title="Song", url="https://example.com/song.tab", is_dir=False)]
-    monkeypatch.setattr("plugins.lutemusic.fetch_supported_tabs", lambda _url: items)
+    monkeypatch.setattr("oud.plugins.lutemusic.fetch_supported_tabs", lambda _url: items)
     handle_plugin_key(state, 10)
     assert state.plugin_title == "Lutemusic"
     assert state.plugin_items
@@ -39,7 +39,7 @@ def test_handle_plugin_key_downloads_item(monkeypatch, tmp_path: Path) -> None:
     enter_plugin_mode(state)
     state.plugin_name = "lutemusic"
     state.plugin_items = [RemoteTab(title="Song", url="https://example.com/song.tab", is_dir=False)]
-    monkeypatch.setattr("plugins.lutemusic.download_tab", lambda _item, _dest: tmp_path / "song.tab")
+    monkeypatch.setattr("oud.plugins.lutemusic.download_tab", lambda _item, _dest: tmp_path / "song.tab")
     handle_plugin_key(state, ord("d"))
     assert state.message.startswith("Downloaded")
 

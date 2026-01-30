@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 
-from core.ft3 import load_ft3
-from core.tab_parser import load_tab
+from oud.core.ft3 import load_ft3
+from oud.core.tab_parser import load_tab
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Minimal FT3 reader")
-    parser.add_argument("path", help="Path to .ft3 or .ft3.gz")
+    parser.add_argument("path", help="Path to .ft3, .ft3.gz, or .tab")
     args = parser.parse_args()
 
     piece = load_tab(args.path) if args.path.lower().endswith(".tab") else load_ft3(args.path)

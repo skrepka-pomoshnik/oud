@@ -1,4 +1,4 @@
-from core.tab_parser import load_tab, load_tab_data
+from oud.core.tab_parser import load_tab, load_tab_data
 
 
 def test_load_tab_simple(tmp_path) -> None:
@@ -37,3 +37,20 @@ def test_load_tab_data_cripps_format(tmp_path) -> None:
     assert parsed.piece.author == "Author"
     assert parsed.piece.tuning == "g2c3f3a3d4g4"
     assert parsed.piece.bars
+
+
+def test_parse_french_extended_letters(tmp_path) -> None:
+    content = "\n".join(
+        [
+            "{Test}",
+            "b",
+            "0qrst--",
+            "e",
+        ],
+    )
+    path = tmp_path / "extended.tab"
+    path.write_text(content, encoding="utf-8")
+    piece = load_tab(str(path))
+    assert piece.bars
+    notes = piece.bars[0].chords[0].notes
+    assert [note.fret for note in notes[:4]] == [15, 16, 17, 18]

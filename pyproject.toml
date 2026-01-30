@@ -22,4 +22,4 @@ dependencies = [
 ]
 
 [project.scripts]
-oud = "app:main"
+oud = "oud.app:main"

@@ -1,8 +1,8 @@
 import os
 
-from core.model import Bar, Piece
-from editor.state import EditorState
-from tui.input import (
+from oud.core.model import Bar, Piece
+from oud.editor.state import EditorState
+from oud.tui.input import (
     complete_command,
     handle_command,
     handle_search,
@@ -58,6 +58,13 @@ def test_complete_command_basic(tmp_path) -> None:
     state.cmdline = f"e {dir_path}"
     assert complete_command(state) is True
     assert state.cmdline.endswith(os.sep)
+    multi_dir = tmp_path / "many"
+    multi_dir.mkdir()
+    (multi_dir / "one.tab").write_text("x", encoding="utf-8")
+    (multi_dir / "two.ft3").write_text("x", encoding="utf-8")
+    state.cmdline = f"e {multi_dir}{os.sep}"
+    assert complete_command(state) is True
+    assert state.message.startswith("Matches:")
     state.cmdline = "zzzz"
     assert complete_command(state) is True
     state.cmdline = f"set {tmp_path}{os.sep}file"

@@ -1,6 +1,6 @@
 import gzip
 
-from core.ft3 import load_ft3, note_type_to_denominator
+from oud.core.ft3 import load_ft3, note_type_to_denominator
 
 
 def test_load_minimal_ft3(tmp_path) -> None:

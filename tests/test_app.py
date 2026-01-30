@@ -1,18 +1,18 @@
 import curses
 from typing import cast
 
-from core.model import Bar, Piece
-from editor.actions import handle_insert, handle_normal
-from editor.command_ops import cmd_bar, cmd_stave
-from editor.commands import cmd_footnote, cmd_header_template, cmd_subtitle, cmd_title
-from editor.state import EditorState
-from editor.status import status_line
-from tui.commands import apply_command, apply_set_command
-from tui.controller import handle_key
-from tui.input import handle_command as handle_command_input
-from tui.input import handle_search as handle_search_input
-from tui.input import history_next, history_prev, parse_search
-from tui.loop import run_loop
+from oud.core.model import Bar, Piece
+from oud.editor.actions import handle_insert, handle_normal
+from oud.editor.command_ops import cmd_bar, cmd_stave
+from oud.editor.commands import cmd_footnote, cmd_header_template, cmd_subtitle, cmd_title
+from oud.editor.state import EditorState
+from oud.editor.status import status_line
+from oud.tui.commands import apply_command, apply_set_command
+from oud.tui.controller import handle_key
+from oud.tui.input import handle_command as handle_command_input
+from oud.tui.input import handle_search as handle_search_input
+from oud.tui.input import history_next, history_prev, parse_search
+from oud.tui.loop import run_loop
 
 
 def _state() -> EditorState:
@@ -292,3 +292,75 @@ def test_app_main_smoke_with_path(monkeypatch) -> None:
         handle_normal=handle_normal,
         apply_command=apply_command,
     ) == 0
+
+
+def test_app_main_smoke_interactions(monkeypatch) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "napms", lambda *_args: None)
+    monkeypatch.setattr(curses, "A_REVERSE", 0)
+    monkeypatch.setattr(curses, "A_BOLD", 0)
+    monkeypatch.setattr(curses, "KEY_RESIZE", -1)
+    monkeypatch.setattr(curses, "KEY_EXIT", 27)
+    monkeypatch.setattr(curses, "KEY_LEFT", -1)
+    monkeypatch.setattr(curses, "KEY_RIGHT", -1)
+    monkeypatch.setattr(curses, "KEY_UP", -1)
+    monkeypatch.setattr(curses, "KEY_DOWN", -1)
+    monkeypatch.setattr(curses, "KEY_PPAGE", -1)
+    monkeypatch.setattr(curses, "KEY_NPAGE", -1)
+    monkeypatch.setattr(curses, "KEY_HOME", -1)
+    monkeypatch.setattr(curses, "KEY_END", -1)
+    monkeypatch.setattr(curses, "KEY_IC", -1)
+    monkeypatch.setattr(curses, "KEY_DC", -1)
+    monkeypatch.setattr(curses, "KEY_BACKSPACE", 127)
+    monkeypatch.setattr(curses, "ERR", -1)
+
+    class FakeWindow:
+        def __init__(self) -> None:
+            self._calls = 0
+            self.added = 0
+            self._keys = [
+                ord(":"),
+                ord("w"),
+                127,
+                27,
+                ord("/"),
+                ord("1"),
+                10,
+                ord("q"),
+            ]
+
+        def getmaxyx(self):
+            return (12, 60)
+
+        def keypad(self, _flag):
+            return None
+
+        def timeout(self, _delay):
+            return None
+
+        def erase(self):
+            return None
+
+        def refresh(self):
+            return None
+
+        def addstr(self, *_args, **_kwargs):
+            self.added += 1
+
+        def getch(self):
+            if self._calls < len(self._keys):
+                key = self._keys[self._calls]
+                self._calls += 1
+                return key
+            return -1
+
+    window = FakeWindow()
+    assert run_loop(
+        cast(curses.window, window),
+        None,
+        config_path="config.toml",
+        handle_insert=handle_insert,
+        handle_normal=handle_normal,
+        apply_command=apply_command,
+    ) == 0
+    assert window.added > 0

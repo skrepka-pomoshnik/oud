@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from core.model import Bar, Chord, Note, Piece
-from core.tab_parser import TabData
-from editor import command_ops as cmd_ops
-from editor.state import EditorState
-from tui import commands as cmd
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.tab_parser import TabData
+from oud.editor import command_ops as cmd_ops
+from oud.editor.state import EditorState
+from oud.tui import commands as cmd
 
 
 def _state(bars: int = 2) -> EditorState:
@@ -97,7 +97,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     def _save(_path: str, _settings: dict[str, str]) -> None:
         return None
 
-    monkeypatch.setattr(cmd, "save_settings", _save)
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
     cmd.cmd_set(
         state,
         "measures=every measuresstep=2 tuning=renaissance "
@@ -105,7 +105,8 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "spacing=10 spacingmode=spread flagredundant=off maxbars=4 maxchords=6 "
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
-        "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse",
+        "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
+        "maxrepeats=30",
         str(tmp_path / "cfg.toml"),
     )
     assert state.settings["measures"] == "every"
@@ -134,6 +135,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["showextras"] == "on"
     assert state.settings["showtactus"] == "on"
     assert state.settings["italianorient"] == "reverse"
+    assert state.settings["maxrepeats"] == "30"
     assert state.piece.title == "Title"
     assert state.piece.author == "Author"
     assert state.piece.composer == "Composer"
@@ -145,24 +147,24 @@ def test_cmd_ascii_and_midicmd(monkeypatch: pytest.MonkeyPatch) -> None:
     assert state.ascii_preview is True
     cmd.cmd_ascii(state, "off")
     assert state.ascii_preview is False
-    monkeypatch.setattr(cmd.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(cmd_ops.shutil, "which", lambda _name: None)
     cmd.cmd_midicmd(state, "")
-    assert state.message == "No MIDI player"
+    assert state.message == "No MIDI player found"
 
 def test_cmd_open_tab_and_ft3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
     tab_piece = Piece(title="Tab", bars=[Bar()], strings=6)
     tab_data = TabData(tab_piece, {(0, 0, 0): "a"}, {(0, 0, 0): 4}, set(), 8)
-    monkeypatch.setattr("editor.command_ops.load_tab_data", lambda _path: tab_data)
+    monkeypatch.setattr("oud.editor.command_ops.load_tab_data", lambda _path: tab_data)
     cmd.cmd_open(state, str(tmp_path / "file.tab"))
     assert state.piece.title == "Tab"
     assert state.bar_width == 8
-    monkeypatch.setattr("editor.command_ops.load_tab_data", lambda _path: None)
-    monkeypatch.setattr("editor.command_ops.load_tab", lambda _path: tab_piece)
+    monkeypatch.setattr("oud.editor.command_ops.load_tab_data", lambda _path: None)
+    monkeypatch.setattr("oud.editor.command_ops.load_tab", lambda _path: tab_piece)
     cmd.cmd_open(state, str(tmp_path / "other.tab"))
     assert state.piece.title == "Tab"
     ft3_piece = Piece(title="Ft3", bars=[Bar()], strings=6)
-    monkeypatch.setattr("editor.command_ops.load_ft3", lambda _path: ft3_piece)
+    monkeypatch.setattr("oud.editor.command_ops.load_ft3", lambda _path: ft3_piece)
     cmd.cmd_open(state, str(tmp_path / "file.ft3"))
     assert state.piece.title == "Ft3"
 
@@ -174,7 +176,14 @@ def test_cmd_write_and_ascii(tmp_path: Path) -> None:
     assert out_tab.exists()
     out_txt = tmp_path / "out.txt"
     cmd.cmd_write_ascii(state, str(out_txt))
-    assert out_txt.read_text(encoding="utf-8")
+    content = out_txt.read_text(encoding="utf-8")
+    assert content
+    state.screen_width = 40
+    state.screen_height = 8
+    cmd.cmd_write_ascii(state, str(out_txt))
+    lines = out_txt.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == state.screen_height
+    assert all(len(line) == state.screen_width for line in lines)
 
 
 def test_cmd_bar_and_chord() -> None:
@@ -188,7 +197,7 @@ def test_cmd_bar_and_chord() -> None:
     cmd.cmd_chord(state, "delete")
     assert state.piece.bars[state.cursor_bar].chords == []
     cmd.cmd_chord(state, "other")
-    assert state.message == "Chord action: insert/delete"
+    assert state.message == "Chord action: add/del"
 
 
 def test_cmd_stave_variants() -> None:
@@ -246,11 +255,11 @@ def test_cmd_midi_lilypond_pdf_play_source(
     def _start_midi(state: EditorState, start_bar: int | None = None, path: str | None = None) -> None:
         state.message = f"Played {start_bar} {path}"
 
-    monkeypatch.setattr(cmd, "export_midi", _export_midi)
-    monkeypatch.setattr(cmd, "export_lilypond", _export_lilypond)
-    monkeypatch.setattr(cmd, "print_lilypond_pdf", _print_pdf)
-    monkeypatch.setattr(cmd, "save_settings", _save)
-    monkeypatch.setattr(cmd, "start_midi", _start_midi)
+    monkeypatch.setattr(cmd_ops, "export_midi", _export_midi)
+    monkeypatch.setattr(cmd_ops, "export_lilypond", _export_lilypond)
+    monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    monkeypatch.setattr("oud.editor.midi_control.start_midi", _start_midi)
 
     cmd.cmd_midi(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Midi ok"
@@ -265,14 +274,14 @@ def test_cmd_midi_lilypond_pdf_play_source(
     cmd.cmd_source(state, "")
     assert state.message == "No source path"
     state.path = str(tmp_path / "src.tab")
-    monkeypatch.setattr(cmd.shutil, "which", lambda _name: "/usr/bin/less")
+    monkeypatch.setattr(cmd_ops.shutil, "which", lambda _name: "/usr/bin/less")
     ran: dict[str, list[str]] = {}
 
     def _run(args: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         ran["args"] = args
         return subprocess.CompletedProcess(args, 0)
 
-    monkeypatch.setattr(cmd.subprocess, "run", _run)
+    monkeypatch.setattr(cmd_ops.subprocess, "run", _run)
     cmd.cmd_source(state, "")
     assert ran["args"][0].endswith("less")
     cmd.cmd_tool(state, "gridflags", str(tmp_path / "cfg.toml"))

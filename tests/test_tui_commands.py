@@ -1,9 +1,9 @@
-from core.model import Bar, Chord, Note, Piece
-from editor.command_ops import convert_overrides
-from editor.edit_ops import apply_duration
-from editor.state import EditorState
-from editor.verify_ops import bar_duration_sum
-from tui.commands import _parse_time_sig_value, _tuning_preset
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.editor.command_ops import convert_overrides
+from oud.editor.edit_ops import apply_duration
+from oud.editor.state import EditorState
+from oud.editor.verify_ops import bar_duration_sum
+from oud.tui.commands import _parse_time_sig_value, _tuning_preset
 
 
 def _state() -> EditorState:
@@ -20,6 +20,7 @@ def test_parse_time_sig_value() -> None:
 
 def test_tuning_preset() -> None:
     assert _tuning_preset("renaissance") == "g2c3f3a3d4g4"
+    assert _tuning_preset("renaissance7") == "f2g2c3f3a3d4g4"
     assert _tuning_preset("unknown") is None
 
 
@@ -46,7 +47,7 @@ def test_apply_duration_replaces_column() -> None:
     state.durations[(0, 1, 0)] = 4
     apply_duration(state, (0, 0, 0), 8)
     assert state.durations[(0, 0, 0)] == 8
-    assert (0, 1, 0) not in state.durations
+    assert state.durations[(0, 1, 0)] == 4
 
 
 def test_convert_overrides_updates_message() -> None:

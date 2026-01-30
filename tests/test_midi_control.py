@@ -3,9 +3,9 @@ from __future__ import annotations
 import subprocess
 from typing import cast
 
-from core.model import Bar, Piece
-from editor.midi_control import midi_output_path, start_midi, stop_midi
-from editor.state import EditorState
+from oud.core.model import Bar, Piece
+from oud.editor.midi_control import midi_output_path, start_midi, stop_midi
+from oud.editor.state import EditorState
 
 
 class _Proc:
@@ -51,8 +51,8 @@ def test_start_midi(monkeypatch) -> None:
     def _play_midi(_path: str, *_, **__) -> tuple[str, _Proc]:
         return ("Playing", _Proc())
 
-    monkeypatch.setattr("editor.midi_control.export_midi", _export_midi)
-    monkeypatch.setattr("editor.midi_control.play_midi", _play_midi)
+    monkeypatch.setattr("oud.editor.midi_control.export_midi", _export_midi)
+    monkeypatch.setattr("oud.editor.midi_control.play_midi", _play_midi)
     start_midi(state, start_bar=1, path="out.mid", bpm=120)
     messages.append(state.message)
     assert state.midi_proc is not None

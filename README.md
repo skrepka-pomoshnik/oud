@@ -16,7 +16,7 @@ python3 app.py examples/example.ft3
 
 - `h/j/k/l` move
 - `i` insert mode, `esc` normal mode
-- `r` rest (insert), `R` replace one cell
+- `r` replace one cell (normal), `r` rest (insert)
 - `:` command mode, `?` help
 - `x` delete note (normal mode), space clears in insert mode
 - `o/O` add bar after/before, `+/-` delete bar
@@ -81,3 +81,16 @@ midipatch = 24
 ## Rest rendering
 
 Rests are shown as `_.` in the staff.
+
+## Architecture (quick)
+
+- `oud/core/` parsing, models, time/tuning/render utilities
+- `oud/editor/` state, ops, undo/redo, commands
+- `oud/tui/` input, controller, viewport
+- `oud/ui/` curses rendering and layout
+- `oud/exports/` tab/ly/midi exporters
+- `oud/plugins/` self-contained plugins
+
+Entry points:
+- `app.py` (root wrapper) → `oud/app.py`
+- `cli.py` (root wrapper) → `oud/cli.py`
