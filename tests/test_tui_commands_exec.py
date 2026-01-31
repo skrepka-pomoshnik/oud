@@ -288,7 +288,7 @@ def test_cmd_midi_lilypond_pdf_play_source(
     cmd.cmd_tool(state, "comments", str(tmp_path / "cfg.toml"))
     cmd.cmd_tool(state, "reflow", str(tmp_path / "cfg.toml"))
     cmd.cmd_tool(state, "unknown", str(tmp_path / "cfg.toml"))
-    assert state.message == "Tool: reflow|gridflags|comments"
+    assert state.message == "Tool: reflow|gridflags|flagstyle|comments"
     cmd.cmd_barline(state, "thin")
     cmd.cmd_barline(state, "nope")
     assert state.message == "Barline must be thin/thick/double/hidden/pale"

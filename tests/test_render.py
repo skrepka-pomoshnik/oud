@@ -143,8 +143,8 @@ def test_chord_positions_spread() -> None:
 def test_flag_row_marks_positions() -> None:
     positions = [(0, 4, False), (3, 8, False)]
     flags = flag_row(positions, bar_width=6)
-    assert flags[0] == "I"
-    assert flags[3] == "I"
+    assert flags[0] == "|"
+    assert flags[3] == "|"
     assert flags[4] == "\\"
 
 

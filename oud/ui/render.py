@@ -6,6 +6,7 @@ from oud.core.tuning_utils import parse_bass_strings
 from oud.core.view_model import (
     Piece,
     _bar_annotations,
+    _bar_compact_width,
     _bar_display_width,
     _bar_durations,
     _bar_number_for_index,
@@ -14,6 +15,7 @@ from oud.core.view_model import (
     _bars_fit,
     _filter_redundant_positions,
     _flag_positions_all,
+    _infer_time_signature,
     _inline_bass_row,
     _next_system_start,
     _parse_time_signature,
@@ -366,6 +368,7 @@ def render_piece(  # noqa: PLR0912, C901
             default_duration,
             dotted,
             max_chords=max_chords,
+            compact=spacing_fill in ("compact", "smart"),
         )
     else:
         bars_per_line = max(1, usable_width // (bar_width + bar_gap))
@@ -407,7 +410,17 @@ def render_piece(  # noqa: PLR0912, C901
         bar_widths: list[int] = []
         if spacing_mode == "auto":
             bar_widths.extend(
-                _bar_display_width(
+                _bar_compact_width(
+                    piece.bars[abs_bar],
+                    abs_bar,
+                    bar_width,
+                    overrides,
+                    durations,
+                    default_duration,
+                    dotted,
+                )
+                if spacing_fill in ("compact", "smart")
+                else _bar_display_width(
                     piece.bars[abs_bar],
                     abs_bar,
                     bar_width,
@@ -423,16 +436,11 @@ def render_piece(  # noqa: PLR0912, C901
                 return sum(widths) + bar_gap * max(0, len(widths) - 1)
 
             total_width = total_bar_width(bar_widths)
-            if bar_widths and total_width > usable_width:
-                overflow = total_width - usable_width
-                idx = len(bar_widths) - 1
-                while overflow > 0 and any(width > 3 for width in bar_widths):
-                    if bar_widths[idx] > 3:
-                        bar_widths[idx] -= 1
-                        overflow -= 1
-                    idx -= 1
-                    if idx < 0:
-                        idx = len(bar_widths) - 1
+            while bar_widths and total_width > usable_width:
+                bar_widths.pop()
+                bar_indices = bar_indices[: len(bar_widths)]
+                total_width = total_bar_width(bar_widths)
+            bar_end = bar_start + len(bar_widths)
             total_width = total_bar_width(bar_widths)
             if bar_widths and spacing_fill == "stretch" and total_width < usable_width:
                 extra = usable_width - total_width
@@ -450,10 +458,15 @@ def render_piece(  # noqa: PLR0912, C901
             _safe_addstr(stdscr, row_start + (rows["staff"] or 0) + display_idx, 0, label)
 
         bar_x = left_margin
-        if spacing_mode == "auto" and bar_widths and spacing_fill == "center":
+        gap_sizes: list[int] | None = None
+        if spacing_mode == "auto" and bar_widths:
             total_width = sum(bar_widths) + bar_gap * max(0, len(bar_widths) - 1)
-            extra_left = max(0, (usable_width - total_width) // 2)
-            bar_x += extra_left
+            if spacing_fill == "center":
+                extra_left = max(0, (usable_width - total_width) // 2)
+                bar_x += extra_left
+            elif spacing_fill == "smart":
+                gaps = max(0, len(bar_widths) - 1)
+                gap_sizes = [bar_gap for _ in range(gaps)]
         for local_idx, bar in enumerate(piece.bars[bar_start:bar_end]):
             abs_bar = bar_start + local_idx
             style = settings.get("style", "french")
@@ -493,7 +506,12 @@ def render_piece(  # noqa: PLR0912, C901
                 step_value,
             )
             key_label = settings.get("key", "")
-            beats, _unit, sig_label = _parse_time_signature(settings.get("time", "C"))
+            time_setting = settings.get("time", "C")
+            time_value = bar.time_sig or time_setting
+            if time_value in ("auto", "detect"):
+                inferred = _infer_time_signature(bar, default_duration)
+                time_value = inferred or "C"
+            beats, _unit, sig_label = _parse_time_signature(time_value)
             tactus = _tactus_row(bar_width, beats)
             barline = bar.barline or "|"
             repeat = bar.repeat or ""
@@ -565,7 +583,7 @@ def render_piece(  # noqa: PLR0912, C901
                     _filter_redundant_positions(positions) if hide_redundant else positions
                 )
                 flagstyle = settings.get("flagstyle", "standard")
-                stem = "I"
+                stem = "|"
                 flag = "\\"
                 if flagstyle == "italian":
                     stem = "I"
@@ -623,13 +641,13 @@ def render_piece(  # noqa: PLR0912, C901
                 if show_dur and rows["dur"] is not None:
                     dur_cells = [" " for _ in range(bar_width)]
                     last: int | None = None
-                    for col, denom, _dot in positions:
+                    for col, denom, dot in positions:
                         if hide_redundant:
                             if denom != last:
-                                dur_cells[col] = duration_display(denom)
+                                dur_cells[col] = duration_display(denom, dot)
                                 last = denom
                         else:
-                            dur_cells[col] = duration_display(denom)
+                            dur_cells[col] = duration_display(denom, dot)
                     if spacing_mode == "auto":
                         content_width = max(1, display_width - barpad * 2)
                         dur_cells = _scale_row(dur_cells, content_width, " ")
@@ -688,7 +706,7 @@ def render_piece(  # noqa: PLR0912, C901
                         dotted=dotted,
                     )
                 flagstyle = settings.get("flagstyle", "standard")
-                stem = "I"
+                stem = "|"
                 flag = "\\"
                 if flagstyle == "italian":
                     stem = "I"
@@ -814,7 +832,10 @@ def render_piece(  # noqa: PLR0912, C901
                         )
 
             if spacing_mode == "auto":
-                bar_x += display_width + bar_gap
+                if gap_sizes is not None and local_idx < len(gap_sizes):
+                    bar_x += display_width + gap_sizes[local_idx]
+                else:
+                    bar_x += display_width + bar_gap
             else:
                 bar_x += bar_width + bar_gap
 

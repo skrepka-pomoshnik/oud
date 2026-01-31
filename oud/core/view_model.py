@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 from oud.core.model import Bar, Piece
 from oud.core.render_utils import (
     bar_cells,
@@ -24,6 +26,7 @@ from oud.ui.layout_map import (
 
 __all__ = [  # noqa: RUF022
     "_bar_annotations",
+    "_bar_compact_width",
     "_bar_display_width",
     "_bar_durations",
     "_bar_flags",
@@ -46,6 +49,7 @@ __all__ = [  # noqa: RUF022
     "_string_label",
     "_tactus_row",
     "_tuning_labels",
+    "_infer_time_signature",
     "Bar",
     "Piece",
     "bar_cells",
@@ -59,6 +63,91 @@ __all__ = [  # noqa: RUF022
     "flag_row",
     "note_type_to_denom",
 ]
+
+
+def _bar_compact_width(
+    bar: Bar,
+    bar_index: int,
+    bar_width: int,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    default_duration: int,
+    dotted: set[tuple[int, int]] | None = None,
+) -> int:
+    max_string = 5
+    for (b, s, _c) in overrides:
+        if b == bar_index:
+            max_string = max(max_string, s)
+    for (b, s, _c) in durations:
+        if b == bar_index:
+            max_string = max(max_string, s)
+    strings = max_string + 1
+    max_slash, max_dot = _bar_flag_span(
+        bar,
+        bar_index,
+        strings,
+        overrides,
+        durations,
+        default_duration,
+        dotted,
+    )
+    count = _bar_note_count(bar, bar_index, bar_width, overrides, durations, default_duration)
+    count = max(1, count)
+    min_flag_width = 2 + max_slash + max_dot
+    width_needed = min_flag_width
+    tail_pad = 1
+    max_span = max(1, 1 + max_slash + max_dot)
+    if bar.chords:
+        positions = chord_positions(bar, bar_width, default_duration)
+        spans: list[int] = []
+        for col, denom, dot in positions:
+            span = 1 + flag_count(denom) + (1 if dot else 0)
+            width_needed = max(width_needed, col + span + 1 + tail_pad)
+            spans.append(span)
+    else:
+        positions = flag_positions_from_durations(
+            durations,
+            bar_index,
+            strings,
+            bar_width,
+            default_duration,
+            dotted=dotted,
+        )
+        spans = []
+        for col, denom, dot in positions:
+            span = 1 + flag_count(denom) + (1 if dot else 0)
+            width_needed = max(width_needed, col + span + 1 + tail_pad)
+            spans.append(span)
+    if spans:
+        width_needed = max(width_needed, sum(spans) + len(spans) + tail_pad)
+    else:
+        width_needed = max(width_needed, (count - 1) * 2 + 1 + max_span + tail_pad)
+    return max(3, width_needed)
+
+
+def _infer_time_signature(bar: Bar, default_duration: int = 4) -> str | None:
+    if not bar.chords:
+        return None
+    total = Fraction(0, 1)
+    max_denom = 0
+    for chord in bar.chords:
+        denom = note_type_to_denom(chord.note_type) or default_duration
+        max_denom = max(max_denom, denom)
+        dur = Fraction(1, denom)
+        if chord.dotted:
+            dur = dur * Fraction(3, 2)
+        total += dur
+    if total <= 0:
+        return None
+    if total == Fraction(3, 8) and max_denom <= 8:
+        return "3/4"
+    for unit in (4, 8, 2, 1):
+        beats = total * unit
+        if beats.denominator == 1:
+            beats_int = int(beats.numerator)
+            if 1 <= beats_int <= 12:
+                return f"{beats_int}/{unit}"
+    return None
 
 
 def _tuning_labels(  # noqa: C901, PLR0912
@@ -252,7 +341,26 @@ def _bar_display_width(
     count = _bar_note_count(bar, bar_index, bar_width, overrides, durations, default_duration)
     count = max(1, count)
     min_flag_width = 2 + max_slash + max_dot
-    return max(3, (count * 2) + 1, min_flag_width)
+    width_needed = min_flag_width
+    if bar.chords:
+        positions = chord_positions(bar, bar_width, default_duration)
+        for col, denom, dot in positions:
+            span = 1 + flag_count(denom) + (1 if dot else 0)
+            width_needed = max(width_needed, col + span + 1)
+    else:
+        positions = flag_positions_from_durations(
+            durations,
+            bar_index,
+            strings,
+            bar_width,
+            default_duration,
+            dotted=dotted,
+        )
+        for col, denom, dot in positions:
+            span = 1 + flag_count(denom) + (1 if dot else 0)
+            width_needed = max(width_needed, col + span + 1)
+    min_unit = max(2, 2 + max_slash + max_dot)
+    return max(3, width_needed, (count * min_unit) + 1)
 
 
 def _bar_flag_span(
@@ -313,21 +421,33 @@ def _bars_fit(
     dotted: set[tuple[int, int]] | None,
     *,
     max_chords: int = 0,
+    compact: bool = False,
 ) -> int:
     if usable_width <= 0:
         return 1
     count = 0
     total = 0
     for idx in range(bar_offset, len(bars)):
-        display = _bar_display_width(
-            bars[idx],
-            idx,
-            bar_width,
-            overrides,
-            durations,
-            default_duration,
-            dotted,
-        )
+        if compact:
+            display = _bar_compact_width(
+                bars[idx],
+                idx,
+                bar_width,
+                overrides,
+                durations,
+                default_duration,
+                dotted,
+            )
+        else:
+            display = _bar_display_width(
+                bars[idx],
+                idx,
+                bar_width,
+                overrides,
+                durations,
+                default_duration,
+                dotted,
+            )
         if max_chords > 0:
             display = max(display, (max_chords * 2) + 1)
         needed = display if count == 0 else display + bar_gap
@@ -451,10 +571,11 @@ def _bar_durations(
                 continue
             is_dotted = dotted is not None and (bar_index, col) in dotted
             if denom != last or is_dotted:
-                row[col] = duration_display(denom)
+                row[col] = duration_display(denom, is_dotted)
                 last = denom
         else:
-            row[col] = duration_display(denom)
+            is_dotted = dotted is not None and (bar_index, col) in dotted
+            row[col] = duration_display(denom, is_dotted)
     return row
 
 

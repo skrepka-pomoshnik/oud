@@ -100,13 +100,14 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
                 fret_byte = bar_data[ptr + 1]
                 fret = fret_byte - 0x61 if 0x61 <= fret_byte <= 0x7A else fret_byte - 0x30
             elif bar_data[ptr] == 8:
-                if bar_data[ptr + 4] == 0x00:
+                flag = bar_data[ptr + 4]
+                if flag == 0x00:
                     string = 7
                     fret = bar_data[ptr + 1] - 0x61
-                elif bar_data[ptr + 4] == 0x20:
+                elif flag & 0x20:
                     string = bar_data[ptr + 1] - 0x30 + 7
                     fret = 0
-                elif bar_data[ptr + 4] == 0x48:
+                elif flag & 0x48 == 0x48:
                     string = 8
                     fret = bar_data[ptr + 1] - 0x61
 

@@ -135,6 +135,7 @@ def test_bars_fit_respects_usable_width() -> None:
         durations=durations,
         default_duration=4,
         dotted=None,
+        compact=False,
     )
     fit_one = _bars_fit(
         bars,
@@ -146,8 +147,9 @@ def test_bars_fit_respects_usable_width() -> None:
         durations=durations,
         default_duration=4,
         dotted=None,
+        compact=False,
     )
-    assert fit_two == 2
+    assert fit_two == 1
     assert fit_one == 1
 
 

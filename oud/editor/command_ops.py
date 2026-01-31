@@ -447,7 +447,15 @@ def apply_set_command(state: EditorState, args: str, config_path: str) -> None: 
                 continue
             state.settings["showtuning"] = value
         elif key == "flagstyle":
-            allowed = {"standard", "italian", "thin", "board", "capirola", "englishgrid", "continental"}
+            allowed = {
+                "standard",
+                "italian",
+                "thin",
+                "board",
+                "capirola",
+                "englishgrid",
+                "continental",
+            }
             if value not in allowed:
                 state.message = (
                     "Flagstyle must be standard/italian/thin/board/capirola/englishgrid/continental"
@@ -487,8 +495,8 @@ def apply_set_command(state: EditorState, args: str, config_path: str) -> None: 
                 continue
             state.settings["spacingmode"] = value
         elif key == "spacingfill":
-            if value not in ("stretch", "center"):
-                state.message = "Spacingfill must be stretch/center"
+            if value not in ("stretch", "center", "compact", "smart"):
+                state.message = "Spacingfill must be stretch/center/compact/smart"
                 continue
             state.settings["spacingfill"] = value
         elif key == "flagredundant":
@@ -712,6 +720,26 @@ def cmd_tool(state: EditorState, action: str, config_path: str) -> None:
         save_settings(config_path, state.settings)
         state.message = f"Flagstyle {next_value}"
         return
+    if value in ("flagstyle", "flagstyles", "flagcycle"):
+        styles = [
+            "standard",
+            "thin",
+            "board",
+            "italian",
+            "capirola",
+            "englishgrid",
+            "continental",
+        ]
+        current = state.settings.get("flagstyle", "standard")
+        try:
+            idx = styles.index(current)
+        except ValueError:
+            idx = -1
+        next_value = styles[(idx + 1) % len(styles)]
+        state.settings["flagstyle"] = next_value
+        save_settings(config_path, state.settings)
+        state.message = f"Flagstyle {next_value}"
+        return
     if value == "comments":
         prev = dict(state.annotations)
         state.annotations.clear()
@@ -724,16 +752,19 @@ def cmd_tool(state: EditorState, action: str, config_path: str) -> None:
         )
         state.message = "Annotations cleared"
         return
-    state.message = "Tool: reflow|gridflags|comments"
+    state.message = "Tool: reflow|gridflags|flagstyle|comments"
 
 
 def cmd_time(state: EditorState, value: str) -> None:
-    parsed = parse_time_signature_value(value)
-    if parsed is None:
-        state.message = "Invalid time signature"
-        return
-    beats, unit = parsed
-    text = f"{beats}/{unit}"
+    if value in ("auto", "detect"):
+        text = "auto"
+    else:
+        parsed = parse_time_signature_value(value)
+        if parsed is None:
+            state.message = "Invalid time signature"
+            return
+        beats, unit = parsed
+        text = f"{beats}/{unit}"
     prev_setting = state.settings.get("time")
     prev_bar = None
     state.settings["time"] = text

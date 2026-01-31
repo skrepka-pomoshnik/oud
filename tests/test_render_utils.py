@@ -58,7 +58,7 @@ def test_flag_row_marks_stems_flags_and_dots() -> None:
         ],
         bar_width=6,
     )
-    assert row == ["I", "\\", "I", "\\", "\\", "."]
+    assert row == ["|", "\\", "|", "\\", "\\", "."]
 
 
 def test_flag_row_style_supports_alt_flags() -> None:
@@ -74,6 +74,32 @@ def test_flag_row_style_supports_stem_width() -> None:
 def test_stem_row_style_draws_stems_only() -> None:
     row = stem_row_style([(1, 8, False)], 4, stem="|")
     assert row == [" ", "|", " ", " "]
+
+
+def test_flag_row_style_places_dot_after_flags_when_space() -> None:
+    row = flag_row_style([(0, 16, True)], 6, stem="|", flag="\\")
+    # 16th = two flags, dot should be after stem+flags when space allows.
+    assert row == ["|", "\\", "\\", ".", " ", " "]
+
+
+def test_flag_row_style_frog_galliard_bar13_spacing() -> None:
+    positions = [
+        (0, 16, True),
+        (2, 32, False),
+        (3, 16, False),
+        (5, 16, False),
+        (7, 16, False),
+        (9, 16, False),
+    ]
+    row = flag_row_style(positions, 24, stem="|", flag="\\")
+    text = "".join(row)
+    # Dotted 16th should show dot after its flags.
+    assert text.startswith("|\\\\.")
+    # Ensure at least one space between visible groups.
+    groups = [idx for idx, ch in enumerate(text) if ch == "|"]
+    assert len(groups) >= 3
+    assert groups[1] - groups[0] >= 4
+    assert groups[2] - groups[1] >= 3
 
 
 def test_bar_cells_string_mapping() -> None:

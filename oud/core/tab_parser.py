@@ -126,6 +126,7 @@ def load_tab(path: str, strings: int = 6) -> Piece:  # noqa: PLR0912, C901
     last_note_type: int | None = None
     saw_letters = False
     saw_digits = False
+    default_time: str | None = None
     with Path(path).open(encoding="utf-8", errors="ignore") as f:
         for raw in f:
             line = raw.rstrip("\n")
@@ -139,10 +140,25 @@ def load_tab(path: str, strings: int = 6) -> Piece:  # noqa: PLR0912, C901
                 header = line[1:].strip()
                 if header.lower().startswith("tuning:"):
                     piece.tuning = header.split(":", 1)[1].strip()
+                elif header.lower().startswith(("time:", "timesig:", "meter:")):
+                    value = header.split(":", 1)[1].strip()
+                    parsed = _parse_time_signature(value)
+                    default_time = parsed
+                    if current_bar.time_sig is None and parsed:
+                        current_bar.time_sig = parsed
                 elif header.lower().startswith("subtitle:"):
                     piece.subtitle = header.split(":", 1)[1].strip()
                 elif header.lower().startswith("footnote:"):
                     piece.footnote = header.split(":", 1)[1].strip()
+                continue
+            if line.startswith("$"):
+                header = line[1:].strip()
+                if header.lower().startswith(("time=", "timesig=", "meter=")):
+                    value = header.split("=", 1)[1].strip()
+                    parsed = _parse_time_signature(value)
+                    default_time = parsed
+                    if current_bar.time_sig is None and parsed:
+                        current_bar.time_sig = parsed
                 continue
             if line.startswith("-tuning "):
                 piece.tuning = line.split(" ", 1)[1].strip()
@@ -154,7 +170,7 @@ def load_tab(path: str, strings: int = 6) -> Piece:  # noqa: PLR0912, C901
             if line.startswith("b"):
                 if current_bar.chords or current_bar.notes:
                     piece.bars.append(current_bar)
-                current_bar = Bar()
+                current_bar = Bar(time_sig=default_time)
                 continue
             if line.startswith("S"):
                 current_bar.time_sig = _parse_time_signature(line.strip())

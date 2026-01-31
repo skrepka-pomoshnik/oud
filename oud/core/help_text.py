@@ -45,21 +45,24 @@ HELP_LINES = [
     ":annot <text>|clear               :highlight on/off",
     ":slur start/end/clear             :tie start/end/clear",
     ":hold start/end/clear",
-    ":set style=... strings=... tuning=... tuninglabels=... flagstyle=... flagstems=... time=...",
+    (
+        ":set style=... strings=... tuning=... tuninglabels=... "
+        "flagstyle=... flagstems=... time=... (or auto)"
+    ),
     ":set keys=vim|vim+arrows|casual|casual+arrows",
     (
         ":set spacing=... barsperline=... maxbars=... maxchords=... bargap=... "
         "linelen=... staffthick=... fontstyle=..."
     ),
     ":set flagredundant=on|off",
-    ":set spacingmode=packed|spread|auto spacingfill=stretch|center showtuning=on|off",
+    ":set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart showtuning=on|off",
     ":set key=... countdots=on/off grid=on/off",
     ":set measuresstep=... (used with measures=every)",
     ":set italianorient=normal|reverse italianmultifret=on|off viewinvert=on|off",
     ":set frenchc=normal|alt frenche=normal|tail",
     ":set midipatch=... midigate=... soundfont=... tempo=...",
     ":set charstyle=... title=... author=... composer=...",
-    ":tool reflow|gridflags|comments",
+    ":tool reflow|gridflags|flagstyle|comments",
 ]
 
 

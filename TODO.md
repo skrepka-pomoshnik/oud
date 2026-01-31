@@ -12,32 +12,17 @@ Constraints
 - Python 3.10 only, macOS/Linux, pure curses, minimal deps.
 
 P0
-- [x] add TODO/DONE to .gitignore; fold about_project.md into README and remove it; move code into oud/ package.
 
 P1 (Suckless + Maintainable Core)
-- [x] Action-dispatch helpers: reuse a single action-map pattern in key handlers.
-- [x] Single command surface: move TUI command logic into editor ops only.
-- [x] Simplify editor actions: split normal/insert handlers into smaller pure helpers.
 
 P2 (Core Features)
-- [x] Cursor helpers: centralize clamp/offset logic in controller utils.
-- [x] Message constants: reduce inline strings, standardize status wording.
-- [x] Declarative layout map: define screen regions and row offsets in one place.
-- [ ] TUI test coverage: ui/tui modules at 70% coverage (render + input + commands). (started: tui/controller tests)
-- [ ] Tab render tests (VexFlow parity): string->row mapping, flag/stem positions, dotted flags, beams/grid grouping, ties/slides, grace notes. (partial: flags/durations)
-- [ ] Layout/spacing tests: per-bar width allocation, alignment across rows, mixed durations, right-justify behavior.
-- [ ] Conversion tests (LuteScribe parity): .tab/.ft3 -> internal -> .tab/.ft3 golden files; parse/roundtrip on sample inputs. (basic .tab roundtrip + golden fixture added)
-- [] Analyze refs again for ideas and features to add to TODO P3.
+- [ ] Suckless architecture: prompt/history/completion as a shared tiny module; keymap remap hooks; buffer list as lightweight quick menu (neatvi q).
 - [ ] Playback animation: highlight current bar/column while MIDI is playing.
 - [ ] Vim parity: f/F/t/T + ;/, char search; * / # word search; n/N; 0/^/$; gg/G; % match; `m/'m marks (marks are comments that can be visible).
 - [ ] Vim parity: command history + ^A autocomplete in prompts, search history keys.
 - [ ] Bars per line/system: limit bars per row (0 = auto).
-- [x] LilyPond export: headers, tuning, time sig, barlines, repeats.
-- [x] LilyPond export: ornaments/slurs/ties/holds mapping or omit.
 - [ ] Bass course entry: slash shorthand (/ // ///) and numeric bass labels (7-13 or 1-7).
 - [ ] Inline bass display: show extra courses as in-place rows (e.g. `---` / `-a-` under staff) instead of full extra lines.
-- [x] Inline bass labels: numeric (preferred) and slash styles, editable rows.
-- [x] Bass string add guard: require bassstrings setting; warn when none configured.
 - [ ] Flag styles: English grid beams vs continental single flags.
 - [ ] Tuning presets for 7-13 course lutes and baroque tunings; show in header.
 - [ ] Ornaments: left-hand signs, right-hand arpeggio/separee, fingering signs, rest/dynamics/fermata/coda/repeats.
@@ -49,7 +34,15 @@ P2 (Core Features)
 - [ ] Reprise support: repeat/da capo markers and render cues.
 - [ ] MusicXML import/export support (see refs).
 - [] every tui : command should have at least 1 test
-- [ ] Suckless architecture: prompt/history/completion as a shared tiny module; keymap remap hooks; buffer list as lightweight quick menu (neatvi q).
+- [] Analyze refs again for ideas and features to add to TODO P3.
+
+Testing (P2)
+- [ ] TUI test coverage: ui/tui modules at 70% coverage (render + input + commands). (started: tui/controller tests)
+- [ ] Tab render tests (VexFlow parity): string->row mapping, flag/stem positions, dotted flags, beams/grid grouping, ties/slides, grace notes. (partial: flags/durations)
+- [ ] Rendering matrix tests: cover mixed durations/chords, dotted flags, collisions, auto spacing (no lost notes/stems), multiple flag styles, bass rows on/off.
+- [ ] Layout/spacing tests: per-bar width allocation, alignment across rows, mixed durations, right-justify behavior.
+- [ ] Conversion tests (LuteScribe parity): .tab/.ft3 -> internal -> .tab/.ft3 golden files; parse/roundtrip on sample inputs. (basic .tab roundtrip + golden fixture added)
+- [ ] Add Spanish tab support, its actually like italian tab, but inverted string order.
 
 P3 (Advanced + Parity)
 - [ ] MEI import/export support (see refs).
@@ -58,7 +51,7 @@ P3 (Advanced + Parity)
 - [ ] Plugin protocol: generic plugin interface (root_items/open/download/help_path).
 - [ ] Export tablature as graphics in multiple formats.
 - [ ] Export tablature/transcription to MEI.
-- [ ] Add German/Spanish tab support.
+- [ ] Add German tab support.
 - [ ] Style presets: historical tablature fonts/layouts per source.
 - [ ] Text blocks: font/size/color for annotations and captions.
 - [ ] End-of-piece arabesques and grace notes.

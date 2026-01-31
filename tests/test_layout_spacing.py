@@ -52,6 +52,7 @@ def test_bars_fit_respects_usable_width_and_gap() -> None:
         durations=durations,
         default_duration=4,
         dotted=set(),
+        compact=False,
     )
     assert count == 2
 
@@ -69,5 +70,6 @@ def test_bars_fit_max_chords_min_width() -> None:
         default_duration=4,
         dotted=set(),
         max_chords=4,
+        compact=False,
     )
     assert count == 1

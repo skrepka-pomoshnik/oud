@@ -41,3 +41,9 @@ def test_load_ft3_cpiece_length_prefix(tmp_path) -> None:
         f.write(payload)
     piece = load_ft3(str(path))
     assert piece.title == "Fancy"
+
+
+def test_frog_galliard_bar8_includes_bass() -> None:
+    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    bar = piece.bars[7]
+    assert any(note.string >= 7 for note in bar.notes)

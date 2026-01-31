@@ -149,12 +149,14 @@ def bar_cells_from_chords(
     return cells
 
 
-def duration_display(duration: int) -> str:
+def duration_display(duration: int, dotted: bool = False) -> str:
     if duration == 16:
-        return "6"
-    if duration == 32:
-        return "3"
-    return str(duration)
+        text = "6"
+    elif duration == 32:
+        text = "3"
+    else:
+        text = str(duration)
+    return f"{text}." if dotted else text
 
 
 def duration_flag(duration: int) -> str:
@@ -182,7 +184,7 @@ def flag_count(denom: int) -> int:
     return count
 
 
-def flag_row_style(
+def flag_row_style(  # noqa: C901
     positions: list[tuple[int, int, bool]],
     bar_width: int,
     *,
@@ -192,6 +194,7 @@ def flag_row_style(
     stem_width: int = 1,
 ) -> list[str]:
     row = [" " for _ in range(bar_width)]
+    dot_positions: list[int] = []
     for col, denom, dotted in positions:
         row[col] = stem
         for extra in range(1, max(1, stem_width)):
@@ -206,12 +209,18 @@ def flag_row_style(
         if dotted:
             pos = col + max(1, stem_width) + slash_count
             if pos < bar_width:
-                row[pos] = dot
+                dot_positions.append(pos)
+    for pos in dot_positions:
+        idx = pos
+        while idx < bar_width and row[idx] != " ":
+            idx += 1
+        if idx < bar_width:
+            row[idx] = dot
     return row
 
 
 def flag_row(positions: list[tuple[int, int, bool]], bar_width: int) -> list[str]:
-    return flag_row_style(positions, bar_width, stem="I", flag="\\")
+    return flag_row_style(positions, bar_width, stem="|", flag="\\")
 
 
 def stem_row_style(
