@@ -40,18 +40,21 @@ def _state() -> EditorState:
     return EditorState(piece, settings)
 
 
-def test_status_line_includes_path_cursor_and_modified(tmp_path) -> None:
+def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     state = _state()
     state.path = str(tmp_path / "example.ft3")
+    state.settings["filepath"] = state.path
     state.cursor_bar = 1
     state.cursor_string = 2
     state.cursor_col = 3
     state.modified = True
     line = status_line(state)
-    assert "example.ft3*" in line
+    assert "example.ft3" not in line
+    assert line.startswith("*bar:2")
     assert "bar:2" in line
-    assert "str:3" in line
     assert "beat:2/4" in line
+    assert "str:" not in line
+    assert "style:" not in line
 
 
 def test_parse_search_one_based() -> None:

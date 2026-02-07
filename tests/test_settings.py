@@ -32,7 +32,6 @@ def test_save_and_load_settings(tmp_path) -> None:
         "italianmultifret": "off",
         "viewinvert": "on",
         "frenchc": "alt",
-        "frenche": "tail",
     }
     save_settings(str(path), settings)
     loaded = load_settings(str(path))
@@ -64,4 +63,3 @@ def test_save_and_load_settings(tmp_path) -> None:
     assert loaded["italianmultifret"] == "off"
     assert loaded["viewinvert"] == "on"
     assert loaded["frenchc"] == "alt"
-    assert loaded["frenche"] == "tail"

@@ -18,7 +18,6 @@ def _bar_rows(state: EditorState, bar_index: int) -> list[list[str]]:
     bar = state.piece.bars[bar_index]
     style = state.settings.get("style", "french")
     french_c = state.settings.get("frenchc", "normal")
-    french_e = state.settings.get("frenche", "normal")
     cells = (
         bar_cells_from_chords(
             bar,
@@ -27,7 +26,6 @@ def _bar_rows(state: EditorState, bar_index: int) -> list[list[str]]:
             4,
             style,
             french_c=french_c,
-            french_e=french_e,
         )
         if bar.chords
         else bar_cells(
@@ -36,7 +34,6 @@ def _bar_rows(state: EditorState, bar_index: int) -> list[list[str]]:
             state.bar_width,
             style,
             french_c=french_c,
-            french_e=french_e,
         )
     )
     for (b_idx, s_idx, col), value in state.overrides.items():

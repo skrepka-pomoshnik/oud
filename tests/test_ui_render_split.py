@@ -123,6 +123,36 @@ def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:
     assert kwargs["stdscr"].refreshes == 1
 
 
+def test_render_piece_passes_explicit_barsperline_limit(monkeypatch) -> None:
+    called = {}
+
+    def _fake_render_systems(*_args, **kwargs):
+        called["bars_limit"] = kwargs["bars_per_line_limit"]
+
+    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    kwargs = _args("normal")
+    kwargs["settings"]["spacingmode"] = "auto"
+    kwargs["settings"]["barsperline"] = "4"
+    kwargs["settings"]["maxbars"] = "0"
+    render_piece(**kwargs)
+    assert called["bars_limit"] == 4
+
+
+def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
+    called = {}
+
+    def _fake_render_systems(*_args, **kwargs):
+        called["bars_limit"] = kwargs["bars_per_line_limit"]
+
+    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    kwargs = _args("normal")
+    kwargs["settings"]["spacingmode"] = "auto"
+    kwargs["settings"]["barsperline"] = "0"
+    kwargs["settings"]["maxbars"] = "0"
+    render_piece(**kwargs)
+    assert called["bars_limit"] == 0
+
+
 def test_render_header_hides_tuning_and_shows_readable_meta() -> None:
     kwargs = _args("normal")
     kwargs["piece"].title = "Lachrimae"

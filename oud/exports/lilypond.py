@@ -134,11 +134,9 @@ def _span_maps(
     return starts, ends
 
 
-def _french_override_fret(ch: str, french_c: str, french_e: str) -> int | None:
+def _french_override_fret(ch: str, french_c: str) -> int | None:
     if french_c == "alt" and ch == "r":
         return 2
-    if french_e == "tail" and ch == "E":
-        return 4
     letters = "abcdefghiklmnopqrst"
     if ch in letters:
         return letters.index(ch)
@@ -153,7 +151,6 @@ def _collect_override_chords(  # noqa: C901
     style: str,
     default_duration: int,
     french_c: str,
-    french_e: str,
 ) -> list[tuple[int, list[tuple[int, int]], int]]:
     cols = sorted({col for (b, _s, col) in overrides if b == bar_index})
     events: list[tuple[int, list[tuple[int, int]], int]] = []
@@ -170,7 +167,7 @@ def _collect_override_chords(  # noqa: C901
                 elif ch == "x":
                     notes.append((s_idx, 10))
             else:
-                fret = _french_override_fret(ch, french_c, french_e)
+                fret = _french_override_fret(ch, french_c)
                 if fret is not None:
                     notes.append((s_idx, fret))
         if not notes:
@@ -193,9 +190,29 @@ def _barline_token(bar: Bar) -> str:
         return ":|."
     if repeat == ".":
         return ".|."
+    if repeat == ":|:":
+        return ":|:"
     line = bar.barline or "|"
     mapping = {"|": "|", "||": "||", ":": ":", " ": ""}
     return mapping.get(line, "|")
+
+
+def _repeat_mark_token(bar: Bar) -> str | None:
+    repeat = (bar.repeat or "").strip()
+    mapping = {
+        "DC": "D.C.",
+        "DS": "D.S.",
+        "Fine": "Fine",
+        "Coda": "Coda",
+        "To Coda": "To Coda",
+        "DC al Fine": "D.C. al Fine",
+        "DC al Coda": "D.C. al Coda",
+        "DS al Fine": "D.S. al Fine",
+        "DS al Coda": "D.S. al Coda",
+    }
+    if repeat in mapping:
+        return f'\\mark \\markup {{ "{mapping[repeat]}" }}'
+    return None
 
 
 def export_lilypond(  # noqa: PLR0912, C901
@@ -252,8 +269,10 @@ def export_lilypond(  # noqa: PLR0912, C901
     default_duration = 4
     style = settings.get("style") or "french"
     french_c = settings.get("frenchc") or "normal"
-    french_e = settings.get("frenche") or "normal"
     for b_idx, bar in enumerate(piece.bars):
+        repeat_mark = _repeat_mark_token(bar)
+        if repeat_mark:
+            body.append(f"  {repeat_mark}")
         slur_starts, slur_ends = _span_maps(slurs, b_idx)
         tie_starts, _tie_ends = _span_maps(ties, b_idx)
         hold_starts, _hold_ends = _span_maps(holds, b_idx)
@@ -293,7 +312,6 @@ def export_lilypond(  # noqa: PLR0912, C901
                 style,
                 default_duration,
                 french_c,
-                french_e,
             )
             if not events:
                 body.append("  r4")

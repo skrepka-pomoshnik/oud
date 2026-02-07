@@ -43,6 +43,13 @@ def test_load_ft3_cpiece_length_prefix(tmp_path) -> None:
     assert piece.title == "Fancy"
 
 
+def test_load_ft3_uses_filename_when_title_missing(tmp_path) -> None:
+    path = tmp_path / "czarna_krowa.ft3"
+    path.write_bytes(b"\x03\x80")
+    piece = load_ft3(str(path))
+    assert piece.title == "czarna krowa"
+
+
 def test_frog_galliard_bar8_includes_bass() -> None:
     piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
     bar = piece.bars[7]
@@ -62,3 +69,44 @@ def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
         total += value
     assert abs(total - 3.0) < 0.01
     assert bar.time_sig == "O"
+
+
+def test_load_ft3_extracts_section_metadata_from_real_file() -> None:
+    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    assert piece.key == "GM"
+    assert piece.piece_type == "galliard"
+    assert piece.difficulty == "Challenge"
+    assert piece.ensemble == "7-course"
+    assert piece.title == "23a. The frog galliard"
+    assert piece.composer == "John Dowland"
+
+
+def test_load_ft3_parses_footnote_parts_from_annotation(tmp_path) -> None:
+    payload = (
+        b"CPiece{\\rtf1\\ansi Demo}\r\n~"
+        b"\x00\x00footnote: src info  editor name  commentary here\r\n"
+        b"source: source from annotation\r\n"
+        b"CBar\x03\x80"
+    )
+    path = tmp_path / "meta.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.footnote == "src info  editor name  commentary here"
+    assert piece.footnote_source == "src info"
+    assert piece.footnote_editor == "editor name"
+    assert piece.footnote_comment == "commentary here"
+    assert piece.source == "source from annotation"
+
+
+def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
+    paths = [
+        "examples/example.ft3",
+        "examples/26_lachrimae_galliard_in_G.ft3",
+        "lutemusic/23a_frogg_galliard_2.ft3",
+    ]
+    for path in paths:
+        piece = load_ft3(path)
+        title = piece.title or ""
+        assert "\\rtf" not in title
+        assert "{" not in title
+        assert "}" not in title

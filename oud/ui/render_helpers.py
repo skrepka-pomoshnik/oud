@@ -48,6 +48,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         return f"{label:<14}{value or ''}"
 
     fields = [
+        line("File:", settings.get("filepath")),
         line("Title:", piece.title),
         line("Subtitle:", piece.subtitle),
         line("Author:", piece.author),
@@ -74,7 +75,6 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("TuneLabels:", settings.get("tuninglabels")),
         line("ItalianOrient:", settings.get("italianorient")),
         line("French c:", settings.get("frenchc")),
-        line("French e:", settings.get("frenche")),
         line("FlagRedundant:", settings.get("flagredundant")),
     ]
     return ["INFO", "", *fields, "", "q/esc to close"]

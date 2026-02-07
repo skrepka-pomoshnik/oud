@@ -11,7 +11,6 @@ def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:
     bar = state.piece.bars[bar_index]
     style = state.settings.get("style", "french")
     french_c = state.settings.get("frenchc", "normal")
-    french_e = state.settings.get("frenche", "normal")
     cells = (
         bar_cells_from_chords(
             bar,
@@ -20,7 +19,6 @@ def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:
             4,
             style,
             french_c=french_c,
-            french_e=french_e,
         )
         if bar.chords
         else bar_cells(
@@ -29,7 +27,6 @@ def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:
             state.bar_width,
             style,
             french_c=french_c,
-            french_e=french_e,
         )
     )
     row = cells[row_index] if 0 <= row_index < len(cells) else ["-" for _ in range(state.bar_width)]

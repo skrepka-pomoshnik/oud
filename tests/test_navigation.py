@@ -59,3 +59,49 @@ def test_note_movement_uses_chord_positions() -> None:
     assert state.cursor_col == 0
     move_right_note(state)
     assert state.cursor_col == 3
+
+
+def test_note_movement_uses_grid_onset_columns() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.durations[(0, 0, 0)] = 4
+    state.durations[(0, 0, 2)] = 16
+    state.durations[(0, 0, 4)] = 8
+    state.cursor_bar = 0
+    state.cursor_col = 0
+    move_right_note(state)
+    assert state.cursor_col == 2
+    move_right_note(state)
+    assert state.cursor_col == 4
+
+
+def test_note_movement_crosses_bars_by_onset() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.durations[(0, 0, 6)] = 8
+    state.durations[(1, 0, 1)] = 4
+    state.cursor_bar = 0
+    state.cursor_col = 6
+    move_right_note(state)
+    assert state.cursor_bar == 1
+    assert state.cursor_col == 1
+    move_left_note(state)
+    assert state.cursor_bar == 0
+    assert state.cursor_col == 6
+
+
+def test_note_movement_prefers_notes_on_current_string() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.piece.bars[0] = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        ],
+    )
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 0
+    move_right_note(state)
+    assert state.cursor_col == 4

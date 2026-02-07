@@ -51,6 +51,7 @@ _BOOL_KEYS = {
 _INT_KEYS = {
     "maxbars",
     "barsperline",
+    "barpad",
     "maxchords",
     "maxrepeats",
     "linelen",
@@ -85,7 +86,6 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "basslabels": ({"numeric", "slash", "tuning"}, "Basslabels must be numeric/slash/tuning"),
     "italianorient": ({"normal", "reverse"}, "Italianorient must be normal/reverse"),
     "frenchc": ({"normal", "alt"}, "Frenchc must be normal/alt"),
-    "frenche": ({"normal", "tail"}, "Frenche must be normal/tail"),
 }
 
 

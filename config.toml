@@ -1,5 +1,5 @@
 [settings]
-barpad = 2
+barpad = 1
 barsperline = 0
 basslabels = "tuning"
 charstyle = "standard"
@@ -9,7 +9,7 @@ flagstems = "double"
 flagstyle = "standard"
 fontstyle = "modern"
 frenchc = "normal"
-frenche = "normal"
+frenchcshape = "normal"
 grid = "off"
 italianmultifret = "on"
 italianorient = "normal"

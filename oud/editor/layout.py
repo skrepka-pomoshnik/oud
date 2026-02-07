@@ -78,3 +78,21 @@ def system_range(state: EditorState, bar_index: int, per_line: int) -> tuple[int
         if start <= bar_index < end:
             return start, end
     return 0, len(state.piece.bars)
+
+
+def jump_system_row(state: EditorState, bar_index: int, delta: int, per_line: int) -> int:
+    starts = system_start_indices(state, len(state.piece.bars), per_line)
+    if not starts:
+        return 0
+    current_idx = 0
+    for idx, start in enumerate(starts):
+        end = starts[idx + 1] if idx + 1 < len(starts) else len(state.piece.bars)
+        if start <= bar_index < end:
+            current_idx = idx
+            break
+    current_start = starts[current_idx]
+    offset = max(0, bar_index - current_start)
+    target_idx = min(len(starts) - 1, max(0, current_idx + delta))
+    target_start = starts[target_idx]
+    target_end = starts[target_idx + 1] if target_idx + 1 < len(starts) else len(state.piece.bars)
+    return min(target_end - 1, target_start + offset)

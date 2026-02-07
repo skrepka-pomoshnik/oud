@@ -24,6 +24,7 @@ from oud.core.view_model import (
     bar_cells_from_chords,
     chord_positions,
     duration_display,
+    flag_count,
     flag_positions_from_durations,
 )
 from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
@@ -42,33 +43,6 @@ def _build_chord_scale_map(
         for (pos, denom, dot) in positions
     ]
     spread_positions = spread_flag_positions(scaled_positions, content_width, min_gap=1)
-    cols = [col for (col, _denom, _dot) in spread_positions]
-    reqs: list[int] = []
-    for idx in range(1, len(spread_positions)):
-        prev = spread_positions[idx - 1]
-        curr = spread_positions[idx]
-        same_group = prev[1] == curr[1] and prev[2] == curr[2]
-        reqs.append(1 if same_group else 2)
-    for idx, req in enumerate(reqs, start=1):
-        min_col = cols[idx - 1] + req
-        cols[idx] = max(cols[idx], min_col)
-    max_col = content_width - 1
-    for idx in range(len(cols) - 1, -1, -1):
-        cols[idx] = min(cols[idx], max_col)
-        if idx > 0:
-            req = reqs[idx - 1]
-            prev_max = cols[idx] - req
-            cols[idx - 1] = min(cols[idx - 1], prev_max)
-    for idx, req in enumerate(reqs, start=1):
-        min_col = cols[idx - 1] + req
-        cols[idx] = max(cols[idx], min_col)
-    for idx in range(len(cols)):
-        cols[idx] = max(cols[idx], 0)
-
-    spread_positions = [
-        (cols[idx], denom, dot)
-        for idx, (_col, denom, dot) in enumerate(spread_positions)
-    ]
     ordered_raw = sorted(positions, key=lambda item: item[0])
     src_to_dest = {
         raw_col: scaled_col
@@ -88,13 +62,83 @@ def _scale_chord_row(
     content_width: int,
 ) -> list[str]:
     scaled = [fill_char for _ in range(content_width)]
+    last_pos = -1
     for src_col, ch in enumerate(row_cells[:bar_width]):
         if ch == fill_char:
             continue
         dest_col = src_to_dest.get(src_col, _scale_col(src_col, bar_width, content_width))
-        if 0 <= dest_col < content_width:
-            scaled[dest_col] = ch
+        target = max(0, min(content_width - 1, dest_col))
+        if target <= last_pos and last_pos + 1 < content_width:
+            target = last_pos + 1
+        if scaled[target] != fill_char:
+            moved = False
+            for offset in range(1, content_width):
+                right = target + offset
+                left = target - offset
+                if right < content_width and scaled[right] == fill_char:
+                    target = right
+                    moved = True
+                    break
+                if left >= 0 and scaled[left] == fill_char:
+                    target = left
+                    moved = True
+                    break
+            if not moved:
+                continue
+        scaled[target] = ch
+        last_pos = target
     return scaled
+
+
+def _place_duration_cells_aligned(row: list[str], col: int, text: str) -> None:
+    width = len(row)
+    if col < 0 or col >= width or not text:
+        return
+    for idx, ch in enumerate(text):
+        target = col + idx
+        if target >= width:
+            break
+        row[target] = ch
+
+
+def _required_flag_content_width(
+    positions: list[tuple[int, int, bool]],
+    *,
+    min_gap: int = 1,
+) -> int:
+    if not positions:
+        return 1
+    spans = [1 + flag_count(denom) + (1 if dot else 0) for (_c, denom, dot) in positions]
+    return max(1, sum(spans) + max(0, len(spans) - 1) * max(0, min_gap))
+
+
+def _required_duration_content_width(
+    positions: list[tuple[int, int, bool]],
+    *,
+    min_gap: int = 1,
+) -> int:
+    if not positions:
+        return 1
+    spans = [max(1, len(duration_display(denom, dot))) for (_c, denom, dot) in positions]
+    return max(1, sum(spans) + max(0, len(spans) - 1) * max(0, min_gap))
+
+
+def _chord_positions_distinct(
+    bar,
+    bar_width: int,
+    default_duration: int,
+) -> tuple[list[tuple[int, int, bool]], int]:
+    if not bar.chords:
+        return chord_positions(bar, bar_width, default_duration), bar_width
+    width = max(1, bar_width, len(bar.chords))
+    max_width = max(width, len(bar.chords) * 2 + 2)
+    while width <= max_width:
+        positions = chord_positions(bar, width, default_duration)
+        cols = [col for col, _denom, _dot in positions]
+        if len(cols) == len(set(cols)):
+            return positions, width
+        width += 1
+    return chord_positions(bar, max_width, default_duration), max_width
 
 
 def render_systems(  # noqa: C901, PLR0912
@@ -220,7 +264,12 @@ def render_systems(  # noqa: C901, PLR0912
                 total_width = total_bar_width(bar_widths)
             bar_end = bar_start + len(bar_widths)
             total_width = total_bar_width(bar_widths)
-            if bar_widths and spacing_fill == "stretch" and total_width < usable_width:
+            if (
+                bar_widths
+                and len(bar_widths) > 1
+                and spacing_fill in ("stretch", "smart")
+                and total_width < usable_width
+            ):
                 extra = usable_width - total_width
                 idx = 0
                 while extra > 0 and bar_widths:
@@ -238,40 +287,39 @@ def render_systems(  # noqa: C901, PLR0912
             safe_addstr(stdscr, row_start + (rows["staff"] or 0) + display_idx, 0, label)
 
         bar_x = left_margin
-        gap_sizes: list[int] | None = None
         if spacing_mode == "auto" and bar_widths:
             total_width = sum(bar_widths) + bar_gap * max(0, len(bar_widths) - 1)
             if spacing_fill == "center":
                 extra_left = max(0, (usable_width - total_width) // 2)
                 bar_x += extra_left
-            elif spacing_fill == "smart":
-                gaps = max(0, len(bar_widths) - 1)
-                gap_sizes = [bar_gap for _ in range(gaps)]
         for local_idx, bar in enumerate(piece.bars[bar_start:bar_end]):
             abs_bar = bar_start + local_idx
             style = settings.get("style", "french")
             french_c = settings.get("frenchc", "normal")
-            french_e = settings.get("frenche", "normal")
-            cells = (
-                bar_cells_from_chords(
+            chord_positions_all: list[tuple[int, int, bool]] = []
+            grid_width = bar_width
+            if bar.chords:
+                chord_positions_all, grid_width = _chord_positions_distinct(
+                    bar,
+                    bar_width,
+                    default_duration,
+                )
+                cells = bar_cells_from_chords(
                     bar,
                     total_strings,
-                    bar_width,
+                    grid_width,
                     default_duration,
                     style,
                     french_c=french_c,
-                    french_e=french_e,
                 )
-                if bar.chords
-                else bar_cells(
+            else:
+                cells = bar_cells(
                     bar,
                     total_strings,
                     bar_width,
                     style,
                     french_c=french_c,
-                    french_e=french_e,
                 )
-            )
             measures = settings.get("measures", "start")
             countdots = settings.get("countdots", "off")
             step_value = 1
@@ -291,78 +339,100 @@ def render_systems(  # noqa: C901, PLR0912
                 inferred = _infer_time_signature(bar, default_duration)
                 time_value = inferred or "C"
             beats, _unit, _sig_label = _parse_time_signature(time_value)
-            tactus = _tactus_row(bar_width, beats)
+            tactus = _tactus_row(grid_width, beats)
             barline = bar.barline or "|"
             repeat = bar.repeat or ""
-            ann_cells = _bar_annotations(annotations, abs_bar, bar_width)
-            orn_cells = _bar_ornaments(ornaments, abs_bar, bar_width)
-            slur_cells = _bar_span_row(slurs, abs_bar, bar_width, "(", ")", "~")
-            tie_cells = _bar_span_row(ties, abs_bar, bar_width, "[", "]", "-")
-            hold_cells = _bar_span_row(holds, abs_bar, bar_width, "<", ">", "_")
-            apply_overrides(cells, overrides, abs_bar, total_strings, bar_width)
+            repeat_glyph = repeat if repeat in {".:", ":.", "."} else ""
+            repeat_cue = repeat if not repeat_glyph else ""
+            ann_cells = _bar_annotations(annotations, abs_bar, grid_width)
+            orn_cells = _bar_ornaments(ornaments, abs_bar, grid_width)
+            slur_cells = _bar_span_row(slurs, abs_bar, grid_width, "(", ")", "~")
+            tie_cells = _bar_span_row(ties, abs_bar, grid_width, "[", "]", "-")
+            hold_cells = _bar_span_row(holds, abs_bar, grid_width, "<", ">", "_")
+            apply_overrides(cells, overrides, abs_bar, total_strings, grid_width)
             display_width = bar_width
             if spacing_mode == "auto":
                 display_width = bar_widths[local_idx]
+            scale_bar = spacing_mode == "auto"
+            if bar.chords:
+                preview_flags = (
+                    _filter_redundant_positions(chord_positions_all)
+                    if hide_redundant
+                    else chord_positions_all
+                )
+                min_content = _required_flag_content_width(preview_flags)
+                if show_dur and rows["dur"] is not None:
+                    min_content = max(
+                        min_content,
+                        _required_duration_content_width(preview_flags),
+                    )
+                min_display = min_content + barpad * 2
+                if min_display > display_width:
+                    display_width = min_display
+                    scale_bar = True
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
-                safe_addstr(stdscr, meta_row, bar_x - 2, repeat)
+                safe_addstr(stdscr, meta_row, bar_x - 2, repeat_glyph)
                 if abs_bar == 0:
                     safe_addstr(stdscr, meta_row, 0, " ")
                 if number is not None:
                     safe_addstr(stdscr, meta_row, bar_x, number)
+                if repeat_cue:
+                    cue_x = bar_x + (len(number) + 1 if number is not None else 0)
+                    safe_addstr(stdscr, meta_row, cue_x, repeat_cue)
             if rows["ann"] is not None:
                 ann_row = ann_cells
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     ann_row = _scale_row(ann_cells, content_width, " ")
                     ann_row = pad_row(ann_row, display_width, barpad)
                 safe_addstr(stdscr, row_start + (rows["ann"] or 0), bar_x, "".join(ann_row))
             if rows["orn"] is not None:
                 orn_row = orn_cells
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     orn_row = _scale_row(orn_cells, content_width, " ")
                     orn_row = pad_row(orn_row, display_width, barpad)
                 safe_addstr(stdscr, row_start + (rows["orn"] or 0), bar_x, "".join(orn_row))
             if rows["tactus"] is not None:
                 tactus_row = tactus
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     tactus_row = _scale_row(tactus, content_width, " ")
                     tactus_row = pad_row(tactus_row, display_width, barpad)
                 safe_addstr(stdscr, row_start + (rows["tactus"] or 0), bar_x, "".join(tactus_row))
             if rows["slur"] is not None:
                 slur_row = slur_cells
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     slur_row = _scale_row(slur_cells, content_width, " ")
                     slur_row = pad_row(slur_row, display_width, barpad)
                 safe_addstr(stdscr, row_start + (rows["slur"] or 0), bar_x, "".join(slur_row))
             if rows["tie"] is not None:
                 tie_row = tie_cells
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     tie_row = _scale_row(tie_cells, content_width, " ")
                     tie_row = pad_row(tie_row, display_width, barpad)
                 safe_addstr(stdscr, row_start + (rows["tie"] or 0), bar_x, "".join(tie_row))
             if rows["hold"] is not None:
                 hold_row = hold_cells
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     hold_row = _scale_row(hold_cells, content_width, " ")
                     hold_row = pad_row(hold_row, display_width, barpad)
                 safe_addstr(stdscr, row_start + (rows["hold"] or 0), bar_x, "".join(hold_row))
             if bar.chords:
-                positions = chord_positions(bar, bar_width, default_duration)
+                positions = chord_positions_all
                 flag_positions = (
                     _filter_redundant_positions(positions) if hide_redundant else positions
                 )
                 flagstyle = settings.get("flagstyle", "standard")
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     _, src_to_dest = _build_chord_scale_map(
-                        positions,
-                        bar_width,
+                        flag_positions,
+                        grid_width,
                         content_width,
                     )
                     render_positions = [
@@ -397,9 +467,10 @@ def render_systems(  # noqa: C901, PLR0912
                     and 0 <= playback_col < bar_width
                 ):
                     content_width = max(1, display_width - barpad * 2)
+                    playback_grid_col = _scale_col(playback_col, bar_width, grid_width)
                     pcol = src_to_dest.get(
-                        playback_col,
-                        _scale_col(playback_col, bar_width, content_width),
+                        playback_grid_col,
+                        _scale_col(playback_grid_col, grid_width, content_width),
                     )
                     safe_addstr(
                         stdscr,
@@ -415,36 +486,59 @@ def render_systems(  # noqa: C901, PLR0912
                         bar_x,
                         "".join(stem_cells),
                     )
+                dur_col_map: dict[int, int] = {}
+                dur_padded = False
                 if show_dur and rows["dur"] is not None:
-                    content_width = max(1, display_width - barpad * 2)
-                    if spacing_mode == "auto":
+                    ordered_flags = sorted(flag_positions, key=lambda item: item[0])
+                    if scale_bar or spacing_mode == "auto":
+                        content_width = max(1, display_width - barpad * 2)
+                        scaled_positions = [
+                            (_scale_col(col, grid_width, content_width), denom, dot)
+                            for col, denom, dot in ordered_flags
+                        ]
+                        spread_positions = spread_flag_positions(
+                            scaled_positions,
+                            content_width,
+                            min_gap=1,
+                        )
                         dur_cells = [" " for _ in range(content_width)]
-                        for col, denom, dot in flag_positions:
-                            target_col = src_to_dest.get(
-                                col,
-                                _scale_col(col, bar_width, content_width),
+                        for (raw_col, denom, dot), (target_col, _d2, _dot2) in zip(
+                            ordered_flags, spread_positions, strict=False,
+                        ):
+                            dur_col_map[raw_col] = target_col
+                            _place_duration_cells_aligned(
+                                dur_cells,
+                                target_col,
+                                duration_display(denom, dot),
                             )
-                            for idx, ch in enumerate(duration_display(denom, dot)):
-                                pos = target_col + idx
-                                if 0 <= pos < content_width and dur_cells[pos] == " ":
-                                    dur_cells[pos] = ch
                         dur_cells = pad_row(dur_cells, display_width, barpad)
+                        dur_padded = True
                     else:
+                        spread_positions = spread_flag_positions(
+                            ordered_flags,
+                            bar_width,
+                            min_gap=1,
+                        )
                         dur_cells = [" " for _ in range(bar_width)]
-                        for col, denom, dot in flag_positions:
-                            for idx, ch in enumerate(duration_display(denom, dot)):
-                                pos = col + idx
-                                if 0 <= pos < bar_width and dur_cells[pos] == " ":
-                                    dur_cells[pos] = ch
+                        for (raw_col, denom, dot), (target_col, _d2, _dot2) in zip(
+                            ordered_flags, spread_positions, strict=False,
+                        ):
+                            dur_col_map[raw_col] = target_col
+                            _place_duration_cells_aligned(
+                                dur_cells,
+                                target_col,
+                                duration_display(denom, dot),
+                            )
                     safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
                 if abs_bar == cursor_bar:
                     for col, _denom, _dot in positions:
-                        if col == cursor_col:
+                        cursor_grid_col = _scale_col(cursor_col, bar_width, grid_width)
+                        if col == cursor_grid_col:
                             flag_y = row_start + (rows["flag"] or 0)
                             content_width = max(1, display_width - barpad * 2)
                             scaled_col = src_to_dest.get(
                                 col,
-                                _scale_col(col, bar_width, content_width),
+                                _scale_col(col, grid_width, content_width),
                             )
                             cursor_x = bar_x + barpad + scaled_col
                             safe_addstr(
@@ -456,14 +550,21 @@ def render_systems(  # noqa: C901, PLR0912
                             )
                             if show_dur and rows["dur"] is not None:
                                 dur_y = row_start + (rows["dur"] or 0)
-                                dur_x = bar_x + barpad + scaled_col
-                                safe_addstr(
-                                    stdscr,
-                                    dur_y,
-                                    dur_x,
-                                    dur_cells[barpad + scaled_col],
-                                    A_BOLD,
-                                )
+                                dur_col = dur_col_map.get(col, scaled_col)
+                                if dur_padded:
+                                    dur_idx = barpad + dur_col
+                                    dur_x = bar_x + dur_idx
+                                else:
+                                    dur_idx = dur_col
+                                    dur_x = bar_x + dur_idx
+                                if 0 <= dur_idx < len(dur_cells):
+                                    safe_addstr(
+                                        stdscr,
+                                        dur_y,
+                                        dur_x,
+                                        dur_cells[dur_idx],
+                                        A_BOLD,
+                                    )
                             break
             else:
                 if hide_redundant:
@@ -488,7 +589,7 @@ def render_systems(  # noqa: C901, PLR0912
                 flagstyle = settings.get("flagstyle", "standard")
                 flag_cells, stem_cells = build_flag_rows(
                     flag_positions,
-                    spacing_mode=spacing_mode,
+                    spacing_mode="auto" if scale_bar else spacing_mode,
                     display_width=display_width,
                     bar_width=bar_width,
                     barpad=barpad,
@@ -527,10 +628,10 @@ def render_systems(  # noqa: C901, PLR0912
                         hide_redundant=hide_redundant,
                         dotted=dotted,
                     )
-                    if spacing_mode == "auto":
+                    if scale_bar:
                         content_width = max(1, display_width - barpad * 2)
                         dur_cells = _scale_row(dur_cells, content_width, " ")
-                        dur_cells = pad_row(dur_cells, display_width, barpad)
+                    dur_cells = pad_row(dur_cells, display_width, barpad)
                     safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
             cursor_display_index = cursor_string if cursor_string < display_strings else None
             for display_idx in range(display_strings):
@@ -544,23 +645,25 @@ def render_systems(  # noqa: C901, PLR0912
                 if actual >= 6:
                     row_cells = _inline_bass_row(row_cells)
                     fill_char = " "
-                if spacing_mode == "auto":
+                if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
                     if bar.chords:
                         row_cells = _scale_chord_row(
                             row_cells,
                             fill_char=fill_char,
                             src_to_dest=src_to_dest,
-                            bar_width=bar_width,
+                            bar_width=grid_width,
                             content_width=content_width,
                         )
                     else:
                         row_cells = _scale_row(row_cells, content_width, fill_char)
                     row_cells = pad_row(row_cells, display_width, barpad, pad_char=fill_char)
                 row_text = "".join(row_cells)
-                safe_addstr(stdscr, y, bar_x - 1, "|")
+                if local_idx == 0:
+                    safe_addstr(stdscr, y, bar_x - 1, "|")
                 safe_addstr(stdscr, y, bar_x, row_text)
-                safe_addstr(stdscr, y, bar_x + display_width, barline)
+                barline_x = min(width - 1, bar_x + display_width)
+                safe_addstr(stdscr, y, barline_x, barline)
 
                 if (
                     abs_bar == cursor_bar
@@ -569,16 +672,20 @@ def render_systems(  # noqa: C901, PLR0912
                     and 0 <= cursor_col < bar_width
                 ):
                     content_width = max(1, display_width - barpad * 2)
-                    cell_x = bar_x + barpad + _scale_col(
-                        cursor_col,
-                        bar_width,
-                        content_width,
-                    )
+                    if bar.chords:
+                        cursor_grid_col = _scale_col(cursor_col, bar_width, grid_width)
+                        scaled_cursor_col = src_to_dest.get(
+                            cursor_grid_col,
+                            _scale_col(cursor_grid_col, grid_width, content_width),
+                        )
+                    else:
+                        scaled_cursor_col = _scale_col(cursor_col, bar_width, content_width)
+                    cell_x = bar_x + barpad + scaled_cursor_col
                     safe_addstr(
                         stdscr,
                         y,
                         cell_x,
-                        row_text[barpad + _scale_col(cursor_col, bar_width, content_width)],
+                        row_text[barpad + scaled_cursor_col],
                         A_REVERSE,
                     )
                 if (
@@ -588,39 +695,63 @@ def render_systems(  # noqa: C901, PLR0912
                     and 0 <= playback_col < bar_width
                 ):
                     content_width = max(1, display_width - barpad * 2)
-                    play_x = bar_x + barpad + _scale_col(
-                        playback_col,
-                        bar_width,
-                        content_width,
-                    )
+                    if bar.chords:
+                        playback_grid_col = _scale_col(playback_col, bar_width, grid_width)
+                        scaled_play_col = src_to_dest.get(
+                            playback_grid_col,
+                            _scale_col(playback_grid_col, grid_width, content_width),
+                        )
+                    else:
+                        scaled_play_col = _scale_col(playback_col, bar_width, content_width)
+                    play_x = bar_x + barpad + scaled_play_col
                     safe_addstr(
                         stdscr,
                         y,
                         play_x,
-                        row_text[barpad + _scale_col(playback_col, bar_width, content_width)],
+                        row_text[barpad + scaled_play_col],
                         A_BOLD,
                     )
                 for col in range(bar_width):
                     if (abs_bar, actual, col) in highlights:
                         content_width = max(1, display_width - barpad * 2)
-                        hl_x = bar_x + barpad + _scale_col(
-                            col,
-                            bar_width,
-                            content_width,
-                        )
+                        if bar.chords:
+                            highlight_grid_col = _scale_col(col, bar_width, grid_width)
+                            scaled_hl_col = src_to_dest.get(
+                                highlight_grid_col,
+                                _scale_col(highlight_grid_col, grid_width, content_width),
+                            )
+                        else:
+                            scaled_hl_col = _scale_col(col, bar_width, content_width)
+                        hl_x = bar_x + barpad + scaled_hl_col
                         safe_addstr(
                             stdscr,
                             y,
                             hl_x,
-                            row_text[barpad + _scale_col(col, bar_width, content_width)],
+                            row_text[barpad + scaled_hl_col],
                             A_BOLD,
                         )
 
-            if spacing_mode == "auto":
-                if gap_sizes is not None and local_idx < len(gap_sizes):
-                    bar_x += display_width + gap_sizes[local_idx]
+            if (
+                playback_bar is not None
+                and playback_col is not None
+                and abs_bar == playback_bar
+                and 0 <= playback_col < bar_width
+            ):
+                content_width = max(1, display_width - barpad * 2)
+                if bar.chords:
+                    playback_grid_col = _scale_col(playback_col, bar_width, grid_width)
+                    scaled_play_col = src_to_dest.get(
+                        playback_grid_col,
+                        _scale_col(playback_grid_col, grid_width, content_width),
+                    )
                 else:
-                    bar_x += display_width + bar_gap
+                    scaled_play_col = _scale_col(playback_col, bar_width, content_width)
+                marker_y = row_start + (rows["staff"] or 0) + display_strings
+                marker_x = bar_x + barpad + scaled_play_col
+                safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
+
+            if spacing_mode == "auto":
+                bar_x += display_width + bar_gap
             else:
-                bar_x += bar_width + bar_gap
+                bar_x += display_width + bar_gap
         current_bar_start = bar_end

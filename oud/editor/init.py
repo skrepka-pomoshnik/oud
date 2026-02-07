@@ -19,6 +19,7 @@ def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C
     state.durations = durations
     state.dotted = dotted
     state.path = path
+    state.settings["filepath"] = path or ""
     is_tab = bool(path and path.lower().endswith(".tab"))
     if piece.style:
         state.settings["style"] = piece.style

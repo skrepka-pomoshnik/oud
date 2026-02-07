@@ -3,15 +3,16 @@ from __future__ import annotations
 from oud.core.model import Bar
 
 
-def format_fret(  # noqa: PLR0911
+def format_fret(
     style: str,
     fret: int,
-    french_c: str = "normal",
-    french_e: str = "normal",
+    french_c_shape: str = "normal",
+    **legacy: str,
 ) -> str:
+    legacy_c = legacy.get("french_c") or legacy.get("frenchc")
+    if legacy_c and french_c_shape == "normal":
+        french_c_shape = legacy_c
     if style == "italian":
-        if 0 <= fret <= 9:
-            return str(fret)
         if fret == 10:
             return "x"
         return str(fret)
@@ -36,14 +37,12 @@ def format_fret(  # noqa: PLR0911
         "s",
         "t",
     ]
-    if 0 <= fret < len(letters):
-        letter = letters[fret]
-        if french_c == "alt" and letter == "c":
-            return "r"
-        if french_e == "tail" and letter == "e":
-            return "E"
-        return letter
-    return "?"
+    if not 0 <= fret < len(letters):
+        return "?"
+    letter = letters[fret]
+    if french_c_shape in ("historical", "alt") and letter == "c":
+        return "r"
+    return letter
 
 
 def bar_cells(
@@ -51,9 +50,12 @@ def bar_cells(
     strings: int,
     bar_width: int,
     style: str,
-    french_c: str = "normal",
-    french_e: str = "normal",
+    french_c_shape: str = "normal",
+    **legacy: str,
 ) -> list[list[str]]:
+    legacy_c = legacy.get("french_c") or legacy.get("frenchc")
+    if legacy_c and french_c_shape == "normal":
+        french_c_shape = legacy_c
     cells = [["-" for _ in range(bar_width)] for _ in range(strings)]
     next_col = [0 for _ in range(strings)]
 
@@ -64,7 +66,7 @@ def bar_cells(
         col = next_col[s_idx]
         if col >= bar_width:
             continue
-        text = format_fret(style, note.fret, french_c=french_c, french_e=french_e)
+        text = format_fret(style, note.fret, french_c_shape=french_c_shape)
         if len(text) > 2:
             text = text[-2:]
         for offset, ch in enumerate(text):
@@ -132,9 +134,12 @@ def bar_cells_from_chords(
     bar_width: int,
     default_duration: int,
     style: str,
-    french_c: str = "normal",
-    french_e: str = "normal",
+    french_c_shape: str = "normal",
+    **legacy: str,
 ) -> list[list[str]]:
+    legacy_c = legacy.get("french_c") or legacy.get("frenchc")
+    if legacy_c and french_c_shape == "normal":
+        french_c_shape = legacy_c
     cells = [["-" for _ in range(bar_width)] for _ in range(strings)]
     positions = chord_positions(bar, bar_width, default_duration)
     if not positions:
@@ -146,8 +151,7 @@ def bar_cells_from_chords(
                 cells[s_idx][col] = format_fret(
                     style,
                     note.fret,
-                    french_c=french_c,
-                    french_e=french_e,
+                    french_c_shape=french_c_shape,
                 )
     return cells
 

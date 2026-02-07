@@ -60,8 +60,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "italianorient": "normal",
     "italianmultifret": "on",
     "viewinvert": "off",
-    "frenchc": "normal",
-    "frenche": "normal",
+    "frenchcshape": "normal",
     "maxrepeats": "30",
 }
 

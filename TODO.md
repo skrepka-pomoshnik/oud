@@ -11,19 +11,7 @@ Keep a running `DONE.md` log of completed work.
 Constraints
 - Python 3.10 only, macOS/Linux, pure curses, minimal deps.
 
-P0
-- [x] Refactor now: split `oud/ui/render.py` into small layered modules (`render_system`, `render_bar`, `render_status`) while preserving output 1:1.
-
-P1 (Suckless + Maintainable Core)
-
 P2 (Core Features)
-- [x] Suckless architecture: keymap remap hooks.
-- [x] Suckless architecture: shared prompt/history module used by `:` and `/` prompts.
-- [x] Playback animation: highlight current bar/column while MIDI is playing.
-- [x] Vim parity: * / # word search; n/N; % match; `m/'m marks (marks are comments that can be visible).
-- [x] Vim parity: f/F/t/T + ;/, char search.
-- [x] Vim parity: command history + ^A autocomplete in prompts, search history keys.
-- [ ] Bars per line/system: limit bars per row (0 = auto).
 - [ ] Render packing invariant: no note/flag loss, no overlap, no hidden chord due to spacing mode.
 - [ ] Reflow by chord-wrap threshold (TAB/LuteScribe style): whole-bar breaks only, per-system chord cap.
 - [ ] Bass course entry: slash shorthand (/ // ///) and numeric bass labels (7-13 or 1-7).
@@ -39,20 +27,15 @@ P2 (Core Features)
 - [ ] Merge/split staves into separate voices.
 - [ ] Transpose tablature up/down; convert between tunings.
 - [ ] Double/halve rhythm values; normalize rhythm signs to barlines/intervals.
-- [ ] Reprise support: repeat/da capo markers and render cues.
 - [ ] MusicXML import/export support (see refs).
-- [ ] Every TUI `:` command has at least one direct execution test. (partial: tool/load command tests added)
-- [ ] Import robustness: FT3/RTF title cleanup + section-aware metadata extraction (no RTF artifacts in header).
+- [ ] Every TUI `:` command has at least one direct execution test.
 - [ ] TAB parser parity: handle multi-section files and missing header/body separator cleanly.
-- [ ] ASCII save mode parity: export exactly current terminal layout frame (what user sees).
 
 Testing (P2)
-- [x] Test coverage gate: project coverage >= 80%.
-- [ ] TUI test coverage: ui/tui modules at 70% coverage (render + input + commands). (started: tui/controller tests)
-- [ ] Tab render tests (VexFlow parity): string->row mapping, flag/stem positions, dotted flags, beams/grid grouping, ties/slides, grace notes. (partial: flags/durations)
+- [ ] Tab render tests (VexFlow parity): string->row mapping, flag/stem positions, dotted flags, beams/grid grouping, ties/slides, grace notes.
 - [ ] Rendering matrix tests: cover mixed durations/chords, dotted flags, collisions, auto spacing (no lost notes/stems), multiple flag styles, bass rows on/off.
 - [ ] Layout/spacing tests: per-bar width allocation, alignment across rows, mixed durations, right-justify behavior.
-- [ ] Conversion tests (LuteScribe parity): .tab/.ft3 -> internal -> .tab/.ft3 golden files; parse/roundtrip on sample inputs. (basic .tab roundtrip + golden fixture added)
+- [ ] Conversion tests (LuteScribe parity): .tab/.ft3 -> internal -> .tab/.ft3 golden files; parse/roundtrip on sample inputs.
 - [ ] Conversion matrix tests (luteconv style): source x destination goldens for `.ft3/.tab/.tc/.musicxml/.mei` (subset to supported outputs).
 - [ ] Geometry tests (VexFlow style): high-fret multi-digit widths, tick context spacing, stem-through-staff, tie/slide on single notes + chords.
 - [ ] Import fixtures (LuteScribe style): 7th/8th-course fretted notes, multi-section TAB, no-break headers/body.
@@ -62,7 +45,7 @@ Testing (P2)
 P3 (Advanced + Parity)
 - [ ] Buffer list as lightweight quick menu (neatvi q).
 - [ ] MEI import/export support (see refs).
-- [ ] Split command_ops.py into small domain files (file I/O, score edits, tools, view) with a thin router. (partial: settings + file I/O + notation + tool/view + open/load + score edits + media/playback extracted)
+- [ ] Split command_ops.py into small domain files (file I/O, score edits, tools, view) with a thin router.
 - [ ] Vim parity: buffer list/quick switch (q menu), buffer aliases, previous buffer (~), next/prev buffer (+/-).
 - [ ] Register-like macro/prompt buffers (neatvi-inspired): reusable command snippets for repetitive edit tasks.
 - [ ] Plugin protocol: generic plugin interface (root_items/open/download/help_path).
@@ -78,7 +61,6 @@ P3 (Advanced + Parity)
 - [ ] Selection mode (`v`) for range operations and exports.
 - [ ] Loop playback for selection or bar range.
 - [ ] Caption and page-numbering options.
-- [ ] Fronimo metadata parsing: footnote/source/editor/comment, section annotations, key/type/difficulty/ensemble/part.
 - [ ] Tools: remove comments, set grid flag style, reflow all.
 - [ ] Playback window: play piece/selection/stave with instrument + tempo defaults.
 - [ ] View invert option: reverse row order while keeping controls correct.

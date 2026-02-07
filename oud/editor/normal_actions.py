@@ -15,10 +15,10 @@ from oud.editor.keymap import (
     normal_bindings,
     pending_bindings,
 )
-from oud.editor.layout import bars_per_line
+from oud.editor.layout import bars_per_line, jump_system_row
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
-from oud.editor.navigation import move_left_note, move_right_note
+from oud.editor.navigation import move_left, move_right
 from oud.editor.search_ops import (
     jump_mark,
     jump_match,
@@ -249,7 +249,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
                 state.cursor_col,
             )
             if count > 1:
-                move_right_note(state)
+                move_right(state)
         state.pending_key = ""
         return True
     if key in action_keys.pending:
@@ -310,11 +310,11 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
     keys = movement_keys(state, include_arrows=True)
     if key in keys.left:
         for _ in range(count):
-            move_left_note(state)
+            move_left(state)
         return True
     if key in keys.right:
         for _ in range(count):
-            move_right_note(state)
+            move_right(state)
         return True
     if key in keys.up:
         state.cursor_string -= count
@@ -324,13 +324,11 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
         return True
     if key in action_keys.page_up:
         per_line = bars_per_line(state, state.screen_width)
-        state.cursor_bar = max(0, state.cursor_bar - per_line * count)
-        state.cursor_col = 0
+        state.cursor_bar = jump_system_row(state, state.cursor_bar, -count, per_line)
         return True
     if key in action_keys.page_down:
         per_line = bars_per_line(state, state.screen_width)
-        state.cursor_bar = min(len(state.piece.bars) - 1, state.cursor_bar + per_line * count)
-        state.cursor_col = 0
+        state.cursor_bar = jump_system_row(state, state.cursor_bar, count, per_line)
         return True
     if key in action_keys.bar_next:
         state.cursor_bar = min(len(state.piece.bars) - 1, state.cursor_bar + count)

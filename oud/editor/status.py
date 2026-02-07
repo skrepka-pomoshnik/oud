@@ -17,10 +17,7 @@ def _time_symbol(value: str) -> str:
 
 
 def status_line(state: EditorState) -> str:
-    name = state.path.split("/")[-1] if state.path else "[No file]"
-    mod = "*" if state.modified else ""
     bar = state.cursor_bar + 1
-    string = state.cursor_string + 1
     beat_text = f"col:{state.cursor_col + 1}"
     parsed = parse_time_signature_value(state.settings.get("time", "C"))
     if parsed is not None and state.bar_width > 0:
@@ -35,8 +32,8 @@ def status_line(state: EditorState) -> str:
         bar_time = state.piece.bars[state.cursor_bar].time_sig
         if bar_time:
             time_value = bar_time
-    style = state.settings.get("style", "french")
+    mod = "*" if state.modified else ""
     return (
-        f"{name}{mod}  bar:{bar} str:{string} {beat_text}  "
-        f"dur:{state.current_duration}  style:{style}  time:{_time_symbol(time_value)}"
+        f"{mod}bar:{bar} {beat_text}  "
+        f"dur:{state.current_duration}  time:{_time_symbol(time_value)}"
     )

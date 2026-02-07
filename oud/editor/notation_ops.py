@@ -48,10 +48,30 @@ def cmd_barline(state: EditorState, value: str) -> None:
 
 
 def cmd_repeat(state: EditorState, value: str) -> None:
-    if value not in ("none", "start", "end", "dots"):
-        state.message = "Repeat must be none/start/end/dots"
+    normalized = "".join(value.strip().lower().replace(".", "").split())
+    if normalized not in {
+        "none",
+        "start",
+        "end",
+        "dots",
+        "both",
+        "dc",
+        "dacapo",
+        "ds",
+        "fine",
+        "coda",
+        "tocoda",
+        "dcalfine",
+        "dcalcoda",
+        "dsalfine",
+        "dsalcoda",
+    }:
+        state.message = (
+            "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
+            "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
+        )
         return
-    set_repeat(state, value)
+    set_repeat(state, normalized)
 
 
 def set_ornament(state: EditorState, value: str) -> None:
@@ -173,16 +193,31 @@ def set_repeat(state: EditorState, value: str) -> None:
         return
     bar = state.piece.bars[state.cursor_bar]
     prev = bar.repeat
+    normalized = "".join(value.strip().lower().replace(".", "").split())
     mapping = {
         "none": "",
         "start": ".:",
         "end": ":.",
         "dots": ".",
+        "both": ":|:",
+        "dc": "DC",
+        "dacapo": "DC",
+        "ds": "DS",
+        "fine": "Fine",
+        "coda": "Coda",
+        "tocoda": "To Coda",
+        "dcalfine": "DC al Fine",
+        "dcalcoda": "DC al Coda",
+        "dsalfine": "DS al Fine",
+        "dsalcoda": "DS al Coda",
     }
-    new = mapping.get(value, "")
-    if new and not prev:
+    new = mapping.get(normalized, "")
+    structural = new in {".:", ":.", ".", ":|:"}
+    if structural and not prev:
         limit = int(state.settings.get("maxrepeats", "30") or 30)
-        existing = sum(1 for entry in state.piece.bars if entry.repeat)
+        existing = sum(
+            1 for entry in state.piece.bars if entry.repeat in {".:", ":.", ".", ":|:"}
+        )
         if existing >= limit:
             state.message = f"Repeat limit {limit} reached"
             return
@@ -195,7 +230,7 @@ def set_repeat(state: EditorState, value: str) -> None:
     )
     bar.repeat = new
     state.modified = True
-    state.message = f"Repeat {value}"
+    state.message = f"Repeat {normalized}"
 
 
 def set_slur(state: EditorState, value: str) -> None:

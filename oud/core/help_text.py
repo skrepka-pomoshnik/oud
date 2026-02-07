@@ -17,7 +17,7 @@ HELP_LINES = [
     "Match %                                  Play    M",
     "Add  gj (bass string)",
     "Plugins gp or :plugins (plugin: j/k move, h back, l/enter open, d download, / search)",
-    "Flags f (cycle style)                   Letters F (c), E (e)",
+    "Flags f (cycle style)                   Letters F (c)",
     "End  G / $                              Command : / Search /",
     "",
     "INSERT MODE",
@@ -43,7 +43,10 @@ HELP_LINES = [
     ":lilypond [path] export lilypond  :pdf              compile pdf (P)",
     ":midicmd [path]  show midi command",
     ":bar add|before|after|del         :barline thin|thick|double|hidden|pale",
-    ":repeat none|start|end|dots       :orn <char>|clear",
+    (
+        ":repeat none|start|end|dots|both|dc|ds|fine|coda|tocoda|"
+        "dcalfine|dcalcoda|dsalfine|dsalcoda   :orn <char>|clear"
+    ),
     ":annot <text>|clear               :highlight on/off",
     ":slur start/end/clear             :tie start/end/clear",
     ":hold start/end/clear",
@@ -65,7 +68,7 @@ HELP_LINES = [
     ":set lute|guitar (preset metasettings)",
     ":set measuresstep=... (used with measures=every)",
     ":set italianorient=normal|reverse italianmultifret=on|off viewinvert=on|off",
-    ":set frenchc=normal|alt frenche=normal|tail",
+    ":set frenchc=normal|alt",
     ":set midipatch=... midigate=... soundfont=... tempo=...",
     ":set charstyle=... title=... author=... composer=...",
     ":tool reflow|gridflags|flagstyle|comments",

@@ -78,6 +78,7 @@ def cmd_open(
     else:
         state.piece = load_ft3_fn(path)
     state.path = path
+    state.settings["filepath"] = path
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted

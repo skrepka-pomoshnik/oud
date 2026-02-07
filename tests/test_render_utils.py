@@ -18,11 +18,6 @@ def test_format_fret_french_excludes_j() -> None:
 def test_format_fret_french_alt_c() -> None:
     assert format_fret("french", 2, french_c="alt") == "r"
 
-
-def test_format_fret_french_tail_e() -> None:
-    assert format_fret("french", 4, french_e="tail") == "E"
-
-
 def test_flag_positions_shortest_note_per_column() -> None:
     durations = {
         (0, 0, 0): 4,

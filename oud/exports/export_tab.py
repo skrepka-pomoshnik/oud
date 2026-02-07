@@ -31,7 +31,6 @@ def export_tab(  # noqa: PLR0912, C901
     settings_map = settings or {}
     style = settings_map.get("style") or piece.style or "french"
     french_c = settings_map.get("frenchc") or "normal"
-    french_e = settings_map.get("frenche") or "normal"
     default_duration = 4
 
     def time_signature_line(value: str | None) -> str | None:
@@ -47,8 +46,6 @@ def export_tab(  # noqa: PLR0912, C901
     def french_to_fret(ch: str) -> int | None:
         if ch == "r":
             return 2
-        if ch == "E":
-            return 4
         if "a" <= ch <= "p":
             return ord(ch) - ord("a")
         return None
@@ -85,7 +82,7 @@ def export_tab(  # noqa: PLR0912, C901
     def format_fret_char(fret: int) -> str:
         if style == "italian" and fret >= 10:
             return "x"
-        text = format_fret(style, fret, french_c=french_c, french_e=french_e)
+        text = format_fret(style, fret, french_c=french_c)
         return text[0] if text else "-"
 
     def chord_notes_for_col(bar_index: int, col: int) -> list[tuple[int, int]]:
@@ -179,7 +176,6 @@ def export_ascii(
     settings_map = settings or {}
     style = settings_map.get("style") or "french"
     french_c = settings_map.get("frenchc") or "normal"
-    french_e = settings_map.get("frenche") or "normal"
     reverse_strings = (
         style == "italian"
         and (settings_map.get("italianorient") or "normal") == "reverse"
@@ -193,7 +189,6 @@ def export_ascii(
                 default_duration,
                 style,
                 french_c=french_c,
-                french_e=french_e,
             )
             if bar.chords
             else bar_cells(
@@ -202,7 +197,6 @@ def export_ascii(
                 bar_width,
                 style,
                 french_c=french_c,
-                french_e=french_e,
             )
         )
         for s_idx in range(piece.strings):

@@ -9,7 +9,7 @@ from oud.editor.edit_ops import apply_duration, apply_override, clear_cell_note,
 from oud.editor.keymap import insert_bindings, italian_duration_digits
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import stop_midi
-from oud.editor.navigation import move_left, move_left_note, move_right, move_right_note
+from oud.editor.navigation import move_left, move_right
 from oud.editor.ops import (
     chord_index_at_col,
     denom_to_note_type,
@@ -32,7 +32,6 @@ def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
         return
     style = state.settings.get("style", "french")
     french_c = state.settings.get("frenchc", "normal")
-    french_e = state.settings.get("frenche", "normal")
     positions = chord_positions(bar, state.bar_width, default_duration=4)
     for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
         for note in chord.notes:
@@ -44,7 +43,6 @@ def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
                 style,
                 note.fret,
                 french_c=french_c,
-                french_e=french_e,
             )
         denom = note_type_to_denom(chord.note_type) or 4
         state.durations[(bar_index, 0, col)] = denom
@@ -470,11 +468,11 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         return False
 
     def _handle_left() -> bool:
-        move_left_note(state)
+        move_left(state)
         return True
 
     def _handle_right() -> bool:
-        move_right_note(state)
+        move_right(state)
         return True
 
     def _handle_up() -> bool:

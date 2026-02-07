@@ -41,6 +41,43 @@ def test_export_lilypond_barline_and_repeat(tmp_path) -> None:
     assert '\\bar "||"' in text
 
 
+def test_export_lilypond_repeat_cue_marks(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    bar.repeat = "DC al Fine"
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "cue.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert 'D.C. al Fine' in text
+
+
+def test_export_lilypond_repeat_both_and_ds_coda(tmp_path) -> None:
+    bar1 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    bar1.repeat = ":|:"
+    bar2 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    bar2.repeat = "DS al Coda"
+    piece = Piece(title="T", bars=[bar1, bar2], strings=6)
+    path = tmp_path / "repeat_variants.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert '\\bar ":|:"' in text
+    assert "D.S. al Coda" in text
+
+
 def test_export_lilypond_slur_tie_hold(tmp_path) -> None:
     bar = Bar()
     piece = Piece(title="T", bars=[bar], strings=6)

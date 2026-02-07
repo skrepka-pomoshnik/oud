@@ -35,6 +35,22 @@ class Piece:
     author: str | None = None
     composer: str | None = None
     footnote: str | None = None
+    footnote_source: str | None = None
+    footnote_editor: str | None = None
+    footnote_comment: str | None = None
+    key: str | None = None
+    piece_type: str | None = None
+    difficulty: str | None = None
+    ensemble: str | None = None
+    part: str | None = None
+    instrumentation: str | None = None
+    source: str | None = None
+    editor: str | None = None
+    comment: str | None = None
+    publisher: str | None = None
+    volume: str | None = None
+    page: str | None = None
+    section_annotations: dict[str, str] = field(default_factory=dict)
     tuning: str | None = None
     style: str | None = None
     bars: list[Bar] = field(default_factory=list)

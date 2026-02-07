@@ -8,8 +8,6 @@ from oud.core.view_model import (
     _filter_redundant_positions,
     _flag_positions_all,
     _layout_rows,
-    _parse_time_signature,
-    _tactus_row,
     build_bar_view,
 )
 from oud.ui.framebuffer import FrameBuffer
@@ -49,8 +47,9 @@ def test_bar_durations_are_fixed_width_cells() -> None:
         hide_redundant=True,
     )
     assert len("".join(row)) == 6
-    assert row[0] == "1"
-    assert row[1] == "6"
+    text = "".join(row)
+    assert text.startswith("16")
+    assert "8" in text
 
 
 def test_bar_flags_mapping() -> None:
@@ -230,22 +229,8 @@ def test_bar_number_for_index() -> None:
     assert _bar_number_for_index(piece, 4, "five", "off", 1) == "[5]"
     assert _bar_number_for_index(piece, 5, "five", "off", 1) is None
     assert _bar_number_for_index(piece, 1, "every", "on", 1) == "[3]"
-    assert _bar_number_for_index(piece, 4, "every", "off", 2) == "[5]"
-    assert _bar_number_for_index(piece, 2, "every", "off", 2) == "[3]"
-
-
-def test_parse_time_signature() -> None:
-    assert _parse_time_signature("C") == (4, 4, "C")
-    assert _parse_time_signature("O") == (3, 4, "O")
-    assert _parse_time_signature("3/8") == (3, 8, "3/8")
-
-
-def test_tactus_row_marks_beats() -> None:
-    row = _tactus_row(bar_width=8, beats=4)
-    assert row[0] == "|"
-    assert row[2] == "|"
-    assert row[4] == "|"
-    assert row[6] == "|"
+    assert _bar_number_for_index(piece, 3, "every", "off", 2) == "[4]"
+    assert _bar_number_for_index(piece, 2, "every", "off", 2) is None
 
 
 def test_layout_rows_compacts_when_short() -> None:

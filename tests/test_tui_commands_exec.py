@@ -6,6 +6,7 @@ import pytest
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.tab_parser import TabData
 from oud.editor import command_ops as cmd_ops
+from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.state import EditorState
 from oud.tui import commands as cmd
 
@@ -38,7 +39,6 @@ def _state(bars: int = 2) -> EditorState:
         "showtactus": "off",
         "italianorient": "normal",
         "frenchc": "normal",
-        "frenche": "normal",
     }
     state = EditorState(piece, settings)
     state.screen_width = 80
@@ -77,7 +77,7 @@ def test_cmd_set_and_convert(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
     cmd.cmd_set(
         state,
-        "strings=7 style=italian grid=on showdur=on frenchc=alt frenche=tail",
+        "strings=7 style=italian grid=on showdur=on frenchc=alt",
         str(tmp_path / "cfg.toml"),
     )
     assert state.settings["strings"] == "7"
@@ -85,7 +85,6 @@ def test_cmd_set_and_convert(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert state.settings["grid"] == "on"
     assert state.settings["showdur"] == "on"
     assert state.settings["frenchc"] == "alt"
-    assert state.settings["frenche"] == "tail"
     assert saved["strings"] == "7"
     state.overrides[(0, 0, 0)] = "0"
     cmd.cmd_convert(state, "french", str(tmp_path / "cfg.toml"))
@@ -102,7 +101,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         state,
         "measures=every measuresstep=2 tuning=renaissance "
         "flagstyle=italian time=3/2 key=D countdots=on keys=vim "
-        "spacing=10 spacingmode=spread flagredundant=off maxbars=4 maxchords=6 "
+        "spacing=10 spacingmode=spread flagredundant=off maxbars=4 barsperline=3 barpad=2 maxchords=6 "
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
         "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
@@ -121,6 +120,8 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["spacingmode"] == "spread"
     assert state.settings["flagredundant"] == "off"
     assert state.settings["maxbars"] == "4"
+    assert state.settings["barsperline"] == "3"
+    assert state.settings["barpad"] == "2"
     assert state.settings["maxchords"] == "6"
     assert state.settings["linelen"] == "60"
     assert state.settings["bargap"] == "2"
@@ -199,9 +200,10 @@ def test_cmd_write_and_ascii(tmp_path: Path) -> None:
     state.screen_width = 40
     state.screen_height = 8
     cmd.cmd_write_ascii(state, str(out_txt))
-    lines = out_txt.read_text(encoding="utf-8").splitlines()
+    content_after = out_txt.read_text(encoding="utf-8")
+    assert content_after == render_ascii_snapshot(state)
+    lines = content_after.splitlines()
     assert len(lines) == state.screen_height
-    assert all(len(line) == state.screen_width for line in lines)
 
 
 def test_cmd_bar_and_chord() -> None:
@@ -311,5 +313,11 @@ def test_cmd_midi_lilypond_pdf_play_source(
     cmd.cmd_barline(state, "nope")
     assert state.message == "Barline must be thin/thick/double/hidden/pale"
     cmd.cmd_repeat(state, "start")
+    assert state.piece.bars[state.cursor_bar].repeat == ".:"
+    cmd.cmd_repeat(state, "dc al fine")
+    assert state.piece.bars[state.cursor_bar].repeat == "DC al Fine"
     cmd.cmd_repeat(state, "bad")
-    assert state.message == "Repeat must be none/start/end/dots"
+    assert state.message == (
+        "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
+        "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
+    )

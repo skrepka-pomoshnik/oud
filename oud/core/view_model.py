@@ -96,7 +96,8 @@ def _bar_compact_width(
     width_needed = min_flag_width
     tail_pad = 1
     if bar.chords:
-        positions = chord_positions(bar, bar_width, default_duration)
+        chord_width = max(bar_width, len(bar.chords))
+        positions = chord_positions(bar, chord_width, default_duration)
         for col, denom, dot in positions:
             span = 1 + flag_count(denom) + (1 if dot else 0)
             width_needed = max(width_needed, col + span + 1 + tail_pad)
@@ -333,7 +334,8 @@ def _bar_display_width(
     min_flag_width = 2 + max_slash + max_dot
     width_needed = min_flag_width
     if bar.chords:
-        positions = chord_positions(bar, bar_width, default_duration)
+        chord_width = max(bar_width, len(bar.chords))
+        positions = chord_positions(bar, chord_width, default_duration)
         for col, denom, dot in positions:
             span = 1 + flag_count(denom) + (1 if dot else 0)
             width_needed = max(width_needed, col + span + 1)
@@ -525,7 +527,7 @@ def _bar_number_for_index(
     if measures == "every":
         if step <= 0:
             step = 1
-        if bar_index > 0 and bar_index % step == 0:
+        if bar_index > 0 and number % step == 0:
             return f"[{number}]"
         return None
     if measures == "five":
@@ -688,7 +690,6 @@ def build_bar_view(
     style: str,
     *,
     french_c: str = "normal",
-    french_e: str = "normal",
 ) -> dict[str, list[str]]:
     bar_cells_data = (
         bar_cells_from_chords(
@@ -698,7 +699,6 @@ def build_bar_view(
             default_duration,
             style,
             french_c=french_c,
-            french_e=french_e,
         )
         if bar.chords
         else bar_cells(
@@ -707,7 +707,6 @@ def build_bar_view(
             bar_width,
             style,
             french_c=french_c,
-            french_e=french_e,
         )
     )
     for (b, s, col), ch in overrides.items():
