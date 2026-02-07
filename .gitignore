@@ -27,6 +27,7 @@ downloads/
 *.xlsx
 *.log
 *.out
+out.*
 quality.txt
 TODO.md
 DONE.md
