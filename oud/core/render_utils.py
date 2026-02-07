@@ -116,9 +116,12 @@ def chord_positions(
         return []
     positions: list[tuple[int, int, bool]] = []
     cum = 0
+    prev_pos = -1
     for denom, dot, u in zip(denoms, dotted, units, strict=False):
-        pos = min(bar_width - 1, (cum * (bar_width - 1)) // total)
+        raw_pos = min(bar_width - 1, (cum * (bar_width - 1)) // total)
+        pos = min(bar_width - 1, max(raw_pos, prev_pos + 1))
         positions.append((pos, denom, dot))
+        prev_pos = pos
         cum += u
     return positions
 
@@ -150,13 +153,24 @@ def bar_cells_from_chords(
 
 
 def duration_display(duration: int, dotted: bool = False) -> str:
-    if duration == 16:
-        text = "6"
-    elif duration == 32:
-        text = "3"
-    else:
-        text = str(duration)
+    text = str(duration)
     return f"{text}." if dotted else text
+
+
+def place_duration_cells(
+    row: list[str],
+    col: int,
+    duration: int,
+    dotted: bool = False,
+) -> None:
+    text = duration_display(duration, dotted)
+    width = len(row)
+    if col < 0 or col >= width:
+        return
+    for idx, ch in enumerate(text):
+        pos = col + idx
+        if 0 <= pos < width and row[pos] == " ":
+            row[pos] = ch
 
 
 def duration_flag(duration: int) -> str:
@@ -221,6 +235,74 @@ def flag_row_style(  # noqa: C901
 
 def flag_row(positions: list[tuple[int, int, bool]], bar_width: int) -> list[str]:
     return flag_row_style(positions, bar_width, stem="|", flag="\\")
+
+
+def spread_flag_positions(
+    positions: list[tuple[int, int, bool]],
+    bar_width: int,
+    *,
+    min_gap: int = 0,
+) -> list[tuple[int, int, bool]]:
+    if not positions or bar_width <= 0:
+        return []
+    ordered = sorted(positions, key=lambda item: item[0])
+    if len(ordered) == 1:
+        col, denom, dot = ordered[0]
+        return [(max(0, min(bar_width - 1, col)), denom, dot)]
+
+    spans = [1 + flag_count(denom) + (1 if dot else 0) for (_c, denom, dot) in ordered]
+
+    gap = max(0, min_gap)
+    while gap >= 0:
+        solved = _solve_spread_cols(ordered, spans, bar_width, gap)
+        if solved is not None:
+            return [
+                (solved[idx], denom, dot) for idx, (_c, denom, dot) in enumerate(ordered)
+            ]
+        gap -= 1
+
+    cols = _fallback_spread_cols(len(ordered), spans, bar_width)
+    return [(cols[idx], denom, dot) for idx, (_c, denom, dot) in enumerate(ordered)]
+
+
+def _solve_spread_cols(
+    ordered: list[tuple[int, int, bool]],
+    spans: list[int],
+    bar_width: int,
+    gap: int,
+) -> list[int] | None:
+    starts_max = [max(0, bar_width - span) for span in spans]
+    lower: list[int] = [0] * len(ordered)
+    upper: list[int] = [0] * len(ordered)
+
+    lower[0] = max(0, min(starts_max[0], ordered[0][0]))
+    for idx in range(1, len(ordered)):
+        required = lower[idx - 1] + spans[idx - 1] + gap
+        lower[idx] = max(required, ordered[idx][0])
+        lower[idx] = min(lower[idx], starts_max[idx])
+
+    upper[-1] = starts_max[-1]
+    for idx in range(len(ordered) - 2, -1, -1):
+        upper[idx] = min(starts_max[idx], upper[idx + 1] - (spans[idx] + gap))
+
+    for idx in range(len(ordered)):
+        if lower[idx] > upper[idx]:
+            return None
+
+    cols = [0] * len(ordered)
+    cols[0] = max(lower[0], min(ordered[0][0], upper[0]))
+    for idx in range(1, len(ordered)):
+        min_required = cols[idx - 1] + spans[idx - 1] + gap
+        cols[idx] = max(min_required, min(ordered[idx][0], upper[idx]))
+        cols[idx] = max(cols[idx], lower[idx])
+        if cols[idx] > upper[idx]:
+            return None
+    return cols
+
+
+def _fallback_spread_cols(count: int, spans: list[int], bar_width: int) -> list[int]:
+    step = max(1, (bar_width - 1) // max(1, count - 1))
+    return [min(max(0, bar_width - spans[idx]), idx * step) for idx in range(count)]
 
 
 def stem_row_style(

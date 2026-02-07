@@ -21,6 +21,7 @@ def test_parse_time_sig_value() -> None:
 def test_tuning_preset() -> None:
     assert _tuning_preset("renaissance") == "g2c3f3a3d4g4"
     assert _tuning_preset("renaissance7") == "f2g2c3f3a3d4g4"
+    assert _tuning_preset("guitarlute") == "e2a2d3g3b3e4"
     assert _tuning_preset("unknown") is None
 
 

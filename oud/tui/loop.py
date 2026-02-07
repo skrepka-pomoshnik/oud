@@ -3,6 +3,7 @@ from __future__ import annotations
 import curses
 
 from oud.editor.init import init_state
+from oud.editor.playback import update_playback_animation
 from oud.editor.status import status_line
 from oud.exports.export_tab import export_ascii
 from oud.tui.controller import handle_key as handle_key_impl
@@ -48,6 +49,7 @@ def run_loop(
         state.screen_height = height
         state.screen_width = width
         state.clamp()
+        update_playback_animation(state)
         ensure_cursor_visible(state, width, height)
         frame_buffer = FrameBuffer(height, width)
         render_piece(
@@ -96,6 +98,8 @@ def run_loop(
             state.plugin_index,
             state.plugin_offset,
             state.help_offset if state.mode != "info" else state.info_offset,
+            state.playback_bar,
+            state.playback_col,
         )
         frame = frame_buffer.snapshot()
         if state.last_frame_size != (height, width):

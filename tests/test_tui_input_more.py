@@ -69,6 +69,12 @@ def test_complete_command_basic(tmp_path) -> None:
     assert complete_command(state) is True
     state.cmdline = f"set {tmp_path}{os.sep}file"
     assert complete_command(state) is True
+    state.cmdline = "set gu"
+    assert complete_command(state) is True
+    assert state.cmdline == "set guitar "
+    state.cmdline = "set lu"
+    assert complete_command(state) is True
+    assert state.cmdline == "set lute "
     missing_dir = tmp_path / "missing"
     state.cmdline = f"e {missing_dir}{os.sep}x"
     assert complete_command(state) is True
@@ -127,3 +133,15 @@ def test_parse_search_and_handle_search() -> None:
     state.searchline = ""
     handle_search(state, ord("9"))
     assert state.searchline == "9"
+
+
+def test_search_prompt_uses_history() -> None:
+    state = _state()
+    state.search_history = ["2", "7"]
+    state.mode = "search"
+    handle_search(state, 259)  # KEY_UP
+    assert state.searchline == "7"
+    handle_search(state, 259)  # KEY_UP
+    assert state.searchline == "2"
+    handle_search(state, 258)  # KEY_DOWN
+    assert state.searchline == "7"

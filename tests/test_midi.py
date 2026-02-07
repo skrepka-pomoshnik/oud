@@ -1,5 +1,7 @@
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.exports.midi import (
+    BASE_NOTE_VELOCITY,
+    _accent_velocity,
     _bar_chord_events,
     _collect_manual_chords,
     _duration_ticks,
@@ -11,6 +13,7 @@ from oud.exports.midi import (
     _program_change,
     _vlq,
     _write_track,
+    build_playback_timeline,
     export_midi,
 )
 
@@ -67,6 +70,19 @@ def test_duration_ticks_dotted() -> None:
     assert _duration_ticks(4, dotted=True) == 720
 
 
+def test_accent_velocity_for_4_4_beats() -> None:
+    assert _accent_velocity(0, 4, 4) > BASE_NOTE_VELOCITY
+    assert _accent_velocity(480, 4, 4) == BASE_NOTE_VELOCITY
+    assert _accent_velocity(960, 4, 4) > BASE_NOTE_VELOCITY
+    assert _accent_velocity(960, 4, 4) < _accent_velocity(0, 4, 4)
+
+
+def test_accent_velocity_for_3_4_beats() -> None:
+    assert _accent_velocity(0, 3, 4) > BASE_NOTE_VELOCITY
+    assert _accent_velocity(480, 3, 4) == BASE_NOTE_VELOCITY
+    assert _accent_velocity(960, 3, 4) == BASE_NOTE_VELOCITY
+
+
 def test_fret_from_override() -> None:
     assert _fret_from_override("x", "italian") == 10
     assert _fret_from_override("4", "italian") == 4
@@ -88,7 +104,7 @@ def test_collect_manual_chords_dotted_duration() -> None:
         dotted={(0, 0)},
     )
     assert len(events) == 1
-    start, duration, notes = events[0]
+    start, duration, _col, notes = events[0]
     assert start == 0
     assert duration == 720
     assert {note.fret for note in notes} == {0, 2}
@@ -109,8 +125,29 @@ def test_bar_chord_events_apply_overrides() -> None:
         dotted=None,
     )
     assert events
-    _start, _dur, notes = events[0]
+    _start, _dur, _col, notes = events[0]
     assert notes[0].fret == 2
+
+
+def test_build_playback_timeline_includes_bar_and_col() -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6)
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert timeline
+    start, end, bar_index, col = timeline[0]
+    assert start == 0.0
+    assert end > start
+    assert bar_index == 0
+    assert col >= 0
 
 
 def test_note_messages() -> None:

@@ -108,6 +108,8 @@ class SearchBindings:
     escape: tuple[int, ...]
     backspace: tuple[int, ...]
     enter: tuple[int, ...]
+    history_up: tuple[int, ...]
+    history_down: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -136,6 +138,20 @@ class NormalActionBindings:
     col_start: tuple[int, ...]
     col_end: tuple[int, ...]
     jump_bottom: tuple[int, ...]
+    find_forward: tuple[int, ...]
+    find_backward: tuple[int, ...]
+    till_forward: tuple[int, ...]
+    till_backward: tuple[int, ...]
+    find_repeat: tuple[int, ...]
+    find_repeat_reverse: tuple[int, ...]
+    word_search_forward: tuple[int, ...]
+    word_search_backward: tuple[int, ...]
+    word_search_next: tuple[int, ...]
+    word_search_prev: tuple[int, ...]
+    match_jump: tuple[int, ...]
+    mark_set: tuple[int, ...]
+    mark_jump_line: tuple[int, ...]
+    mark_jump_exact: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -168,6 +184,57 @@ class HelpActionBindings:
     viewer: tuple[int, ...]
 
 
+def _parse_key_token(state, token: str) -> int | None:  # noqa: PLR0911
+    keycodes = state.keycodes
+    text = token.strip()
+    if not text:
+        return None
+    lower = text.lower()
+    named = {
+        "left": keycodes.left,
+        "right": keycodes.right,
+        "up": keycodes.up,
+        "down": keycodes.down,
+        "home": keycodes.home,
+        "end": keycodes.end,
+        "pgup": keycodes.ppage,
+        "pageup": keycodes.ppage,
+        "pgdn": keycodes.npage,
+        "pagedown": keycodes.npage,
+        "enter": keycodes.enter,
+        "return": keycodes.enter,
+        "esc": 27,
+        "escape": 27,
+        "tab": keycodes.tab,
+        "backspace": keycodes.backspace,
+        "delete": keycodes.dc,
+        "space": ord(" "),
+    }
+    if lower in named:
+        return named[lower]
+    if lower.startswith("ctrl-") and len(lower) == 6 and lower[-1].isalpha():
+        return ord(lower[-1].upper()) & 31
+    if lower.startswith("^") and len(lower) == 2 and lower[-1].isalpha():
+        return ord(lower[-1].upper()) & 31
+    if text.isdigit():
+        return int(text)
+    if len(text) == 1:
+        return ord(text)
+    return None
+
+
+def _remap_tuple(state, setting_key: str, default: tuple[int, ...]) -> tuple[int, ...]:
+    value = state.settings.get(setting_key, "").strip()
+    if not value:
+        return default
+    parsed: list[int] = []
+    for part in value.replace(",", " ").split():
+        key = _parse_key_token(state, part)
+        if key is not None:
+            parsed.append(key)
+    return tuple(parsed) if parsed else default
+
+
 def movement_keys(state, *, include_arrows: bool) -> MovementKeys:
     profile = _profile(state)
     left = profile.move_left
@@ -180,6 +247,10 @@ def movement_keys(state, *, include_arrows: bool) -> MovementKeys:
         right += (keycodes.right,)
         up += (keycodes.up,)
         down += (keycodes.down,)
+    left = _remap_tuple(state, "remap_move_left", left)
+    right = _remap_tuple(state, "remap_move_right", right)
+    up = _remap_tuple(state, "remap_move_up", up)
+    down = _remap_tuple(state, "remap_move_down", down)
     return MovementKeys(left=left, right=right, up=up, down=down)
 
 
@@ -190,32 +261,32 @@ def normal_bindings(state) -> NormalBindings:
     bar_after: tuple[int, ...] = (ord("o"), ord("+"), *profile.bar_after_extra)
     bar_delete: tuple[int, ...] = (ord("X"), ord("-"), *profile.bar_delete_extra)
     return NormalBindings(
-        quit=(ord("q"), ord("Q"), 3),
-        command=(ord(":"),),
-        help=help_keys,
-        search=(ord("/"),),
-        insert=(ord("i"), keycodes.enter, 10, 13),
-        replace=(ord("r"),),
-        info=(ord("I"),),
-        bar_after=bar_after,
-        bar_before=(ord("O"),),
-        bar_delete=bar_delete,
-        print_pdf=(ord("P"),),
-        play=(ord("m"), ord("M")),
-        undo=(ord("u"),),
-        redo=(18,),
+        quit=_remap_tuple(state, "remap_quit", (ord("q"), ord("Q"), 3)),
+        command=_remap_tuple(state, "remap_command", (ord(":"),)),
+        help=_remap_tuple(state, "remap_help", help_keys),
+        search=_remap_tuple(state, "remap_search", (ord("/"),)),
+        insert=_remap_tuple(state, "remap_insert", (ord("i"), keycodes.enter, 10, 13)),
+        replace=_remap_tuple(state, "remap_replace", (ord("r"),)),
+        info=_remap_tuple(state, "remap_info", (ord("I"),)),
+        bar_after=_remap_tuple(state, "remap_bar_after", bar_after),
+        bar_before=_remap_tuple(state, "remap_bar_before", (ord("O"),)),
+        bar_delete=_remap_tuple(state, "remap_bar_delete", bar_delete),
+        print_pdf=_remap_tuple(state, "remap_print_pdf", (ord("P"),)),
+        play=_remap_tuple(state, "remap_play", (ord("M"),)),
+        undo=_remap_tuple(state, "remap_undo", (ord("u"),)),
+        redo=_remap_tuple(state, "remap_redo", (18,)),
     )
 
 
 def insert_bindings(state) -> InsertBindings:
     keycodes = state.keycodes
     return InsertBindings(
-        quit=(ord("q"), ord("Q"), 3),
-        escape=(27, keycodes.exit),
-        clear=(ord(" "),),
-        barline=(ord("|"),),
-        dot=(ord("."),),
-        prefix=(ord(";"), ord(",")),
+        quit=_remap_tuple(state, "remap_insert_quit", (ord("q"), ord("Q"), 3)),
+        escape=_remap_tuple(state, "remap_insert_escape", (27, keycodes.exit)),
+        clear=_remap_tuple(state, "remap_insert_clear", (ord(" "),)),
+        barline=_remap_tuple(state, "remap_insert_barline", (ord("|"),)),
+        dot=_remap_tuple(state, "remap_insert_dot", (ord("."),)),
+        prefix=_remap_tuple(state, "remap_insert_prefix", (ord(";"), ord(","))),
     )
 
 
@@ -238,6 +309,8 @@ def search_bindings(state) -> SearchBindings:
         escape=(27,),
         backspace=(keycodes.backspace, 127, 8),
         enter=(keycodes.enter, 10, 13),
+        history_up=(keycodes.up,),
+        history_down=(keycodes.down,),
     )
 
 
@@ -263,17 +336,31 @@ def normal_action_bindings(state) -> NormalActionBindings:
     col_start = profile.col_start
     col_end = profile.col_end
     return NormalActionBindings(
-        row_first=(ord("^"),),
-        delete_cell=(ord("x"),),
-        paste=(ord("p"),),
-        pending=(ord("g"), ord("d"), ord("y")),
+        row_first=_remap_tuple(state, "remap_row_first", (ord("^"),)),
+        delete_cell=_remap_tuple(state, "remap_delete_cell", (ord("x"),)),
+        paste=_remap_tuple(state, "remap_paste", (ord("p"),)),
+        pending=_remap_tuple(state, "remap_pending", (ord("g"), ord("d"), ord("y"))),
         bar_next=bar_next,
         bar_prev=bar_prev,
         page_up=page_up,
         page_down=page_down,
         col_start=col_start,
         col_end=col_end,
-        jump_bottom=(ord("G"),),
+        jump_bottom=_remap_tuple(state, "remap_jump_bottom", (ord("G"),)),
+        find_forward=_remap_tuple(state, "remap_find_forward", (ord("f"),)),
+        find_backward=_remap_tuple(state, "remap_find_backward", (ord("F"),)),
+        till_forward=_remap_tuple(state, "remap_till_forward", (ord("t"),)),
+        till_backward=_remap_tuple(state, "remap_till_backward", (ord("T"),)),
+        find_repeat=_remap_tuple(state, "remap_find_repeat", (ord(";"),)),
+        find_repeat_reverse=_remap_tuple(state, "remap_find_repeat_reverse", (ord(","),)),
+        word_search_forward=_remap_tuple(state, "remap_word_search_forward", (ord("*"),)),
+        word_search_backward=_remap_tuple(state, "remap_word_search_backward", (ord("#"),)),
+        word_search_next=_remap_tuple(state, "remap_word_search_next", (ord("n"),)),
+        word_search_prev=_remap_tuple(state, "remap_word_search_prev", (ord("N"),)),
+        match_jump=_remap_tuple(state, "remap_match_jump", (ord("%"),)),
+        mark_set=_remap_tuple(state, "remap_mark_set", (ord("m"),)),
+        mark_jump_line=_remap_tuple(state, "remap_mark_jump_line", (ord("'"),)),
+        mark_jump_exact=_remap_tuple(state, "remap_mark_jump_exact", (ord("`"),)),
     )
 
 

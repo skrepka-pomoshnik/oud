@@ -4,10 +4,13 @@ import os
 from pathlib import Path
 
 from oud.editor.keymap import command_bindings, search_bindings
+from oud.editor.settings_ops import set_preset_names
 from oud.editor.state import EditorState
 from oud.settings import DEFAULT_SETTINGS
 from oud.tui.commands import command_names, no_space_commands, path_commands
 from oud.tui.prompt import PromptBindings, update_prompt
+from oud.tui.prompt_history import history_next as history_next_impl
+from oud.tui.prompt_history import history_prev as history_prev_impl
 
 
 def _prompt_bindings(bindings) -> PromptBindings:
@@ -22,27 +25,15 @@ def _prompt_bindings(bindings) -> PromptBindings:
 
 
 def history_prev(state: EditorState) -> str | None:
-    if not state.command_history:
-        return None
-    if state.command_history_index is None:
-        state.command_history_index = len(state.command_history) - 1
-    else:
-        state.command_history_index = max(0, state.command_history_index - 1)
-    return state.command_history[state.command_history_index]
+    text, index = history_prev_impl(state.command_history, state.command_history_index)
+    state.command_history_index = index
+    return text
 
 
 def history_next(state: EditorState) -> str | None:
-    if not state.command_history:
-        return None
-    if state.command_history_index is None:
-        return ""
-    state.command_history_index = min(
-        len(state.command_history), state.command_history_index + 1,
-    )
-    if state.command_history_index >= len(state.command_history):
-        state.command_history_index = None
-        return ""
-    return state.command_history[state.command_history_index]
+    text, index = history_next_impl(state.command_history, state.command_history_index)
+    state.command_history_index = index
+    return text
 
 
 def complete_command_text(  # noqa: PLR0911, C901, PLR0912
@@ -64,16 +55,22 @@ def complete_command_text(  # noqa: PLR0911, C901, PLR0912
     cmd, rest = cmdline.split(" ", 1)
     if cmd == "set":
         keys = sorted({*DEFAULT_SETTINGS.keys(), *state.settings.keys()})
+        presets = list(set_preset_names())
         token = rest.strip()
         if not token:
-            return cmdline, "Options: " + " ".join(keys[:8])
+            options = sorted(keys + presets)
+            return cmdline, "Options: " + " ".join(options[:8])
         if "=" in token:
             return cmdline, None
-        matches = [key for key in keys if key.startswith(token)]
+        matches = sorted([key for key in keys if key.startswith(token)])
+        matches.extend([name for name in presets if name.startswith(token)])
         if not matches:
             return cmdline, None
         if len(matches) == 1:
-            return f"{cmd} {matches[0]}=", None
+            match = matches[0]
+            if match in presets:
+                return f"{cmd} {match} ", None
+            return f"{cmd} {match}=", None
         return cmdline, "Options: " + " ".join(matches[:8])
     if cmd not in path_commands():
         return cmdline, None
@@ -184,18 +181,24 @@ def handle_search(state: EditorState, key: int) -> bool:
         state.searchline,
         key,
         prompt_bindings,
-        history=[],
-        history_index=None,
+        history=state.search_history,
+        history_index=state.search_history_index,
     )
     state.searchline = result.text
+    state.search_history_index = result.history_index
     if result.cancel:
         state.mode = "normal"
         state.searchline = ""
+        state.search_history_index = None
         return True
     if result.submit:
-        target = parse_search(state.searchline)
+        search_text = state.searchline
+        target = parse_search(search_text)
         state.searchline = ""
         state.mode = "normal"
+        state.search_history_index = None
+        if search_text:
+            state.search_history.append(search_text)
         if target is None:
             state.message = "Invalid bar"
             return True

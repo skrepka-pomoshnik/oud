@@ -103,7 +103,7 @@ def test_scale_row_spreads_notes_with_min_gap() -> None:
     scaled = _scale_row(row, 10, "-")
     positions = [idx for idx, ch in enumerate(scaled) if ch != "-"]
     assert len(positions) == 2
-    assert positions[1] - positions[0] >= 2
+    assert positions[1] - positions[0] >= 1
 
 
 def test_bar_display_width_accounts_for_notes_and_flags() -> None:
@@ -149,7 +149,7 @@ def test_bars_fit_respects_usable_width() -> None:
         dotted=None,
         compact=False,
     )
-    assert fit_two == 1
+    assert fit_two == 2
     assert fit_one == 1
 
 

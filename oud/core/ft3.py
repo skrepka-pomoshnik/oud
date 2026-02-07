@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import re
 from pathlib import Path
+from statistics import median
 
 from oud.core.model import Bar, Chord, Note, Piece
 
@@ -134,12 +135,48 @@ def load_ft3(path: str) -> Piece:
     composer = None
 
     bars = [parse_bar(chunk) for chunk in re.split(b"\x03\x80", data)]
+    _apply_legacy_duration_fix(bars)
     max_string = 0
     for bar in bars:
         for note in bar.notes:
             max_string = max(max_string, note.string + 1)
     strings = max(6, max_string) if max_string else 6
     return Piece(title=title, author=author, composer=composer, bars=bars, strings=strings)
+
+
+def _bar_sum_quarter_beats(bar: Bar) -> float:
+    total = 0.0
+    for chord in bar.chords:
+        denom = note_type_to_denominator(chord.note_type)
+        if denom is None:
+            continue
+        value = 4.0 / denom
+        if chord.dotted:
+            value *= 1.5
+        total += value
+    return total
+
+
+def _needs_legacy_duration_fix(bars: list[Bar]) -> bool:
+    if not bars or any(bar.time_sig for bar in bars):
+        return False
+    sums = [_bar_sum_quarter_beats(bar) for bar in bars if bar.chords]
+    if not sums:
+        return False
+    return abs(median(sums) - 1.5) < 0.05
+
+
+def _apply_legacy_duration_fix(bars: list[Bar]) -> None:
+    # Some FT3 files encode rhythms one step faster (e.g. 7 meaning 16th).
+    # Detect this pattern and shift note_type by one to restore musical lengths.
+    if not _needs_legacy_duration_fix(bars):
+        return
+    for bar in bars:
+        if bar.time_sig is None:
+            bar.time_sig = "O"
+        for chord in bar.chords:
+            if chord.note_type > 2:
+                chord.note_type -= 1
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:

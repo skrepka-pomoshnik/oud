@@ -13,6 +13,8 @@ HELP_LINES = [
     "Undo u / Redo ^R                         Bar     o/O  +/-",
     "Top  gg / g                             Help    ? (less) / F1",
     "Info I                                   Flags f (cycle style)",
+    "Search * / # / n / N                     Marks   m{a}  'a  `a",
+    "Match %                                  Play    M",
     "Add  gj (bass string)",
     "Plugins gp or :plugins (plugin: j/k move, h back, l/enter open, d download, / search)",
     "Flags f (cycle style)                   Letters F (c), E (e)",
@@ -55,8 +57,12 @@ HELP_LINES = [
         "linelen=... staffthick=... fontstyle=..."
     ),
     ":set flagredundant=on|off",
-    ":set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart showtuning=on|off",
+    (
+        ":set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart "
+        "showtuning=on|off"
+    ),
     ":set key=... countdots=on/off grid=on/off",
+    ":set lute|guitar (preset metasettings)",
     ":set measuresstep=... (used with measures=every)",
     ":set italianorient=normal|reverse italianmultifret=on|off viewinvert=on|off",
     ":set frenchc=normal|alt frenche=normal|tail",

@@ -359,6 +359,184 @@ def test_normal_mode_counts_move() -> None:
     assert state.cursor_col == 2
 
 
+def test_normal_find_forward_and_repeat() -> None:
+    state = _state()
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 0, 3)] = "a"
+    dispatch_key(
+        state,
+        ord("f"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    dispatch_key(
+        state,
+        ord("a"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.cursor_col == 1
+    dispatch_key(
+        state,
+        ord(";"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.cursor_col == 3
+
+
+def test_normal_find_backward_and_reverse_repeat() -> None:
+    state = _state()
+    state.cursor_col = 6
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 0, 3)] = "a"
+    state.overrides[(0, 0, 5)] = "a"
+    state.overrides[(0, 0, 6)] = "a"
+    dispatch_key(
+        state,
+        ord("F"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    dispatch_key(
+        state,
+        ord("a"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.cursor_col == 5
+    dispatch_key(
+        state,
+        ord(","),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.cursor_col == 6
+
+
+def test_normal_word_search_and_repeat() -> None:
+    state = _state()
+    state.piece.bars.append(Bar())
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 0, 3)] = "a"
+    state.overrides[(1, 0, 0)] = "a"
+    state.cursor_bar = 0
+    state.cursor_col = 1
+    dispatch_key(
+        state,
+        ord("*"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert (state.cursor_bar, state.cursor_col) == (0, 3)
+    dispatch_key(
+        state,
+        ord("n"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert (state.cursor_bar, state.cursor_col) == (1, 0)
+    dispatch_key(
+        state,
+        ord("N"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert (state.cursor_bar, state.cursor_col) == (0, 3)
+
+
+def test_normal_percent_jump_between_repeats() -> None:
+    state = _state()
+    state.piece.bars = [Bar(), Bar(), Bar()]
+    state.piece.bars[0].repeat = ".:"
+    state.piece.bars[2].repeat = ":."
+    state.cursor_bar = 0
+    dispatch_key(
+        state,
+        ord("%"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.cursor_bar == 2
+
+
+def test_normal_marks_set_and_jump() -> None:
+    state = _state()
+    state.cursor_bar = 0
+    state.cursor_col = 2
+    dispatch_key(
+        state,
+        ord("m"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    dispatch_key(
+        state,
+        ord("a"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.marks["a"] == (0, 0, 2)
+    state.cursor_bar = 1
+    state.cursor_col = 0
+    dispatch_key(
+        state,
+        ord("'"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    dispatch_key(
+        state,
+        ord("a"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert (state.cursor_bar, state.cursor_col) == (0, 2)
+
+
+def test_keymap_remap_hook_for_movement() -> None:
+    state = _state()
+    state.settings["remap_move_left"] = "a"
+    state.cursor_col = 3
+    dispatch_key(
+        state,
+        ord("a"),
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
+    assert state.cursor_col == 2
+
+
 def test_normal_mode_x_clears_cell() -> None:
     state = _state()
     state.overrides[(0, 0, 0)] = "a"

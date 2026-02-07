@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
+from oud.editor.playback import reset_playback_animation
 from oud.editor.state import EditorState
-from oud.exports.midi import export_midi, play_midi
+from oud.exports.midi import build_playback_timeline, export_midi, play_midi
 
 
 def midi_output_path(state: EditorState) -> str:
@@ -15,9 +17,11 @@ def midi_output_path(state: EditorState) -> str:
 
 def stop_midi(state: EditorState) -> None:
     if state.midi_proc is None:
+        reset_playback_animation(state)
         return
     proc = state.midi_proc
     state.midi_proc = None
+    reset_playback_animation(state)
     if proc.poll() is None:
         proc.terminate()
     state.message = "MIDI stopped"
@@ -49,5 +53,21 @@ def start_midi(
         start_bar=start_bar,
         dotted=state.dotted,
     )
+    state.playback_timeline = build_playback_timeline(
+        state.piece,
+        state.overrides,
+        state.durations,
+        state.bar_width,
+        settings=state.settings,
+        bpm=bpm,
+        start_bar=start_bar,
+        dotted=state.dotted,
+    )
+    state.playback_index = 0
+    state.playback_bar = None
+    state.playback_col = None
+    state.playback_started_at = None
     soundfont = state.settings.get("soundfont", "") or None
     state.message, state.midi_proc = play_midi(path, soundfont=soundfont)
+    if state.midi_proc is not None:
+        state.playback_started_at = time.monotonic()

@@ -42,6 +42,8 @@ class EditorState:
         self.redo_stack: list[UndoAction] = []
         self.command_history: list[str] = []
         self.command_history_index: int | None = None
+        self.search_history: list[str] = []
+        self.search_history_index: int | None = None
         self.settings = settings
         self.replace_once = False
         self.insert_prefix = ""
@@ -61,8 +63,18 @@ class EditorState:
         self.screen_width = 0
         self.screen_height = 0
         self.midi_proc: subprocess.Popen[bytes] | None = None
+        self.playback_timeline: list[tuple[float, float, int, int]] = []
+        self.playback_started_at: float | None = None
+        self.playback_index = 0
+        self.playback_bar: int | None = None
+        self.playback_col: int | None = None
         self.count_prefix = ""
         self.pending_key = ""
+        self.pending_find = ""
+        self.last_find: tuple[str, str] | None = None
+        self.last_word_search: tuple[str, int] | None = None
+        self.marks: dict[str, tuple[int, int, int]] = {}
+        self.pending_mark = ""
         self.pending_quit = False
         self.yanked_bar: YankedBar | None = None
         self.stave_breaks: set[int] = set()

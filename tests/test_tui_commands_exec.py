@@ -141,6 +141,24 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.piece.composer == "Composer"
 
 
+def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
+    assert state.settings["style"] == "italian"
+    assert state.settings["tuning"] == "e2a2d3g3b3e4"
+    assert state.settings["strings"] == "6"
+    assert state.settings["italianorient"] == "reverse"
+    cmd.cmd_set(state, "lute", str(tmp_path / "cfg.toml"))
+    assert state.settings["style"] == "french"
+    assert state.settings["tuning"] == "g2c3f3a3d4g4"
+    assert state.settings["strings"] == "6"
+
+
 def test_cmd_ascii_and_midicmd(monkeypatch: pytest.MonkeyPatch) -> None:
     state = _state()
     cmd.cmd_ascii(state, "on")

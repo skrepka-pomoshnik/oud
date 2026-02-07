@@ -1,10 +1,12 @@
 from oud.core.model import Bar, Note
 from oud.core.render_utils import (
     bar_cells,
+    duration_display,
     flag_positions_from_durations,
     flag_row,
     flag_row_style,
     format_fret,
+    spread_flag_positions,
     stem_row_style,
 )
 
@@ -82,6 +84,21 @@ def test_flag_row_style_places_dot_after_flags_when_space() -> None:
     assert row == ["|", "\\", "\\", ".", " ", " "]
 
 
+def test_duration_display_uses_full_denominators() -> None:
+    assert duration_display(16) == "16"
+    assert duration_display(32, dotted=True) == "32."
+
+
+def test_spread_flag_positions_preserves_tail_space_at_right_edge() -> None:
+    # Regression: last 8th at right edge must keep room for one tail.
+    positions = [(0, 4, True), (3, 16, False), (4, 8, False)]
+    spread = spread_flag_positions(positions, 8, min_gap=1)
+    assert spread[-1][0] <= 6
+    row = flag_row_style(spread, 8, stem="|", flag="\\")
+    assert row[6] == "|"
+    assert row[7] == "\\"
+
+
 def test_flag_row_style_frog_galliard_bar13_spacing() -> None:
     positions = [
         (0, 16, True),
@@ -91,7 +108,7 @@ def test_flag_row_style_frog_galliard_bar13_spacing() -> None:
         (7, 16, False),
         (9, 16, False),
     ]
-    row = flag_row_style(positions, 24, stem="|", flag="\\")
+    row = flag_row_style(spread_flag_positions(positions, 24), 24, stem="|", flag="\\")
     text = "".join(row)
     # Dotted 16th should show dot after its flags.
     assert text.startswith("|\\\\.")
@@ -100,6 +117,18 @@ def test_flag_row_style_frog_galliard_bar13_spacing() -> None:
     assert len(groups) >= 3
     assert groups[1] - groups[0] >= 4
     assert groups[2] - groups[1] >= 3
+
+
+def test_spread_flag_positions_avoids_overlap_in_dense_groups() -> None:
+    positions = [(0, 16, True), (2, 32, False), (3, 16, False)]
+    spread = spread_flag_positions(positions, 16)
+    assert [col for col, _den, _dot in spread] == [0, 4, 8]
+
+
+def test_spread_flag_positions_with_min_gap_adds_separator() -> None:
+    positions = [(0, 16, True), (2, 32, False), (3, 16, False)]
+    spread = spread_flag_positions(positions, 24, min_gap=1)
+    assert [col for col, _den, _dot in spread] == [0, 5, 10]
 
 
 def test_bar_cells_string_mapping() -> None:

@@ -5,6 +5,7 @@ from typing import cast
 
 from oud.core.model import Bar, Piece
 from oud.editor.midi_control import midi_output_path, start_midi, stop_midi
+from oud.editor.playback import update_playback_animation
 from oud.editor.state import EditorState
 
 
@@ -57,3 +58,18 @@ def test_start_midi(monkeypatch) -> None:
     messages.append(state.message)
     assert state.midi_proc is not None
     assert messages[-1] == "Playing"
+
+
+def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
+    state = _state()
+    state.playback_timeline = [(0.0, 0.5, 0, 1), (0.5, 1.0, 0, 4)]
+    state.playback_started_at = 100.0
+    state.playback_index = 0
+    state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
+    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.25)
+    update_playback_animation(state)
+    assert state.playback_bar == 0
+    assert state.playback_col == 1
+    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.75)
+    update_playback_animation(state)
+    assert state.playback_col == 4

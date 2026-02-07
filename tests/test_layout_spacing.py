@@ -1,5 +1,6 @@
+from oud.core.ft3 import build_durations, load_ft3
 from oud.core.model import Bar, Chord, Note
-from oud.core.view_model import _bar_display_width, _bars_fit
+from oud.core.view_model import _bar_compact_width, _bar_display_width, _bars_fit
 
 
 def test_bar_display_width_accounts_for_flags_and_dots() -> None:
@@ -73,3 +74,28 @@ def test_bars_fit_max_chords_min_width() -> None:
         compact=False,
     )
     assert count == 1
+
+
+def test_compact_width_for_frog_galliard_bars_stays_tight() -> None:
+    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    durations = build_durations(piece)
+    bar7_width = _bar_compact_width(
+        piece.bars[6],
+        bar_index=6,
+        bar_width=16,
+        overrides={},
+        durations=durations,
+        default_duration=4,
+        dotted=set(),
+    )
+    bar21_width = _bar_compact_width(
+        piece.bars[20],
+        bar_index=20,
+        bar_width=16,
+        overrides={},
+        durations=durations,
+        default_duration=4,
+        dotted=set(),
+    )
+    assert bar7_width <= 18
+    assert bar21_width <= 20

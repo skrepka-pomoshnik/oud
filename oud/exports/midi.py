@@ -7,8 +7,10 @@ import sys
 from pathlib import Path
 
 from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.time_utils import parse_time_signature_value
 
 TICKS_PER_QUARTER = 480
+BASE_NOTE_VELOCITY = 80
 
 
 def _note_type_to_denom(note_type: int) -> int | None:
@@ -106,10 +108,10 @@ def _collect_manual_chords(
     style: str,
     default_duration: int,
     dotted: set[tuple[int, int]] | None,
-) -> list[tuple[int, int, list[Note]]]:
+) -> list[tuple[int, int, int, list[Note]]]:
     _ = bar_width
     columns = sorted({col for (b, _s, col) in overrides if b == bar_index})
-    events: list[tuple[int, int, list[Note]]] = []
+    events: list[tuple[int, int, int, list[Note]]] = []
     current_time = 0
     for col in columns:
         notes: list[Note] = []
@@ -131,7 +133,7 @@ def _collect_manual_chords(
                 break
         is_dotted = dotted is not None and (bar_index, col) in dotted
         duration = _duration_ticks(denom, is_dotted)
-        events.append((current_time, duration, notes))
+        events.append((current_time, duration, col, notes))
         current_time += duration
     return events
 
@@ -199,8 +201,8 @@ def _bar_chord_events(
     style: str,
     default_duration: int,
     dotted: set[tuple[int, int]] | None,
-) -> list[tuple[int, int, list[Note]]]:
-    events: list[tuple[int, int, list[Note]]] = []
+) -> list[tuple[int, int, int, list[Note]]]:
+    events: list[tuple[int, int, int, list[Note]]] = []
     if not bar.chords:
         manual = _collect_manual_chords(
             bar_index,
@@ -212,8 +214,8 @@ def _bar_chord_events(
             default_duration,
             dotted,
         )
-        for start, duration, notes in manual:
-            events.append((start, duration, notes))
+        for start, duration, col, notes in manual:
+            events.append((start, duration, col, notes))
         return events
     time = 0
     positions = _chord_positions(bar.chords, bar_width, default_duration)
@@ -223,9 +225,54 @@ def _bar_chord_events(
         duration = _duration_ticks(denom, is_dotted)
         if chord.notes:
             notes = _apply_overrides(chord.notes, overrides, bar_index, col, style, strings)
-            events.append((time, duration, notes))
+            events.append((time, duration, col, notes))
         time += duration
     return events
+
+
+def build_playback_timeline(
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    settings: dict[str, str] | None = None,
+    *,
+    bpm: int = 90,
+    start_bar: int = 0,
+    dotted: set[tuple[int, int]] | None = None,
+) -> list[tuple[float, float, int, int]]:
+    settings = settings or {}
+    style = settings.get("style") or "french"
+    default_duration = 4
+    timeline: list[tuple[float, float, int, int]] = []
+    sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
+    current_time = 0
+    for b_idx, bar in enumerate(piece.bars):
+        if b_idx < start_bar:
+            continue
+        chord_events = _bar_chord_events(
+            bar,
+            b_idx,
+            piece.strings,
+            overrides,
+            durations,
+            bar_width,
+            style,
+            default_duration,
+            dotted=dotted,
+        )
+        if not chord_events:
+            continue
+        max_end = 0
+        for start, duration, col, notes in chord_events:
+            if not notes:
+                continue
+            event_start = (current_time + start) * sec_per_tick
+            event_end = (current_time + start + duration) * sec_per_tick
+            timeline.append((event_start, event_end, b_idx, col))
+            max_end = max(max_end, start + duration)
+        current_time += max_end
+    return timeline
 
 
 def _note_on(channel: int, pitch: int, velocity: int) -> bytes:
@@ -243,6 +290,35 @@ def _program_change(channel: int, program: int) -> bytes:
 def _meta_tempo(bpm: int) -> bytes:
     mpqn = int(60_000_000 / max(1, bpm))
     return bytes([0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF])
+
+
+def _meter_for_bar(bar: Bar, settings: dict[str, str]) -> tuple[int, int]:
+    if bar.time_sig:
+        parsed = parse_time_signature_value(bar.time_sig)
+        if parsed is not None:
+            return parsed
+    parsed = parse_time_signature_value(settings.get("time", ""))
+    if parsed is not None:
+        return parsed
+    return 4, 4
+
+
+def _accent_velocity(start: int, beats: int, unit: int, base: int = BASE_NOTE_VELOCITY) -> int:
+    beat_ticks = _duration_ticks(unit, dotted=False)
+    if beat_ticks <= 0 or start % beat_ticks != 0:
+        return base
+    beat_index = (start // beat_ticks) % max(1, beats)
+    if beats == 4:
+        if beat_index == 0:
+            return min(127, base + 18)
+        if beat_index == 2:
+            return min(127, base + 8)
+    elif beats == 3:
+        if beat_index == 0:
+            return min(127, base + 16)
+    elif beat_index == 0:
+        return min(127, base + 14)
+    return base
 
 
 def _end_of_track() -> bytes:
@@ -307,6 +383,7 @@ def export_midi(
     for b_idx, bar in enumerate(piece.bars):
         if b_idx < start_bar:
             continue
+        beats, unit = _meter_for_bar(bar, settings)
         chord_events = _bar_chord_events(
             bar,
             b_idx,
@@ -321,14 +398,15 @@ def export_midi(
         if not chord_events:
             continue
         max_end = 0
-        for start, duration, notes in chord_events:
+        for start, duration, _col, notes in chord_events:
+            velocity = _accent_velocity(start, beats, unit)
             note_len = max(1, int(duration * gate))
             for note in notes:
                 s_idx = note.string - 1
                 if s_idx < 0 or s_idx >= len(pitches):
                     continue
                 pitch = pitches[s_idx] + note.fret
-                events.append((current_time + start, _note_on(0, pitch, 80)))
+                events.append((current_time + start, _note_on(0, pitch, velocity)))
                 events.append((current_time + start + note_len, _note_off(0, pitch, 64)))
             max_end = max(max_end, start + duration)
         current_time += max_end

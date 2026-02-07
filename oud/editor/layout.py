@@ -21,7 +21,9 @@ def bars_per_line(state: EditorState, width: int) -> int:
     max_width = width
     linelen = state.settings.get("linelen", "")
     if linelen.isdigit():
-        max_width = min(max_width, max(1, int(linelen)))
+        line_limit = int(linelen)
+        if line_limit > 0:
+            max_width = min(max_width, line_limit)
     usable_width = max(0, max_width - left_margin)
     per_line = max(1, usable_width // (state.bar_width + bar_gap(state)))
     maxbars = state.settings.get("maxbars", "")

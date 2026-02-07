@@ -12,6 +12,8 @@ from oud.core.view_model import (
     _tactus_row,
     build_bar_view,
 )
+from oud.ui.framebuffer import FrameBuffer
+from oud.ui.render import render_piece
 
 
 def test_bar_durations_prefers_smallest_division() -> None:
@@ -35,6 +37,20 @@ def test_bar_durations_show_all_when_redundant_disabled() -> None:
         hide_redundant=False,
     )
     assert row == ["4", "4", "4", "4"]
+
+
+def test_bar_durations_are_fixed_width_cells() -> None:
+    row = _bar_durations(
+        durations={(0, 0, 0): 16, (0, 0, 2): 8},
+        bar_index=0,
+        strings=6,
+        bar_width=6,
+        default_duration=4,
+        hide_redundant=True,
+    )
+    assert len("".join(row)) == 6
+    assert row[0] == "1"
+    assert row[1] == "6"
 
 
 def test_bar_flags_mapping() -> None:
@@ -209,6 +225,7 @@ def test_bar_number_for_index() -> None:
     piece = Piece(bars=[b0, b1, Bar(), Bar(), Bar(), Bar()])
     assert _bar_number_for_index(piece, 0, "start", "off", 1) == "[1]"
     assert _bar_number_for_index(piece, 3, "start", "off", 1) is None
+    assert _bar_number_for_index(piece, 0, "every", "off", 1) is None
     assert _bar_number_for_index(piece, 3, "every", "off", 1) == "[4]"
     assert _bar_number_for_index(piece, 4, "five", "off", 1) == "[5]"
     assert _bar_number_for_index(piece, 5, "five", "off", 1) is None
@@ -238,3 +255,70 @@ def test_layout_rows_compacts_when_short() -> None:
     layout = _layout_rows(height=20, strings=6)
     assert layout["staff"] is not None
     assert layout["dur"] is not None
+
+
+def test_render_auto_mode_not_forced_to_one_bar_per_row() -> None:
+    piece = Piece(
+        title="T",
+        bars=[Bar(notes=[Note(1, 0, 0)]) for _ in range(4)],
+        strings=6,
+    )
+    settings = {
+        "spacingmode": "auto",
+        "spacingfill": "compact",
+        "style": "french",
+        "linelen": "0",
+        "bargap": "1",
+        "barpad": "1",
+        "barsperline": "0",
+        "maxbars": "0",
+        "showdur": "off",
+        "showextras": "off",
+        "showtactus": "off",
+        "flagredundant": "on",
+        "flagstems": "single",
+        "tuning": "g2c3f3a3d4g4",
+        "showtuning": "on",
+        "tuninglabels": "relative",
+        "bassstrings": "",
+        "basslabels": "tuning",
+        "measures": "start",
+        "countdots": "off",
+        "time": "C",
+        "key": "C",
+        "flagstyle": "standard",
+    }
+    fb = FrameBuffer(24, 120)
+    render_piece(
+        fb,
+        piece,
+        0,
+        0,
+        0,
+        0,
+        10,
+        {},
+        {},
+        {},
+        {},
+        set(),
+        set(),
+        [],
+        [],
+        [],
+        "normal",
+        "",
+        "",
+        "",
+        "",
+        settings,
+        None,
+        set(),
+        "",
+        [],
+        0,
+        0,
+    )
+    frame = fb.snapshot()
+    note_line = next(line for line in frame.lines if "-a-" in line)
+    assert note_line.count("|") >= 3

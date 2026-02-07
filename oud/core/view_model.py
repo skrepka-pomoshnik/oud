@@ -13,6 +13,7 @@ from oud.core.render_utils import (
     flag_positions_from_durations,
     flag_row,
     note_type_to_denom,
+    place_duration_cells,
 )
 from oud.ui.layout_map import (
     block_height as _block_height,
@@ -91,19 +92,14 @@ def _bar_compact_width(
         default_duration,
         dotted,
     )
-    count = _bar_note_count(bar, bar_index, bar_width, overrides, durations, default_duration)
-    count = max(1, count)
     min_flag_width = 2 + max_slash + max_dot
     width_needed = min_flag_width
     tail_pad = 1
-    max_span = max(1, 1 + max_slash + max_dot)
     if bar.chords:
         positions = chord_positions(bar, bar_width, default_duration)
-        spans: list[int] = []
         for col, denom, dot in positions:
             span = 1 + flag_count(denom) + (1 if dot else 0)
             width_needed = max(width_needed, col + span + 1 + tail_pad)
-            spans.append(span)
     else:
         positions = flag_positions_from_durations(
             durations,
@@ -113,15 +109,9 @@ def _bar_compact_width(
             default_duration,
             dotted=dotted,
         )
-        spans = []
         for col, denom, dot in positions:
             span = 1 + flag_count(denom) + (1 if dot else 0)
             width_needed = max(width_needed, col + span + 1 + tail_pad)
-            spans.append(span)
-    if spans:
-        width_needed = max(width_needed, sum(spans) + len(spans) + tail_pad)
-    else:
-        width_needed = max(width_needed, (count - 1) * 2 + 1 + max_span + tail_pad)
     return max(3, width_needed)
 
 
@@ -271,7 +261,7 @@ def _scale_row(row: list[str], dest_width: int, fill_char: str) -> list[str]:  #
         positions.append((_scale_col(src_col, src_width, dest_width), ch))
     if not positions:
         return scaled
-    min_gap = 2 if fill_char == "-" else 1
+    min_gap = 1
     last_pos = -min_gap
     for dest_col, ch in positions:
         target = max(dest_col, last_pos + min_gap)
@@ -535,7 +525,7 @@ def _bar_number_for_index(
     if measures == "every":
         if step <= 0:
             step = 1
-        if bar_index % step == 0:
+        if bar_index > 0 and bar_index % step == 0:
             return f"[{number}]"
         return None
     if measures == "five":
@@ -571,11 +561,11 @@ def _bar_durations(
                 continue
             is_dotted = dotted is not None and (bar_index, col) in dotted
             if denom != last or is_dotted:
-                row[col] = duration_display(denom, is_dotted)
+                place_duration_cells(row, col, denom, is_dotted)
                 last = denom
         else:
             is_dotted = dotted is not None and (bar_index, col) in dotted
-            row[col] = duration_display(denom, is_dotted)
+            place_duration_cells(row, col, denom, is_dotted)
     return row
 
 
