@@ -12,7 +12,12 @@ def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C
     settings = load_settings(config_path)
     piece, overrides, durations, dotted, bar_width = load_piece_data(path)
     if not piece.bars:
-        piece.bars = [Bar()]
+        try:
+            initial_bars = int(settings.get("newbars", DEFAULT_SETTINGS.get("newbars", "8")))
+        except ValueError:
+            initial_bars = int(DEFAULT_SETTINGS.get("newbars", "8"))
+        initial_bars = max(1, initial_bars)
+        piece.bars = [Bar() for _ in range(initial_bars)]
 
     state = EditorState(piece, settings, config_path=config_path)
     state.overrides = overrides

@@ -76,6 +76,39 @@ def test_bars_fit_max_chords_min_width() -> None:
     assert count == 1
 
 
+def test_bars_fit_respects_chord_wrap_threshold() -> None:
+    bars = [
+        Bar(
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 4, 0)]),
+            ],
+        ),
+        Bar(
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 5, 0)]),
+            ],
+        ),
+    ]
+    count = _bars_fit(
+        bars,
+        bar_offset=0,
+        bar_gap=1,
+        usable_width=120,
+        bar_width=16,
+        overrides={},
+        durations={},
+        default_duration=4,
+        dotted=set(),
+        compact=True,
+        chord_wrap_limit=4,
+    )
+    assert count == 1
+
+
 def test_compact_width_for_frog_galliard_bars_stays_tight() -> None:
     piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
     durations = build_durations(piece)

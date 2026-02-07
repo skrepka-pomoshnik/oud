@@ -51,7 +51,8 @@ Set with:
 
 ### Vim profile (core)
 
-- Move: `h j k l`
+- Move: `h j k l` (cell/row step)
+- Row jump: `J` / `K` (next/previous rendered row, preserves row offset)
 - Insert: `i` or `Enter`
 - Replace once: `r`
 - Delete note: `x` (`[count]x` supported)
@@ -91,14 +92,17 @@ Set with:
 
 ## 5.3 Durations
 
-Duration entry maps to denominators:
+French insert-mode digit mapping:
 
-- `1 -> whole`
-- `2 -> half`
-- `4 -> quarter`
-- `8 -> eighth`
-- `6 -> sixteenth`
-- `3 -> thirty-second`
+- `1 -> 1` (whole)
+- `2 -> 2` (half)
+- `3 -> 4` (quarter)
+- `4 -> 8` (eighth)
+- `5 -> 16`
+- `6 -> 32`
+- `7 -> 64`
+
+Italian mode keeps numeric fret entry and supports duration with `Ctrl+1..7` or `;1..7`.
 
 Durations are tracked per onset column and rendered according to current flag style/redundancy settings.
 
@@ -169,6 +173,10 @@ Durations are tracked per onset column and rendered according to current flag st
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`
 - Input profile: `keys`
 
+Notes:
+- `barsperline=0` means auto.
+- `barpad` controls left/right inner padding inside bars.
+
 ## 8) Plugin System (Current)
 
 - Open plugin menu with `:plugins` or `gp` in normal mode.
@@ -214,6 +222,11 @@ Durations are tracked per onset column and rendered according to current flag st
 - Some advanced historical symbols/layouts are partial or pending.
 - Import is best-effort for proprietary formats (FT3/JT* semantics vary).
 - Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
+
+## 12) Status and Info Split
+
+- Main status bar keeps live editing context only (bar/beat, duration, time).
+- Path/file metadata is intentionally moved to `:info` to keep editing status compact.
 
 ## 11) Architecture Map
 

@@ -98,3 +98,13 @@ def test_bass_strings_used_and_apply_overrides() -> None:
     apply_overrides(cells, {(0, 0, 1): "r", (0, 1, 2): "c"}, 0, 8, 4)
     assert cells[0][1] == "_"
     assert cells[1][2] == "c"
+
+
+def test_bass_strings_used_does_not_treat_sixth_course_as_bass() -> None:
+    piece = Piece(
+        title="T",
+        bars=[Bar(notes=[Note(string=6, fret=0, raw_pos=0)])],
+        strings=6,
+    )
+    used = bass_strings_used(piece, {})
+    assert used == set()

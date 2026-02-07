@@ -159,8 +159,9 @@ def bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) 
             used.add(string)
     for bar in piece.bars:
         for note in bar.notes:
-            if note.string >= 6:
-                used.add(note.string)
+            idx = note.string - 1
+            if idx >= 6:
+                used.add(idx)
         for chord in bar.chords:
             for note in chord.notes:
                 idx = note.string - 1

@@ -1,5 +1,10 @@
-from oud.core.model import Bar, Piece
-from oud.editor.layout import bars_per_line, jump_system_row
+from oud.core.model import Bar, Chord, Note, Piece
+from oud.editor.layout import (
+    bars_per_line,
+    dynamic_system_starts,
+    jump_system_row,
+    jump_system_row_dynamic,
+)
 from oud.editor.state import EditorState
 
 
@@ -60,3 +65,45 @@ def test_jump_system_row_clamps_to_target_row_bounds() -> None:
     per_line = bars_per_line(state, width=200)
     # offset 2 cannot exist in the last short row, so it clamps to bar 7.
     assert jump_system_row(state, bar_index=2, delta=2, per_line=per_line) == 7
+
+
+def test_jump_system_row_dynamic_uses_rendered_row_starts() -> None:
+    state = _state({"spacingmode": "auto", "barsperline": "0", "linelen": "40"})
+    starts = dynamic_system_starts(state, width=120)
+    assert starts
+    if len(starts) < 2:
+        return
+    bar_index = starts[0] + 1
+    target = jump_system_row_dynamic(state, bar_index=bar_index, delta=1, width=120)
+    next_start = starts[1]
+    next_end = starts[2] if len(starts) > 2 else len(state.piece.bars)
+    expected = min(next_end - 1, next_start + 1)
+    assert target == expected
+
+
+def test_dynamic_system_starts_respect_chordwrap_threshold() -> None:
+    bars = [
+        Bar(
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 4, 0)]),
+            ],
+        )
+        for _ in range(4)
+    ]
+    state = EditorState(
+        Piece(bars=bars, strings=6),
+        {
+            "spacingmode": "auto",
+            "spacingfill": "compact",
+            "barsperline": "0",
+            "maxbars": "0",
+            "bargap": "1",
+            "linelen": "0",
+            "chordwrap": "4",
+        },
+    )
+    state.bar_width = 16
+    starts = dynamic_system_starts(state, width=200)
+    assert starts == [0, 1, 2, 3]

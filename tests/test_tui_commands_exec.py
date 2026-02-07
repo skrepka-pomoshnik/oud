@@ -102,6 +102,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "measures=every measuresstep=2 tuning=renaissance "
         "flagstyle=italian time=3/2 key=D countdots=on keys=vim "
         "spacing=10 spacingmode=spread flagredundant=off maxbars=4 barsperline=3 barpad=2 maxchords=6 "
+        "chordwrap=12 "
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
         "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
@@ -123,6 +124,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["barsperline"] == "3"
     assert state.settings["barpad"] == "2"
     assert state.settings["maxchords"] == "6"
+    assert state.settings["chordwrap"] == "12"
     assert state.settings["linelen"] == "60"
     assert state.settings["bargap"] == "2"
     assert state.settings["staffthick"] == "2"
@@ -140,6 +142,18 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.piece.title == "Title"
     assert state.piece.author == "Author"
     assert state.piece.composer == "Composer"
+
+
+def test_cmd_set_spacingmode_stretch_alias(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "spacingmode=stretch", str(tmp_path / "cfg.toml"))
+    assert state.settings["spacingmode"] == "auto"
+    assert state.settings["spacingfill"] == "edge"
 
 
 def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

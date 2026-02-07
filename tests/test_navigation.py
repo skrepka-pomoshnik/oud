@@ -1,5 +1,17 @@
+from pathlib import Path
+
 from oud.core.model import Bar, Chord, Note, Piece
-from oud.editor.navigation import move_left, move_left_note, move_right, move_right_note
+from oud.editor.init import init_state
+from oud.editor.navigation import (
+    _bar_content_width_for_cursor,
+    _cursor_display_map_for_bar,
+    move_left,
+    move_left_note,
+    move_right,
+    move_right_note,
+    move_right_visual,
+)
+from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 
 
@@ -105,3 +117,44 @@ def test_note_movement_prefers_notes_on_current_string() -> None:
     state.cursor_col = 0
     move_right_note(state)
     assert state.cursor_col == 4
+
+
+def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
+    root = Path(__file__).resolve().parents[1]
+    state = init_state(
+        str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
+        config_path="config.toml",
+    )
+    state.settings["spacingmode"] = "auto"
+    state.settings["spacingfill"] = "stretch"
+    state.settings["barpad"] = "1"
+    state.screen_width = 90
+    state.cursor_bar = 3
+    content = _bar_content_width_for_cursor(state, 3)
+    mapping = _cursor_display_map_for_bar(state, 3, content)
+    dup = next((idx for idx in range(len(mapping) - 1) if mapping[idx] == mapping[idx + 1]), None)
+    assert dup is not None
+    if dup is None:
+        return
+    state.cursor_col = dup
+    move_right_visual(state)
+    assert state.cursor_bar == 3
+    assert mapping[state.cursor_col] != mapping[dup]
+
+
+def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
+    root = Path(__file__).resolve().parents[1]
+    state = init_state(
+        str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
+        config_path="config.toml",
+    )
+    state.settings["spacingmode"] = "auto"
+    state.settings["spacingfill"] = "stretch"
+    state.settings["barpad"] = "1"
+    state.screen_width = 120
+    state.cursor_bar = 0
+    state.cursor_string = 1
+    state.cursor_col = 0
+    for _ in range(4):
+        handle_normal(state, ord("l"))
+    assert state.cursor_col == 5

@@ -401,6 +401,31 @@ def _bar_note_count(
     return len(_bar_note_columns(overrides, durations, bar_index=bar_index))
 
 
+def _bar_chord_count(
+    bar: Bar,
+    bar_index: int,
+    bar_width: int,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    default_duration: int,
+) -> int:
+    if bar.chords:
+        return len(bar.chords)
+    count = _bar_note_count(
+        bar,
+        bar_index,
+        bar_width,
+        overrides,
+        durations,
+        default_duration,
+    )
+    if count > 0:
+        return count
+    if bar.notes:
+        return len(bar.notes)
+    return 0
+
+
 def _bars_fit(
     bars: list[Bar],
     bar_offset: int,
@@ -414,12 +439,28 @@ def _bars_fit(
     *,
     max_chords: int = 0,
     compact: bool = False,
+    chord_wrap_limit: int = 0,
 ) -> int:
     if usable_width <= 0:
         return 1
     count = 0
     total = 0
+    chords_total = 0
     for idx in range(bar_offset, len(bars)):
+        chord_count = _bar_chord_count(
+            bars[idx],
+            idx,
+            bar_width,
+            overrides,
+            durations,
+            default_duration,
+        )
+        if (
+            chord_wrap_limit > 0
+            and count > 0
+            and (chords_total + chord_count) > chord_wrap_limit
+        ):
+            break
         if compact:
             display = _bar_compact_width(
                 bars[idx],
@@ -446,6 +487,7 @@ def _bars_fit(
         if total + needed > usable_width:
             break
         total += needed
+        chords_total += chord_count
         count += 1
     return max(1, count)
 

@@ -51,6 +51,7 @@ _BOOL_KEYS = {
 _INT_KEYS = {
     "maxbars",
     "barsperline",
+    "chordwrap",
     "barpad",
     "maxchords",
     "maxrepeats",
@@ -60,6 +61,7 @@ _INT_KEYS = {
     "midipatch",
     "midigate",
     "tempo",
+    "newbars",
 }
 
 _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
@@ -74,10 +76,13 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"vim", "vim+arrows", "casual", "casual+arrows"},
         "Keys must be vim/vim+arrows/casual/casual+arrows",
     ),
-    "spacingmode": ({"packed", "spread", "auto"}, "Spacingmode must be packed/spread/auto"),
+    "spacingmode": (
+        {"packed", "spread", "auto", "stretch"},
+        "Spacingmode must be packed/spread/auto/stretch",
+    ),
     "spacingfill": (
-        {"stretch", "center", "compact", "smart"},
-        "Spacingfill must be stretch/center/compact/smart",
+        {"stretch", "center", "compact", "smart", "edge"},
+        "Spacingfill must be stretch/center/compact/smart/edge",
     ),
     "fontstyle": (
         {"modern", "renaissance", "baroque"},
@@ -110,6 +115,10 @@ def _set_enum(state: EditorState, key: str, value: str) -> bool:
     if value not in allowed:
         state.message = error
         return False
+    if key == "spacingmode" and value == "stretch":
+        state.settings["spacingmode"] = "auto"
+        state.settings["spacingfill"] = "edge"
+        return True
     if key == "style":
         current = state.settings.get("style", "french")
         if value != current:

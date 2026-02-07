@@ -53,6 +53,16 @@ def _build_chord_scale_map(
     return spread_positions, src_to_dest
 
 
+def _note_event_columns(cells: list[list[str]], total_strings: int, grid_width: int) -> list[int]:
+    cols: list[int] = []
+    for col in range(grid_width):
+        for actual in range(total_strings):
+            if cells[actual][col] != "-":
+                cols.append(col)
+                break
+    return cols
+
+
 def _scale_chord_row(
     row_cells: list[str],
     *,
@@ -123,6 +133,28 @@ def _required_duration_content_width(
     return max(1, sum(spans) + max(0, len(spans) - 1) * max(0, min_gap))
 
 
+def _grid_display_map(
+    *,
+    grid_width: int,
+    content_width: int,
+    src_to_dest: dict[int, int],
+) -> list[int]:
+    width = max(1, grid_width)
+    content = max(1, content_width)
+    mapping: list[int] = []
+    prev = 0
+    for grid_col in range(width):
+        dest = src_to_dest.get(grid_col, _scale_col(grid_col, width, content))
+        dest = max(0, min(content - 1, dest))
+        if grid_col > 0 and dest < prev:
+            dest = prev
+        if grid_col > 0 and dest > prev + 1:
+            dest = prev + 1
+        mapping.append(dest)
+        prev = dest
+    return mapping
+
+
 def _chord_positions_distinct(
     bar,
     bar_width: int,
@@ -188,6 +220,7 @@ def render_systems(  # noqa: C901, PLR0912
     default_duration: int,
     tuning_labels: list[str],
     basslabels: str,
+    chord_wrap_limit: int,
 ) -> None:
     total_bars = len(piece.bars)
     current_bar_start = bar_offset
@@ -207,6 +240,7 @@ def render_systems(  # noqa: C901, PLR0912
         bar_start = current_bar_start
         if bar_start >= total_bars:
             break
+        compact_auto = spacing_fill in ("compact", "smart", "stretch", "edge")
         if spacing_mode == "auto":
             bars_per_line = _bars_fit(
                 piece.bars,
@@ -219,7 +253,8 @@ def render_systems(  # noqa: C901, PLR0912
                 default_duration,
                 dotted,
                 max_chords=max_chords,
-                compact=spacing_fill in ("compact", "smart"),
+                compact=compact_auto,
+                chord_wrap_limit=chord_wrap_limit,
             )
         else:
             bars_per_line = bars_per_line_limit
@@ -230,6 +265,7 @@ def render_systems(  # noqa: C901, PLR0912
         bar_end = min(total_bars, bar_end)
         bar_indices = list(range(bar_start, bar_end))
         bar_widths: list[int] = []
+        gap_after: list[int] = []
         if spacing_mode == "auto":
             bar_widths.extend(
                 _bar_compact_width(
@@ -241,7 +277,7 @@ def render_systems(  # noqa: C901, PLR0912
                     default_duration,
                     dotted,
                 )
-                if spacing_fill in ("compact", "smart")
+                if compact_auto
                 else _bar_display_width(
                     piece.bars[abs_bar],
                     abs_bar,
@@ -264,6 +300,7 @@ def render_systems(  # noqa: C901, PLR0912
                 total_width = total_bar_width(bar_widths)
             bar_end = bar_start + len(bar_widths)
             total_width = total_bar_width(bar_widths)
+            gap_after = [bar_gap for _ in range(max(0, len(bar_widths) - 1))]
             if (
                 bar_widths
                 and len(bar_widths) > 1
@@ -276,6 +313,25 @@ def render_systems(  # noqa: C901, PLR0912
                     bar_widths[idx] += 1
                     extra -= 1
                     idx = (idx + 1) % len(bar_widths)
+            elif (
+                bar_widths
+                and len(bar_widths) > 1
+                and spacing_fill == "edge"
+                and total_width < usable_width
+            ):
+                extra = usable_width - total_width
+                if len(gap_after) == 1:
+                    gap_after[0] += extra
+                else:
+                    while extra > 0:
+                        gap_after[0] += 1
+                        extra -= 1
+                        if extra <= 0:
+                            break
+                        gap_after[-1] += 1
+                        extra -= 1
+            elif bar_widths and len(bar_widths) == 1 and total_width < usable_width:
+                bar_widths[0] += usable_width - total_width
         for display_idx in range(display_strings):
             label = "  "
             if sys_idx == 0:
@@ -361,6 +417,8 @@ def render_systems(  # noqa: C901, PLR0912
                     else chord_positions_all
                 )
                 min_content = _required_flag_content_width(preview_flags)
+                note_cols = _note_event_columns(cells, total_strings, grid_width)
+                min_content = max(min_content, len(note_cols))
                 if show_dur and rows["dur"] is not None:
                     min_content = max(
                         min_content,
@@ -427,17 +485,33 @@ def render_systems(  # noqa: C901, PLR0912
                 flag_positions = (
                     _filter_redundant_positions(positions) if hide_redundant else positions
                 )
+                ordered_flags = sorted(flag_positions, key=lambda item: item[0])
                 flagstyle = settings.get("flagstyle", "standard")
+                dur_source_positions: list[tuple[int, int]] = []
                 if scale_bar:
                     content_width = max(1, display_width - barpad * 2)
+                    flag_min_gap = 0
                     _, src_to_dest = _build_chord_scale_map(
-                        flag_positions,
+                        positions,
                         grid_width,
                         content_width,
                     )
                     render_positions = [
                         (src_to_dest.get(col, 0), denom, dot)
-                        for (col, denom, dot) in flag_positions
+                        for (col, denom, dot) in ordered_flags
+                    ]
+                    final_flag_positions = spread_flag_positions(
+                        render_positions,
+                        content_width,
+                        min_gap=flag_min_gap,
+                    )
+                    dur_source_positions = [
+                        (raw_col, col)
+                        for (raw_col, _denom, _dot), (col, _d2, _dot2) in zip(
+                            ordered_flags,
+                            final_flag_positions,
+                            strict=False,
+                        )
                     ]
                     flag_cells, stem_cells = build_flag_rows(
                         render_positions,
@@ -446,11 +520,25 @@ def render_systems(  # noqa: C901, PLR0912
                         bar_width=content_width,
                         barpad=0,
                         flagstyle=flagstyle,
+                        min_gap=flag_min_gap,
                     )
                     flag_cells = pad_row(flag_cells, display_width, barpad)
                     stem_cells = pad_row(stem_cells, display_width, barpad)
                 else:
                     src_to_dest = {}
+                    final_flag_positions = spread_flag_positions(
+                        ordered_flags,
+                        bar_width,
+                        min_gap=1,
+                    )
+                    dur_source_positions = [
+                        (raw_col, col)
+                        for (raw_col, _denom, _dot), (col, _d2, _dot2) in zip(
+                            ordered_flags,
+                            final_flag_positions,
+                            strict=False,
+                        )
+                    ]
                     flag_cells, stem_cells = build_flag_rows(
                         flag_positions,
                         spacing_mode=spacing_mode,
@@ -459,6 +547,12 @@ def render_systems(  # noqa: C901, PLR0912
                         barpad=barpad,
                         flagstyle=flagstyle,
                     )
+                content_width = max(1, display_width - barpad * 2)
+                grid_map = _grid_display_map(
+                    grid_width=grid_width,
+                    content_width=content_width,
+                    src_to_dest=src_to_dest,
+                )
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
                 if (
                     playback_bar is not None
@@ -466,12 +560,8 @@ def render_systems(  # noqa: C901, PLR0912
                     and abs_bar == playback_bar
                     and 0 <= playback_col < bar_width
                 ):
-                    content_width = max(1, display_width - barpad * 2)
                     playback_grid_col = _scale_col(playback_col, bar_width, grid_width)
-                    pcol = src_to_dest.get(
-                        playback_grid_col,
-                        _scale_col(playback_grid_col, grid_width, content_width),
-                    )
+                    pcol = grid_map[playback_grid_col]
                     safe_addstr(
                         stdscr,
                         row_start + (rows["flag"] or 0),
@@ -489,21 +579,13 @@ def render_systems(  # noqa: C901, PLR0912
                 dur_col_map: dict[int, int] = {}
                 dur_padded = False
                 if show_dur and rows["dur"] is not None:
-                    ordered_flags = sorted(flag_positions, key=lambda item: item[0])
                     if scale_bar or spacing_mode == "auto":
                         content_width = max(1, display_width - barpad * 2)
-                        scaled_positions = [
-                            (_scale_col(col, grid_width, content_width), denom, dot)
-                            for col, denom, dot in ordered_flags
-                        ]
-                        spread_positions = spread_flag_positions(
-                            scaled_positions,
-                            content_width,
-                            min_gap=1,
-                        )
                         dur_cells = [" " for _ in range(content_width)]
-                        for (raw_col, denom, dot), (target_col, _d2, _dot2) in zip(
-                            ordered_flags, spread_positions, strict=False,
+                        for (raw_col, denom, dot), (_raw_key, target_col) in zip(
+                            ordered_flags,
+                            dur_source_positions,
+                            strict=False,
                         ):
                             dur_col_map[raw_col] = target_col
                             _place_duration_cells_aligned(
@@ -514,14 +596,11 @@ def render_systems(  # noqa: C901, PLR0912
                         dur_cells = pad_row(dur_cells, display_width, barpad)
                         dur_padded = True
                     else:
-                        spread_positions = spread_flag_positions(
-                            ordered_flags,
-                            bar_width,
-                            min_gap=1,
-                        )
                         dur_cells = [" " for _ in range(bar_width)]
-                        for (raw_col, denom, dot), (target_col, _d2, _dot2) in zip(
-                            ordered_flags, spread_positions, strict=False,
+                        for (raw_col, denom, dot), (_raw_key, target_col) in zip(
+                            ordered_flags,
+                            dur_source_positions,
+                            strict=False,
                         ):
                             dur_col_map[raw_col] = target_col
                             _place_duration_cells_aligned(
@@ -535,11 +614,7 @@ def render_systems(  # noqa: C901, PLR0912
                         cursor_grid_col = _scale_col(cursor_col, bar_width, grid_width)
                         if col == cursor_grid_col:
                             flag_y = row_start + (rows["flag"] or 0)
-                            content_width = max(1, display_width - barpad * 2)
-                            scaled_col = src_to_dest.get(
-                                col,
-                                _scale_col(col, grid_width, content_width),
-                            )
+                            scaled_col = grid_map[col]
                             cursor_x = bar_x + barpad + scaled_col
                             safe_addstr(
                                 stdscr,
@@ -567,16 +642,25 @@ def render_systems(  # noqa: C901, PLR0912
                                     )
                             break
             else:
+                has_explicit_content = bool(bar.notes)
+                if not has_explicit_content:
+                    has_explicit_content = any(
+                        b == abs_bar and value not in ("", "-", " ")
+                        for (b, _s, _c), value in overrides.items()
+                    ) or any(b == abs_bar for (b, _s, _c) in durations)
                 if hide_redundant:
-                    flag_positions = flag_positions_from_durations(
-                        durations,
-                        abs_bar,
-                        total_strings,
-                        bar_width,
-                        default_duration,
-                        dotted=dotted,
-                    )
-                    flag_positions = _filter_redundant_positions(flag_positions)
+                    if has_explicit_content:
+                        flag_positions = flag_positions_from_durations(
+                            durations,
+                            abs_bar,
+                            total_strings,
+                            bar_width,
+                            default_duration,
+                            dotted=dotted,
+                        )
+                        flag_positions = _filter_redundant_positions(flag_positions)
+                    else:
+                        flag_positions = []
                 else:
                     flag_positions = _flag_positions_all(
                         durations,
@@ -659,8 +743,7 @@ def render_systems(  # noqa: C901, PLR0912
                         row_cells = _scale_row(row_cells, content_width, fill_char)
                     row_cells = pad_row(row_cells, display_width, barpad, pad_char=fill_char)
                 row_text = "".join(row_cells)
-                if local_idx == 0:
-                    safe_addstr(stdscr, y, bar_x - 1, "|")
+                safe_addstr(stdscr, y, bar_x - 1, "|")
                 safe_addstr(stdscr, y, bar_x, row_text)
                 barline_x = min(width - 1, bar_x + display_width)
                 safe_addstr(stdscr, y, barline_x, barline)
@@ -674,10 +757,7 @@ def render_systems(  # noqa: C901, PLR0912
                     content_width = max(1, display_width - barpad * 2)
                     if bar.chords:
                         cursor_grid_col = _scale_col(cursor_col, bar_width, grid_width)
-                        scaled_cursor_col = src_to_dest.get(
-                            cursor_grid_col,
-                            _scale_col(cursor_grid_col, grid_width, content_width),
-                        )
+                        scaled_cursor_col = grid_map[cursor_grid_col]
                     else:
                         scaled_cursor_col = _scale_col(cursor_col, bar_width, content_width)
                     cell_x = bar_x + barpad + scaled_cursor_col
@@ -697,10 +777,7 @@ def render_systems(  # noqa: C901, PLR0912
                     content_width = max(1, display_width - barpad * 2)
                     if bar.chords:
                         playback_grid_col = _scale_col(playback_col, bar_width, grid_width)
-                        scaled_play_col = src_to_dest.get(
-                            playback_grid_col,
-                            _scale_col(playback_grid_col, grid_width, content_width),
-                        )
+                        scaled_play_col = grid_map[playback_grid_col]
                     else:
                         scaled_play_col = _scale_col(playback_col, bar_width, content_width)
                     play_x = bar_x + barpad + scaled_play_col
@@ -716,10 +793,7 @@ def render_systems(  # noqa: C901, PLR0912
                         content_width = max(1, display_width - barpad * 2)
                         if bar.chords:
                             highlight_grid_col = _scale_col(col, bar_width, grid_width)
-                            scaled_hl_col = src_to_dest.get(
-                                highlight_grid_col,
-                                _scale_col(highlight_grid_col, grid_width, content_width),
-                            )
+                            scaled_hl_col = grid_map[highlight_grid_col]
                         else:
                             scaled_hl_col = _scale_col(col, bar_width, content_width)
                         hl_x = bar_x + barpad + scaled_hl_col
@@ -740,10 +814,7 @@ def render_systems(  # noqa: C901, PLR0912
                 content_width = max(1, display_width - barpad * 2)
                 if bar.chords:
                     playback_grid_col = _scale_col(playback_col, bar_width, grid_width)
-                    scaled_play_col = src_to_dest.get(
-                        playback_grid_col,
-                        _scale_col(playback_grid_col, grid_width, content_width),
-                    )
+                    scaled_play_col = grid_map[playback_grid_col]
                 else:
                     scaled_play_col = _scale_col(playback_col, bar_width, content_width)
                 marker_y = row_start + (rows["staff"] or 0) + display_strings
@@ -751,7 +822,8 @@ def render_systems(  # noqa: C901, PLR0912
                 safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
 
             if spacing_mode == "auto":
-                bar_x += display_width + bar_gap
+                next_gap = gap_after[local_idx] if local_idx < len(gap_after) else 0
+                bar_x += display_width + next_gap
             else:
                 bar_x += display_width + bar_gap
         current_bar_start = bar_end

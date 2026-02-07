@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from itertools import pairwise
+
 import pytest
 
 from oud.core.ft3 import build_durations, load_ft3
@@ -308,3 +310,200 @@ def test_render_matrix_no_double_joined_barlines_for_default_bars() -> None:
     assert len(staff_rows) == 6
     assert all("||" not in row for row in staff_rows)
     assert all("| " not in row for row in staff_rows)
+
+
+def test_render_matrix_empty_bar_does_not_draw_lonely_flag_stem() -> None:
+    piece = Piece(title="Empty", bars=[Bar() for _ in range(8)], strings=6)
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "spacingmode": "auto",
+            "spacingfill": "stretch",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+            "flagredundant": "on",
+        },
+    )
+    lines = _render_lines(piece, settings, width=100, height=18)
+    staff_top = next((idx for idx, line in enumerate(lines) if "-" in line and "|" in line), None)
+    assert staff_top is not None
+    if staff_top is None:
+        return
+    flag_row = lines[staff_top - 1]
+    assert "|" not in flag_row
+
+
+def test_render_matrix_chord_onsets_not_lost_when_flags_are_redundant() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, fret, 0)])
+            for fret in range(10)
+        ],
+    )
+    piece = Piece(title="ChordMap", bars=[bar, bar], strings=6)
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "style": "french",
+            "showtuning": "off",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "spacingmode": "auto",
+            "spacingfill": "smart",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+            "flagredundant": "on",
+        },
+    )
+    lines = _render_lines(piece, settings, width=70, height=18)
+    staff_row = next(line for line in lines if "-" in line and "|" in line)
+    for marker in "abcdefghik":
+        assert marker in staff_row
+
+
+def test_render_matrix_smart_fill_stretches_early_bars_uniformly() -> None:
+    piece = Piece(title="SmartGap", bars=[Bar() for _ in range(4)], strings=6)
+    overrides = {
+        (0, 0, 0): "a",
+        (1, 0, 0): "b",
+        (2, 0, 0): "c",
+        (3, 0, 0): "d",
+    }
+    durations = {
+        (0, 0, 0): 4,
+        (1, 0, 0): 4,
+        (2, 0, 0): 4,
+        (3, 0, 0): 4,
+    }
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "style": "french",
+            "showtuning": "off",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "spacingmode": "auto",
+            "spacingfill": "smart",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+        },
+    )
+    row = next(
+        line
+        for line in _render_lines(
+            piece,
+            settings,
+            overrides=overrides,
+            durations=durations,
+            width=80,
+            height=16,
+        )
+        if "-" in line and "|" in line
+    )
+    bars = row[row.find("|") + 1 :].split("|")
+    assert len(bars) >= 4
+    assert all(len(bar.strip()) > 3 for bar in bars[:3])
+
+
+def test_render_matrix_edge_prefers_edge_gaps() -> None:
+    piece = Piece(title="StretchEdge", bars=[Bar() for _ in range(4)], strings=6)
+    overrides = {
+        (0, 0, 0): "a",
+        (1, 0, 0): "b",
+        (2, 0, 0): "c",
+        (3, 0, 0): "d",
+    }
+    durations = {
+        (0, 0, 0): 4,
+        (1, 0, 0): 4,
+        (2, 0, 0): 4,
+        (3, 0, 0): 4,
+    }
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "style": "french",
+            "showtuning": "off",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "spacingmode": "auto",
+            "spacingfill": "edge",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+        },
+    )
+    row = next(
+        line
+        for line in _render_lines(
+            piece,
+            settings,
+            overrides=overrides,
+            durations=durations,
+            width=80,
+            height=16,
+        )
+        if "-" in line and "|" in line
+    )
+    bars = [idx for idx, ch in enumerate(row) if ch == "|"]
+    diffs = [b - a for a, b in pairwise(bars)]
+    # Large edge gaps should dominate; middle gap should stay compact.
+    large = sorted(diffs)[-2:]
+    assert len(large) == 2
+    assert large[0] > 10 and large[1] > 10
+    assert min(diffs) < 10
+
+
+def test_render_matrix_stretch_keeps_gaps_uniform() -> None:
+    piece = Piece(title="StretchUniform", bars=[Bar() for _ in range(4)], strings=6)
+    overrides = {
+        (0, 0, 0): "a",
+        (1, 0, 0): "b",
+        (2, 0, 0): "c",
+        (3, 0, 0): "d",
+    }
+    durations = {
+        (0, 0, 0): 4,
+        (1, 0, 0): 4,
+        (2, 0, 0): 4,
+        (3, 0, 0): 4,
+    }
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "style": "french",
+            "showtuning": "off",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "spacingmode": "auto",
+            "spacingfill": "stretch",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+        },
+    )
+    row = next(
+        line
+        for line in _render_lines(
+            piece,
+            settings,
+            overrides=overrides,
+            durations=durations,
+            width=80,
+            height=16,
+        )
+        if "-" in line and "|" in line
+    )
+    bars = [idx for idx, ch in enumerate(row) if ch == "|"]
+    diffs = [b - a for a, b in pairwise(bars)]
+    assert max(diffs) - min(diffs) <= 2

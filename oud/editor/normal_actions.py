@@ -15,10 +15,10 @@ from oud.editor.keymap import (
     normal_bindings,
     pending_bindings,
 )
-from oud.editor.layout import bars_per_line, jump_system_row
+from oud.editor.layout import bars_per_line, jump_system_row, jump_system_row_dynamic
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
-from oud.editor.navigation import move_left, move_right
+from oud.editor.navigation import move_left_visual, move_right, move_right_visual
 from oud.editor.search_ops import (
     jump_mark,
     jump_match,
@@ -310,25 +310,43 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
     keys = movement_keys(state, include_arrows=True)
     if key in keys.left:
         for _ in range(count):
-            move_left(state)
+            move_left_visual(state)
         return True
     if key in keys.right:
         for _ in range(count):
-            move_right(state)
+            move_right_visual(state)
         return True
     if key in keys.up:
         state.cursor_string -= count
+        state.clamp()
         return True
     if key in keys.down:
         state.cursor_string += count
+        state.clamp()
         return True
     if key in action_keys.page_up:
-        per_line = bars_per_line(state, state.screen_width)
-        state.cursor_bar = jump_system_row(state, state.cursor_bar, -count, per_line)
+        if state.settings.get("spacingmode", "packed") == "auto":
+            state.cursor_bar = jump_system_row_dynamic(
+                state,
+                state.cursor_bar,
+                -count,
+                state.screen_width,
+            )
+        else:
+            per_line = bars_per_line(state, state.screen_width)
+            state.cursor_bar = jump_system_row(state, state.cursor_bar, -count, per_line)
         return True
     if key in action_keys.page_down:
-        per_line = bars_per_line(state, state.screen_width)
-        state.cursor_bar = jump_system_row(state, state.cursor_bar, count, per_line)
+        if state.settings.get("spacingmode", "packed") == "auto":
+            state.cursor_bar = jump_system_row_dynamic(
+                state,
+                state.cursor_bar,
+                count,
+                state.screen_width,
+            )
+        else:
+            per_line = bars_per_line(state, state.screen_width)
+            state.cursor_bar = jump_system_row(state, state.cursor_bar, count, per_line)
         return True
     if key in action_keys.bar_next:
         state.cursor_bar = min(len(state.piece.bars) - 1, state.cursor_bar + count)

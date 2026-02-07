@@ -3,7 +3,12 @@ from __future__ import annotations
 import copy
 from collections.abc import Callable
 
-from oud.core.render_utils import chord_positions, format_fret, note_type_to_denom
+from oud.core.render_utils import (
+    chord_positions,
+    format_fret,
+    note_type_to_denom,
+    spread_flag_positions,
+)
 from oud.editor.controller_utils import cursor_key, string_index
 from oud.editor.edit_ops import apply_duration, apply_override, clear_cell_note, record_action
 from oud.editor.keymap import insert_bindings, italian_duration_digits
@@ -53,9 +58,39 @@ def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
     state.modified = True
 
 
+def _snap_cursor_to_chord_slot(state: EditorState) -> None:
+    bar_index = state.cursor_bar
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return
+    bar = state.piece.bars[bar_index]
+    if not bar.chords:
+        return
+    has_grid = any(b == bar_index for (b, _s, _c) in state.overrides) or any(
+        b == bar_index for (b, _s, _c) in state.durations
+    )
+    if has_grid:
+        return
+    slots = [
+        col
+        for (col, _denom, _dot) in spread_flag_positions(
+            chord_positions(bar, state.bar_width, default_duration=4),
+            state.bar_width,
+            min_gap=1,
+        )
+    ]
+    if not slots or state.cursor_col in slots:
+        return
+    cur = state.cursor_col
+    state.cursor_col = min(
+        slots,
+        key=lambda col: (abs(col - cur), 0 if col <= cur else 1, -col),
+    )
+
+
 def _apply_duration_key(state: EditorState, dur: int) -> bool:
     state.current_duration = dur
     advance_if_overflow(state, dur, string_index(state, state.cursor_string))
+    _snap_cursor_to_chord_slot(state)
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
     bar = state.cursor_bar
@@ -83,6 +118,8 @@ def _apply_duration_key(state: EditorState, dur: int) -> bool:
 
 
 def _handle_insert_dot(state: EditorState) -> bool:
+    bar_col = (state.cursor_bar, state.cursor_col)
+    _snap_cursor_to_chord_slot(state)
     bar_col = (state.cursor_bar, state.cursor_col)
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
@@ -127,6 +164,7 @@ def _handle_insert_rest(state: EditorState) -> bool:
         state.current_duration,
         string_index(state, state.cursor_string),
     )
+    _snap_cursor_to_chord_slot(state)
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
     apply_override(state, cursor_key(state), "r")
@@ -154,6 +192,7 @@ def _handle_insert_note(state: EditorState, ch: str, style: str) -> bool:
         column_denom(state, state.cursor_bar, state.cursor_col),
         string_index(state, state.cursor_string),
     )
+    _snap_cursor_to_chord_slot(state)
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
     bar = state.cursor_bar
@@ -208,6 +247,7 @@ def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
         column_denom(state, state.cursor_bar, state.cursor_col),
         string_index(state, state.cursor_string),
     )
+    _snap_cursor_to_chord_slot(state)
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
     bar = state.cursor_bar

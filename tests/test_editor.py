@@ -81,14 +81,15 @@ def test_insert_duration_digits_map_in_french() -> None:
     assert state.current_duration == 64
 
 
-def test_insert_fret_falls_back_to_override_when_no_chord_at_col() -> None:
+def test_insert_fret_snaps_to_chord_slot_when_cursor_in_gap() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
     state.piece.bars[0].chords = [chord]
     state.cursor_col = 1
     state.mode = "insert"
     actions.handle_insert(state, ord("a"))
-    assert state.overrides[(0, 0, 1)] == "a"
+    assert state.overrides[(0, 0, 0)] == "a"
+    assert (0, 0, 1) not in state.overrides
 
 
 def test_insert_flattens_chords_to_grid() -> None:
@@ -99,6 +100,32 @@ def test_insert_flattens_chords_to_grid() -> None:
     actions.handle_insert(state, ord("a"))
     assert state.piece.bars[0].chords == []
     assert state.overrides[(0, 0, 0)] == "a"
+
+
+def test_insert_note_snaps_to_nearest_chord_slot_left_tie() -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+    ]
+    state.mode = "insert"
+    state.cursor_col = 2
+    actions.handle_insert(state, ord("b"))
+    assert state.overrides[(0, 0, 0)] == "b"
+    assert (0, 0, 2) not in state.durations
+
+
+def test_insert_duration_snaps_to_existing_chord_slot() -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+    ]
+    state.mode = "insert"
+    state.cursor_col = 2
+    actions.handle_insert(state, ord("6"))
+    assert state.durations[(0, 0, 0)] == 32
+    assert (0, 0, 2) not in state.durations
 
 
 def test_confirm_quit_when_modified() -> None:
@@ -212,6 +239,19 @@ def test_insert_rest_sets_override_and_duration() -> None:
     actions.handle_insert(state, ord("r"))
     assert state.overrides[(0, 0, 0)] == "r"
     assert state.durations[(0, 0, 0)] == state.current_duration
+
+
+def test_insert_rest_snaps_to_chord_slot_when_cursor_in_gap() -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+    ]
+    state.mode = "insert"
+    state.cursor_col = 1
+    actions.handle_insert(state, ord("r"))
+    assert state.overrides[(0, 0, 0)] == "r"
+    assert (0, 0, 1) not in state.overrides
 
 
 def test_row_overflow_advances_to_next_bar() -> None:

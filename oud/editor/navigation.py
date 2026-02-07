@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from oud.core.model import Bar
 from oud.core.render_utils import chord_positions, spread_flag_positions
+from oud.core.view_model import _scale_col
 from oud.editor.controller_utils import string_index
+from oud.editor.layout import auto_system_bar_plan, dynamic_system_starts
 from oud.editor.state import EditorState
 
 
@@ -25,6 +27,133 @@ def move_right(state: EditorState) -> None:
         state.cursor_bar += 1
         state.cursor_col = 0
         state.modified = True
+
+
+def _bar_content_width_for_cursor(state: EditorState, bar_index: int) -> int:
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return state.bar_width
+    spacing_mode = state.settings.get("spacingmode", "packed")
+    if spacing_mode != "auto":
+        return state.bar_width
+    starts = dynamic_system_starts(state, state.screen_width)
+    start = max((value for value in starts if value <= bar_index), default=0)
+    bar_indices, widths = auto_system_bar_plan(state, start, state.screen_width)
+    try:
+        idx = bar_indices.index(bar_index)
+        display_width = widths[idx]
+    except ValueError:
+        display_width = state.bar_width
+    barpad_text = state.settings.get("barpad", "1")
+    barpad = int(barpad_text) if barpad_text.isdigit() else 1
+    return max(1, display_width - barpad * 2)
+
+
+def _chord_positions_distinct_for_nav(
+    bar: Bar,
+    bar_width: int,
+    default_duration: int = 4,
+) -> tuple[list[tuple[int, int, bool]], int]:
+    if not bar.chords:
+        return chord_positions(bar, bar_width, default_duration), bar_width
+    width = max(1, bar_width, len(bar.chords))
+    max_width = max(width, len(bar.chords) * 2 + 2)
+    while width <= max_width:
+        positions = chord_positions(bar, width, default_duration)
+        cols = [col for col, _denom, _dot in positions]
+        if len(cols) == len(set(cols)):
+            return positions, width
+        width += 1
+    return chord_positions(bar, max_width, default_duration), max_width
+
+
+def _grid_display_map_for_nav(
+    *,
+    grid_width: int,
+    content_width: int,
+    src_to_dest: dict[int, int],
+) -> list[int]:
+    width = max(1, grid_width)
+    content = max(1, content_width)
+    mapping: list[int] = []
+    prev = 0
+    for grid_col in range(width):
+        dest = src_to_dest.get(grid_col, _scale_col(grid_col, width, content))
+        dest = max(0, min(content - 1, dest))
+        if grid_col > 0 and dest < prev:
+            dest = prev
+        if grid_col > 0 and dest > prev + 1:
+            dest = prev + 1
+        mapping.append(dest)
+        prev = dest
+    return mapping
+
+
+def _cursor_display_map_for_bar(
+    state: EditorState,
+    bar_index: int,
+    content_width: int,
+) -> list[int]:
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return [_scale_col(col, state.bar_width, content_width) for col in range(state.bar_width)]
+    bar = state.piece.bars[bar_index]
+    if not bar.chords:
+        return [_scale_col(col, state.bar_width, content_width) for col in range(state.bar_width)]
+    positions, grid_width = _chord_positions_distinct_for_nav(bar, state.bar_width, 4)
+    scaled_positions = [
+        (_scale_col(pos, grid_width, content_width), denom, dot)
+        for (pos, denom, dot) in positions
+    ]
+    spread_positions = spread_flag_positions(scaled_positions, content_width, min_gap=1)
+    ordered_raw = sorted(positions, key=lambda item: item[0])
+    src_to_dest = {
+        raw_col: scaled_col
+        for (raw_col, _raw_denom, _raw_dot), (scaled_col, _denom, _dot) in zip(
+            ordered_raw,
+            spread_positions,
+            strict=False,
+        )
+    }
+    grid_map = _grid_display_map_for_nav(
+        grid_width=grid_width,
+        content_width=content_width,
+        src_to_dest=src_to_dest,
+    )
+    return [
+        grid_map[_scale_col(col, state.bar_width, grid_width)]
+        for col in range(state.bar_width)
+    ]
+
+
+def move_left_visual(state: EditorState) -> None:
+    prev_bar = state.cursor_bar
+    prev_col = state.cursor_col
+    prev_content = _bar_content_width_for_cursor(state, prev_bar)
+    prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
+    prev_scaled = prev_map[prev_col]
+    move_left(state)
+    if state.cursor_bar != prev_bar:
+        return
+    while state.cursor_col > 0:
+        scaled = prev_map[state.cursor_col]
+        if scaled != prev_scaled:
+            break
+        move_left(state)
+
+
+def move_right_visual(state: EditorState) -> None:
+    prev_bar = state.cursor_bar
+    prev_col = state.cursor_col
+    prev_content = _bar_content_width_for_cursor(state, prev_bar)
+    prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
+    prev_scaled = prev_map[prev_col]
+    move_right(state)
+    if state.cursor_bar != prev_bar:
+        return
+    while state.cursor_col < state.bar_width - 1:
+        scaled = prev_map[state.cursor_col]
+        if scaled != prev_scaled:
+            break
+        move_right(state)
 
 
 def _bar_has_grid_data(state: EditorState, bar_index: int) -> bool:

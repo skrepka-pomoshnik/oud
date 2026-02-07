@@ -13,6 +13,7 @@ def build_flag_rows(
     bar_width: int,
     barpad: int,
     flagstyle: str,
+    min_gap: int = 1,
 ) -> tuple[list[str], list[str]]:
     stem, flag = flag_symbols(flagstyle)
     if spacing_mode == "auto":
@@ -24,7 +25,7 @@ def build_flag_rows(
         scaled_positions = spread_flag_positions(
             scaled_positions,
             content_width,
-            min_gap=1,
+            min_gap=min_gap,
         )
         flag_cells = flag_row_style(
             scaled_positions,
@@ -41,7 +42,7 @@ def build_flag_rows(
         stem_cells = pad_row(stem_cells, display_width, barpad)
         return flag_cells, stem_cells
 
-    spread_positions = spread_flag_positions(positions, bar_width, min_gap=1)
+    spread_positions = spread_flag_positions(positions, bar_width, min_gap=min_gap)
     flag_cells = flag_row_style(
         spread_positions,
         bar_width,

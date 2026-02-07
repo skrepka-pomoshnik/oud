@@ -187,6 +187,10 @@ def render_piece(  # noqa: C901, PLR0912
     max_chords_text = settings.get("maxchords", "")
     if max_chords_text.isdigit():
         max_chords = int(max_chords_text)
+    chord_wrap_limit = 0
+    chord_wrap_text = settings.get("chordwrap", "")
+    if chord_wrap_text.isdigit():
+        chord_wrap_limit = int(chord_wrap_text)
     if spacing_mode == "auto":
         bars_per_line_limit = 0
     else:
@@ -252,6 +256,7 @@ def render_piece(  # noqa: C901, PLR0912
         default_duration=default_duration,
         tuning_labels=tuning_labels,
         basslabels=basslabels,
+        chord_wrap_limit=chord_wrap_limit,
     )
 
     if display_strings > 0:

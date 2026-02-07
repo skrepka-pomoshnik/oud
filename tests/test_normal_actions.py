@@ -69,3 +69,30 @@ def test_hl_skips_only_barline_between_bars() -> None:
     handle_normal(state, ord("h"))
     assert state.cursor_bar == 0
     assert state.cursor_col == state.bar_width - 1
+
+
+def test_hl_auto_mode_advances_visible_step_without_double_press() -> None:
+    state = _state()
+    state.settings["spacingmode"] = "auto"
+    state.settings["spacingfill"] = "compact"
+    state.settings["barpad"] = "1"
+    state.bar_width = 12
+    state.cursor_bar = 0
+    state.cursor_col = 0
+    start = (state.cursor_bar, state.cursor_col)
+    handle_normal(state, ord("l"))
+    first = (state.cursor_bar, state.cursor_col)
+    assert first != start
+    handle_normal(state, ord("l"))
+    second = (state.cursor_bar, state.cursor_col)
+    assert second != first
+
+
+def test_jk_clamp_to_visible_string_bounds() -> None:
+    state = _state()
+    state.cursor_string = 0
+    handle_normal(state, ord("k"))
+    assert state.cursor_string == 0
+    state.cursor_string = state.piece.strings - 1
+    handle_normal(state, ord("j"))
+    assert state.cursor_string == state.piece.strings - 1

@@ -18,7 +18,8 @@ python3 app.py examples/example.ft3
 
 ## Controls (vim)
 
-- `h/j/k/l` move
+- `h/j/k/l` move one cell/row
+- `J/K` jump to next/previous rendered row (same bar offset)
 - `i` insert mode, `esc` normal mode
 - `r` replace one cell (normal), `r` rest (insert)
 - `:` command mode, `?` help
@@ -57,11 +58,28 @@ python3 app.py examples/example.ft3
 :source [path]  view file with less
 :set maxbars=.. limit bars per system
 :set measures=every measuresstep=10
+:set barsperline=0   auto bars/row
+:set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart
 ```
+
+## Status + Info
+
+- Status bar shows: bar/beat, current duration, current time symbol.
+- File path and technical metadata are in `:info`.
 
 ## Tuning order
 
 Tuning strings are written low → high, e.g. `g2c3f3a3d4g4`.
+
+## Duration keys (French insert mode)
+
+- `1 -> 1` (whole)
+- `2 -> 2` (half)
+- `3 -> 4` (quarter)
+- `4 -> 8` (eighth)
+- `5 -> 16`
+- `6 -> 32`
+- `7 -> 64`
 
 ## LilyPond tablature
 

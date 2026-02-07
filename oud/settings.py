@@ -42,6 +42,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "barpad": "1",
     "maxbars": "0",
     "barsperline": "0",
+    "chordwrap": "0",
     "linelen": "80",
     "flagredundant": "on",
     "staffthick": "1",
@@ -62,6 +63,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "viewinvert": "off",
     "frenchcshape": "normal",
     "maxrepeats": "30",
+    "newbars": "8",
 }
 
 

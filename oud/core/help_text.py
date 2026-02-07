@@ -56,12 +56,12 @@ HELP_LINES = [
     ),
     ":set keys=vim|vim+arrows|casual|casual+arrows",
     (
-        ":set spacing=... barsperline=... maxbars=... maxchords=... bargap=... "
+        ":set spacing=... barsperline=... maxbars=... maxchords=... chordwrap=... bargap=... "
         "linelen=... staffthick=... fontstyle=..."
     ),
     ":set flagredundant=on|off",
     (
-        ":set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart "
+        ":set spacingmode=packed|spread|auto|stretch spacingfill=stretch|center|compact|smart|edge "
         "showtuning=on|off"
     ),
     ":set key=... countdots=on/off grid=on/off",

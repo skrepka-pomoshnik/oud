@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from itertools import pairwise
 from pathlib import Path
 
 from oud.core.ft3 import load_ft3
-from oud.core.view_model import _filter_redundant_positions
+from oud.core.view_model import _filter_redundant_positions, bar_cells_from_chords
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_system import (
     _build_chord_scale_map,
     _chord_positions_distinct,
+    _grid_display_map,
     _place_duration_cells_aligned,
     _required_flag_content_width,
     _scale_chord_row,
@@ -85,6 +87,25 @@ def test_required_flag_content_width_accounts_for_tails() -> None:
     assert _required_flag_content_width(positions) == 12
 
 
+def test_grid_display_map_is_monotonic() -> None:
+    mapping = _grid_display_map(
+        grid_width=8,
+        content_width=6,
+        src_to_dest={2: 4, 3: 5, 4: 3},
+    )
+    assert mapping == sorted(mapping)
+
+
+def test_grid_display_map_does_not_skip_visual_columns() -> None:
+    mapping = _grid_display_map(
+        grid_width=10,
+        content_width=9,
+        src_to_dest={0: 0, 2: 1, 3: 2, 4: 3, 6: 4, 7: 5},
+    )
+    steps = [b - a for a, b in pairwise(mapping)]
+    assert all(step in (0, 1) for step in steps)
+
+
 def test_lachrimae_bar27_flags_do_not_collapse_to_pipes() -> None:
     root = Path(__file__).resolve().parents[1]
     piece = load_ft3(str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"))
@@ -106,3 +127,36 @@ def test_lachrimae_bar27_flags_do_not_collapse_to_pipes() -> None:
     assert "\\\\" in text
     assert "|||||" not in text
     assert width > 8
+
+
+def test_lachrimae_bar1_stem_aligns_to_second_string_d() -> None:
+    root = Path(__file__).resolve().parents[1]
+    piece = load_ft3(str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"))
+    bar = piece.bars[0]
+    positions, width = _chord_positions_distinct(bar, bar_width=10, default_duration=4)
+    _, src_to_dest = _build_chord_scale_map(positions, bar_width=width, content_width=10)
+    filtered = _filter_redundant_positions(positions)
+    render_positions = [
+        (src_to_dest.get(col, 0), denom, dot) for col, denom, dot in filtered
+    ]
+    flags, _stems = build_flag_rows(
+        render_positions,
+        spacing_mode="fixed",
+        display_width=10,
+        bar_width=10,
+        barpad=0,
+        flagstyle="standard",
+        min_gap=0,
+    )
+    stem_cols = [idx for idx, ch in enumerate(flags) if ch == "|"]
+    cells = bar_cells_from_chords(bar, piece.strings, width, 4, "french", french_c="normal")
+    scaled_row = _scale_chord_row(
+        cells[1],
+        fill_char="-",
+        src_to_dest=src_to_dest,
+        bar_width=width,
+        content_width=10,
+    )
+    d_col = next(idx for idx, ch in enumerate(scaled_row) if ch == "d")
+    assert len(stem_cols) >= 2
+    assert d_col == stem_cols[1]
