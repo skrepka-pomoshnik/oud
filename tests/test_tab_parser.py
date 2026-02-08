@@ -54,3 +54,63 @@ def test_parse_french_extended_letters(tmp_path) -> None:
     assert piece.bars
     notes = piece.bars[0].chords[0].notes
     assert [note.fret for note in notes[:4]] == [15, 16, 17, 18]
+
+
+def test_load_tab_hash_flag_lines_are_parsed_as_chords(tmp_path) -> None:
+    content = "\n".join(
+        [
+            "{HashFlags}",
+            "b",
+            "#2 cd",
+            "x e",
+            "b",
+            "e",
+        ],
+    )
+    path = tmp_path / "hash_flags.tab"
+    path.write_text(content, encoding="utf-8")
+    piece = load_tab(str(path))
+    assert piece.bars
+    assert len(piece.bars[0].chords) == 2
+    assert piece.bars[0].chords[0].note_type == 6
+    assert piece.bars[0].chords[1].note_type == 6
+
+
+def test_load_tab_multisection_continues_after_e_marker(tmp_path) -> None:
+    content = "\n".join(
+        [
+            "{Multi}",
+            "b",
+            "0a",
+            "e",
+            "{Second}",
+            "b",
+            "1b",
+            "e",
+        ],
+    )
+    path = tmp_path / "multi_section.tab"
+    path.write_text(content, encoding="utf-8")
+    piece = load_tab(str(path))
+    assert len(piece.bars) == 2
+    assert len(piece.bars[0].chords) == 1
+    assert len(piece.bars[1].chords) == 1
+
+
+def test_load_tab_without_header_body_separator(tmp_path) -> None:
+    content = "\n".join(
+        [
+            "{NoSeparator/Composer}",
+            "b",
+            "0a",
+            "1b",
+            "e",
+        ],
+    )
+    path = tmp_path / "no_sep.tab"
+    path.write_text(content, encoding="utf-8")
+    piece = load_tab(str(path))
+    assert piece.title == "NoSeparator"
+    assert piece.composer == "Composer"
+    assert piece.bars
+    assert len(piece.bars[0].chords) == 2

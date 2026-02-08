@@ -12,7 +12,12 @@ Constraints
 - Python 3.10 only, macOS/Linux, pure curses, minimal deps.
 
 P2 (Core Features)
-- [ ] Render packing invariant: no note/flag loss, no overlap, no hidden chord due to spacing mode.
+- [ ] Incremental TAB parser pass: reparse only changed bar/line ranges, not full document, and expose stable AST deltas.
+- [ ] Rule pipeline for post-parse checks: pluggable lint/verify/convert rules over the same parsed model.
+- [ ] UI state slices: split player/menu/prompt/view state into small structs with explicit reducers.
+- [ ] Generic list-menu engine: shared `(items,index,offset,filter)` handler for plugins/files/help/buffers.
+- [ ] Playback-cursor timeline contract: one time->(bar,col) source used by both MIDI playback and UI highlight.
+- [x] Render packing invariant: no note/flag loss, no overlap, no hidden chord due to spacing mode.
 - [ ] Reflow by chord-wrap threshold (TAB/LuteScribe style): whole-bar breaks only, per-system chord cap.
 - [ ] Bass course entry: slash shorthand (/ // ///) and numeric bass labels (7-13 or 1-7).
 - [ ] Inline bass display: show extra courses as in-place rows (e.g. `---` / `-a-` under staff) instead of full extra lines.
@@ -28,8 +33,12 @@ P2 (Core Features)
 - [ ] Transpose tablature up/down; convert between tunings.
 - [ ] Double/halve rhythm values; normalize rhythm signs to barlines/intervals.
 - [ ] MusicXML import/export support (see refs).
-- [ ] Every TUI `:` command has at least one direct execution test.
-- [ ] TAB parser parity: handle multi-section files and missing header/body separator cleanly.
+- [ ] MusicXML import parser (`.musicxml -> Piece/Bar/Chord/Note`) with tablature technical tags.
+- [ ] MXL package support (`.mxl` read/write with container.xml + mimetype).
+- [ ] MusicXML conversion goldens built from local `.tab/.ft3` fixtures (no direct borrowed MusicXML fixtures).
+- [ ] MusicXML notation parity: fermata/fingering/pluck + richer barline/repeat/time symbols.
+- [x] Every TUI `:` command has at least one direct execution test.
+- [x] TAB parser parity: handle multi-section files and missing header/body separator cleanly.
 
 Testing (P2)
 - [ ] Tab render tests (VexFlow parity): string->row mapping, flag/stem positions, dotted flags, beams/grid grouping, ties/slides, grace notes.

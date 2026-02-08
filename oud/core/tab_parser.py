@@ -8,12 +8,15 @@ from oud.core.model import Bar, Chord, Note, Piece
 FLAG_TO_NOTE_TYPE = {
     "W": 2,
     "w": 3,
+    "B": 2,
+    "L": 2,
     "0": 4,
     "1": 5,
     "2": 6,
     "3": 7,
     "4": 8,
     "5": 9,
+    "6": 10,
 }
 
 
@@ -57,18 +60,55 @@ def _note_type_for_flag(flag: str, last: int | None) -> int | None:
     return FLAG_TO_NOTE_TYPE.get(flag)
 
 
-def _parse_chord_line(
+def _looks_like_hash_header(line: str) -> bool:
+    text = line[1:].strip()
+    if not text:
+        return True
+    if ":" in text:
+        return True
+    return text.startswith((" ", "\t"))
+
+
+def _normalize_chord_line(line: str) -> str:
+    if not line:
+        return line
+    if line[0] not in {"Y", "y"}:
+        return line
+    if len(line) == 1:
+        return ""
+    second = line[1]
+    if second in ".bB":
+        return ""
+    if second in {"#", "x", "w", "W", "B", "L"} or second.isdigit():
+        return line[1:]
+    return f"0{line[1:]}"
+
+
+def _parse_chord_line(  # noqa: C901
     line: str, strings: int, last_note_type: int | None,
 ) -> tuple[Chord | None, int | None]:
-    if not line:
+    text = _normalize_chord_line(line)
+    if not text:
         return None, last_note_type
-    flag = line[0]
+    idx = 0
+    grid = None
+    if text.startswith("#"):
+        grid = "start"
+        idx += 1
+        if idx >= len(text):
+            return None, last_note_type
+    flag = text[idx]
     if flag.isspace():
         return None, last_note_type
     dotted = False
-    rest = line[1:]
+    rest = text[idx + 1:]
+    if rest.startswith("!"):
+        rest = rest[1:]
     if rest.startswith("."):
         dotted = True
+        rest = rest[1:]
+    if rest.startswith("#"):
+        grid = "start"
         rest = rest[1:]
     note_type = _note_type_for_flag(flag, last_note_type)
     if note_type is None:
@@ -79,7 +119,7 @@ def _parse_chord_line(
         text = text.ljust(strings)
     prefer_alt_c = not any(ch in text for ch in "qst")
 
-    chord = Chord(note_type=note_type, dotted=dotted, grid=None)
+    chord = Chord(note_type=note_type, dotted=dotted, grid=grid)
     for idx, ch in enumerate(text[:strings]):
         if _is_fret_char(ch):
             fret = _fret_from_char(ch, prefer_alt_c)
@@ -129,14 +169,14 @@ def load_tab(path: str, strings: int = 6) -> Piece:  # noqa: PLR0912, C901
     default_time: str | None = None
     with Path(path).open(encoding="utf-8", errors="ignore") as f:
         for raw in f:
-            line = raw.rstrip("\n")
+            line = raw.rstrip("\n").rstrip("\r")
             if not line:
                 continue
             if line.startswith("{") and line.endswith("}"):
                 text = line.strip("{}").strip()
                 _apply_title_block(piece, text)
                 continue
-            if line.startswith("#"):
+            if line.startswith("#") and _looks_like_hash_header(line):
                 header = line[1:].strip()
                 if header.lower().startswith("tuning:"):
                     piece.tuning = header.split(":", 1)[1].strip()
@@ -175,8 +215,12 @@ def load_tab(path: str, strings: int = 6) -> Piece:  # noqa: PLR0912, C901
             if line.startswith("S"):
                 current_bar.time_sig = _parse_time_signature(line.strip())
                 continue
-            if line.startswith("e"):
-                break
+            if line.strip() == "e":
+                if current_bar.chords or current_bar.notes:
+                    piece.bars.append(current_bar)
+                current_bar = Bar(time_sig=default_time)
+                last_note_type = None
+                continue
             chord, last_note_type = _parse_chord_line(line, strings, last_note_type)
             if chord and chord.notes:
                 current_bar.chords.append(chord)

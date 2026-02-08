@@ -1,4 +1,5 @@
 import subprocess
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -280,6 +281,12 @@ def test_cmd_midi_lilypond_pdf_play_source(
     def _export_lilypond(_path: str, *_args: object, **_kwargs: object) -> str:
         return "Ly ok"
 
+    def _export_musicxml(_path: str, *_args: object, **_kwargs: object) -> str:
+        return "Xml ok"
+
+    def _export_mxl(_path: str, *_args: object, **_kwargs: object) -> str:
+        return "Mxl ok"
+
     def _print_pdf(_path: str) -> str:
         return "Pdf ok"
 
@@ -291,6 +298,8 @@ def test_cmd_midi_lilypond_pdf_play_source(
 
     monkeypatch.setattr(cmd_ops, "export_midi", _export_midi)
     monkeypatch.setattr(cmd_ops, "export_lilypond", _export_lilypond)
+    monkeypatch.setattr(cmd_ops, "export_musicxml", _export_musicxml)
+    monkeypatch.setattr(cmd_ops, "export_mxl", _export_mxl)
     monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
     monkeypatch.setattr("oud.editor.midi_control.start_midi", _start_midi)
@@ -299,6 +308,10 @@ def test_cmd_midi_lilypond_pdf_play_source(
     assert state.message == "Midi ok"
     cmd.cmd_lilypond(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Ly ok"
+    cmd.apply_command(state, "musicxml out.musicxml", str(tmp_path / "cfg.toml"))
+    assert state.message == "Xml ok"
+    cmd.apply_command(state, "musicxml out.mxl", str(tmp_path / "cfg.toml"))
+    assert state.message == "Mxl ok"
     cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Pdf ok"
     cmd.cmd_play(state, "2 120", str(tmp_path / "cfg.toml"))
@@ -335,3 +348,149 @@ def test_cmd_midi_lilypond_pdf_play_source(
         "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
         "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
     )
+
+
+def test_tui_notation_commands_export_to_musicxml_and_mxl(tmp_path: Path) -> None:
+    state = _state(bars=1)
+    cfg = str(tmp_path / "cfg.toml")
+    cmd.apply_command(state, "time 3/4", cfg)
+    cmd.apply_command(state, "repeat dcalfine", cfg)
+    cmd.apply_command(state, "barline double", cfg)
+    xml_path = tmp_path / "score.musicxml"
+    cmd.apply_command(state, f"musicxml {xml_path}", cfg)
+    text = xml_path.read_text(encoding="utf-8")
+    assert "<beats>3</beats>" in text
+    assert "<beat-type>4</beat-type>" in text
+    assert "<words>D.C. al Fine</words>" in text
+    assert "<bar-style>light-light</bar-style>" in text
+    mxl_path = tmp_path / "score.mxl"
+    cmd.apply_command(state, f"musicxml {mxl_path}", cfg)
+    with zipfile.ZipFile(mxl_path) as zf:
+        names = set(zf.namelist())
+        assert "mimetype" in names
+        assert "META-INF/container.xml" in names
+        assert any(name.endswith(".xml") for name in names)
+
+
+def test_apply_command_dispatch_executes_all_registered_specs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = _state()
+    calls: list[str] = []
+
+    def _record2(name: str):
+        def _stub(_state: EditorState, _args: str) -> None:
+            calls.append(name)
+
+        return _stub
+
+    def _record3(name: str):
+        def _stub(_state: EditorState, _args: str, _cfg: str) -> None:
+            calls.append(name)
+
+        return _stub
+
+    patched_2arg = {
+        "cmd_open",
+        "cmd_write",
+        "cmd_write_ascii",
+        "cmd_ascii",
+        "cmd_title",
+        "cmd_author",
+        "cmd_composer",
+        "cmd_subtitle",
+        "cmd_footnote",
+        "cmd_header_template",
+        "cmd_orn",
+        "cmd_annot",
+        "cmd_highlight",
+        "cmd_midicmd",
+        "cmd_source",
+        "cmd_info",
+        "cmd_plugins",
+        "cmd_bar",
+        "cmd_chord",
+        "cmd_stave",
+        "cmd_slur",
+        "cmd_tie",
+        "cmd_hold",
+        "cmd_barline",
+        "cmd_repeat",
+        "cmd_time",
+        "cmd_verify",
+    }
+    patched_3arg = {
+        "cmd_set",
+        "cmd_convert",
+        "cmd_midi",
+        "cmd_play",
+        "cmd_lilypond",
+        "cmd_musicxml",
+        "cmd_pdf",
+        "cmd_tool",
+        "cmd_undo",
+        "cmd_redo",
+    }
+    for name in patched_2arg:
+        monkeypatch.setattr(cmd, name, _record2(name))
+    for name in patched_3arg:
+        monkeypatch.setattr(cmd, name, _record3(name))
+    cmd._command_specs.cache_clear()
+    cmd._command_map.cache_clear()
+    out_path = tmp_path / "out.tab"
+    xml_path = tmp_path / "out.musicxml"
+    arg_map = {
+        "e": str(out_path),
+        "w": str(out_path),
+        "wa": str(tmp_path / "out.txt"),
+        "wascii": str(tmp_path / "out.txt"),
+        "writeascii": str(tmp_path / "out.txt"),
+        "saveascii": str(tmp_path / "out.txt"),
+        "write": str(out_path),
+        "ascii": "on",
+        "midi": str(tmp_path / "out.mid"),
+        "play": "1 120",
+        "lilypond": str(tmp_path / "out.ly"),
+        "musicxml": str(xml_path),
+        "pdf": str(tmp_path / "out.pdf"),
+        "print": str(tmp_path / "out.pdf"),
+        "set": "showdur=on",
+        "convert": "french",
+        "time": "3/4",
+        "timesig": "4/4",
+        "verify": "",
+        "title": "Title",
+        "author": "Author",
+        "composer": "Composer",
+        "subtitle": "Subtitle",
+        "footnote": "Footnote",
+        "header": "",
+        "undo": "",
+        "redo": "",
+        "orn": "#",
+        "annot": "x",
+        "highlight": "mark",
+        "midicmd": "fluidsynth",
+        "source": "",
+        "info": "",
+        "plugins": "",
+        "bar": "add",
+        "chord": "insert",
+        "stave": "break",
+        "slur": "0 0 0",
+        "tie": "0 0 0",
+        "hold": "0 0 0",
+        "barline": "thin",
+        "repeat": "start",
+        "tool": "gridflags",
+    }
+    specs = cmd._command_specs()
+    for spec in specs:
+        args = arg_map.get(spec.name, "")
+        line = spec.name if not args else f"{spec.name} {args}"
+        cmd.apply_command(state, line, str(tmp_path / "cfg.toml"))
+        assert not state.message.startswith("Unknown command")
+    assert len(calls) == len(specs)
+    cmd._command_specs.cache_clear()
+    cmd._command_map.cache_clear()

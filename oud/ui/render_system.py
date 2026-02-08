@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from oud.core.render_utils import spread_flag_positions
+from oud.core.spacing import auto_bar_plan
 from oud.core.view_model import (
     _bar_annotations,
-    _bar_compact_width,
-    _bar_display_width,
     _bar_durations,
     _bar_number_for_index,
     _bar_ornaments,
     _bar_span_row,
-    _bars_fit,
     _filter_redundant_positions,
     _flag_positions_all,
     _infer_time_signature,
@@ -240,98 +238,32 @@ def render_systems(  # noqa: C901, PLR0912
         bar_start = current_bar_start
         if bar_start >= total_bars:
             break
-        compact_auto = spacing_fill in ("compact", "smart", "stretch", "edge")
+        gaps_after: list[int] = []
+        bar_widths: list[int] = []
         if spacing_mode == "auto":
-            bars_per_line = _bars_fit(
-                piece.bars,
-                bar_start,
-                bar_gap,
-                usable_width,
-                bar_width,
-                overrides,
-                durations,
-                default_duration,
-                dotted,
+            bar_indices, bar_widths, gaps_after = auto_bar_plan(
+                bars=piece.bars,
+                bar_start=bar_start,
+                usable_width=usable_width,
+                bar_width=bar_width,
+                overrides=overrides,
+                durations=durations,
+                default_duration=default_duration,
+                dotted=dotted,
+                bar_gap=bar_gap,
+                spacing_fill=spacing_fill,
+                stave_breaks=stave_breaks,
+                bars_per_line_limit=bars_per_line_limit,
                 max_chords=max_chords,
-                compact=compact_auto,
                 chord_wrap_limit=chord_wrap_limit,
             )
+            bar_end = bar_indices[-1] + 1 if bar_indices else bar_start
         else:
             bars_per_line = bars_per_line_limit
-        if bars_per_line_limit > 0:
-            bars_per_line = min(bars_per_line, bars_per_line_limit)
-        bars_per_line = max(1, bars_per_line)
-        bar_end = _next_system_start(piece.bars, bar_start, bars_per_line, stave_breaks)
-        bar_end = min(total_bars, bar_end)
-        bar_indices = list(range(bar_start, bar_end))
-        bar_widths: list[int] = []
-        gap_after: list[int] = []
-        if spacing_mode == "auto":
-            bar_widths.extend(
-                _bar_compact_width(
-                    piece.bars[abs_bar],
-                    abs_bar,
-                    bar_width,
-                    overrides,
-                    durations,
-                    default_duration,
-                    dotted,
-                )
-                if compact_auto
-                else _bar_display_width(
-                    piece.bars[abs_bar],
-                    abs_bar,
-                    bar_width,
-                    overrides,
-                    durations,
-                    default_duration,
-                    dotted,
-                )
-                for abs_bar in bar_indices
-            )
-
-            def total_bar_width(widths: list[int]) -> int:
-                return sum(widths) + bar_gap * max(0, len(widths) - 1)
-
-            total_width = total_bar_width(bar_widths)
-            while bar_widths and total_width > usable_width:
-                bar_widths.pop()
-                bar_indices = bar_indices[: len(bar_widths)]
-                total_width = total_bar_width(bar_widths)
-            bar_end = bar_start + len(bar_widths)
-            total_width = total_bar_width(bar_widths)
-            gap_after = [bar_gap for _ in range(max(0, len(bar_widths) - 1))]
-            if (
-                bar_widths
-                and len(bar_widths) > 1
-                and spacing_fill in ("stretch", "smart")
-                and total_width < usable_width
-            ):
-                extra = usable_width - total_width
-                idx = 0
-                while extra > 0 and bar_widths:
-                    bar_widths[idx] += 1
-                    extra -= 1
-                    idx = (idx + 1) % len(bar_widths)
-            elif (
-                bar_widths
-                and len(bar_widths) > 1
-                and spacing_fill == "edge"
-                and total_width < usable_width
-            ):
-                extra = usable_width - total_width
-                if len(gap_after) == 1:
-                    gap_after[0] += extra
-                else:
-                    while extra > 0:
-                        gap_after[0] += 1
-                        extra -= 1
-                        if extra <= 0:
-                            break
-                        gap_after[-1] += 1
-                        extra -= 1
-            elif bar_widths and len(bar_widths) == 1 and total_width < usable_width:
-                bar_widths[0] += usable_width - total_width
+            bars_per_line = max(1, bars_per_line)
+            bar_end = _next_system_start(piece.bars, bar_start, bars_per_line, stave_breaks)
+            bar_end = min(total_bars, bar_end)
+            bar_indices = list(range(bar_start, bar_end))
         for display_idx in range(display_strings):
             label = "  "
             if sys_idx == 0:
@@ -822,7 +754,7 @@ def render_systems(  # noqa: C901, PLR0912
                 safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
 
             if spacing_mode == "auto":
-                next_gap = gap_after[local_idx] if local_idx < len(gap_after) else 0
+                next_gap = gaps_after[local_idx] if local_idx < len(gaps_after) else 0
                 bar_x += display_width + next_gap
             else:
                 bar_x += display_width + bar_gap

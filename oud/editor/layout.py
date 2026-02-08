@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+from oud.core.spacing import auto_bar_plan
 from oud.core.view_model import (
-    _bar_compact_width,
-    _bar_display_width,
     _bars_fit,
     _next_system_start,
 )
@@ -182,7 +181,7 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
     return starts
 
 
-def auto_system_bar_plan(  # noqa: C901, PLR0912
+def auto_system_bar_plan(
     state: EditorState,
     start_bar: int,
     width: int,
@@ -200,7 +199,6 @@ def auto_system_bar_plan(  # noqa: C901, PLR0912
             max_width = min(max_width, line_limit)
     usable_width = max(1, max_width - left_margin)
     spacing_fill = state.settings.get("spacingfill", "stretch")
-    compact_fill = spacing_fill in {"compact", "smart", "stretch", "edge"}
     bargap = state.settings.get("bargap", "")
     bar_gap = max(0, int(bargap)) if bargap.isdigit() else 1
     bars_per_line_limit = 0
@@ -222,67 +220,22 @@ def auto_system_bar_plan(  # noqa: C901, PLR0912
     max_chords = int(max_chords_text) if max_chords_text.isdigit() else 0
     chord_wrap_text = state.settings.get("chordwrap", "0")
     chord_wrap_limit = int(chord_wrap_text) if chord_wrap_text.isdigit() else 0
-    bars_per_line = _bars_fit(
-        bars,
-        start_bar,
-        bar_gap,
-        usable_width,
-        state.bar_width,
-        state.overrides,
-        state.durations,
-        4,
-        state.dotted,
+    bar_indices, bar_widths, _gaps = auto_bar_plan(
+        bars=bars,
+        bar_start=start_bar,
+        usable_width=usable_width,
+        bar_width=state.bar_width,
+        overrides=state.overrides,
+        durations=state.durations,
+        default_duration=4,
+        dotted=state.dotted,
+        bar_gap=bar_gap,
+        spacing_fill=spacing_fill,
+        stave_breaks=state.stave_breaks,
+        bars_per_line_limit=bars_per_line_limit,
         max_chords=max_chords,
-        compact=compact_fill,
         chord_wrap_limit=chord_wrap_limit,
     )
-    if bars_per_line_limit > 0:
-        bars_per_line = min(bars_per_line, bars_per_line_limit)
-    bars_per_line = max(1, bars_per_line)
-    bar_end = _next_system_start(bars, start_bar, bars_per_line, state.stave_breaks)
-    bar_end = min(total, bar_end)
-    bar_indices = list(range(start_bar, bar_end))
-    bar_widths: list[int] = []
-    for abs_bar in bar_indices:
-        if compact_fill:
-            width_val = _bar_compact_width(
-                bars[abs_bar],
-                abs_bar,
-                state.bar_width,
-                state.overrides,
-                state.durations,
-                4,
-                state.dotted,
-            )
-        else:
-            width_val = _bar_display_width(
-                bars[abs_bar],
-                abs_bar,
-                state.bar_width,
-                state.overrides,
-                state.durations,
-                4,
-                state.dotted,
-            )
-        bar_widths.append(width_val)
-    while bar_widths and (sum(bar_widths) + bar_gap * max(0, len(bar_widths) - 1)) > usable_width:
-        bar_widths.pop()
-        bar_indices = bar_indices[: len(bar_widths)]
-    total_width = sum(bar_widths) + bar_gap * max(0, len(bar_widths) - 1)
-    if (
-        bar_widths
-        and len(bar_widths) > 1
-        and spacing_fill in {"stretch", "smart"}
-        and total_width < usable_width
-    ):
-        extra = usable_width - total_width
-        idx = 0
-        while extra > 0 and bar_widths:
-            bar_widths[idx] += 1
-            extra -= 1
-            idx = (idx + 1) % len(bar_widths)
-    elif bar_widths and len(bar_widths) == 1 and total_width < usable_width:
-        bar_widths[0] += usable_width - total_width
     return bar_indices, bar_widths
 
 

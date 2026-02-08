@@ -542,14 +542,17 @@ def _filter_redundant_positions(
         return []
     filtered: list[tuple[int, int, bool]] = []
     prev_denom = default_duration
+    prev_dot = False
     for idx, (col, denom, dot) in enumerate(positions):
         if idx == 0:
             filtered.append((col, denom, dot))
             prev_denom = denom
+            prev_dot = dot
             continue
-        if denom != prev_denom or dot:
+        if denom != prev_denom or dot != prev_dot:
             filtered.append((col, denom, dot))
             prev_denom = denom
+            prev_dot = dot
     return filtered
 
 
@@ -591,6 +594,7 @@ def _bar_durations(
 ) -> list[str]:
     row = [" " for _ in range(bar_width)]
     last: int | None = None
+    last_dot = False
     for col in range(bar_width):
         found = None
         for s_idx in range(strings):
@@ -604,9 +608,10 @@ def _bar_durations(
             if found is None:
                 continue
             is_dotted = dotted is not None and (bar_index, col) in dotted
-            if denom != last or is_dotted:
+            if denom != last or is_dotted != last_dot:
                 place_duration_cells(row, col, denom, is_dotted)
                 last = denom
+                last_dot = is_dotted
         else:
             is_dotted = dotted is not None and (bar_index, col) in dotted
             place_duration_cells(row, col, denom, is_dotted)

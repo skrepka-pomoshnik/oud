@@ -169,6 +169,27 @@ def test_flag_positions_filter_redundant() -> None:
     assert filtered == [(0, 4, False), (2, 8, False), (3, 8, True)]
 
 
+def test_flag_positions_filter_redundant_tracks_dot_state_changes() -> None:
+    positions = [(0, 16, True), (1, 16, False), (2, 16, False)]
+    filtered = _filter_redundant_positions(positions)
+    assert filtered == [(0, 16, True), (1, 16, False)]
+
+
+def test_bar_durations_reveals_dot_state_reset() -> None:
+    row = _bar_durations(
+        durations={(0, 0, 0): 16, (0, 0, 3): 16},
+        bar_index=0,
+        strings=6,
+        bar_width=6,
+        default_duration=4,
+        hide_redundant=True,
+        dotted={(0, 0)},
+    )
+    text = "".join(row)
+    assert "16." in text
+    assert text.count("16") >= 2
+
+
 def test_bar_span_row_marks_spans() -> None:
     row = _bar_span_row([(0, 1, 3)], bar_index=0, bar_width=5, start_char="(", end_char=")", fill_char="~")
     assert row == [" ", "(", "~", ")", " "]
