@@ -84,7 +84,26 @@ def auto_bar_plan(  # noqa: C901, PLR0912
     if len(widths) == 1:
         widths[0] += extra
         return bar_indices, widths, gaps
-    if spacing_fill in {"stretch", "smart"}:
+    if spacing_fill == "stretch":
+        if gaps:
+            max_gap = max(2, bar_gap + 2)
+            idx = 0
+            rounds = 0
+            max_rounds = max(1, len(gaps) * max_gap * 2)
+            while extra > 0 and rounds < max_rounds:
+                rounds += 1
+                if gaps[idx] < max_gap:
+                    gaps[idx] += 1
+                    extra -= 1
+                idx = (idx + 1) % len(gaps)
+            if extra > 0:
+                idx = 0
+                while extra > 0:
+                    widths[idx] += 1
+                    extra -= 1
+                    idx = (idx + 1) % len(widths)
+        return bar_indices, widths, gaps
+    if spacing_fill == "smart":
         idx = 0
         while extra > 0:
             widths[idx] += 1

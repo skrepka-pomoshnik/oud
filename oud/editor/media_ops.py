@@ -8,6 +8,8 @@ from oud.editor.state import EditorState
 SaveFn = Callable[[str, dict[str, str]], None]
 ExportMidiFn = Callable[..., str]
 ExportLyFn = Callable[..., str]
+ExportMusicXmlFn = Callable[..., str]
+ExportMxlFn = Callable[..., str]
 StartMidiFn = Callable[..., None]
 MidiCommandFn = Callable[..., list[str] | None]
 WhichFn = Callable[[str], str | None]
@@ -61,6 +63,44 @@ def cmd_lilypond(
         state.bar_width,
         settings=state.settings,
     )
+    save_fn(config_path, state.settings)
+
+
+def cmd_musicxml(
+    state: EditorState,
+    args: str,
+    config_path: str,
+    *,
+    export_musicxml_fn: ExportMusicXmlFn,
+    export_mxl_fn: ExportMxlFn,
+    save_fn: SaveFn,
+) -> None:
+    target = args.strip()
+    if target:
+        path = target
+    else:
+        base = Path(state.path) if state.path else Path("out")
+        path = str(base.with_suffix(".musicxml"))
+    if Path(path).suffix.lower() == ".mxl":
+        state.message = export_mxl_fn(
+            path,
+            state.piece,
+            state.overrides,
+            state.durations,
+            state.bar_width,
+            settings=state.settings,
+            dotted=state.dotted,
+        )
+    else:
+        state.message = export_musicxml_fn(
+            path,
+            state.piece,
+            state.overrides,
+            state.durations,
+            state.bar_width,
+            settings=state.settings,
+            dotted=state.dotted,
+        )
     save_fn(config_path, state.settings)
 
 

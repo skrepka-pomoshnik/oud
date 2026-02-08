@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from oud.core.model import Bar
-from oud.core.render_utils import chord_positions, spread_flag_positions
+from oud.core.render_utils import chord_positions, smart_group_map, spread_flag_positions
 from oud.core.view_model import _scale_col
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import auto_system_bar_plan, dynamic_system_starts
@@ -32,7 +32,7 @@ def move_right(state: EditorState) -> None:
 def _bar_content_width_for_cursor(state: EditorState, bar_index: int) -> int:
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return state.bar_width
-    spacing_mode = state.settings.get("spacingmode", "packed")
+    spacing_mode = state.settings.get("layout", "packed")
     if spacing_mode != "auto":
         return state.bar_width
     starts = dynamic_system_starts(state, state.screen_width)
@@ -99,20 +99,24 @@ def _cursor_display_map_for_bar(
     if not bar.chords:
         return [_scale_col(col, state.bar_width, content_width) for col in range(state.bar_width)]
     positions, grid_width = _chord_positions_distinct_for_nav(bar, state.bar_width, 4)
-    scaled_positions = [
-        (_scale_col(pos, grid_width, content_width), denom, dot)
-        for (pos, denom, dot) in positions
-    ]
-    spread_positions = spread_flag_positions(scaled_positions, content_width, min_gap=1)
-    ordered_raw = sorted(positions, key=lambda item: item[0])
-    src_to_dest = {
-        raw_col: scaled_col
-        for (raw_col, _raw_denom, _raw_dot), (scaled_col, _denom, _dot) in zip(
-            ordered_raw,
-            spread_positions,
-            strict=False,
-        )
-    }
+    if state.settings.get("justify", "stretch") == "smart":
+        groups = spread_flag_positions(positions, grid_width, min_gap=0)
+        src_to_dest = smart_group_map(positions, groups, content_width)
+    else:
+        scaled_positions = [
+            (_scale_col(pos, grid_width, content_width), denom, dot)
+            for (pos, denom, dot) in positions
+        ]
+        spread_positions = spread_flag_positions(scaled_positions, content_width, min_gap=1)
+        ordered_raw = sorted(positions, key=lambda item: item[0])
+        src_to_dest = {
+            raw_col: scaled_col
+            for (raw_col, _raw_denom, _raw_dot), (scaled_col, _denom, _dot) in zip(
+                ordered_raw,
+                spread_positions,
+                strict=False,
+            )
+        }
     grid_map = _grid_display_map_for_nav(
         grid_width=grid_width,
         content_width=content_width,

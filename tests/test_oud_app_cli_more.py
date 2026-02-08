@@ -85,6 +85,24 @@ def test_cmd_convert_ascii_and_unsupported(
     assert "Unsupported output format" in capsys.readouterr().err
 
 
+def test_cmd_convert_mxl(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    called: list[str] = []
+    monkeypatch.setattr(
+        oud_app,
+        "_export_context",
+        lambda _in, _cfg: ({}, 8, "piece", {}, {}, set()),
+    )
+    monkeypatch.setattr(
+        oud_app,
+        "export_mxl",
+        lambda path, *_args, **_kwargs: called.append(path) or f"Wrote {path}",
+    )
+    rc = oud_app._cmd_convert("in.ft3", "out.mxl", "cfg.toml")
+    assert rc == 0
+    assert called == ["out.mxl"]
+    assert "Wrote out.mxl" in capsys.readouterr().out
+
+
 def test_main_tui_no_path_when_only_config(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[object, str | None, str]] = []
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from oud.editor.keymap import help_bindings, normal_bindings
+from oud.editor.list_menu import menu_scroll_offset
 from oud.editor.state import EditorState
 
 
@@ -28,15 +29,15 @@ def handle_key(  # noqa: C901, PLR0911, PLR0912
             return True
         if key in down_keys:
             if state.mode == "help":
-                state.help_offset += 1
+                state.help_offset = menu_scroll_offset(state.help_offset, 1)
             else:
-                state.info_offset += 1
+                state.info_offset = menu_scroll_offset(state.info_offset, 1)
             return True
         if key in up_keys:
             if state.mode == "help":
-                state.help_offset = max(0, state.help_offset - 1)
+                state.help_offset = menu_scroll_offset(state.help_offset, -1)
             else:
-                state.info_offset = max(0, state.info_offset - 1)
+                state.info_offset = menu_scroll_offset(state.info_offset, -1)
             return True
         return True
     if state.mode == "plugin":

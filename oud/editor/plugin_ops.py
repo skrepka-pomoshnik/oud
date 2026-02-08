@@ -9,6 +9,14 @@ from pathlib import Path
 from oud.core.plugin_model import RemoteTab
 from oud.editor.command_ops import cmd_open
 from oud.editor.keymap import plugin_bindings
+from oud.editor.list_menu import (
+    MenuNavBindings,
+    MenuNavState,
+    menu_find_index,
+    menu_page_size,
+    menu_reduce_nav,
+    menu_sync_offset,
+)
 from oud.editor.state import EditorState
 
 
@@ -227,13 +235,18 @@ def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: PLR091
         if not query:
             state.message = ""
             return True
-        for idx, item in enumerate(state.plugin_items):
-            if query in item.title.lower():
-                state.plugin_index = idx
-                page_size = max(1, state.screen_height - 2)
-                state.plugin_offset = min(idx, max(0, idx - page_size + 1))
-                state.message = f"Found: {item.title}"
-                return True
+        idx = menu_find_index(state.plugin_items, query, lambda item: item.title)
+        if idx is not None:
+            page_size = menu_page_size(state.screen_height)
+            state.plugin_index = idx
+            state.plugin_offset = menu_sync_offset(
+                state.plugin_index,
+                state.plugin_offset,
+                page_size,
+                len(state.plugin_items),
+            )
+            state.message = f"Found: {state.plugin_items[idx].title}"
+            return True
         state.message = "No match"
         return True
     if 32 <= key <= 126:
@@ -271,6 +284,7 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
         return True
     if _handle_plugin_search(state, key):
         return True
+    bindings = plugin_bindings(state)
     action = _plugin_action(state, key)
     if action == "exit":
         if not _pop_stack(state):
@@ -280,28 +294,30 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
         if not _pop_stack(state):
             state.mode = "normal"
         return True
-    if action == "top":
-        if state.plugin_pending == "g":
-            state.plugin_index = 0
-            state.plugin_offset = 0
-            state.plugin_pending = ""
-            return True
-        state.plugin_pending = "g"
-        return True
-    state.plugin_pending = ""
-    page_size = max(1, state.screen_height - 2)
-    if action == "bottom":
-        state.plugin_index = max(0, len(state.plugin_items) - 1)
-        state.plugin_offset = max(0, state.plugin_index - page_size + 1)
-        return True
-    if action == "down":
-        state.plugin_index = min(state.plugin_index + 1, len(state.plugin_items) - 1)
-        if state.plugin_index >= state.plugin_offset + page_size:
-            state.plugin_offset = state.plugin_index - page_size + 1
-        return True
-    if action == "up":
-        state.plugin_index = max(0, state.plugin_index - 1)
-        state.plugin_offset = min(state.plugin_offset, state.plugin_index)
+
+    nav_bindings = MenuNavBindings(
+        up=bindings.up,
+        down=bindings.down,
+        top_prefix=bindings.prefix,
+        bottom=bindings.bottom,
+    )
+    page_size = menu_page_size(state.screen_height)
+    nav = MenuNavState(
+        index=state.plugin_index,
+        offset=state.plugin_offset,
+        pending_prefix=state.plugin_pending,
+    )
+    nav, handled = menu_reduce_nav(
+        key,
+        nav,
+        bindings=nav_bindings,
+        length=len(state.plugin_items),
+        page_size=page_size,
+    )
+    state.plugin_index = nav.index
+    state.plugin_offset = nav.offset
+    state.plugin_pending = nav.pending_prefix
+    if handled:
         return True
     if action == "open":
         open_plugin_item(state)

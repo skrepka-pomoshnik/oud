@@ -68,7 +68,7 @@ def test_chord_helpers() -> None:
     assert set_chord_note(bar, 12, 0, 1, 2) is True
     assert bar.chords[0].notes[0].fret == 2
     assert set_chord_note(bar, 12, 0, 1, None) is True
-    assert bar.chords[0].notes == []
+    assert bar.chords == []
 
 
 def test_insert_delete_chord() -> None:

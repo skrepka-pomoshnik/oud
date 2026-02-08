@@ -4,7 +4,10 @@ from itertools import pairwise
 from pathlib import Path
 
 from oud.core.ft3 import load_ft3
+from oud.core.render_utils import smart_group_map, spread_flag_positions
 from oud.core.view_model import _filter_redundant_positions, bar_cells_from_chords
+from oud.editor.init import init_state
+from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_system import (
     _build_chord_scale_map,
@@ -56,8 +59,8 @@ def test_scale_chord_row_aligns_notes_to_shared_columns() -> None:
     assert scaled_b[mapping[3]] == "b"
 
 
-def test_scale_chord_row_avoids_note_clumping_on_collision() -> None:
-    # Force two nearby source notes to compress into a tiny content width.
+def test_scale_chord_row_keeps_anchor_without_drift_on_collision() -> None:
+    # Force two source notes to map to the same destination.
     row = list("-ca-----")
     scaled = _scale_chord_row(
         row,
@@ -67,10 +70,8 @@ def test_scale_chord_row_avoids_note_clumping_on_collision() -> None:
         content_width=3,
     )
     text = "".join(scaled)
-    assert "c" in text
-    assert "a" in text
-    assert text.count("c") == 1
-    assert text.count("a") == 1
+    # No nearest-free-slot drift: one anchored cell remains (last write wins).
+    assert text == "a--"
 
 
 def test_place_duration_cells_aligned_keeps_stem_anchor() -> None:
@@ -160,3 +161,157 @@ def test_lachrimae_bar1_stem_aligns_to_second_string_d() -> None:
     d_col = next(idx for idx, ch in enumerate(scaled_row) if ch == "d")
     assert len(stem_cols) >= 2
     assert d_col == stem_cols[1]
+
+
+def test_lachrimae_bar10_smart_flags_align_with_note_columns() -> None:
+    root = Path(__file__).resolve().parents[1]
+    piece = load_ft3(str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"))
+    bar = piece.bars[9]
+    positions, width = _chord_positions_distinct(bar, bar_width=8, default_duration=4)
+    ordered_flags = sorted(_filter_redundant_positions(positions), key=lambda item: item[0])
+    content_width = 40
+    _, src_to_dest = _build_chord_scale_map(
+        positions,
+        bar_width=width,
+        content_width=content_width,
+        min_gap=2,
+    )
+    render_positions = [
+        (src_to_dest.get(col, 0), denom, dot) for (col, denom, dot) in ordered_flags
+    ]
+    final_positions = spread_flag_positions(render_positions, content_width, min_gap=1)
+    final_map = {
+        raw_col: final_col
+        for (raw_col, _denom, _dot), (final_col, _d2, _dot2) in zip(
+            ordered_flags,
+            final_positions,
+            strict=False,
+        )
+    }
+    cells = bar_cells_from_chords(bar, piece.strings, width, 4, "french", french_c="normal")
+    scaled_rows = [
+        _scale_chord_row(
+            cells[s_idx],
+            fill_char="-",
+            src_to_dest=final_map,
+            bar_width=width,
+            content_width=content_width,
+        )
+        for s_idx in range(piece.strings)
+    ]
+    for raw_col, final_col in final_map.items():
+        has_note = any(cells[s_idx][raw_col] != "-" for s_idx in range(piece.strings))
+        assert has_note
+        assert any(row[final_col] != "-" for row in scaled_rows)
+
+
+def test_forlorne_bar10_smart_no_lonely_stems() -> None:
+    state = init_state("examples/02_forlorne_hope_8C.ft3", config_path="config.toml")
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "smart"
+    state.settings["barpad"] = "1"
+    state.settings["flagredundant"] = "on"
+    state.screen_width = 120
+    bar_idx = 9
+
+    starts = dynamic_system_starts(state, state.screen_width)
+    start = max(value for value in starts if value <= bar_idx)
+    bar_indices, bar_widths, _gaps = auto_system_bar_plan_with_gaps(
+        state,
+        start,
+        state.screen_width,
+    )
+    local_idx = bar_indices.index(bar_idx)
+    display_width = bar_widths[local_idx]
+    content_width = max(1, display_width - 2)
+    bar = state.piece.bars[bar_idx]
+    positions, grid_width = _chord_positions_distinct(bar, state.bar_width, default_duration=4)
+    cells = bar_cells_from_chords(
+        bar,
+        state.piece.strings,
+        grid_width,
+        4,
+        state.settings.get("style", "french"),
+        french_c="normal",
+    )
+    visible_cols = {col for col in range(grid_width) if any(cells[s][col] != "-" for s in range(state.piece.strings))}
+    positions = [item for item in positions if item[0] in visible_cols]
+    ordered_flags = sorted(_filter_redundant_positions(positions), key=lambda item: item[0])
+    src_to_dest = smart_group_map(positions, ordered_flags, content_width)
+    scaled_rows = [
+        _scale_chord_row(
+            cells[s_idx],
+            fill_char="-",
+            src_to_dest=src_to_dest,
+            bar_width=grid_width,
+            content_width=content_width,
+        )
+        for s_idx in range(state.piece.strings)
+    ]
+    for raw_col, _denom, _dot in ordered_flags:
+        stem_col = src_to_dest[raw_col]
+        assert any(row[stem_col] != "-" for row in scaled_rows), (raw_col, stem_col)
+
+
+def test_forlorne_all_smart_stems_have_notes_underneath() -> None:
+    state = init_state("examples/02_forlorne_hope_8C.ft3", config_path="config.toml")
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "smart"
+    state.settings["barpad"] = "1"
+    state.settings["flagredundant"] = "on"
+    state.screen_width = 120
+
+    for start in dynamic_system_starts(state, state.screen_width):
+        bar_indices, bar_widths, _gaps = auto_system_bar_plan_with_gaps(
+            state,
+            start,
+            state.screen_width,
+        )
+        for local_idx, bar_idx in enumerate(bar_indices):
+            bar = state.piece.bars[bar_idx]
+            if not bar.chords:
+                continue
+            display_width = bar_widths[local_idx]
+            content_width = max(1, display_width - 2)
+            positions, grid_width = _chord_positions_distinct(
+                bar,
+                state.bar_width,
+                default_duration=4,
+            )
+            if not positions:
+                continue
+            cells = bar_cells_from_chords(
+                bar,
+                state.piece.strings,
+                grid_width,
+                4,
+                state.settings.get("style", "french"),
+                french_c="normal",
+            )
+            visible_cols = {
+                col
+                for col in range(grid_width)
+                if any(cells[s][col] != "-" for s in range(state.piece.strings))
+            }
+            positions = [item for item in positions if item[0] in visible_cols]
+            ordered_flags = sorted(_filter_redundant_positions(positions), key=lambda item: item[0])
+            if not ordered_flags:
+                continue
+            src_to_dest = smart_group_map(positions, ordered_flags, content_width)
+            scaled_rows = [
+                _scale_chord_row(
+                    cells[s_idx],
+                    fill_char="-",
+                    src_to_dest=src_to_dest,
+                    bar_width=grid_width,
+                    content_width=content_width,
+                )
+                for s_idx in range(state.piece.strings)
+            ]
+            for raw_col, _denom, _dot in ordered_flags:
+                stem_col = src_to_dest[raw_col]
+                assert any(row[stem_col] != "-" for row in scaled_rows), (
+                    bar_idx,
+                    raw_col,
+                    stem_col,
+                )

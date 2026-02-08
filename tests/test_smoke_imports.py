@@ -21,5 +21,9 @@ def test_import_midi_module() -> None:
     __import__("oud.exports.midi")
 
 
+def test_import_musicxml_module() -> None:
+    __import__("oud.exports.musicxml")
+
+
 def test_compile_all() -> None:
     assert compileall.compile_dir(".", quiet=1)

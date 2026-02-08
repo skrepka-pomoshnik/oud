@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.playback_timeline import PlaybackCursor
 from oud.core.time_utils import parse_time_signature_value
 
 TICKS_PER_QUARTER = 480
@@ -162,9 +163,12 @@ def _chord_positions(
         return []
     positions: list[int] = []
     cum = 0
+    prev_pos = -1
     for u in units:
-        pos = min(bar_width - 1, (cum * (bar_width - 1)) // total)
+        raw_pos = min(bar_width - 1, (cum * (bar_width - 1)) // total)
+        pos = min(bar_width - 1, max(raw_pos, prev_pos + 1))
         positions.append(pos)
+        prev_pos = pos
         cum += u
     return positions
 
@@ -240,11 +244,11 @@ def build_playback_timeline(
     bpm: int = 90,
     start_bar: int = 0,
     dotted: set[tuple[int, int]] | None = None,
-) -> list[tuple[float, float, int, int]]:
+) -> list[PlaybackCursor]:
     settings = settings or {}
     style = settings.get("style") or "french"
     default_duration = 4
-    timeline: list[tuple[float, float, int, int]] = []
+    timeline: list[PlaybackCursor] = []
     sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
     current_time = 0
     for b_idx, bar in enumerate(piece.bars):
@@ -264,12 +268,15 @@ def build_playback_timeline(
         if not chord_events:
             continue
         max_end = 0
-        for start, duration, col, notes in chord_events:
+        for event_idx, (start, duration, col, notes) in enumerate(chord_events):
             if not notes:
                 continue
             event_start = (current_time + start) * sec_per_tick
             event_end = (current_time + start + duration) * sec_per_tick
-            timeline.append((event_start, event_end, b_idx, col))
+            marker_col = event_idx if bar.chords else col
+            timeline.append(
+                PlaybackCursor(start=event_start, end=event_end, bar=b_idx, col=marker_col),
+            )
             max_end = max(max_end, start + duration)
         current_time += max_end
     return timeline

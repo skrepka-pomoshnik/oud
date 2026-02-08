@@ -91,8 +91,8 @@ def test_render_matrix_no_lost_overrides_across_spacing_modes(
             "showdur": "on",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": spacing_mode,
-            "spacingfill": spacing_fill,
+            "layout": spacing_mode,
+            "justify": spacing_fill,
             "barsperline": "0",
             "maxbars": "0",
             "linelen": "0",
@@ -133,8 +133,8 @@ def test_render_matrix_bass_rows_show_only_when_used() -> None:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "packed",
-            "spacingfill": "stretch",
+            "layout": "packed",
+            "justify": "stretch",
             "linelen": "0",
             "barsperline": "0",
             "maxbars": "0",
@@ -162,8 +162,8 @@ def test_render_matrix_hold_marker_visible() -> None:
             "showdur": "off",
             "showextras": "on",
             "showtactus": "off",
-            "spacingmode": "packed",
-            "spacingfill": "stretch",
+            "layout": "packed",
+            "justify": "stretch",
             "linelen": "0",
             "barsperline": "0",
             "maxbars": "0",
@@ -204,8 +204,8 @@ def test_render_matrix_duration_text_stays_aligned_with_flags() -> None:
             "showdur": "on",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "packed",
-            "spacingfill": "compact",
+            "layout": "packed",
+            "justify": "compact",
             "barpad": "1",
             "linelen": "0",
             "barsperline": "0",
@@ -230,8 +230,8 @@ def test_render_matrix_lines_are_always_terminal_width(spacing_fill: str) -> Non
     settings = dict(DEFAULT_SETTINGS)
     settings.update(
         {
-            "spacingmode": "auto",
-            "spacingfill": spacing_fill,
+            "layout": "auto",
+            "justify": spacing_fill,
             "showdur": "on",
             "showextras": "on",
             "showtactus": "on",
@@ -258,8 +258,8 @@ def test_render_matrix_smart_fill_reaches_right_edge_on_staff_rows() -> None:
     settings = dict(DEFAULT_SETTINGS)
     settings.update(
         {
-            "spacingmode": "auto",
-            "spacingfill": "smart",
+            "layout": "auto",
+            "justify": "smart",
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
@@ -295,8 +295,8 @@ def test_render_matrix_no_double_joined_barlines_for_default_bars() -> None:
     settings = dict(DEFAULT_SETTINGS)
     settings.update(
         {
-            "spacingmode": "auto",
-            "spacingfill": "smart",
+            "layout": "auto",
+            "justify": "smart",
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
@@ -320,8 +320,8 @@ def test_render_matrix_empty_bar_does_not_draw_lonely_flag_stem() -> None:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "auto",
-            "spacingfill": "stretch",
+            "layout": "auto",
+            "justify": "stretch",
             "barsperline": "0",
             "maxbars": "0",
             "linelen": "0",
@@ -353,8 +353,8 @@ def test_render_matrix_chord_onsets_not_lost_when_flags_are_redundant() -> None:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "auto",
-            "spacingfill": "smart",
+            "layout": "auto",
+            "justify": "smart",
             "barsperline": "0",
             "maxbars": "0",
             "linelen": "0",
@@ -389,8 +389,8 @@ def test_render_matrix_smart_fill_stretches_early_bars_uniformly() -> None:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "auto",
-            "spacingfill": "smart",
+            "layout": "auto",
+            "justify": "smart",
             "barsperline": "0",
             "maxbars": "0",
             "linelen": "0",
@@ -435,8 +435,8 @@ def test_render_matrix_edge_prefers_edge_gaps() -> None:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "auto",
-            "spacingfill": "edge",
+            "layout": "auto",
+            "justify": "edge",
             "barsperline": "0",
             "maxbars": "0",
             "linelen": "0",
@@ -485,8 +485,8 @@ def test_render_matrix_stretch_keeps_gaps_uniform() -> None:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "auto",
-            "spacingfill": "stretch",
+            "layout": "auto",
+            "justify": "stretch",
             "barsperline": "0",
             "maxbars": "0",
             "linelen": "0",
@@ -505,5 +505,55 @@ def test_render_matrix_stretch_keeps_gaps_uniform() -> None:
         if "-" in line and "|" in line
     )
     bars = [idx for idx, ch in enumerate(row) if ch == "|"]
-    diffs = [b - a for a, b in pairwise(bars)]
-    assert max(diffs) - min(diffs) <= 2
+    assert len(bars) >= 8
+    lefts = bars[::2]
+    rights = bars[1::2]
+    widths = [r - l - 1 for l, r in zip(lefts, rights, strict=False)]
+    gaps = [
+        lefts[idx + 1] - rights[idx] - 1
+        for idx in range(min(len(rights), len(lefts) - 1))
+    ]
+    # stretch mode keeps bar content compact and stretches inter-bar spacing.
+    assert max(widths) - min(widths) <= 1
+    assert gaps
+    assert all(gap >= 1 for gap in gaps)
+    assert max(gaps) - min(gaps) <= 1
+
+
+def test_render_matrix_stretch_does_not_visually_split_bars() -> None:
+    piece = Piece(
+        title="StretchSplit",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=6, dotted=True, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=7, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 4, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(4, 5, 0)]),
+                ],
+            )
+            for _ in range(4)
+        ],
+        strings=6,
+    )
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "style": "french",
+            "showtuning": "off",
+            "showdur": "on",
+            "showextras": "off",
+            "showtactus": "off",
+            "layout": "auto",
+            "justify": "stretch",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+            "barpad": "1",
+        },
+    )
+    lines = _render_lines(piece, settings, width=96, height=22)
+    staff_rows = [line for line in lines if "-" in line and "|" in line][:6]
+    assert len(staff_rows) == 6
+    # No detached barline pairs with a blank gap in between.
+    assert all("|  |" not in row for row in staff_rows)

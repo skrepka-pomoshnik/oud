@@ -16,6 +16,7 @@ from oud.editor.load_ops import load_piece_data
 from oud.exports.export_tab import export_tab_to_file
 from oud.exports.lilypond import export_lilypond
 from oud.exports.midi import export_midi
+from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.settings import DEFAULT_SETTINGS, load_settings
 from oud.tui.commands import apply_command
 from oud.tui.loop import run_loop
@@ -153,7 +154,7 @@ def _slice_for_ascii(state, bars_spec: str | None) -> None:
     state.holds = remap_spans(state.holds)
 
 
-def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:
+def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:  # noqa: PLR0911
     settings, bar_width, piece, overrides, durations, dotted = _export_context(path_in, config_path)
     suffix = Path(path_out).suffix.lower()
     if suffix == ".tab":
@@ -181,6 +182,32 @@ def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:
                 durations,
                 bar_width,
                 settings=settings,
+            ),
+        )
+        return 0
+    if suffix in {".musicxml", ".xml"}:
+        print(
+            export_musicxml(
+                path_out,
+                piece,
+                overrides,
+                durations,
+                bar_width,
+                settings=settings,
+                dotted=dotted,
+            ),
+        )
+        return 0
+    if suffix == ".mxl":
+        print(
+            export_mxl(
+                path_out,
+                piece,
+                overrides,
+                durations,
+                bar_width,
+                settings=settings,
+                dotted=dotted,
             ),
         )
         return 0
@@ -232,7 +259,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_convert = sub.add_parser("convert", help="Convert by output extension")
     p_convert.add_argument("input", help="Input .ft3/.tab path")
-    p_convert.add_argument("output", help="Output path (.tab/.txt/.ascii/.ly/.mid)")
+    p_convert.add_argument(
+        "output",
+        help="Output path (.tab/.txt/.ascii/.ly/.mid/.musicxml/.xml/.mxl)",
+    )
     return parser
 
 

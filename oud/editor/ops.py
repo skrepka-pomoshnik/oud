@@ -99,12 +99,21 @@ def chord_index_at_col(bar: Bar, bar_width: int, col: int) -> int | None:
     if not bar.chords:
         return None
     default_duration = 4
-    for idx, (pos, _denom, _dot) in enumerate(
-        chord_positions(bar, bar_width, default_duration),
-    ):
+    positions = chord_positions(bar, bar_width, default_duration)
+    for idx, (pos, _denom, _dot) in enumerate(positions):
         if pos == col:
             return idx
-    return None
+    if positions:
+        nearest = min(
+            enumerate(positions),
+            key=lambda item: abs(item[1][0] - col),
+        )
+        return nearest[0]
+    # Fallback for bars that currently contain only empty chords.
+    if len(bar.chords) == 1:
+        return 0
+    step = max(1, bar_width // len(bar.chords))
+    return min(len(bar.chords) - 1, max(0, col) // step)
 
 
 def set_chord_note(
@@ -122,6 +131,8 @@ def set_chord_note(
         if note.string == string:
             if fret is None:
                 chord.notes = [n for n in chord.notes if n.string != string]
+                if not chord.notes:
+                    bar.chords.pop(idx)
             else:
                 note.fret = fret
             return True
@@ -143,6 +154,8 @@ def insert_chord(bar: Bar, bar_width: int, col: int) -> None:
 
 
 def delete_chord(bar: Bar, bar_width: int, col: int) -> bool:
+    if col < 0 or col >= bar_width:
+        return False
     idx = chord_index_at_col(bar, bar_width, col)
     if idx is None:
         return False

@@ -270,8 +270,8 @@ def test_render_auto_mode_not_forced_to_one_bar_per_row() -> None:
         strings=6,
     )
     settings = {
-        "spacingmode": "auto",
-        "spacingfill": "compact",
+        "layout": "auto",
+        "justify": "compact",
         "style": "french",
         "linelen": "0",
         "bargap": "1",

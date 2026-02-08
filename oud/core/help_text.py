@@ -30,7 +30,7 @@ HELP_LINES = [
     "",
     "COMMANDS",
     ":w [path]        write .tab       :wa [path]        write ascii (save-as)",
-    ":wascii [path]   write ascii      :writeascii       write ascii",
+    ":wascii [path]   write ascii",
     ":wq/:x           write + quit     :q!               quit without save",
     ":e <path>        open             :source [path]    view file with less",
     ":time <sig>      set time sig     :verify           check measure length",
@@ -40,7 +40,8 @@ HELP_LINES = [
     ":subtitle <text>  set subtitle     :composer <text>   set composer",
     ":footnote <text>  set footnote     :header            insert header template",
     ":midi [path]     export midi      :play [bar] [tempo] play from bar",
-    ":lilypond [path] export lilypond  :pdf              compile pdf (P)",
+    ":lilypond [path] export lilypond  :musicxml [path] export musicxml/mxl",
+    ":pdf              compile pdf (P)",
     ":midicmd [path]  show midi command",
     ":bar add|before|after|del         :barline thin|thick|double|hidden|pale",
     (
@@ -61,7 +62,7 @@ HELP_LINES = [
     ),
     ":set flagredundant=on|off",
     (
-        ":set spacingmode=packed|spread|auto|stretch spacingfill=stretch|center|compact|smart|edge "
+        ":set layout=packed|spread|auto|stretch justify=stretch|center|compact|smart|edge "
         "showtuning=on|off"
     ),
     ":set key=... countdots=on/off grid=on/off",

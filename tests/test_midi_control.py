@@ -4,6 +4,7 @@ import subprocess
 from typing import cast
 
 from oud.core.model import Bar, Piece
+from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.midi_control import midi_output_path, start_midi, stop_midi
 from oud.editor.playback import update_playback_animation
 from oud.editor.state import EditorState
@@ -62,7 +63,10 @@ def test_start_midi(monkeypatch) -> None:
 
 def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
     state = _state()
-    state.playback_timeline = [(0.0, 0.5, 0, 1), (0.5, 1.0, 0, 4)]
+    state.playback_timeline = [
+        PlaybackCursor(start=0.0, end=0.5, bar=0, col=1),
+        PlaybackCursor(start=0.5, end=1.0, bar=0, col=4),
+    ]
     state.playback_started_at = 100.0
     state.playback_index = 0
     state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
@@ -73,3 +77,17 @@ def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.75)
     update_playback_animation(state)
     assert state.playback_col == 4
+
+
+def test_update_playback_animation_accepts_legacy_tuple_entries(monkeypatch) -> None:
+    state = _state()
+    state.playback_timeline = cast(
+        list[PlaybackCursor],
+        [(0.0, 0.5, 0, 2), (0.5, 1.0, 0, 5)],
+    )
+    state.playback_started_at = 100.0
+    state.playback_index = 0
+    state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
+    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.6)
+    update_playback_animation(state)
+    assert state.playback_col == 5

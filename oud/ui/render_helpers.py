@@ -60,7 +60,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Tuning:", settings.get("tuning")),
         line("Time:", settings.get("time")),
         line("Key:", settings.get("key")),
-        line("Spacing:", settings.get("spacingmode")),
+        line("Layout:", settings.get("layout")),
         line("Flagstyle:", settings.get("flagstyle")),
         line("Grid:", settings.get("grid")),
         line("ShowDur:", settings.get("showdur")),

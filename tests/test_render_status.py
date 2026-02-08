@@ -39,7 +39,7 @@ def test_resolve_duration_text_from_chord_positions() -> None:
 
 
 def test_build_status_lines_modes() -> None:
-    status, line = build_status_lines(
+    line = build_status_lines(
         mode="command",
         cmdline="w",
         searchline="",
@@ -47,9 +47,8 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text="8",
     )
-    assert status == ":w"
-    assert line == "ok"
-    status, line = build_status_lines(
+    assert line == ":w  ok"
+    line = build_status_lines(
         mode="normal",
         cmdline="",
         searchline="",
@@ -57,6 +56,6 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text="4",
     )
-    assert "len:4" in status
-    assert "msg" in status
-    assert line == "base"
+    assert "len:4" in line
+    assert "msg" in line
+    assert "base" in line

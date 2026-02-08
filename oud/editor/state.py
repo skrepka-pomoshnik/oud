@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypedDict
 
 from oud.core.model import Bar, Piece
+from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.controller_utils import clamp_cursor
 from oud.editor.keycodes import DEFAULT_KEYCODES, KeyCodes
 
@@ -63,7 +64,7 @@ class EditorState:
         self.screen_width = 0
         self.screen_height = 0
         self.midi_proc: subprocess.Popen[bytes] | None = None
-        self.playback_timeline: list[tuple[float, float, int, int]] = []
+        self.playback_timeline: list[PlaybackCursor] = []
         self.playback_started_at: float | None = None
         self.playback_index = 0
         self.playback_bar: int | None = None

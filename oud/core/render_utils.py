@@ -96,7 +96,7 @@ def note_type_to_denom(note_type: int) -> int | None:
 def chord_positions(
     bar: Bar, bar_width: int, default_duration: int,
 ) -> list[tuple[int, int, bool]]:
-    chords = bar.chords or []
+    chords = [chord for chord in (bar.chords or []) if chord.notes]
     denoms: list[int] = []
     dotted: list[bool] = []
     for chord in chords:
@@ -144,7 +144,8 @@ def bar_cells_from_chords(
     positions = chord_positions(bar, bar_width, default_duration)
     if not positions:
         return cells
-    for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
+    chords = [chord for chord in (bar.chords or []) if chord.notes]
+    for chord, (col, _denom, _dot) in zip(chords, positions, strict=False):
         for note in chord.notes:
             s_idx = note.string - 1
             if 0 <= s_idx < strings and 0 <= col < bar_width:
@@ -353,3 +354,49 @@ def flag_positions_from_durations(
             positions.append((col, found, is_dotted))
             last = found
     return positions
+
+
+def smart_group_map(
+    all_positions: list[tuple[int, int, bool]],
+    group_positions: list[tuple[int, int, bool]],
+    content_width: int,
+) -> dict[int, int]:
+    if content_width <= 0 or not all_positions:
+        return {}
+    raw_cols = sorted({col for col, _denom, _dot in all_positions})
+    if not raw_cols:
+        return {}
+    if len(raw_cols) == 1:
+        return {raw_cols[0]: 0}
+
+    groups = sorted({col for col, _denom, _dot in group_positions})
+    boundaries = [col for col in groups if col in set(raw_cols[1:])]
+
+    base_span = len(raw_cols) - 1
+    extra = max(0, content_width - (base_span + 1))
+    gap_before: dict[int, int] = {}
+
+    if boundaries and extra > 0:
+        idx = 0
+        while extra > 0:
+            key = boundaries[idx % len(boundaries)]
+            gap_before[key] = gap_before.get(key, 0) + 1
+            extra -= 1
+            idx += 1
+    elif extra > 0:
+        idx = 1
+        while extra > 0:
+            key = raw_cols[idx % len(raw_cols)]
+            gap_before[key] = gap_before.get(key, 0) + 1
+            extra -= 1
+            idx += 1
+
+    mapping: dict[int, int] = {}
+    cursor = 0
+    mapping[raw_cols[0]] = 0
+    for raw in raw_cols[1:]:
+        cursor += 1 + gap_before.get(raw, 0)
+        if cursor > content_width - 1:
+            cursor = content_width - 1
+        mapping[raw] = cursor
+    return mapping

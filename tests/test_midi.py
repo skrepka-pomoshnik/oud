@@ -3,6 +3,7 @@ from oud.exports.midi import (
     BASE_NOTE_VELOCITY,
     _accent_velocity,
     _bar_chord_events,
+    _chord_positions,
     _collect_manual_chords,
     _duration_ticks,
     _fret_from_override,
@@ -16,6 +17,7 @@ from oud.exports.midi import (
     build_playback_timeline,
     export_midi,
 )
+from oud.core.render_utils import chord_positions as render_chord_positions
 
 
 def test_vlq_encoding() -> None:
@@ -148,6 +150,45 @@ def test_build_playback_timeline_includes_bar_and_col() -> None:
     assert end > start
     assert bar_index == 0
     assert col >= 0
+
+
+def test_build_playback_timeline_uses_chord_index_for_marker_col() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(4, 3, 0)]),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=2,
+        settings={"style": "french"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert [cursor.col for cursor in timeline] == [0, 1, 2, 3]
+
+
+def test_midi_chord_positions_match_render_positions() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=6, dotted=True, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 4, 0)]),
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(4, 5, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(5, 7, 0)]),
+        ],
+    )
+    bar_width = 16
+    expected_cols = [col for (col, _den, _dot) in render_chord_positions(bar, bar_width, 4)]
+    midi_cols = _chord_positions(bar.chords, bar_width, 4)
+    assert midi_cols == expected_cols
 
 
 def test_note_messages() -> None:

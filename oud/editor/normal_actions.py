@@ -325,7 +325,7 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
         state.clamp()
         return True
     if key in action_keys.page_up:
-        if state.settings.get("spacingmode", "packed") == "auto":
+        if state.settings.get("layout", "packed") == "auto":
             state.cursor_bar = jump_system_row_dynamic(
                 state,
                 state.cursor_bar,
@@ -337,7 +337,7 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
             state.cursor_bar = jump_system_row(state, state.cursor_bar, -count, per_line)
         return True
     if key in action_keys.page_down:
-        if state.settings.get("spacingmode", "packed") == "auto":
+        if state.settings.get("layout", "packed") == "auto":
             state.cursor_bar = jump_system_row_dynamic(
                 state,
                 state.cursor_bar,

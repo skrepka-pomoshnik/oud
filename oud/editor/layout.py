@@ -12,7 +12,7 @@ def bar_gap(state: EditorState) -> int:
     gap = state.settings.get("bargap", "")
     if gap.isdigit():
         return max(0, int(gap))
-    mode = state.settings.get("spacingmode", "packed")
+    mode = state.settings.get("layout", "packed")
     return 1 if mode in ("packed", "auto") else 3
 
 
@@ -116,8 +116,8 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
         if line_limit > 0:
             max_width = min(max_width, line_limit)
     usable_width = max(1, max_width - left_margin)
-    spacing_mode = state.settings.get("spacingmode", "packed")
-    spacing_fill = state.settings.get("spacingfill", "stretch")
+    spacing_mode = state.settings.get("layout", "packed")
+    spacing_fill = state.settings.get("justify", "stretch")
     bargap = state.settings.get("bargap", "")
     if bargap.isdigit():
         bar_gap = max(0, int(bargap))
@@ -186,10 +186,19 @@ def auto_system_bar_plan(
     start_bar: int,
     width: int,
 ) -> tuple[list[int], list[int]]:
+    bar_indices, bar_widths, _gaps = auto_system_bar_plan_with_gaps(state, start_bar, width)
+    return bar_indices, bar_widths
+
+
+def auto_system_bar_plan_with_gaps(
+    state: EditorState,
+    start_bar: int,
+    width: int,
+) -> tuple[list[int], list[int], list[int]]:
     bars = state.piece.bars
     total = len(bars)
     if start_bar < 0 or start_bar >= total:
-        return [], []
+        return [], [], []
     left_margin = 3
     max_width = width
     linelen = state.settings.get("linelen", "")
@@ -198,7 +207,7 @@ def auto_system_bar_plan(
         if line_limit > 0:
             max_width = min(max_width, line_limit)
     usable_width = max(1, max_width - left_margin)
-    spacing_fill = state.settings.get("spacingfill", "stretch")
+    spacing_fill = state.settings.get("justify", "stretch")
     bargap = state.settings.get("bargap", "")
     bar_gap = max(0, int(bargap)) if bargap.isdigit() else 1
     bars_per_line_limit = 0
@@ -220,7 +229,7 @@ def auto_system_bar_plan(
     max_chords = int(max_chords_text) if max_chords_text.isdigit() else 0
     chord_wrap_text = state.settings.get("chordwrap", "0")
     chord_wrap_limit = int(chord_wrap_text) if chord_wrap_text.isdigit() else 0
-    bar_indices, bar_widths, _gaps = auto_bar_plan(
+    bar_indices, bar_widths, gaps = auto_bar_plan(
         bars=bars,
         bar_start=start_bar,
         usable_width=usable_width,
@@ -236,7 +245,7 @@ def auto_system_bar_plan(
         max_chords=max_chords,
         chord_wrap_limit=chord_wrap_limit,
     )
-    return bar_indices, bar_widths
+    return bar_indices, bar_widths, gaps
 
 
 def jump_system_row_dynamic(state: EditorState, bar_index: int, delta: int, width: int) -> int:
@@ -249,9 +258,45 @@ def jump_system_row_dynamic(state: EditorState, bar_index: int, delta: int, widt
         if start <= bar_index < end:
             current_idx = idx
             break
-    current_start = starts[current_idx]
-    offset = max(0, bar_index - current_start)
     target_idx = min(len(starts) - 1, max(0, current_idx + delta))
+    if target_idx == current_idx:
+        return bar_index
+    current_start = starts[current_idx]
     target_start = starts[target_idx]
-    target_end = starts[target_idx + 1] if target_idx + 1 < len(starts) else len(state.piece.bars)
-    return min(target_end - 1, target_start + offset)
+    current_indices, current_widths, current_gaps = auto_system_bar_plan_with_gaps(
+        state,
+        current_start,
+        width,
+    )
+    target_indices, target_widths, target_gaps = auto_system_bar_plan_with_gaps(
+        state,
+        target_start,
+        width,
+    )
+    if not target_indices or not target_widths:
+        return bar_index
+
+    def _spans(indices: list[int], widths: list[int], gaps: list[int]) -> list[tuple[int, int, int]]:
+        x = 0
+        spans: list[tuple[int, int, int]] = []
+        for idx, abs_bar in enumerate(indices):
+            w = max(1, widths[idx])
+            spans.append((abs_bar, x, x + w))
+            if idx < len(gaps):
+                x += w + max(0, gaps[idx])
+            else:
+                x += w
+        return spans
+
+    current_spans = _spans(current_indices, current_widths, current_gaps)
+    target_spans = _spans(target_indices, target_widths, target_gaps)
+    current_span = next((span for span in current_spans if span[0] == bar_index), None)
+    if current_span is None:
+        return target_indices[0]
+    _bar, x0, x1 = current_span
+    anchor_x = x0 + max(0, (x1 - x0 - 1) // 2)
+
+    for abs_bar, t0, t1 in target_spans:
+        if t0 <= anchor_x < t1:
+            return abs_bar
+    return min(target_spans, key=lambda span: abs((span[1] + span[2]) // 2 - anchor_x))[0]

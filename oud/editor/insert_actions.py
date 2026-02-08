@@ -29,6 +29,33 @@ from oud.editor.rhythm import advance_if_overflow, column_denom, column_has_dura
 from oud.editor.state import EditorState, UndoAction
 
 
+def _column_has_event(state: EditorState, bar_index: int, col: int) -> bool:
+    if col < 0:
+        return False
+    for s_idx in range(state.piece.strings):
+        key = (bar_index, s_idx, col)
+        if key in state.overrides or key in state.durations:
+            return True
+    return False
+
+
+def _snap_to_previous_time_slot_if_needed(state: EditorState) -> None:
+    """Align to previous onset when layering notes on another string."""
+    bar = state.cursor_bar
+    col = state.cursor_col
+    string = string_index(state, state.cursor_string)
+    if col <= 0:
+        return
+    if _column_has_event(state, bar, col):
+        return
+    if not _column_has_event(state, bar, col - 1):
+        return
+    # Keep normal left-to-right typing on the same string unchanged.
+    if (bar, string, col - 1) in state.overrides or (bar, string, col - 1) in state.durations:
+        return
+    state.cursor_col = col - 1
+
+
 def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return
@@ -88,6 +115,7 @@ def _snap_cursor_to_chord_slot(state: EditorState) -> None:
 
 
 def _apply_duration_key(state: EditorState, dur: int) -> bool:
+    _snap_to_previous_time_slot_if_needed(state)
     state.current_duration = dur
     advance_if_overflow(state, dur, string_index(state, state.cursor_string))
     _snap_cursor_to_chord_slot(state)
@@ -168,13 +196,7 @@ def _handle_insert_rest(state: EditorState) -> bool:
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
     apply_override(state, cursor_key(state), "r")
-    if (
-        not column_has_duration(state, state.cursor_bar, state.cursor_col)
-        or (
-            state.current_duration
-            and column_denom(state, state.cursor_bar, state.cursor_col) != state.current_duration
-        )
-    ):
+    if not column_has_duration(state, state.cursor_bar, state.cursor_col):
         apply_duration(state, cursor_key(state), state.current_duration)
     if state.replace_once:
         state.replace_once = False
@@ -230,13 +252,7 @@ def _handle_insert_note(state: EditorState, ch: str, style: str) -> bool:
             apply_override(state, cursor_key(state), ch)
     else:
         apply_override(state, cursor_key(state), ch)
-    if (
-        not column_has_duration(state, bar, state.cursor_col)
-        or (
-            state.current_duration
-            and column_denom(state, bar, state.cursor_col) != state.current_duration
-        )
-    ):
+    if not column_has_duration(state, bar, state.cursor_col):
         apply_duration(state, cursor_key(state), state.current_duration)
     return True
 
@@ -284,13 +300,7 @@ def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
             if col >= state.bar_width:
                 break
             apply_override(state, (bar, string, col), ch)
-    if (
-        not column_has_duration(state, bar, state.cursor_col)
-        or (
-            state.current_duration
-            and column_denom(state, bar, state.cursor_col) != state.current_duration
-        )
-    ):
+    if not column_has_duration(state, bar, state.cursor_col):
         apply_duration(state, cursor_key(state), state.current_duration)
     return True
 
@@ -348,13 +358,7 @@ def _handle_insert_bass_slash(  # noqa: C901, PLR0911, PLR0912
                     apply_override(state, (bar, target, col), ch)
             else:
                 apply_override(state, (bar, target, col), ch)
-            if (
-                not column_has_duration(state, bar, col)
-                or (
-                    state.current_duration
-                    and column_denom(state, bar, col) != state.current_duration
-                )
-            ):
+            if not column_has_duration(state, bar, col):
                 apply_duration(state, (bar, target, col), state.current_duration)
             state.insert_prefix = ""
             if state.replace_once:

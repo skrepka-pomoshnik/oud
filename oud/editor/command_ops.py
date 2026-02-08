@@ -22,6 +22,7 @@ from oud.editor.media_ops import cmd_lilypond as _cmd_lilypond
 from oud.editor.media_ops import cmd_midi as _cmd_midi
 from oud.editor.media_ops import cmd_midicmd as _cmd_midicmd
 from oud.editor.media_ops import cmd_midicmd_default as _cmd_midicmd_default
+from oud.editor.media_ops import cmd_musicxml as _cmd_musicxml
 from oud.editor.media_ops import cmd_pdf as _cmd_pdf
 from oud.editor.media_ops import cmd_play as _cmd_play
 from oud.editor.media_ops import print_pdf as _print_pdf
@@ -50,6 +51,7 @@ from oud.editor.tool_ops import cmd_plugins as _cmd_plugins
 from oud.editor.tool_ops import cmd_tool as _cmd_tool
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import _midi_command, export_midi
+from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.settings import save_settings
 
 
@@ -152,6 +154,17 @@ def cmd_lilypond(state: EditorState, args: str, config_path: str) -> None:
         args,
         config_path,
         export_lilypond_fn=export_lilypond,
+        save_fn=save_settings,
+    )
+
+
+def cmd_musicxml(state: EditorState, args: str, config_path: str) -> None:
+    _cmd_musicxml(
+        state,
+        args,
+        config_path,
+        export_musicxml_fn=export_musicxml,
+        export_mxl_fn=export_mxl,
         save_fn=save_settings,
     )
 

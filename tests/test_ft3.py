@@ -71,6 +71,21 @@ def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
     assert bar.time_sig == "O"
 
 
+def test_forlorne_ft3_common_time_halfbar_fix_applied() -> None:
+    piece = load_ft3("examples/02_forlorne_hope_8C.ft3")
+    bar = piece.bars[0]
+    total = 0.0
+    for chord in bar.chords:
+        denom = note_type_to_denominator(chord.note_type)
+        assert denom is not None
+        value = 4.0 / denom
+        if chord.dotted:
+            value *= 1.5
+        total += value
+    assert abs(total - 4.0) < 0.01
+    assert bar.time_sig == "C"
+
+
 def test_load_ft3_extracts_section_metadata_from_real_file() -> None:
     piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
     assert piece.key == "GM"

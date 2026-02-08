@@ -11,6 +11,12 @@ from oud.core.view_model import (
     _tuning_labels,
 )
 from oud.ui.render import _apply_overrides, _bass_strings_used
+from oud.ui.render_system import (
+    _build_chord_scale_map,
+    _chord_positions_distinct,
+    _playback_scaled_col_for_chords,
+    _scale_chord_row,
+)
 
 
 def test_parse_time_signature() -> None:
@@ -165,3 +171,75 @@ def test_string_label_uses_bass_styles() -> None:
     assert _string_label(6, 7, tuning_labels, "numeric") == " 7"
     assert _string_label(6, 7, tuning_labels, "slash") == " /"
     assert _string_label(6, 7, tuning_labels, "tuning") == " f"
+
+
+def test_playback_scaled_col_for_chords_prefers_event_index_mapping() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=6, dotted=True, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 4, 0)]),
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(4, 5, 0)]),
+            Chord(note_type=7, dotted=False, grid=None, notes=[Note(5, 7, 0)]),
+        ],
+    )
+    positions, grid_width = _chord_positions_distinct(bar, bar_width=8, default_duration=4)
+    content_width = 18
+    src_to_dest = {
+        raw_col: min(content_width - 1, idx * 3)
+        for idx, (raw_col, _denom, _dot) in enumerate(positions)
+    }
+    playback_col = 3
+    scaled = _playback_scaled_col_for_chords(
+        playback_col=playback_col,
+        bar_width=8,
+        grid_width=grid_width,
+        content_width=content_width,
+        positions=positions,
+        src_to_dest=src_to_dest,
+    )
+    expected = src_to_dest[positions[3][0]]
+    assert scaled == expected
+
+
+def test_scale_chord_row_does_not_drift_on_collision() -> None:
+    row = ["a", "-", "b", "-", "-"]
+    # Deliberate collision: both source cols map to same destination.
+    src_to_dest = {0: 1, 2: 1}
+    scaled = _scale_chord_row(
+        row,
+        fill_char="-",
+        src_to_dest=src_to_dest,
+        bar_width=5,
+        content_width=6,
+    )
+    # No fallback drift to neighboring slots; destination anchor is preserved.
+    assert scaled[1] in {"a", "b"}
+    assert "a" not in scaled[2:4]
+    assert "b" not in scaled[2:4]
+
+
+def test_earl_of_essex_bar29_noteheads_follow_mapped_event_columns() -> None:
+    from oud.core.ft3 import load_ft3
+    from oud.core.render_utils import bar_cells_from_chords
+
+    piece = load_ft3("lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3")
+    bar = piece.bars[28]
+    default_duration = 4
+    bar_width = 12
+    positions, grid_width = _chord_positions_distinct(bar, bar_width, default_duration)
+    content_width = 30
+    _spread, src_to_dest = _build_chord_scale_map(positions, grid_width, content_width)
+    cells = bar_cells_from_chords(bar, piece.strings, grid_width, default_duration, "french")
+    row = cells[2]  # third string has early 8th -> 16th transition
+    scaled = _scale_chord_row(
+        row,
+        fill_char="-",
+        src_to_dest=src_to_dest,
+        bar_width=grid_width,
+        content_width=content_width,
+    )
+    raw_cols = [idx for idx, ch in enumerate(row) if ch != "-"]
+    mapped_cols = [src_to_dest.get(col) for col in raw_cols]
+    scaled_cols = [idx for idx, ch in enumerate(scaled) if ch != "-"]
+    assert mapped_cols == scaled_cols

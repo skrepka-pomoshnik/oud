@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from oud.core.ft3 import load_ft3
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.state import EditorState
 from oud.settings import DEFAULT_SETTINGS
@@ -23,8 +24,8 @@ def _state() -> EditorState:
             "showdur": "off",
             "showextras": "off",
             "showtactus": "off",
-            "spacingmode": "auto",
-            "spacingfill": "compact",
+            "layout": "auto",
+            "justify": "compact",
             "linelen": "0",
             "barsperline": "0",
             "maxbars": "0",
@@ -93,6 +94,17 @@ def test_set_showdur_changes_rendered_rows(tmp_path: Path) -> None:
     assert before != after
 
 
+def test_set_showdur_changes_rendered_rows_in_italian_mode(tmp_path: Path) -> None:
+    state = _state()
+    apply_command(state, "set style=italian", str(tmp_path / "cfg.toml"))
+    state.message = ""
+    before = _render_lines(state)
+    apply_command(state, "set showdur=on", str(tmp_path / "cfg.toml"))
+    state.message = ""
+    after = _render_lines(state)
+    assert before != after
+
+
 def test_tool_gridflags_changes_flag_glyph_in_render(tmp_path: Path) -> None:
     state = _state()
     before = _render_lines(state)
@@ -134,3 +146,35 @@ def test_playback_render_updates_for_different_columns() -> None:
     second = _render_lines(state)
     assert first
     assert second
+
+
+def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
+    piece = load_ft3("examples/02_forlorne_hope_8C.ft3")
+    bar = piece.bars[9]
+    state = EditorState(
+        Piece(title="forlorne", bars=[bar], strings=piece.strings),
+        {
+            **DEFAULT_SETTINGS,
+            "showtuning": "off",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "layout": "auto",
+            "justify": "smart",
+            "linelen": "0",
+            "barsperline": "0",
+            "maxbars": "0",
+            "flagstyle": "standard",
+            "barpad": "1",
+            "flagredundant": "on",
+        },
+    )
+    state.bar_width = 12
+    state.playback_bar = 0
+    cols: list[int] = []
+    for playback_col in range(len(bar.chords)):
+        state.playback_col = playback_col
+        marker = _find_marker(_render_lines(state), "^")
+        assert marker is not None
+        cols.append(marker[1])
+    assert cols == sorted(cols)

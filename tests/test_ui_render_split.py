@@ -53,8 +53,8 @@ def _args(mode: str = "normal"):
         "settings": {
             "style": "french",
             "showtuning": "on",
-            "spacingmode": "packed",
-            "spacingfill": "stretch",
+            "layout": "packed",
+            "justify": "stretch",
             "barpad": "1",
             "showdur": "off",
             "showextras": "off",
@@ -131,7 +131,7 @@ def test_render_piece_passes_explicit_barsperline_limit(monkeypatch) -> None:
 
     monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
-    kwargs["settings"]["spacingmode"] = "auto"
+    kwargs["settings"]["layout"] = "auto"
     kwargs["settings"]["barsperline"] = "4"
     kwargs["settings"]["maxbars"] = "0"
     render_piece(**kwargs)
@@ -146,7 +146,7 @@ def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
 
     monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
-    kwargs["settings"]["spacingmode"] = "auto"
+    kwargs["settings"]["layout"] = "auto"
     kwargs["settings"]["barsperline"] = "0"
     kwargs["settings"]["maxbars"] = "0"
     render_piece(**kwargs)

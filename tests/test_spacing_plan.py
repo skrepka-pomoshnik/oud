@@ -32,6 +32,30 @@ def test_auto_bar_plan_stretch_fills_usable_width() -> None:
     assert len(gaps) == max(0, len(widths) - 1)
     assert all(width > 0 for width in widths)
     assert _total(widths, gaps) == 60
+    # stretch: distribute extra space through bar gaps, not bar content
+    assert all(gap >= 1 for gap in gaps)
+    assert any(gap > 1 for gap in gaps)
+
+
+def test_auto_bar_plan_smart_expands_bar_content_width() -> None:
+    bars = _bars(8)
+    indices, widths, gaps = auto_bar_plan(
+        bars=bars,
+        bar_start=0,
+        usable_width=60,
+        bar_width=8,
+        overrides={},
+        durations={},
+        default_duration=4,
+        dotted=set(),
+        bar_gap=1,
+        spacing_fill="smart",
+        stave_breaks=set(),
+    )
+    assert indices
+    assert _total(widths, gaps) == 60
+    # smart: distribute extra space into bar content widths
+    assert max(widths) > min(widths)
 
 
 def test_auto_bar_plan_edge_fills_usable_width_with_gaps() -> None:

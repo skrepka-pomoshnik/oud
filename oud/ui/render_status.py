@@ -44,7 +44,7 @@ def build_status_lines(
     message: str,
     status_line: str,
     dur_text: str | None,
-) -> tuple[str, str]:
+) -> str:
     status = mode
     if mode == "command":
         status = f":{cmdline}"
@@ -59,4 +59,8 @@ def build_status_lines(
     status_line_text = status_line
     if message and mode in ("command", "search"):
         status_line_text = message
-    return status, status_line_text
+    if mode in ("command", "search"):
+        return f"{status}  {status_line_text}".strip()
+    if status_line_text:
+        return f"{status_line_text}  {status}".strip()
+    return status

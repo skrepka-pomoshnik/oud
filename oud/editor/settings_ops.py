@@ -76,13 +76,13 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"vim", "vim+arrows", "casual", "casual+arrows"},
         "Keys must be vim/vim+arrows/casual/casual+arrows",
     ),
-    "spacingmode": (
+    "layout": (
         {"packed", "spread", "auto", "stretch"},
-        "Spacingmode must be packed/spread/auto/stretch",
+        "Layout must be packed/spread/auto/stretch",
     ),
-    "spacingfill": (
+    "justify": (
         {"stretch", "center", "compact", "smart", "edge"},
-        "Spacingfill must be stretch/center/compact/smart/edge",
+        "Justify must be stretch/center/compact/smart/edge",
     ),
     "fontstyle": (
         {"modern", "renaissance", "baroque"},
@@ -92,7 +92,6 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "italianorient": ({"normal", "reverse"}, "Italianorient must be normal/reverse"),
     "frenchc": ({"normal", "alt"}, "Frenchc must be normal/alt"),
 }
-
 
 def _set_bool(state: EditorState, key: str, value: str) -> bool:
     if value not in ("on", "off"):
@@ -115,9 +114,9 @@ def _set_enum(state: EditorState, key: str, value: str) -> bool:
     if value not in allowed:
         state.message = error
         return False
-    if key == "spacingmode" and value == "stretch":
-        state.settings["spacingmode"] = "auto"
-        state.settings["spacingfill"] = "edge"
+    if key == "layout" and value == "stretch":
+        state.settings["layout"] = "auto"
+        state.settings["justify"] = "edge"
         return True
     if key == "style":
         current = state.settings.get("style", "french")
@@ -254,6 +253,14 @@ def apply_set_command(
         return
     for token in args.split():
         if "=" not in token:
+            if token in _BOOL_KEYS:
+                state.settings[token] = "on"
+                continue
+            if token.startswith("no"):
+                key = token[2:]
+                if key in _BOOL_KEYS:
+                    state.settings[key] = "off"
+                    continue
             if _apply_meta_preset(state, token):
                 continue
             state.message = f"Invalid set token: {token}"

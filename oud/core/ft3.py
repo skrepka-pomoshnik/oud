@@ -313,26 +313,52 @@ def _bar_sum_quarter_beats(bar: Bar) -> float:
     return total
 
 
+def _bar_sums_with_chords(bars: list[Bar]) -> list[float]:
+    return [_bar_sum_quarter_beats(bar) for bar in bars if bar.chords]
+
+
 def _needs_legacy_duration_fix(bars: list[Bar]) -> bool:
     if not bars or any(bar.time_sig for bar in bars):
         return False
-    sums = [_bar_sum_quarter_beats(bar) for bar in bars if bar.chords]
+    sums = _bar_sums_with_chords(bars)
     if not sums:
         return False
     return abs(median(sums) - 1.5) < 0.05
 
 
-def _apply_legacy_duration_fix(bars: list[Bar]) -> None:
-    # Some FT3 files encode rhythms one step faster (e.g. 7 meaning 16th).
-    # Detect this pattern and shift note_type by one to restore musical lengths.
-    if not _needs_legacy_duration_fix(bars):
-        return
+def _needs_common_time_halfbar_fix(bars: list[Bar]) -> bool:
+    if not bars:
+        return False
+    if any((bar.time_sig not in (None, "C")) for bar in bars):
+        return False
+    sums = _bar_sums_with_chords(bars)
+    if not sums:
+        return False
+    med = median(sums)
+    near_half = sum(1 for value in sums if abs(value - 2.0) <= 0.2)
+    # Avoid scaling already-correct 4/4 material.
+    near_full = sum(1 for value in sums if abs(value - 4.0) <= 0.2)
+    return abs(med - 2.0) <= 0.15 and near_half >= int(len(sums) * 0.7) and near_full == 0
+
+
+def _shift_note_types_one_step_longer(bars: list[Bar], time_sig: str) -> None:
     for bar in bars:
         if bar.time_sig is None:
-            bar.time_sig = "O"
+            bar.time_sig = time_sig
         for chord in bar.chords:
             if chord.note_type > 2:
                 chord.note_type -= 1
+
+
+def _apply_legacy_duration_fix(bars: list[Bar]) -> None:
+    # Some FT3 files encode rhythms one step faster (e.g. 7 meaning 16th).
+    # Detect this pattern and shift note_type by one to restore musical lengths.
+    if _needs_legacy_duration_fix(bars):
+        _shift_note_types_one_step_longer(bars, time_sig="O")
+        return
+    # Another legacy encoding pattern stores 4/4 bars at half-length (2.0).
+    if _needs_common_time_halfbar_fix(bars):
+        _shift_note_types_one_step_longer(bars, time_sig="C")
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:

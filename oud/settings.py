@@ -37,8 +37,8 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "countdots": "off",
     "keys": "vim+arrows",
     "spacing": "12",
-    "spacingmode": "auto",
-    "spacingfill": "stretch",
+    "layout": "auto",
+    "justify": "stretch",
     "barpad": "1",
     "maxbars": "0",
     "barsperline": "0",
@@ -61,7 +61,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "italianorient": "normal",
     "italianmultifret": "on",
     "viewinvert": "off",
-    "frenchcshape": "normal",
+    "frenchc": "normal",
     "maxrepeats": "30",
     "newbars": "8",
 }
@@ -81,10 +81,15 @@ def load_settings(path: str) -> dict[str, str]:
     if not isinstance(settings, dict):
         return data
     for key, value in settings.items():
+        if key not in data:
+            continue
         if isinstance(value, str):
             data[key] = value
         elif isinstance(value, int):
             data[key] = str(value)
+    if data.get("layout") == "stretch":
+        data["layout"] = "auto"
+        data["justify"] = "edge"
     return data
 
 

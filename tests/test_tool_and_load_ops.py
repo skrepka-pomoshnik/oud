@@ -13,7 +13,7 @@ def _state() -> EditorState:
     settings = {
         "style": "french",
         "keys": "vim+arrows",
-        "spacingmode": "packed",
+        "layout": "packed",
         "linelen": "80",
         "bargap": "1",
         "flagstyle": "standard",

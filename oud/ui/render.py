@@ -51,10 +51,15 @@ def _render_ascii_preview(
     status_attr: int,
 ) -> None:
     height, _width = stdscr.getmaxyx()
-    for idx, line in enumerate(ascii_lines[: max(0, height - 2)]):
+    for idx, line in enumerate(ascii_lines[: max(0, height - 1)]):
         _safe_addstr(stdscr, idx, 0, _clean_text(line))
-    _safe_addstr(stdscr, height - 2, 0, _clean_text(status_line), status_attr)
-    _safe_addstr(stdscr, height - 1, 0, _clean_text(f"{mode}  ascii preview"), status_attr)
+    _safe_addstr(
+        stdscr,
+        height - 1,
+        0,
+        _clean_text(f"{status_line}  {mode}  ascii preview"),
+        status_attr,
+    )
 
 
 def render_piece(  # noqa: C901, PLR0912
@@ -123,8 +128,8 @@ def render_piece(  # noqa: C901, PLR0912
     _safe_addstr(stdscr, header_row, 0, _clean_text(header))
 
     left_margin = 3
-    spacing_mode = settings.get("spacingmode", "packed")
-    spacing_fill = settings.get("spacingfill", "stretch")
+    spacing_mode = settings.get("layout", "packed")
+    spacing_fill = settings.get("justify", "stretch")
     bargap = settings.get("bargap", "")
     if bargap.isdigit():
         bar_gap = max(0, int(bargap))
@@ -145,6 +150,7 @@ def render_piece(  # noqa: C901, PLR0912
 
     default_duration = 4
     include_meta = True
+    style = settings.get("style", "french")
     show_dur = settings.get("showdur", "off") == "on"
     show_extras = settings.get("showextras", "off") == "on"
     show_tactus = settings.get("showtactus", "off") == "on"
@@ -153,7 +159,7 @@ def render_piece(  # noqa: C901, PLR0912
     reverse_strings = (
         settings.get("viewinvert", "off") == "on"
         or (
-            settings.get("style", "french") == "italian"
+            style == "italian"
             and settings.get("italianorient", "normal") == "reverse"
         )
     )
@@ -277,7 +283,7 @@ def render_piece(  # noqa: C901, PLR0912
         bar_width=bar_width,
         default_duration=default_duration,
     )
-    status, status_line_text = build_status_lines(
+    status_line_text = build_status_lines(
         mode=mode,
         cmdline=cmdline,
         searchline=searchline,
@@ -285,11 +291,10 @@ def render_piece(  # noqa: C901, PLR0912
         status_line=status_line,
         dur_text=dur_text,
     )
-    _safe_addstr(stdscr, height - 1, 0, _clean_text(status), status_attr)
-    _safe_addstr(stdscr, height - 2, 0, _clean_text(status_line_text), status_attr)
+    _safe_addstr(stdscr, height - 1, 0, _clean_text(status_line_text), status_attr)
 
     if mode == "help":
         stdscr.erase()
-        _render_help(stdscr, status, status_attr, help_offset)
+        _render_help(stdscr, status_line_text, status_attr, help_offset)
 
     stdscr.refresh()

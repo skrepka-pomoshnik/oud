@@ -25,7 +25,7 @@ def _state(bars: int = 2) -> EditorState:
         "countdots": "off",
         "keys": "vim+arrows",
         "spacing": "12",
-        "spacingmode": "packed",
+        "layout": "packed",
         "linelen": "80",
         "bargap": "1",
         "staffthick": "1",
@@ -102,7 +102,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         state,
         "measures=every measuresstep=2 tuning=renaissance "
         "flagstyle=italian time=3/2 key=D countdots=on keys=vim "
-        "spacing=10 spacingmode=spread flagredundant=off maxbars=4 barsperline=3 barpad=2 maxchords=6 "
+        "spacing=10 layout=spread flagredundant=off maxbars=4 barsperline=3 barpad=2 maxchords=6 "
         "chordwrap=12 "
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
@@ -119,7 +119,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["countdots"] == "on"
     assert state.settings["keys"] == "vim"
     assert state.settings["spacing"] == "10"
-    assert state.settings["spacingmode"] == "spread"
+    assert state.settings["layout"] == "spread"
     assert state.settings["flagredundant"] == "off"
     assert state.settings["maxbars"] == "4"
     assert state.settings["barsperline"] == "3"
@@ -145,16 +145,16 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.piece.composer == "Composer"
 
 
-def test_cmd_set_spacingmode_stretch_alias(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_cmd_set_layout_stretch_alias(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
 
     def _save(_path: str, _settings: dict[str, str]) -> None:
         return None
 
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
-    cmd.cmd_set(state, "spacingmode=stretch", str(tmp_path / "cfg.toml"))
-    assert state.settings["spacingmode"] == "auto"
-    assert state.settings["spacingfill"] == "edge"
+    cmd.cmd_set(state, "layout=stretch", str(tmp_path / "cfg.toml"))
+    assert state.settings["layout"] == "auto"
+    assert state.settings["justify"] == "edge"
 
 
 def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -173,6 +173,19 @@ def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["style"] == "french"
     assert state.settings["tuning"] == "g2c3f3a3d4g4"
     assert state.settings["strings"] == "6"
+
+
+def test_cmd_set_bool_shortcuts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "showdur", str(tmp_path / "cfg.toml"))
+    assert state.settings["showdur"] == "on"
+    cmd.cmd_set(state, "noshowdur", str(tmp_path / "cfg.toml"))
+    assert state.settings["showdur"] == "off"
 
 
 def test_cmd_ascii_and_midicmd(monkeypatch: pytest.MonkeyPatch) -> None:

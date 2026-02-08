@@ -17,7 +17,7 @@ def test_save_and_load_settings(tmp_path) -> None:
         "keys": "vim",
         "spacing": "10",
         "barsperline": "3",
-        "spacingmode": "spread",
+        "layout": "spread",
         "linelen": "70",
         "staffthick": "2",
         "fontstyle": "renaissance",
@@ -48,7 +48,7 @@ def test_save_and_load_settings(tmp_path) -> None:
     assert loaded["keys"] == "vim"
     assert loaded["spacing"] == "10"
     assert loaded["barsperline"] == "3"
-    assert loaded["spacingmode"] == "spread"
+    assert loaded["layout"] == "spread"
     assert loaded["linelen"] == "70"
     assert loaded["staffthick"] == "2"
     assert loaded["fontstyle"] == "renaissance"

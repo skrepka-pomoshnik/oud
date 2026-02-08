@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 
+from oud.core.playback_timeline import cursor_from_entry
 from oud.editor.state import EditorState
 
 
@@ -26,15 +27,15 @@ def update_playback_animation(state: EditorState) -> None:
     elapsed = time.monotonic() - state.playback_started_at
     timeline = state.playback_timeline
     idx = max(0, min(state.playback_index, len(timeline) - 1))
-    while idx + 1 < len(timeline) and elapsed >= timeline[idx + 1][0]:
+    while idx + 1 < len(timeline) and elapsed >= cursor_from_entry(timeline[idx + 1]).start:
         idx += 1
-    while idx > 0 and elapsed < timeline[idx][0]:
+    while idx > 0 and elapsed < cursor_from_entry(timeline[idx]).start:
         idx -= 1
     state.playback_index = idx
-    start, end, bar, col = timeline[idx]
-    if start <= elapsed <= end:
-        state.playback_bar = bar
-        state.playback_col = col
+    cursor = cursor_from_entry(timeline[idx])
+    if cursor.contains(elapsed):
+        state.playback_bar = cursor.bar
+        state.playback_col = cursor.col
     else:
         state.playback_bar = None
         state.playback_col = None

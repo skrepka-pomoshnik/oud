@@ -19,7 +19,7 @@ def _state() -> EditorState:
         "countdots": "off",
         "keys": "vim+arrows",
         "spacing": "10",
-        "spacingmode": "packed",
+        "layout": "packed",
         "maxbars": "0",
         "linelen": "80",
         "grid": "off",
@@ -298,6 +298,22 @@ def test_insert_duration_then_note_uses_same_col() -> None:
     assert state.cursor_col == 1
 
 
+def test_insert_duration_on_other_string_snaps_to_same_time_slot() -> None:
+    state = _state()
+    state.settings["style"] = "french"
+    state.mode = "insert"
+    actions.handle_insert(state, ord("3"))
+    actions.handle_insert(state, ord("a"))
+    assert state.cursor_col == 1
+    state.cursor_string = 5
+    actions.handle_insert(state, ord("2"))
+    # Duration change on another row should align to previous onset.
+    assert state.cursor_col == 0
+    actions.handle_insert(state, ord("b"))
+    assert state.overrides[(0, 5, 0)] == "b"
+    assert (0, 5, 1) not in state.overrides
+
+
 def test_duration_persists_for_new_notes() -> None:
     state = _state()
     state.settings["style"] = "french"
@@ -308,6 +324,56 @@ def test_duration_persists_for_new_notes() -> None:
     assert state.durations[(0, 0, 0)] == 8
     actions.handle_insert(state, ord("b"))
     assert state.durations[(0, 0, 1)] == 8
+
+
+def test_insert_note_on_existing_column_does_not_rewrite_duration() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.overrides[(0, 0, 0)] = "a"
+    state.durations[(0, 0, 0)] = 4
+    state.current_duration = 8
+    state.cursor_col = 0
+    state.cursor_string = 1
+
+    actions.handle_insert(state, ord("b"))
+    assert state.overrides[(0, 1, 0)] == "b"
+    assert state.durations[(0, 0, 0)] == 4
+
+    state.cursor_col = 0
+    state.cursor_string = 1
+    actions.handle_insert(state, ord(" "))
+    assert (0, 1, 0) not in state.overrides
+    assert state.overrides[(0, 0, 0)] == "a"
+    assert state.durations[(0, 0, 0)] == 4
+
+
+def test_repeated_add_remove_undo_keeps_column_duration_stable() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.overrides[(0, 0, 0)] = "a"
+    state.durations[(0, 0, 0)] = 4
+
+    for _ in range(6):
+        state.current_duration = 8
+        state.cursor_col = 0
+        state.cursor_string = 1
+        actions.handle_insert(state, ord("b"))
+        assert state.durations[(0, 0, 0)] == 4
+        assert state.overrides[(0, 1, 0)] == "b"
+
+        state.cursor_col = 0
+        state.cursor_string = 1
+        actions.handle_insert(state, ord(" "))
+        assert (0, 1, 0) not in state.overrides
+        assert state.durations[(0, 0, 0)] == 4
+
+        undo_ops.undo(state, config_path="config.toml")
+        assert state.overrides[(0, 1, 0)] == "b"
+        assert state.durations[(0, 0, 0)] == 4
+
+        undo_ops.undo(state, config_path="config.toml")
+        assert (0, 1, 0) not in state.overrides
+        assert state.durations[(0, 0, 0)] == 4
 
 
 def test_invalid_key_does_not_set_duration() -> None:

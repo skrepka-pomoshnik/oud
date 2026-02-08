@@ -16,7 +16,7 @@ def _state(bars: int = 2) -> EditorState:
     settings = {
         "style": "french",
         "keys": "vim+arrows",
-        "spacingmode": "packed",
+        "layout": "packed",
         "linelen": "80",
         "bargap": "1",
     }

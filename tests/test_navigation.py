@@ -125,8 +125,8 @@ def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
         str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
         config_path="config.toml",
     )
-    state.settings["spacingmode"] = "auto"
-    state.settings["spacingfill"] = "stretch"
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "stretch"
     state.settings["barpad"] = "1"
     state.screen_width = 90
     state.cursor_bar = 3
@@ -148,8 +148,8 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
         str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
         config_path="config.toml",
     )
-    state.settings["spacingmode"] = "auto"
-    state.settings["spacingfill"] = "stretch"
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "stretch"
     state.settings["barpad"] = "1"
     state.screen_width = 120
     state.cursor_bar = 0
@@ -157,4 +157,4 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     state.cursor_col = 0
     for _ in range(4):
         handle_normal(state, ord("l"))
-    assert state.cursor_col == 5
+    assert state.cursor_col == 6

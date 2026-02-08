@@ -12,7 +12,7 @@ def _state() -> EditorState:
         "maxbars": "0",
         "linelen": "0",
         "bargap": "1",
-        "spacingmode": "packed",
+        "layout": "packed",
     }
     state = EditorState(piece, settings)
     state.screen_width = 120
@@ -73,8 +73,8 @@ def test_hl_skips_only_barline_between_bars() -> None:
 
 def test_hl_auto_mode_advances_visible_step_without_double_press() -> None:
     state = _state()
-    state.settings["spacingmode"] = "auto"
-    state.settings["spacingfill"] = "compact"
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "compact"
     state.settings["barpad"] = "1"
     state.bar_width = 12
     state.cursor_bar = 0

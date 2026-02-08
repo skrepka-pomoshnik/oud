@@ -112,7 +112,7 @@ Durations are tracked per onset column and rendered according to current flag st
 
 - `:e <path>` open file
 - `:w [path]` write TAB
-- `:wa [path]` / `:wascii [path]` / `:writeascii [path]` write ASCII snapshot/export
+- `:wa [path]` / `:wascii [path]` write ASCII snapshot/export
 - `:wq`, `:x` write + quit
 - `:q!` force quit
 

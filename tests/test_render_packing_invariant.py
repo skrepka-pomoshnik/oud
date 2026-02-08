@@ -27,8 +27,8 @@ def _render(fill: str) -> str:
     settings.update(
         {
             "style": "french",
-            "spacingmode": "auto",
-            "spacingfill": fill,
+            "layout": "auto",
+            "justify": fill,
             "barpad": "1",
             "linelen": "0",
             "barsperline": "0",
