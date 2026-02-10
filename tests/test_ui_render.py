@@ -1,4 +1,6 @@
+from oud.core.ft3 import load_ft3
 from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.render_utils import bar_cells_from_chords
 from oud.core.view_model import (
     _bar_display_width,
     _bars_fit,
@@ -220,9 +222,6 @@ def test_scale_chord_row_does_not_drift_on_collision() -> None:
 
 
 def test_earl_of_essex_bar29_noteheads_follow_mapped_event_columns() -> None:
-    from oud.core.ft3 import load_ft3
-    from oud.core.render_utils import bar_cells_from_chords
-
     piece = load_ft3("lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3")
     bar = piece.bars[28]
     default_duration = 4

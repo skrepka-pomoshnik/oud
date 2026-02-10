@@ -157,7 +157,7 @@ def _required_auto_display_width_for_bar(
     return max(1, min_content + (barpad * 2))
 
 
-def _redistribute_extra_width(
+def _redistribute_extra_width(  # noqa: C901, PLR0912
     widths: list[int],
     gaps: list[int],
     *,
@@ -170,13 +170,21 @@ def _redistribute_extra_width(
         widths[0] += extra
         return
     if spacing_fill == "stretch":
-        if not gaps:
-            return
-        idx = 0
-        while extra > 0:
-            gaps[idx] += 1
+        left = 0
+        right = len(widths) - 1
+        while extra > 0 and left <= right:
+            widths[left] += 1
             extra -= 1
-            idx = (idx + 1) % len(gaps)
+            if extra <= 0:
+                break
+            if right != left:
+                widths[right] += 1
+                extra -= 1
+            left += 1
+            right -= 1
+            if left > right:
+                left = 0
+                right = len(widths) - 1
         return
     if spacing_fill == "smart":
         idx = 0
@@ -578,7 +586,10 @@ def render_systems(  # noqa: C901, PLR0912
                     dur_source_positions = [
                         (
                             raw_col,
-                            src_to_dest.get(raw_col, _scale_col(raw_col, grid_width, content_width)),
+                            src_to_dest.get(
+                                raw_col,
+                                _scale_col(raw_col, grid_width, content_width),
+                            ),
                         )
                         for (raw_col, _denom, _dot) in ordered_flags
                     ]

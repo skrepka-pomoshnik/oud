@@ -1,6 +1,8 @@
 import zipfile
 
 from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.musicxml_import import load_musicxml, load_mxl
+from oud.editor.load_ops import load_piece_data
 from oud.exports.musicxml import export_musicxml, export_mxl
 
 
@@ -88,3 +90,94 @@ def test_export_musicxml_repeat_words_and_mxl_package(tmp_path) -> None:
         assert "mimetype" in names
         assert "META-INF/container.xml" in names
         assert any(name.endswith(".xml") for name in names)
+
+
+def test_musicxml_import_roundtrip_basic(tmp_path) -> None:
+    piece = Piece(
+        title="ImportRT",
+        composer="Composer",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=6, dotted=True, grid=None, notes=[Note(2, 2, 0)]),
+                ],
+            ),
+            Bar(
+                chords=[Chord(note_type=5, dotted=False, grid=None, notes=[])],
+            ),
+        ],
+        strings=6,
+    )
+    xml_path = tmp_path / "round.musicxml"
+    export_musicxml(
+        str(xml_path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french"},
+        dotted=set(),
+    )
+    loaded = load_musicxml(str(xml_path))
+    assert loaded.title == "ImportRT"
+    assert loaded.composer == "Composer"
+    assert len(loaded.bars) == 2
+    assert loaded.bars[0].chords[0].notes[0].string == 1
+    assert loaded.bars[0].chords[1].dotted is True
+    assert loaded.bars[1].chords[0].notes == []
+
+
+def test_mxl_import_roundtrip_basic(tmp_path) -> None:
+    piece = Piece(
+        title="MXLRT",
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 4, 0)])])],
+        strings=6,
+    )
+    mxl_path = tmp_path / "round.mxl"
+    export_mxl(
+        str(mxl_path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french"},
+        dotted=set(),
+    )
+    loaded = load_mxl(str(mxl_path))
+    assert loaded.title == "MXLRT"
+    assert len(loaded.bars) == 1
+    assert loaded.bars[0].chords[0].notes[0].string == 3
+    assert loaded.bars[0].chords[0].notes[0].fret == 4
+
+
+def test_load_piece_data_accepts_musicxml_and_mxl(tmp_path) -> None:
+    piece = Piece(
+        title="Loader",
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])])],
+        strings=6,
+    )
+    xml_path = tmp_path / "loader.xml"
+    mxl_path = tmp_path / "loader.mxl"
+    export_musicxml(
+        str(xml_path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french"},
+        dotted=set(),
+    )
+    export_mxl(
+        str(mxl_path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french"},
+        dotted=set(),
+    )
+    xml_piece, *_ = load_piece_data(str(xml_path))
+    mxl_piece, *_ = load_piece_data(str(mxl_path))
+    assert xml_piece.title == "Loader"
+    assert mxl_piece.title == "Loader"

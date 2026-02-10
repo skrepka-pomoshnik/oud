@@ -19,7 +19,7 @@ def _total_width(widths: list[int], gaps: list[int]) -> int:
     return sum(widths) + sum(gaps)
 
 
-def auto_bar_plan(  # noqa: C901, PLR0912
+def auto_bar_plan(  # noqa: C901, PLR0911, PLR0912
     *,
     bars: list[Bar],
     bar_start: int,
@@ -85,23 +85,23 @@ def auto_bar_plan(  # noqa: C901, PLR0912
         widths[0] += extra
         return bar_indices, widths, gaps
     if spacing_fill == "stretch":
-        if gaps:
-            max_gap = max(2, bar_gap + 2)
-            idx = 0
-            rounds = 0
-            max_rounds = max(1, len(gaps) * max_gap * 2)
-            while extra > 0 and rounds < max_rounds:
-                rounds += 1
-                if gaps[idx] < max_gap:
-                    gaps[idx] += 1
-                    extra -= 1
-                idx = (idx + 1) % len(gaps)
-            if extra > 0:
-                idx = 0
-                while extra > 0:
-                    widths[idx] += 1
-                    extra -= 1
-                    idx = (idx + 1) % len(widths)
+        # Edge-stretch: keep inter-bar gaps compact and spend extra space
+        # inside bars with a left/right emphasis to preserve readable systems.
+        left = 0
+        right = len(widths) - 1
+        while extra > 0 and left <= right:
+            widths[left] += 1
+            extra -= 1
+            if extra <= 0:
+                break
+            if right != left:
+                widths[right] += 1
+                extra -= 1
+            left += 1
+            right -= 1
+            if left > right:
+                left = 0
+                right = len(widths) - 1
         return bar_indices, widths, gaps
     if spacing_fill == "smart":
         idx = 0

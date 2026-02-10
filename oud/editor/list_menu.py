@@ -101,7 +101,7 @@ class MenuNavState:
     pending_prefix: str = ""
 
 
-def menu_reduce_nav(
+def menu_reduce_nav(  # noqa: PLR0911
     key: int,
     nav: MenuNavState,
     *,

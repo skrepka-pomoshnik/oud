@@ -241,7 +241,7 @@ _HANDLERS: dict[str, SetHandler] = {
 }
 
 
-def apply_set_command(
+def apply_set_command(  # noqa: C901
     state: EditorState,
     args: str,
     config_path: str,

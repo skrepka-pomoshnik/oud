@@ -14,12 +14,8 @@ Constraints
 - pure curses, minimal deps
 
 P0 (Critical: correctness + UX breakage)
-- [ ] Fix `J/K` row movement: jump to visually corresponding bar/column on next/prev system with no drift.
-- [ ] Enforce strict note/flag alignment invariant: every rendered stem/beam column must have at least one note under it.
 - [ ] Remove note slippage across rhythm groups (e.g., 8th and 16th groups must not visually merge).
-- [ ] Fix playback `^` mapping under all spacing modes so marker never teleports backward.
 - [ ] Keep bars filling terminal width without broken inter-bar gaps in `stretch`/`smart`.
-- [ ] Add regression tests for all above using real FT3 fixtures (Lachrimae, Forlorne, Frog).
 
 P1 (Core architecture + stable editing)
 - [ ] UI state slices: split player/menu/prompt/view state into small structs with explicit reducers.
@@ -41,9 +37,6 @@ P2 (Notation + formats)
 - [ ] Slur/line styles: up/down, vertical/diagonal, thickness controls.
 - [ ] Ornaments and signs: LH/RH fingerings, arpeggio/separee, rests/dynamics/fermata/coda/repeats.
 - [ ] Double/halve rhythm values and normalization at barlines/intervals.
-- [ ] MusicXML import/export support.
-- [ ] MusicXML import parser (`.musicxml -> Piece/Bar/Chord/Note`) with tablature technical tags.
-- [ ] MXL package support (`.mxl` read/write).
 - [ ] MusicXML notation parity: fermata/fingering/pluck + richer barline/repeat/time symbols.
 - [ ] MusicXML conversion goldens from local `.tab/.ft3` fixtures only.
 - [ ] Add Spanish tab support (Italian-like with inverted string order).

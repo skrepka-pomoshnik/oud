@@ -4,7 +4,13 @@ from oud.core.model import Bar
 from oud.core.render_utils import chord_positions, smart_group_map, spread_flag_positions
 from oud.core.view_model import _scale_col
 from oud.editor.controller_utils import string_index
-from oud.editor.layout import auto_system_bar_plan, dynamic_system_starts
+from oud.editor.layout import (
+    auto_system_bar_plan,
+    bars_per_line,
+    dynamic_system_starts,
+    jump_system_row,
+    jump_system_row_dynamic,
+)
 from oud.editor.state import EditorState
 
 
@@ -158,6 +164,38 @@ def move_right_visual(state: EditorState) -> None:
         if scaled != prev_scaled:
             break
         move_right(state)
+
+
+def jump_row_visual(state: EditorState, delta: int) -> None:
+    prev_bar = state.cursor_bar
+    prev_col = state.cursor_col
+    prev_content = _bar_content_width_for_cursor(state, prev_bar)
+    prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
+    anchor = prev_map[prev_col]
+
+    if state.settings.get("layout", "packed") == "auto":
+        target_bar = jump_system_row_dynamic(
+            state,
+            prev_bar,
+            delta,
+            state.screen_width,
+        )
+    else:
+        per_line = bars_per_line(state, state.screen_width)
+        target_bar = jump_system_row(state, prev_bar, delta, per_line)
+
+    state.cursor_bar = target_bar
+    target_content = _bar_content_width_for_cursor(state, target_bar)
+    target_map = _cursor_display_map_for_bar(state, target_bar, target_content)
+    best_col = min(
+        range(len(target_map)),
+        key=lambda col: (
+            abs(target_map[col] - anchor),
+            abs(col - prev_col),
+            col,
+        ),
+    )
+    state.cursor_col = best_col
 
 
 def _bar_has_grid_data(state: EditorState, bar_index: int) -> bool:

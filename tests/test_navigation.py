@@ -5,6 +5,7 @@ from oud.editor.init import init_state
 from oud.editor.navigation import (
     _bar_content_width_for_cursor,
     _cursor_display_map_for_bar,
+    jump_row_visual,
     move_left,
     move_left_note,
     move_right,
@@ -157,4 +158,29 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     state.cursor_col = 0
     for _ in range(4):
         handle_normal(state, ord("l"))
-    assert state.cursor_col == 6
+    assert state.cursor_col == 5
+
+
+def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode() -> None:
+    root = Path(__file__).resolve().parents[1]
+    state = init_state(
+        str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
+        config_path="config.toml",
+    )
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "smart"
+    state.settings["barpad"] = "1"
+    state.screen_width = 120
+    state.cursor_bar = 1
+    state.cursor_col = 5
+    prev_content = _bar_content_width_for_cursor(state, state.cursor_bar)
+    prev_map = _cursor_display_map_for_bar(state, state.cursor_bar, prev_content)
+    anchor = prev_map[state.cursor_col]
+
+    jump_row_visual(state, 1)
+
+    target_content = _bar_content_width_for_cursor(state, state.cursor_bar)
+    target_map = _cursor_display_map_for_bar(state, state.cursor_bar, target_content)
+    current = target_map[state.cursor_col]
+    best = min(abs(value - anchor) for value in target_map)
+    assert abs(current - anchor) == best

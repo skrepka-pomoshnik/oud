@@ -396,7 +396,6 @@ def smart_group_map(
     mapping[raw_cols[0]] = 0
     for raw in raw_cols[1:]:
         cursor += 1 + gap_before.get(raw, 0)
-        if cursor > content_width - 1:
-            cursor = content_width - 1
+        cursor = min(cursor, content_width - 1)
         mapping[raw] = cursor
     return mapping

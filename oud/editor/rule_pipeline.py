@@ -24,7 +24,7 @@ BarRule = Callable[["EditorState", RuleContext], RuleIssue | None]
 
 
 def run_rules(
-    state: "EditorState",
+    state: EditorState,
     rules: Iterable[BarRule],
     *,
     bar_index: int,
@@ -36,4 +36,3 @@ def run_rules(
         if issue is not None:
             issues.append(issue)
     return issues
-

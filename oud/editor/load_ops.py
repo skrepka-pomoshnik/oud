@@ -4,6 +4,7 @@ from pathlib import Path
 
 from oud.core.ft3 import load_ft3
 from oud.core.model import Piece
+from oud.core.musicxml_import import load_musicxml, load_mxl
 from oud.core.tab_parser import load_tab, load_tab_data
 from oud.editor.state import EditorState
 
@@ -16,7 +17,7 @@ LoadResult = tuple[
 ]
 
 
-def load_piece_data(path: str | None) -> LoadResult:
+def load_piece_data(path: str | None) -> LoadResult:  # noqa: PLR0911
     overrides: dict[tuple[int, int, int], str] = {}
     durations: dict[tuple[int, int, int], int] = {}
     dotted: set[tuple[int, int]] = set()
@@ -35,6 +36,10 @@ def load_piece_data(path: str | None) -> LoadResult:
                 bar_width = parsed.bar_width
                 return parsed.piece, overrides, durations, dotted, bar_width
             return load_tab(path), overrides, durations, dotted, bar_width
+        if path.lower().endswith(".mxl"):
+            return load_mxl(path), overrides, durations, dotted, bar_width
+        if path.lower().endswith((".musicxml", ".xml")):
+            return load_musicxml(path), overrides, durations, dotted, bar_width
         return load_ft3(path), overrides, durations, dotted, bar_width
     return Piece(title="Untitled", bars=[]), overrides, durations, dotted, bar_width
 
@@ -52,6 +57,8 @@ def cmd_open(
     load_tab_data_fn=load_tab_data,
     load_tab_fn=load_tab,
     load_ft3_fn=load_ft3,
+    load_musicxml_fn=load_musicxml,
+    load_mxl_fn=load_mxl,
     build_durations_fn=None,
 ) -> None:
     path = args.strip()
@@ -75,6 +82,10 @@ def cmd_open(
             bar_width = parsed.bar_width
         else:
             state.piece = load_tab_fn(path)
+    elif path.lower().endswith(".mxl"):
+        state.piece = load_mxl_fn(path)
+    elif path.lower().endswith((".musicxml", ".xml")):
+        state.piece = load_musicxml_fn(path)
     else:
         state.piece = load_ft3_fn(path)
     state.path = path

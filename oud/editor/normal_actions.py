@@ -15,10 +15,14 @@ from oud.editor.keymap import (
     normal_bindings,
     pending_bindings,
 )
-from oud.editor.layout import bars_per_line, jump_system_row, jump_system_row_dynamic
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
-from oud.editor.navigation import move_left_visual, move_right, move_right_visual
+from oud.editor.navigation import (
+    jump_row_visual,
+    move_left_visual,
+    move_right,
+    move_right_visual,
+)
 from oud.editor.search_ops import (
     jump_mark,
     jump_match,
@@ -325,28 +329,12 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
         state.clamp()
         return True
     if key in action_keys.page_up:
-        if state.settings.get("layout", "packed") == "auto":
-            state.cursor_bar = jump_system_row_dynamic(
-                state,
-                state.cursor_bar,
-                -count,
-                state.screen_width,
-            )
-        else:
-            per_line = bars_per_line(state, state.screen_width)
-            state.cursor_bar = jump_system_row(state, state.cursor_bar, -count, per_line)
+        for _ in range(count):
+            jump_row_visual(state, -1)
         return True
     if key in action_keys.page_down:
-        if state.settings.get("layout", "packed") == "auto":
-            state.cursor_bar = jump_system_row_dynamic(
-                state,
-                state.cursor_bar,
-                count,
-                state.screen_width,
-            )
-        else:
-            per_line = bars_per_line(state, state.screen_width)
-            state.cursor_bar = jump_system_row(state, state.cursor_bar, count, per_line)
+        for _ in range(count):
+            jump_row_visual(state, 1)
         return True
     if key in action_keys.bar_next:
         state.cursor_bar = min(len(state.piece.bars) - 1, state.cursor_bar + count)

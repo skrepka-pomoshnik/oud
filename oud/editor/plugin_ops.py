@@ -274,7 +274,7 @@ def _plugin_action(state: EditorState, key: int) -> str | None:
     return None
 
 
-def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C901, PLR0912
+def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C901
     if key == ord("?"):
         from oud.editor.command_ops import show_help  # noqa: PLC0415
 

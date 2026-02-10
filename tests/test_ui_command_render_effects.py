@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from oud.core.ft3 import load_ft3
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.state import EditorState
@@ -178,3 +180,48 @@ def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
         assert marker is not None
         cols.append(marker[1])
     assert cols == sorted(cols)
+
+
+@pytest.mark.parametrize("justify", ["smart", "stretch", "compact"])
+@pytest.mark.parametrize(
+    ("path", "bar_index"),
+    [
+        ("examples/26_lachrimae_galliard_in_G.ft3", 0),
+        ("examples/02_forlorne_hope_8C.ft3", 9),
+        ("lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3", 28),
+    ],
+)
+def test_playback_marker_is_monotonic_on_real_fixture_bars(
+    justify: str,
+    path: str,
+    bar_index: int,
+) -> None:
+    piece = load_ft3(path)
+    bar = piece.bars[bar_index]
+    state = EditorState(
+        Piece(title="fixture", bars=[bar], strings=piece.strings),
+        {
+            **DEFAULT_SETTINGS,
+            "showtuning": "off",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "layout": "auto",
+            "justify": justify,
+            "linelen": "0",
+            "barsperline": "0",
+            "maxbars": "0",
+            "flagstyle": "standard",
+            "barpad": "1",
+            "flagredundant": "on",
+        },
+    )
+    state.bar_width = max(10, len(bar.chords))
+    state.playback_bar = 0
+    cols: list[int] = []
+    for playback_col in range(len(bar.chords)):
+        state.playback_col = playback_col
+        marker = _find_marker(_render_lines(state), "^")
+        assert marker is not None
+        cols.append(marker[1])
+    assert cols == sorted(cols), (path, bar_index, justify, cols)

@@ -248,7 +248,12 @@ def auto_system_bar_plan_with_gaps(
     return bar_indices, bar_widths, gaps
 
 
-def jump_system_row_dynamic(state: EditorState, bar_index: int, delta: int, width: int) -> int:
+def jump_system_row_dynamic(  # noqa: C901
+    state: EditorState,
+    bar_index: int,
+    delta: int,
+    width: int,
+) -> int:
     starts = dynamic_system_starts(state, width)
     if not starts:
         return 0
@@ -276,7 +281,11 @@ def jump_system_row_dynamic(state: EditorState, bar_index: int, delta: int, widt
     if not target_indices or not target_widths:
         return bar_index
 
-    def _spans(indices: list[int], widths: list[int], gaps: list[int]) -> list[tuple[int, int, int]]:
+    def _spans(
+        indices: list[int],
+        widths: list[int],
+        gaps: list[int],
+    ) -> list[tuple[int, int, int]]:
         x = 0
         spans: list[tuple[int, int, int]] = []
         for idx, abs_bar in enumerate(indices):

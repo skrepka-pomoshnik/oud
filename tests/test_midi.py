@@ -1,4 +1,5 @@
 from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.render_utils import chord_positions as render_chord_positions
 from oud.exports.midi import (
     BASE_NOTE_VELOCITY,
     _accent_velocity,
@@ -17,7 +18,6 @@ from oud.exports.midi import (
     build_playback_timeline,
     export_midi,
 )
-from oud.core.render_utils import chord_positions as render_chord_positions
 
 
 def test_vlq_encoding() -> None:

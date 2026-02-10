@@ -39,7 +39,7 @@ def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) 
     return total
 
 
-def _rule_time_signature(state: EditorState, context: RuleContext) -> RuleIssue | None:
+def _rule_time_signature(state: EditorState, _context: RuleContext) -> RuleIssue | None:
     parsed = parse_time_signature_value(state.settings.get("time", "C"))
     if parsed is None:
         return RuleIssue(code="time.invalid", message="No valid time signature")
