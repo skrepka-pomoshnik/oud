@@ -26,7 +26,7 @@ STATUS=0
   echo
   echo "== pytest =="
   if python3 -m pytest --version >/dev/null 2>&1; then
-    python3 -m pytest --cov --cov-fail-under=80 || STATUS=1
+    python3 -m pytest tests --cov --cov-fail-under=80 || STATUS=1
   else
     echo "pytest not found"
     STATUS=1

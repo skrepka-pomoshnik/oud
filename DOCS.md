@@ -168,6 +168,7 @@ Durations are tracked per onset column and rendered according to current flag st
 
 - Layout: `spacing`, `spacingmode`, `spacingfill`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
 - Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
+- Rendering presets/cues: `tabnotation`, `timesigstyle`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`
@@ -241,3 +242,25 @@ Entry points:
 
 - `/Users/s/Documents/Python/frnm/app.py` -> `/Users/s/Documents/Python/frnm/oud/app.py`
 - `/Users/s/Documents/Python/frnm/cli.py` -> `/Users/s/Documents/Python/frnm/oud/cli.py`
+
+## 13) LilyPond Parity Audit (Current)
+
+This is a practical parity tracker for LilyPond `TabStaff`-style features in the TUI/ASCII renderer.
+Status values:
+
+- `done`: implemented and covered by tests
+- `partial`: usable, but missing options/edge cases
+- `missing`: not implemented yet
+
+| Feature area | Status | Notes | Tests | Acceptance examples (synthetic) |
+|---|---|---|---|---|
+| Tab notation preset bundle (`tabFullNotation`-like) | partial | `:set tabnotation=minimal|full` toggles coherent display bundle; advanced cues still incomplete (tuplets, richer rests, tie/slur styling) | `tests/test_tab_policy.py`, `tests/test_tui_commands_exec.py`, `tests/test_tab_parity_snippets.py` | `test_tab_snippet_tab_full_notation_preset_bundle`, `test_cmd_set_tabnotation_full_reapply_overrides_user_toggles` |
+| Time-signature cue style (`C/O` vs numeric/fraction) | done | `:set timesigstyle=symbol|numeric|fraction`, in-staff cue shown at system start and meter changes | `tests/test_tab_policy.py`, `tests/test_ui_render_split.py`, `tests/test_tab_parity_snippets.py` | `test_tab_snippet_mid_system_meter_change_cue_fraction_style`, `test_tab_snippet_time_cue_dense_auftact_no_glue_c_o_3` |
+| Tablature fret-label formatting policy split | done | formatter extracted into policy (`tab_policy.fret_label`) and reused by renderer | `tests/test_tab_policy.py` | `test_fret_label_french_and_italian`, `test_fret_label_french_alt_c` |
+| String-row labels / bass-row visibility policy | partial | centralized policy for row ordering and per-system used-bass-row display; richer label policies still pending | `tests/test_tab_policy.py`, `tests/test_ui_render.py` | `test_system_display_indices_for_bars_hides_unused_bass_rows` |
+| Stem/beam rendering in tab rows | partial | multiple flag styles exist; alignment and collision regressions covered, but beamify/partials remain pending | `tests/test_tab_parity_snippets.py`, `tests/test_render_alignment_invariants.py` | `test_tab_snippet_stem_beam_behavior_in_tablature_full_mode`, `test_tab_snippet_tab_full_notation_flagstyle_matrix_renders` |
+| Ties/slurs/holds cue rows | partial | span rows render and align; configurable cue styles (`tiecuestyle`, `slurcuestyle`, `holdcuestyle`) exist. Continued tied-note noteheads support `show|hide` plus ASCII-safe `parenthesize` cue markers via `tienoteheads`; true widened parenthesized noteheads/follow behavior across systems is still pending | `tests/test_tab_parity_snippets.py`, `tests/test_render.py`, `tests/test_tab_policy.py`, `tests/test_tui_commands_exec.py` | `test_build_bar_view_tie_noteheads_hide_hides_continued_column_noteheads`, `test_build_bar_view_tie_noteheads_parenthesize_marks_tie_row_but_keeps_noteheads` |
+| Gliss/slides/harmonics | partial | slide/gliss/harmonic cues exist in model/render paths, but parity for placement/collision is incomplete and needs dedicated geometry regressions | `tests/test_tab_parity_snippets.py`, `tests/test_render.py` | `test_build_bar_view_slur_and_hold_cue_style_variants` (partial cue coverage); dedicated slides/gliss/harmonics matrix pending |
+| Repeats/barlines | partial | repeat markers/barline types are editable and render in score, but parity bookkeeping/test matrix for LilyPond-style repeat/barline symbol variants is incomplete | `tests/test_editor_commands.py`, `tests/test_ui_render.py` | synthetic repeat/barline parity matrix pending |
+| Polyphonic TabVoice behavior | missing | no independent voice model/collision precedence yet | TODO `P3 LilyPond parity: polyphonic TabVoice behavior...` | n/a |
+| Assignment constraints (`minimumFret`, stretch, forced string) | partial | pure assignment-policy module exists with diagnostics/tests; partially reused by temporary preset converter fallback; not yet wired into general edit/engrave placement paths | `tests/test_tab_assign_policy.py`, `tests/test_tui_commands_exec.py` | `test_assign_chord_pitches_max_stretch_constraint`, `test_cmd_set_guitar_partial_convert_negative_shift_uses_target_tuning_for_next_course` |

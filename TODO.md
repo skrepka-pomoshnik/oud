@@ -24,36 +24,28 @@ P1 (Core architecture + stable editing)
 
 P2 (Notation + formats)
 - [ ] Tablature full-notation preset bundle (LilyPond-like): coherent enable/disable for stems/beams/dots/rests/ties/slurs/tuplet cues.
-  - [ ] Add `:set tabnotation=minimal|full` preset switch (thin router only; no duplicated renderer).
-  - [ ] Define preset table (which `show*` / stem / beam / rest / cue options are toggled together).
-  - [ ] Ensure preset application is idempotent and can be overridden per-option after preset.
-  - [ ] Add regression tests that preset changes visible rows/cues and still preserves note/flag alignment.
+  - [ ] Expand `tabnotation=full` coverage to ties/slurs/rests/tuplet cues (not only `show*` bundle toggles).
+  - [ ] Add preset interaction tests for user overrides after preset + preset reapply precedence (documented behavior).
+  - [ ] Add preset matrix tests across `flagstyle` families (standard/board/englishgrid/continental).
 - [ ] Flag styles parity: English grid beams and continental flags.
 - [ ] Beamify algorithm for grouped beams and partial beams.
 - [ ] Slur/line styles: up/down, vertical/diagonal, thickness controls.
 - [ ] Ornaments and signs: LH/RH fingerings, arpeggio/separee, rests/dynamics/fermata/coda/repeats.
 - [ ] Double/halve rhythm values and normalization at barlines/intervals.
 - [ ] Tablature formatting parity: configurable fret label policies (numeric/letter/custom labels), multi-digit fret collision rules, bass-label policies.
-  - [ ] Split fret-label formatting policy from renderer placement (`format_fret` + width/collision policy).
   - [ ] Add configurable multi-digit fret spacing policy (tight / separated / collision-safe).
   - [ ] Add configurable bass-label policy matrix (numeric / slash / tuning / hidden when unused).
   - [ ] Add tests for `1-2-12` style separation in Italian mode and no accidental glyph merging.
 - [ ] Tablature tie/slur/gliss parity: tied-note visibility/parenthesize cues and follow-up behavior across system breaks.
-  - [ ] Model tied-note display policy (`hide`, `show`, `parenthesize`) for continued notes.
+  - [ ] Extend tied-note notehead display policy to `parenthesize` for continued notes (current `tienoteheads=show|hide` implemented; parenthesize needs wider notehead representation).
   - [ ] Handle tie-followed-by-slur/gliss notehead display cues explicitly.
   - [ ] Add system-break regressions for tied note visibility and cue placement.
   - [ ] Add collision tests for gliss/slur lines against fret glyphs and parentheses.
 - [ ] MusicXML notation parity: fermata/fingering/pluck + richer barline/repeat/time symbols.
 - [ ] Add Spanish tab support (Italian-like with inverted string order).
-- [ ] Configurable time-signature rendering style (symbol vs numeric/full cue for `C`/`O` and fractions).
-  - [ ] Add setting (`timesigstyle` or similar): `symbol|numeric|fraction`.
-  - [ ] Map `C/O` to numeric cues (`4/4`,`3/4`) when requested.
-  - [ ] Keep in-staff cue placement and no-overlap guarantees across styles.
-  - [ ] Add regressions for system-start and mid-system meter changes in each style.
 - [ ] LilyPond tab parity audit matrix: map supported/unsupported TabStaff features and track parity status per feature.
-  - [ ] Create `DOCS` parity table: feature, status (`done/partial/missing`), notes, tests.
-  - [ ] Cover core areas first: formatting, stems/beams, ties/slurs/gliss, polyphony, tunings, rests/time cues.
-  - [ ] Link each parity row to test files (or TODO item if untested).
+  - [ ] Keep `DOCS` parity table current as features land (status + linked tests).
+  - [ ] Add “acceptance examples” column (synthetic case names) for faster regression triage.
 
 P3 (Maintainability + advanced parity)
 - [ ] Split `command_ops.py` into small domain modules with thin router.
@@ -65,10 +57,10 @@ P3 (Maintainability + advanced parity)
 - [ ] Add German tab support.
 - [ ] Historical style presets (fonts/layouts per source).
 - [ ] LilyPond parity: tablature assignment constraints (`minimumFret` / stretch / forced string) as explicit edit/engrave policies.
-  - [ ] Add explicit assignment policy object/settings (minimum fret, max stretch, restrain open strings).
-  - [ ] Respect forced string input while handling impossible/negative fret cases deterministically.
-  - [ ] Add diagnostics/warnings path for impossible placements (do not silently mis-render).
-  - [ ] Add synthetic assignment tests for constrained chord placement.
+  - [ ] Wire core assignment policy into edit ops (course-shift keep-pitch / transpose) instead of ad-hoc placement.
+  - [ ] Route export/engrave pitch->string fallback through assignment policy for deterministic behavior across formats.
+  - [ ] Surface assignment diagnostics/warnings in TUI (`:verify` / status / info) when placement is impossible.
+  - [ ] Replace temporary preset conversion bridge (`oud/editor/preset_convert.py`, 3rd-string-only shift) with assignment-policy based transpose/course-shift.
 - [ ] LilyPond parity: polyphonic TabVoice behavior and collision handling for independent voices on one tab staff.
   - [ ] Represent multiple voices in one bar/system without destroying shared rhythm alignment.
   - [ ] Define collision precedence (voice noteheads, flags, ties/slurs, ornaments).
@@ -86,8 +78,6 @@ P4 (Optional)
 Testing backlog
 - [ ] Navigation regressions for `J/K` on uneven rows and mixed spacing modes (including visible-row targeting under hidden bass rows).
   - [ ] Add fullscreen-width synthetic cases with alternating system row counts (bass rows appear/disappear).
-  - [ ] Add `scrollmode=smooth|page` behavior assertions for same fixtures.
-  - [ ] Add `beatsnap=off|soft` navigation-map consistency checks.
 - [ ] Rendering matrix tests (synthetic): mixed durations/chords, collisions, bass rows on/off, all spacing modes.
   - [ ] Build a reusable synthetic bar/system factory (durations, rows, dots, ties/slurs, meter changes).
   - [ ] Matrix over `justify` (`compact/smart/stretch/edge`) and `beatsnap` (`off/soft`).
@@ -101,15 +91,12 @@ Testing backlog
 - [ ] Conversion tests: `.tab/.ft3 -> model -> .tab/.ft3` goldens.
 - [ ] Conversion matrix tests for `.ft3/.tab/.musicxml/.mei` (supported subset).
 - [ ] Geometry tests: multi-digit frets, tick spacing, stem-through-staff, ties/slides on notes/chords.
-  - [ ] Multi-digit fret width/collision cases (`10/11/12`) in Italian and French/letter modes.
-  - [ ] Dot and flag-tail placement cases (dotted 16th/32nd near dense groups).
   - [ ] Time-cue overlap cases in auftact area (`C/O/3`) with dense first beats.
 - [ ] Import fixtures: 7th/8th-course fretted notes, multi-section TAB, no-break header/body, meter changes mid-system.
 - [ ] Property/fuzz parser tests for malformed flags/rhythms/whitespace.
 - [ ] LilyPond-inspired snippet regressions (synthetic): stem/beam behavior, polyphony, letter tablature formatting, slides/gliss, harmonics.
   - [ ] `stem-and-beam-behavior` analogue: stem direction/beam shape options in tab rows.
   - [ ] `polyphony-in-tablature` analogue: two voices, independent rhythms, same staff.
-  - [ ] `letter-tablature-formatting` analogue: same music rendered in numeric vs letter formatting.
   - [ ] `slides/gliss/harmonics` analogues: cue/collision placement and visibility rules.
 - [ ] LilyPond-style visual regression workflow (optional): snapshot/signature diff for ASCII renderer outputs across known cases.
   - [ ] Define canonical ASCII snapshot normalization (trim volatile header/status/cursor/playback marks).

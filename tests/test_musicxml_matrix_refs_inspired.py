@@ -15,15 +15,14 @@ def _musicxml_supported_signature(piece) -> tuple:
     """
     bars: list[tuple] = []
     for bar in piece.bars:
-        chords: list[tuple] = []
-        for chord in bar.chords:
-            chords.append(
-                (
-                    chord.note_type,
-                    bool(chord.dotted),
-                    tuple((n.string, n.fret) for n in chord.notes),
-                )
+        chords = [
+            (
+                chord.note_type,
+                bool(chord.dotted),
+                tuple((n.string, n.fret) for n in chord.notes),
             )
+            for chord in bar.chords
+        ]
         bars.append((bar.repeat, tuple(chords)))
     return (piece.strings, tuple(bars))
 
