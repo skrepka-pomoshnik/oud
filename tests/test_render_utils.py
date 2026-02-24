@@ -7,6 +7,7 @@ from oud.core.render_utils import (
     flag_row_style,
     format_fret,
     spread_flag_positions,
+    soft_beat_snap_map,
     stem_row_style,
 )
 
@@ -124,6 +125,47 @@ def test_spread_flag_positions_with_min_gap_adds_separator() -> None:
     positions = [(0, 16, True), (2, 32, False), (3, 16, False)]
     spread = spread_flag_positions(positions, 24, min_gap=1)
     assert [col for col, _den, _dot in spread] == [0, 5, 10]
+
+
+def test_soft_beat_snap_map_groups_onsets_by_equal_beats() -> None:
+    # Four onsets compressed toward the left should be redistributed across beats.
+    positions = [
+        (0, 4, False),
+        (2, 8, False),
+        (4, 8, False),
+        (6, 4, False),
+    ]
+    mapping = soft_beat_snap_map(
+        positions,
+        grid_width=8,
+        content_width=16,
+        beats=4,
+        min_gap=0,
+    )
+    cols = [mapping[p[0]] for p in positions]
+    assert cols == sorted(cols)
+    # Expect one onset landing in each quarter bucket (0-3, 4-7, 8-11, 12-15).
+    assert [min(3, col // 4) for col in cols] == [0, 1, 2, 3]
+
+
+def test_soft_beat_snap_map_does_not_reserve_trailing_empty_beat() -> None:
+    # Onsets only in beats 1-3 of a 4-beat bar should not leave a fake empty beat-4 gap.
+    positions = [
+        (0, 4, False),
+        (2, 8, False),
+        (4, 8, False),
+    ]
+    mapping = soft_beat_snap_map(
+        positions,
+        grid_width=8,
+        content_width=16,
+        beats=4,
+        min_gap=0,
+    )
+    cols = [mapping[p[0]] for p in positions]
+    assert cols == sorted(cols)
+    # Last onset should reach into the right half, not be stuck in beat-3 area.
+    assert cols[-1] >= 10
 
 
 def test_bar_cells_string_mapping() -> None:

@@ -12,6 +12,7 @@ from oud.core.view_model import (
     _tactus_row,
     _tuning_labels,
 )
+from oud.core.tuning_utils import default_bass_strings
 from oud.ui.render import _apply_overrides, _bass_strings_used
 from oud.ui.render_system import (
     _build_chord_scale_map,
@@ -73,15 +74,19 @@ def test_tuning_labels_bass_order_high_to_low() -> None:
     assert labels == ["g", "d", "a", "f", "c", "g", "f", "d", "c"]
 
 
-def test_inline_bass_row_renders_dashes() -> None:
+def test_default_bass_strings_start_from_d() -> None:
+    assert default_bass_strings(3) == ["d2", "c2", "b1"]
+
+
+def test_inline_bass_row_keeps_only_real_bass_notes() -> None:
     row = ["-", "-", "a", "-", "-", "-", "b", "-"]
     inline = _inline_bass_row(row)
-    assert inline[1] == "-"
+    assert inline[1] == " "
     assert inline[2] == "a"
-    assert inline[3] == "-"
-    assert inline[5] == "-"
+    assert inline[3] == " "
+    assert inline[5] == " "
     assert inline[6] == "b"
-    assert inline[7] == "-"
+    assert inline[7] == " "
 
 
 def test_bass_strings_used_tracks_overrides_and_chords() -> None:
@@ -175,6 +180,12 @@ def test_string_label_uses_bass_styles() -> None:
     assert _string_label(6, 7, tuning_labels, "tuning") == " f"
 
 
+def test_string_label_tuning_mode_falls_back_for_missing_bass_tuning_labels() -> None:
+    tuning_labels = ["g", "d", "a", "f", "c", "g", "", ""]
+    assert _string_label(6, 8, tuning_labels, "tuning") == " 7"
+    assert _string_label(7, 8, tuning_labels, "tuning") == " 8"
+
+
 def test_playback_scaled_col_for_chords_prefers_event_index_mapping() -> None:
     bar = Bar(
         chords=[
@@ -219,6 +230,19 @@ def test_scale_chord_row_does_not_drift_on_collision() -> None:
     assert scaled[1] in {"a", "b"}
     assert "a" not in scaled[2:4]
     assert "b" not in scaled[2:4]
+
+
+def test_scale_chord_row_preserves_bass_note_over_inline_dash_collision() -> None:
+    row = ["a", "-", " ", " "]
+    src_to_dest = {0: 0, 1: 0}
+    scaled = _scale_chord_row(
+        row,
+        fill_char=" ",
+        src_to_dest=src_to_dest,
+        bar_width=4,
+        content_width=2,
+    )
+    assert scaled[0] == "a"
 
 
 def test_earl_of_essex_bar29_noteheads_follow_mapped_event_columns() -> None:

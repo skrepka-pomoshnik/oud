@@ -47,7 +47,16 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text="8",
     )
-    assert line == ":w  ok"
+    assert line == ":w"
+    line = build_status_lines(
+        mode="command",
+        cmdline="e ex",
+        searchline="",
+        message="Matches: examples/ examples2/",
+        status_line="base",
+        dur_text=None,
+    )
+    assert line.startswith(":e ex  Matches:")
     line = build_status_lines(
         mode="normal",
         cmdline="",

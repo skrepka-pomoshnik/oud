@@ -84,6 +84,14 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"stretch", "center", "compact", "smart", "edge"},
         "Justify must be stretch/center/compact/smart/edge",
     ),
+    "scrollmode": (
+        {"smooth", "page"},
+        "Scrollmode must be smooth/page",
+    ),
+    "beatsnap": (
+        {"off", "soft"},
+        "Beatsnap must be off/soft",
+    ),
     "fontstyle": (
         {"modern", "renaissance", "baroque"},
         "Fontstyle must be modern/renaissance/baroque",

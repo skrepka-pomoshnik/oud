@@ -156,14 +156,54 @@ def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
 def test_render_header_hides_tuning_and_shows_readable_meta() -> None:
     kwargs = _args("normal")
     kwargs["piece"].title = "Lachrimae"
+    kwargs["piece"].composer = "John Dowland"
     kwargs["piece"].bars[0].time_sig = "O"
     kwargs["settings"]["key"] = "C"
     render_piece(**kwargs)
-    header_texts = [text for (y, _x, text, _a) in kwargs["stdscr"].calls if y == 0]
+    header_calls = [(x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if y == 0]
+    header_texts = [text for (_x, text) in header_calls]
     assert any("Lachrimae" in text for text in header_texts)
+    assert any("John Dowland" in text for text in header_texts)
+    assert any(x > 0 and "Lachrimae" in text for (x, text) in header_calls)
     assert not any("g2c3f3a3d4g4" in text for text in header_texts)
-    all_text = " ".join(text for (_y, _x, text, _a) in kwargs["stdscr"].calls)
-    assert "key:C" not in all_text
+    assert not any("key:C" in text for text in header_texts)
+    assert not any("[1 bars]" in text for text in header_texts)
+
+
+def test_render_shows_time_signature_at_left_of_score_once() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O"), Bar()], strings=6)
+    render_piece(**kwargs)
+    time_calls = [
+        (y, x, text)
+        for (y, x, text, _a) in kwargs["stdscr"].calls
+        if y >= 2
+        if text.strip() in {"C", "O", "|", "/", "3", "4"}
+    ]
+    assert any(text.strip() == "O" for (_y, _x, text) in time_calls)
+    assert any(x >= 3 for (_y, x, text) in time_calls if text.strip() == "O")
+    # Inlined time signature is drawn as a small multi-row block (>=3 rows).
+    inline_rows = [(y, text) for (y, _x, text) in time_calls if text.strip() in {"O", "|", "/", "4"}]
+    assert len(inline_rows) >= 3
+    assert sum(1 for (_y, _x, text) in time_calls if text.strip().startswith("O")) == 1
+
+
+def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="3/4"), Bar()], strings=6)
+    render_piece(**kwargs)
+    numeric_calls = [
+        (y, x, text)
+        for (y, x, text, _a) in kwargs["stdscr"].calls
+        if text.strip() == "3"
+    ]
+    assert numeric_calls
+    # In-staff / auftact placement, not over left labels.
+    assert any(x >= 3 for (_y, x, _text) in numeric_calls)
+    staff_y_values = [y for (y, x, _text) in numeric_calls if x >= 3]
+    assert staff_y_values
+    # Not on the first string row (header row offset + first staff line).
+    assert min(staff_y_values) > 2
 
 
 def test_render_draws_left_staff_barline() -> None:

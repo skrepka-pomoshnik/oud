@@ -399,3 +399,59 @@ def smart_group_map(
         cursor = min(cursor, content_width - 1)
         mapping[raw] = cursor
     return mapping
+
+
+def soft_beat_snap_map(
+    positions: list[tuple[int, int, bool]],
+    *,
+    grid_width: int,
+    content_width: int,
+    beats: int,
+    min_gap: int = 1,
+) -> dict[int, int]:
+    if content_width <= 0 or beats <= 1 or not positions:
+        return {}
+    ordered = sorted(positions, key=lambda item: item[0])
+    if len(ordered) == 1:
+        raw = ordered[0][0]
+        return {raw: max(0, min(content_width - 1, content_width // 2))}
+
+    width = max(1, grid_width)
+    bucket_count = max(1, beats)
+    raw_buckets = [
+        min(bucket_count - 1, (raw_col * bucket_count) // width)
+        for (raw_col, _denom, _dot) in ordered
+    ]
+    min_bucket = min(raw_buckets)
+    max_bucket = max(raw_buckets)
+    active_bucket_count = max(1, (max_bucket - min_bucket) + 1)
+    seeded: list[tuple[int, int, bool]] = []
+    raw_cols: list[int] = []
+    for (raw_col, denom, dot), bucket in zip(ordered, raw_buckets, strict=False):
+        active_bucket = bucket - min_bucket
+        dst_start = (active_bucket * content_width) // active_bucket_count
+        dst_end = ((active_bucket + 1) * content_width) // active_bucket_count - 1
+        if dst_end < dst_start:
+            dst_end = dst_start
+        raw_start = (bucket * width) // bucket_count
+        raw_end = ((bucket + 1) * width) // bucket_count - 1
+        if raw_end < raw_start:
+            raw_end = raw_start
+        if raw_end == raw_start:
+            target = dst_start
+        else:
+            target = dst_start + ((raw_col - raw_start) * max(0, dst_end - dst_start)) // (
+                raw_end - raw_start
+            )
+        seeded.append((max(0, min(content_width - 1, target)), denom, dot))
+        raw_cols.append(raw_col)
+
+    # Soft beat snap arranges note onsets; visible flag tails are placed later.
+    # Using full flag spans here (especially with hidden redundant flags) over-reserves
+    # width and leaves misleading trailing dash space.
+    unit_seeded = [(col, 4, False) for (col, _denom, _dot) in seeded]
+    spread = spread_flag_positions(unit_seeded, content_width, min_gap=max(0, min_gap))
+    return {
+        raw: col
+        for raw, (col, _denom, _dot) in zip(raw_cols, spread, strict=False)
+    }

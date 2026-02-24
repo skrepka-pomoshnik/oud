@@ -157,8 +157,11 @@ class NormalActionBindings:
 @dataclass(frozen=True)
 class PendingBindings:
     gg: tuple[int, ...]
+    gh: tuple[int, ...]
     gj: tuple[int, ...]
+    gi: tuple[int, ...]
     gp: tuple[int, ...]
+    gr: tuple[int, ...]
     dd: tuple[int, ...]
     yy: tuple[int, ...]
 
@@ -367,8 +370,11 @@ def normal_action_bindings(state) -> NormalActionBindings:
 def pending_bindings() -> PendingBindings:
     return PendingBindings(
         gg=(ord("g"),),
+        gh=(ord("h"),),
         gj=(ord("j"),),
+        gi=(ord("i"),),
         gp=(ord("p"),),
+        gr=(ord("r"),),
         dd=(ord("d"),),
         yy=(ord("y"),),
     )

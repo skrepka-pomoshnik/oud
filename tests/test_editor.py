@@ -1,3 +1,5 @@
+import pytest
+
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor import actions, edit_ops, ops, undo_ops
 from oud.editor import command_ops as cmd_ops
@@ -252,6 +254,42 @@ def test_insert_rest_snaps_to_chord_slot_when_cursor_in_gap() -> None:
     actions.handle_insert(state, ord("r"))
     assert state.overrides[(0, 0, 0)] == "r"
     assert (0, 0, 1) not in state.overrides
+
+
+@pytest.mark.parametrize(
+    ("prefix_count", "expected_string_index"),
+    [
+        (1, 6),  # /a -> 7th course
+        (2, 7),  # //a -> 8th course
+        (3, 8),  # ///a -> 9th course
+    ],
+)
+def test_insert_french_bass_slash_shorthand_targets_extra_courses(
+    prefix_count: int,
+    expected_string_index: int,
+) -> None:
+    state = _state()
+    state.mode = "insert"
+    state.piece.strings = 9
+    state.settings["strings"] = "9"
+    for _ in range(prefix_count):
+        actions.handle_insert(state, ord("/"))
+    actions.handle_insert(state, ord("a"))
+    assert state.overrides[(0, expected_string_index, 0)] == "a"
+    assert state.durations[(0, expected_string_index, 0)] == state.current_duration
+    assert state.cursor_col == 1
+
+
+def test_insert_french_bass_slash_shorthand_rejects_missing_course() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.piece.strings = 7
+    state.settings["strings"] = "7"
+    actions.handle_insert(state, ord("/"))
+    actions.handle_insert(state, ord("/"))
+    actions.handle_insert(state, ord("a"))
+    assert "Bass string not available" in state.message
+    assert not any(key[1] >= 6 for key in state.overrides)
 
 
 def test_row_overflow_advances_to_next_bar() -> None:

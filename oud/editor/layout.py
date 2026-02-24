@@ -29,7 +29,8 @@ def bars_per_line(state: EditorState, width: int) -> int:
         line_limit = int(linelen)
         if line_limit > 0:
             max_width = min(max_width, line_limit)
-    usable_width = max(0, max_width - left_margin)
+    right_padding = 1
+    usable_width = max(0, max_width - left_margin - right_padding)
     per_line = max(1, usable_width // (state.bar_width + bar_gap(state)))
     maxbars = state.settings.get("maxbars", "")
     if maxbars.isdigit():
@@ -115,7 +116,8 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
         line_limit = int(linelen)
         if line_limit > 0:
             max_width = min(max_width, line_limit)
-    usable_width = max(1, max_width - left_margin)
+    right_padding = 1
+    usable_width = max(1, max_width - left_margin - right_padding)
     spacing_mode = state.settings.get("layout", "packed")
     spacing_fill = state.settings.get("justify", "stretch")
     bargap = state.settings.get("bargap", "")
@@ -153,26 +155,25 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
     current = 0
     while current < total:
         if spacing_mode == "auto":
-            bars_per_line = _bars_fit(
-                bars,
-                current,
-                bar_gap,
-                usable_width,
-                state.bar_width,
-                state.overrides,
-                state.durations,
-                4,
-                state.dotted,
-                max_chords=max_chords,
-                compact=spacing_fill in ("compact", "smart", "stretch", "edge"),
-                chord_wrap_limit=chord_wrap_limit,
-            )
+            bar_indices, _widths, _gaps = auto_system_bar_plan_with_gaps(state, current, width)
+            if bars_per_line_limit > 0 and bar_indices:
+                capped = bar_indices[:bars_per_line_limit]
+                bar_indices = capped
+            next_start = (bar_indices[-1] + 1) if bar_indices else (current + 1)
+            if state.stave_breaks:
+                # Respect manual breaks by truncating at the first break within the planned system.
+                next_start = _next_system_start(
+                    bars,
+                    current,
+                    max(1, next_start - current),
+                    state.stave_breaks,
+                )
         else:
             bars_per_line = bars_per_line_limit
-        if bars_per_line_limit > 0:
-            bars_per_line = min(bars_per_line, bars_per_line_limit)
-        bars_per_line = max(1, bars_per_line)
-        next_start = _next_system_start(bars, current, bars_per_line, state.stave_breaks)
+            if bars_per_line_limit > 0:
+                bars_per_line = min(bars_per_line, bars_per_line_limit)
+            bars_per_line = max(1, bars_per_line)
+            next_start = _next_system_start(bars, current, bars_per_line, state.stave_breaks)
         if next_start <= current:
             break
         if next_start < total:
@@ -206,7 +207,8 @@ def auto_system_bar_plan_with_gaps(
         line_limit = int(linelen)
         if line_limit > 0:
             max_width = min(max_width, line_limit)
-    usable_width = max(1, max_width - left_margin)
+    right_padding = 1
+    usable_width = max(1, max_width - left_margin - right_padding)
     spacing_fill = state.settings.get("justify", "stretch")
     bargap = state.settings.get("bargap", "")
     bar_gap = max(0, int(bargap)) if bargap.isdigit() else 1
@@ -245,6 +247,51 @@ def auto_system_bar_plan_with_gaps(
         max_chords=max_chords,
         chord_wrap_limit=chord_wrap_limit,
     )
+    if state.settings.get("layout", "packed") == "auto" and bar_indices:
+        # Match renderer's final width normalization so navigation and viewport
+        # operate on the same system breaks the user actually sees.
+        from oud.ui.render_system import (  # noqa: PLC0415
+            _redistribute_extra_width,
+            _required_auto_display_width_for_bar,
+        )
+
+        barpad_text = state.settings.get("barpad", "1")
+        barpad = int(barpad_text) if barpad_text.isdigit() else 1
+        show_dur = state.settings.get("showdur", "off") == "on"
+        hide_redundant = state.settings.get("flagredundant", "on") == "on"
+        style = state.settings.get("style", "french")
+        french_c = state.settings.get("frenchc", "normal")
+        spacing_fill = state.settings.get("justify", "stretch")
+        min_widths = [
+            _required_auto_display_width_for_bar(
+                bars[abs_bar],
+                total_strings=state.piece.strings,
+                bar_width=state.bar_width,
+                default_duration=4,
+                style=style,
+                french_c=french_c,
+                show_dur=show_dur,
+                hide_redundant=hide_redundant,
+                barpad=barpad,
+                flag_gap=2 if spacing_fill == "smart" else 1,
+            )
+            for abs_bar in bar_indices
+        ]
+        bar_widths = [
+            max(width, min_width)
+            for width, min_width in zip(bar_widths, min_widths, strict=False)
+        ]
+        while bar_widths and (sum(bar_widths) + sum(gaps)) > usable_width:
+            bar_widths.pop()
+            bar_indices = bar_indices[: len(bar_widths)]
+            gaps = gaps[: max(0, len(bar_widths) - 1)]
+        extra = max(0, usable_width - (sum(bar_widths) + sum(gaps)))
+        _redistribute_extra_width(
+            bar_widths,
+            gaps,
+            spacing_fill=spacing_fill,
+            extra=extra,
+        )
     return bar_indices, bar_widths, gaps
 
 

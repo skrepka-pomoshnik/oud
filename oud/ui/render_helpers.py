@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from oud import __version__
 from oud.core.help_text import help_lines
 from oud.core.model import Piece
 from oud.ui.adapter import CursesError, Screen
@@ -49,6 +50,8 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
 
     fields = [
         line("File:", settings.get("filepath")),
+        line("Terminal:", settings.get("terminal")),
+        line("Version:", __version__),
         line("Title:", piece.title),
         line("Subtitle:", piece.subtitle),
         line("Author:", piece.author),

@@ -5,12 +5,17 @@ import pytest
 from oud.core.ft3 import build_durations
 from oud.core.render_utils import bar_cells_from_chords, smart_group_map
 from oud.core.view_model import _filter_redundant_positions, _scale_col
-from oud.editor.init import init_state
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import render_piece
 from oud.ui.render_helpers import apply_overrides
 from oud.ui.render_system import _build_chord_scale_map, _chord_positions_distinct, _scale_chord_row
+from tests.helpers_regression_cases import (
+    dense_flag_alignment_piece,
+    multi_bar_spacing_piece,
+    piece_with_unused_then_used_bass_rows,
+    regression_state,
+)
 
 
 def _content_width_for_bar(state, bar_index: int) -> int:
@@ -77,56 +82,40 @@ def _flag_cols_and_rows(state, bar_index: int) -> tuple[list[int], list[str]]:
 
 
 @pytest.mark.parametrize("justify", ["smart", "stretch", "compact"])
-@pytest.mark.parametrize(
-    ("path", "bar_index"),
-    [
-        ("examples/26_lachrimae_galliard_in_G.ft3", 0),
-        ("examples/02_forlorne_hope_8C.ft3", 9),
-        ("lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3", 28),
-    ],
-)
-def test_real_fixtures_no_lonely_stems_and_no_flag_collapse(
-    justify: str,
-    path: str,
-    bar_index: int,
-) -> None:
-    state = init_state(path, config_path="config.toml")
+def test_synthetic_dense_bar_no_lonely_stems_and_no_flag_collapse(justify: str) -> None:
+    state = regression_state(dense_flag_alignment_piece(), justify=justify, bar_width=12)
     state.settings["layout"] = "auto"
     state.settings["justify"] = justify
     state.settings["barpad"] = "1"
     state.settings["flagredundant"] = "on"
-    state.screen_width = 120
     state.bar_width = max(state.bar_width, 10)
 
-    flag_cols, scaled_rows = _flag_cols_and_rows(state, bar_index)
-    assert flag_cols, (path, bar_index, justify)
-    assert len(flag_cols) == len(set(flag_cols)), (path, bar_index, justify, flag_cols)
+    flag_cols, scaled_rows = _flag_cols_and_rows(state, 0)
+    assert flag_cols, justify
+    assert len(flag_cols) == len(set(flag_cols)), (justify, flag_cols)
     for col in flag_cols:
-        assert any(row[col] not in ("-", " ") for row in scaled_rows), (
-            path,
-            bar_index,
-            justify,
-            col,
-        )
+        assert any(row[col] not in ("-", " ") for row in scaled_rows), (justify, col)
 
 
-def _render_lines(path: str, justify: str, width: int = 120, height: int = 26) -> list[str]:
-    state = init_state(path, config_path="config.toml")
-    state.settings.update(
-        {
-            "layout": "auto",
-            "justify": justify,
-            "showdur": "on",
-            "showextras": "on",
-            "showtactus": "on",
-            "showmeta": "off",
-            "barpad": "1",
-            "barsperline": "0",
-            "maxbars": "0",
-            "linelen": "0",
-        },
-    )
-    fb = FrameBuffer(height, width)
+@pytest.mark.parametrize("justify", ["smart", "stretch"])
+def test_synthetic_dense_bar_flags_anchor_to_note_onsets_strict(justify: str) -> None:
+    state = regression_state(dense_flag_alignment_piece(), justify=justify, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = justify
+    state.settings["barpad"] = "1"
+    state.settings["flagredundant"] = "on"
+    state.bar_width = max(state.bar_width, 10)
+
+    flag_cols, scaled_rows = _flag_cols_and_rows(state, 0)
+    assert flag_cols
+    # Strict: every rendered flag column must be directly above a real note glyph.
+    for col in flag_cols:
+        col_glyphs = [row[col] for row in scaled_rows]
+        assert any(ch not in ("-", " ", "|") for ch in col_glyphs), (justify, col, col_glyphs)
+
+
+def _render_state_lines(state, *, height: int = 24) -> list[str]:
+    fb = FrameBuffer(height, state.screen_width or 120)
     render_piece(
         fb,
         state.piece,
@@ -163,18 +152,113 @@ def _render_lines(path: str, justify: str, width: int = 120, height: int = 26) -
     return fb.snapshot().lines
 
 
+def test_synthetic_system_inlines_time_sig() -> None:
+    state = regression_state(piece_with_unused_then_used_bass_rows(), justify="stretch", width=80, bar_width=10)
+    state.settings["tuning"] = "g2c3f3a3d4g4d2"
+    lines = _render_state_lines(state)
+    # Time signature should be inlined into a staff row, not on a standalone row.
+    assert any(("C" in line or "O" in line) and "|" in line and "-" in line for line in lines)
+    assert not any(line.strip() in {"C", "O", "3/4", "4/4"} for line in lines[:10])
+
+
 @pytest.mark.parametrize("justify", ["smart", "stretch"])
-@pytest.mark.parametrize(
-    "path",
-    [
-        "examples/26_lachrimae_galliard_in_G.ft3",
-        "examples/02_forlorne_hope_8C.ft3",
-        "lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3",
-    ],
-)
-def test_real_fixtures_no_broken_bar_seams(path: str, justify: str) -> None:
-    lines = _render_lines(path, justify)
+def test_synthetic_multi_bar_no_broken_bar_seams(justify: str) -> None:
+    state = regression_state(multi_bar_spacing_piece(), justify=justify, width=120, bar_width=12)
+    lines = _render_state_lines(state, height=26)
     staff_rows = [line for line in lines if "-" in line and "|" in line]
     assert staff_rows
     # Broken seam pattern between adjacent bars must never appear.
     assert all("|  |" not in row for row in staff_rows)
+
+
+@pytest.mark.parametrize("justify", ["smart", "stretch"])
+def test_synthetic_multi_bar_staff_rows_reach_right_edge(justify: str) -> None:
+    width = 120
+    state = regression_state(multi_bar_spacing_piece(), justify=justify, width=width, bar_width=12)
+    lines = _render_state_lines(state, height=26)
+    staff_rows = [line for line in lines if "-" in line and "|" in line]
+    assert staff_rows
+    assert all(row.rfind("|") == width - 2 for row in staff_rows)
+
+
+def test_synthetic_staff_rows_keep_dash_before_right_barline() -> None:
+    width = 120
+    state = regression_state(multi_bar_spacing_piece(), justify="stretch", width=width, bar_width=12)
+    lines = _render_state_lines(state, height=26)
+    staff_rows = [line for line in lines if "-" in line and "|" in line]
+    assert staff_rows
+    for row in staff_rows:
+        right = row.rfind("|")
+        if right <= 0:
+            continue
+        assert row[right - 1] == "-", row
+
+
+def test_synthetic_final_frame_smart_stem_anchors_have_notes_under() -> None:
+    state = regression_state(multi_bar_spacing_piece(), justify="smart", width=120, bar_width=12)
+    lines = _render_state_lines(state, height=26)
+    # Find the first rendered staff row dynamically (layout rows vary with settings).
+    staff_start = next(
+        idx
+        for idx, line in enumerate(lines)
+        if line.count("|") >= 2 and line.count("-") >= 8
+    )
+    flag_row = lines[staff_start - 2]
+    staff_rows = lines[staff_start : staff_start + 6]
+    assert len(staff_rows) == 6
+    barlines = [idx for idx, ch in enumerate(staff_rows[0]) if ch == "|"]
+    assert len(barlines) >= 3
+    for i in range(len(barlines) - 1):
+        x0 = barlines[i] + 1
+        x1 = barlines[i + 1]
+        seg_flag = flag_row[x0:x1]
+        seg_staff = [row[x0:x1] for row in staff_rows]
+        for col, ch in enumerate(seg_flag):
+            if ch != "|":
+                continue
+            under = [row[col] for row in seg_staff]
+            assert any(g not in ("-", " ", "|") for g in under), (i, col, seg_flag, under)
+
+
+@pytest.mark.parametrize("justify", ["smart", "stretch"])
+def test_synthetic_dense_bar_no_event_column_merge(justify: str) -> None:
+    state = regression_state(dense_flag_alignment_piece(), justify=justify, bar_width=12)
+    bar_index = 0
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = justify
+    state.settings["barpad"] = "1"
+    state.settings["flagredundant"] = "on"
+    state.bar_width = max(state.bar_width, 12)
+
+    bar = state.piece.bars[bar_index]
+    positions, grid_width = _chord_positions_distinct(bar, state.bar_width, default_duration=4)
+    cells = bar_cells_from_chords(
+        bar,
+        state.piece.strings,
+        grid_width,
+        4,
+        state.settings.get("style", "french"),
+        french_c=state.settings.get("frenchc", "normal"),
+    )
+    apply_overrides(cells, state.overrides, bar_index, state.piece.strings, grid_width)
+    visible_cols = sorted(
+        {
+            col
+            for col in range(grid_width)
+            if any(cells[s_idx][col] not in ("-", " ") for s_idx in range(state.piece.strings))
+        },
+    )
+    assert visible_cols
+    content_width = _content_width_for_bar(state, bar_index)
+    ordered_flags = sorted(_filter_redundant_positions(positions), key=lambda item: item[0])
+    if justify == "smart":
+        src_to_dest = smart_group_map(positions, ordered_flags, content_width)
+    else:
+        _, src_to_dest = _build_chord_scale_map(
+            positions,
+            bar_width=grid_width,
+            content_width=content_width,
+            min_gap=1,
+        )
+    mapped = [src_to_dest.get(col, _scale_col(col, grid_width, content_width)) for col in visible_cols]
+    assert len(mapped) == len(set(mapped))

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from oud.core.model import Piece
-from oud.core.tuning_utils import parse_bass_strings
+from oud.core.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
 from oud.core.view_model import _block_height, _tuning_labels
 from oud.ui.adapter import A_REVERSE, Screen
 from oud.ui.render_helpers import (
@@ -27,6 +27,33 @@ from oud.ui.render_helpers import (
 )
 from oud.ui.render_status import build_status_lines, resolve_duration_text
 from oud.ui.render_system import render_systems
+
+
+def _render_header_line(
+    stdscr: Screen,
+    *,
+    width: int,
+    piece: Piece,
+    settings: dict[str, str],
+) -> None:
+    title = piece.title or "Untitled"
+    right = _clean_text(piece.composer or "")
+    title_text = _clean_text(title)
+    if width <= 0:
+        return
+    if right:
+        right = right[: max(0, width)]
+        right_x = max(0, width - len(right))
+        title_max = max(0, right_x - 1)
+        if title_max > 0:
+            centered = title_text[:title_max]
+            title_x = max(0, (title_max - len(centered)) // 2)
+            _safe_addstr(stdscr, 0, title_x, centered)
+        _safe_addstr(stdscr, 0, right_x, right)
+        return
+    centered = title_text[:width]
+    title_x = max(0, (width - len(centered)) // 2)
+    _safe_addstr(stdscr, 0, title_x, centered)
 
 
 def _bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:
@@ -101,7 +128,9 @@ def render_piece(  # noqa: C901, PLR0912
 
     status_attr = A_REVERSE
     if mode == "info":
-        _render_info(stdscr, status_line, status_attr, help_offset, piece, settings)
+        info_settings = dict(settings)
+        info_settings["terminal"] = f"{width}x{height}"
+        _render_info(stdscr, status_line, status_attr, help_offset, piece, info_settings)
         stdscr.refresh()
         return
     if mode == "plugin":
@@ -122,10 +151,9 @@ def render_piece(  # noqa: C901, PLR0912
         stdscr.refresh()
         return
 
-    header = f"{piece.title or 'Untitled'}  [{len(piece.bars)} bars]"
     tuning_text = piece.tuning or settings.get("tuning", "")
     header_row = 0
-    _safe_addstr(stdscr, header_row, 0, _clean_text(header))
+    _render_header_line(stdscr, width=width, piece=piece, settings=settings)
 
     left_margin = 3
     spacing_mode = settings.get("layout", "packed")
@@ -140,13 +168,14 @@ def render_piece(  # noqa: C901, PLR0912
     if barpad_text.isdigit():
         barpad = max(0, int(barpad_text))
     max_width = width
-    usable_width = max(0, max_width - left_margin)
+    right_padding = 1
+    usable_width = max(0, max_width - left_margin - right_padding)
     linelen = settings.get("linelen", "")
     if linelen.isdigit():
         line_limit = int(linelen)
         if line_limit > 0:
             max_width = min(max_width, line_limit)
-            usable_width = max(0, max_width - left_margin)
+            usable_width = max(0, max_width - left_margin - right_padding)
 
     default_duration = 4
     include_meta = True
@@ -166,6 +195,9 @@ def render_piece(  # noqa: C901, PLR0912
     show_octaves = settings.get("tuninglabels", "relative") == "absolute"
     used_bass = _bass_strings_used(piece, overrides)
     bass_tokens = parse_bass_strings(settings.get("bassstrings", ""))
+    if not bass_tokens:
+        tuning_strings = tuning_count(tuning_text) if tuning_text else 0
+        bass_tokens = default_bass_strings(max(0, total_strings - tuning_strings))
     base_strings = min(6, total_strings)
     display_indices = list(range(base_strings))
     display_indices.extend(

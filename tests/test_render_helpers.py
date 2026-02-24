@@ -63,9 +63,14 @@ def test_clean_pad_and_flag_symbols() -> None:
 
 def test_info_help_plugin_and_info_render() -> None:
     piece = Piece(title="T", bars=[Bar()], strings=6, composer="C", subtitle="S", footnote="F")
-    lines = info_lines(piece, {"style": "french", "time": "C", "filepath": "examples/x.ft3"})
+    lines = info_lines(
+        piece,
+        {"style": "french", "time": "C", "filepath": "examples/x.ft3", "terminal": "120x38"},
+    )
     assert lines[0] == "INFO"
     assert any(line.startswith("File:") for line in lines)
+    assert any(line.startswith("Terminal:") for line in lines)
+    assert any(line.startswith("Version:") for line in lines)
     s = _Screen(h=6, w=30)
     render_help(s, "help", 1, 0)
     render_plugin(s, "plugin", 1, "Plugins", ["a", "b"], 1, 0, "msg")

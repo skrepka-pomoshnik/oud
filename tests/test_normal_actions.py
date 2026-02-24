@@ -96,3 +96,32 @@ def test_jk_clamp_to_visible_string_bounds() -> None:
     state.cursor_string = state.piece.strings - 1
     handle_normal(state, ord("j"))
     assert state.cursor_string == state.piece.strings - 1
+
+
+def test_gi_opens_info_mode() -> None:
+    state = _state()
+    handle_normal(state, ord("g"))
+    assert state.pending_key == "g"
+    handle_normal(state, ord("i"))
+    assert state.mode == "info"
+
+
+def test_gh_opens_help_mode() -> None:
+    state = _state()
+    handle_normal(state, ord("g"))
+    handle_normal(state, ord("h"))
+    assert state.mode == "help"
+
+
+def test_gr_reports_when_no_file_or_unsaved() -> None:
+    state = _state()
+    handle_normal(state, ord("g"))
+    handle_normal(state, ord("r"))
+    assert state.message == "No file to reload"
+
+    state = _state()
+    state.path = "x.ft3"
+    state.modified = True
+    handle_normal(state, ord("g"))
+    handle_normal(state, ord("r"))
+    assert "Unsaved changes" in state.message

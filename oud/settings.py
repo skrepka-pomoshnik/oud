@@ -39,6 +39,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "spacing": "12",
     "layout": "auto",
     "justify": "stretch",
+    "beatsnap": "off",
     "barpad": "1",
     "maxbars": "0",
     "barsperline": "0",

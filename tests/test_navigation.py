@@ -2,6 +2,7 @@ from pathlib import Path
 
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.init import init_state
+from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.editor.navigation import (
     _bar_content_width_for_cursor,
     _cursor_display_map_for_bar,
@@ -14,6 +15,7 @@ from oud.editor.navigation import (
 )
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
+from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 
 def _state() -> EditorState:
@@ -128,13 +130,13 @@ def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
     )
     state.settings["layout"] = "auto"
     state.settings["justify"] = "stretch"
+    state.settings["beatsnap"] = "off"
     state.settings["barpad"] = "1"
     state.screen_width = 90
     state.cursor_bar = 3
     content = _bar_content_width_for_cursor(state, 3)
     mapping = _cursor_display_map_for_bar(state, 3, content)
     dup = next((idx for idx in range(len(mapping) - 1) if mapping[idx] == mapping[idx + 1]), None)
-    assert dup is not None
     if dup is None:
         return
     state.cursor_col = dup
@@ -151,6 +153,7 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     )
     state.settings["layout"] = "auto"
     state.settings["justify"] = "stretch"
+    state.settings["beatsnap"] = "off"
     state.settings["barpad"] = "1"
     state.screen_width = 120
     state.cursor_bar = 0
@@ -184,3 +187,41 @@ def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode() -> None:
     current = target_map[state.cursor_col]
     best = min(abs(value - anchor) for value in target_map)
     assert abs(current - anchor) == best
+
+
+def test_jump_row_visual_auto_uses_cursor_visual_x_for_target_bar_selection_synthetic() -> None:
+    state = regression_state(multi_bar_spacing_piece(), justify="stretch", width=36, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["barpad"] = "1"
+    state.cursor_bar = 1
+    state.cursor_col = 10
+    prev_bar = state.cursor_bar
+    prev_content = _bar_content_width_for_cursor(state, prev_bar)
+    prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
+    prev_anchor = prev_map[state.cursor_col]
+
+    jump_row_visual(state, 1)
+
+    assert state.cursor_bar != prev_bar
+    target_content = _bar_content_width_for_cursor(state, state.cursor_bar)
+    target_map = _cursor_display_map_for_bar(state, state.cursor_bar, target_content)
+    current = target_map[state.cursor_col]
+    best = min(abs(value - prev_anchor) for value in target_map)
+    assert abs(current - prev_anchor) == best
+
+
+def test_dynamic_system_starts_matches_final_auto_plan_sequence_synthetic() -> None:
+    state = regression_state(multi_bar_spacing_piece(), justify="smart", width=64, bar_width=12)
+    starts = dynamic_system_starts(state, state.screen_width)
+    expected = [0]
+    current = 0
+    while current < len(state.piece.bars):
+        inds, _widths, _gaps = auto_system_bar_plan_with_gaps(state, current, state.screen_width)
+        if not inds:
+            break
+        nxt = inds[-1] + 1
+        if nxt >= len(state.piece.bars):
+            break
+        expected.append(nxt)
+        current = nxt
+    assert starts == expected

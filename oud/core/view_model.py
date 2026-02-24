@@ -211,17 +211,17 @@ def _string_label(
     tuning_labels: list[str],
     basslabels: str,
 ) -> str:
+    def _bass_fallback() -> str:
+        if basslabels == "slash":
+            return "/" * max(1, actual - 5)
+        return str(actual + 1)
+
     if actual >= 6 and basslabels != "tuning":
-        if basslabels == "numeric":
-            label_value = str(actual + 1)
-        elif basslabels == "slash":
-            label_value = "/" * max(1, actual - 5)
-        else:
-            label_value = str(actual + 1)
+        label_value = _bass_fallback()
     elif actual < len(tuning_labels):
-        label_value = tuning_labels[actual]
+        label_value = tuning_labels[actual] or (_bass_fallback() if actual >= 6 else str(total_strings - actual))
     else:
-        label_value = str(total_strings - actual)
+        label_value = _bass_fallback() if actual >= 6 else str(total_strings - actual)
     if len(label_value) > 2:
         label_value = label_value[:2]
     return f"{label_value:>2}"
@@ -233,10 +233,6 @@ def _inline_bass_row(row: list[str]) -> list[str]:
         if ch in ("-", " "):
             continue
         inline[idx] = ch
-        if idx - 1 >= 0 and inline[idx - 1] == " ":
-            inline[idx - 1] = "-"
-        if idx + 1 < len(inline) and inline[idx + 1] == " ":
-            inline[idx + 1] = "-"
     return inline
 
 

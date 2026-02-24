@@ -107,10 +107,35 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             state.message = f"Bass string {token} added"
             state.pending_key = ""
             return True
+        if state.pending_key == "g" and key in pending_keys.gh:
+            state.mode = "help"
+            state.help_offset = 0
+            state.pending_key = ""
+            return True
+        if state.pending_key == "g" and key in pending_keys.gi:
+            state.mode = "info"
+            state.info_offset = 0
+            state.pending_key = ""
+            return True
         if state.pending_key == "g" and key in pending_keys.gp:
             from oud.editor.plugin_ops import enter_plugin_mode  # noqa: PLC0415
 
             enter_plugin_mode(state)
+            state.pending_key = ""
+            return True
+        if state.pending_key == "g" and key in pending_keys.gr:
+            if state.modified:
+                state.message = "Unsaved changes. Save or use :e to reload."
+                state.pending_key = ""
+                return True
+            if not state.path:
+                state.message = "No file to reload"
+                state.pending_key = ""
+                return True
+            from oud.editor.command_ops import cmd_open  # noqa: PLC0415
+
+            cmd_open(state, state.path)
+            state.message = f"Reloaded: {state.path}"
             state.pending_key = ""
             return True
         if state.pending_key == "d" and key in pending_keys.dd:

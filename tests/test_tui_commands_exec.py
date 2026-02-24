@@ -107,7 +107,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
         "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
-        "maxrepeats=30",
+        "maxrepeats=30 scrollmode=page beatsnap=soft",
         str(tmp_path / "cfg.toml"),
     )
     assert state.settings["measures"] == "every"
@@ -140,6 +140,8 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["showtactus"] == "on"
     assert state.settings["italianorient"] == "reverse"
     assert state.settings["maxrepeats"] == "30"
+    assert state.settings["scrollmode"] == "page"
+    assert state.settings["beatsnap"] == "soft"
     assert state.piece.title == "Title"
     assert state.piece.author == "Author"
     assert state.piece.composer == "Composer"
@@ -232,6 +234,13 @@ def test_cmd_write_and_ascii(tmp_path: Path) -> None:
     assert content_after == render_ascii_snapshot(state)
     lines = content_after.splitlines()
     assert len(lines) == state.screen_height
+
+
+def test_cmd_set_tuning_baroque_alias(tmp_path: Path) -> None:
+    state = _state()
+    cfg = str(tmp_path / "cfg.toml")
+    cmd.cmd_set(state, "tuning=baroque13", cfg)
+    assert state.settings["tuning"] == "a4b-4c4d4e4f4g4a3d3f3a2d2f2"
 
 
 def test_cmd_bar_and_chord() -> None:
