@@ -6,8 +6,9 @@ from oud.core.render_utils import (
     smart_group_map,
     soft_beat_snap_map,
     spread_flag_positions,
+    trim_right_slack_for_onsets,
 )
-from oud.core.view_model import _parse_time_signature, _scale_col
+from oud.core.view_model import _filter_redundant_positions, _parse_time_signature, _scale_col
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import (
     auto_system_bar_plan,
@@ -117,12 +118,23 @@ def _cursor_display_map_for_bar(
     time_value = bar.time_sig or time_setting
     beats, _unit, _label = _parse_time_signature(time_value)
     if beatsnap_mode == "soft" and beats > 1:
+        visible_positions = (
+            _filter_redundant_positions(positions)
+            if state.settings.get("flagredundant", "on") == "on"
+            else positions
+        )
         src_to_dest = soft_beat_snap_map(
             positions,
             grid_width=grid_width,
             content_width=content_width,
             beats=beats,
             min_gap=1 if state.settings.get("justify", "stretch") == "smart" else 0,
+        )
+        src_to_dest = trim_right_slack_for_onsets(
+            src_to_dest,
+            all_positions=positions,
+            visible_positions=visible_positions,
+            content_width=content_width,
         )
     elif state.settings.get("justify", "stretch") == "smart":
         groups = spread_flag_positions(positions, grid_width, min_gap=0)
@@ -190,6 +202,8 @@ def _system_display_indices_for_bar(state: EditorState, bar_index: int) -> list[
 def move_left_visual(state: EditorState) -> None:
     prev_bar = state.cursor_bar
     prev_col = state.cursor_col
+    actual_string = string_index(state, state.cursor_string)
+    note_stops = set(_row_note_cols(state, prev_bar, actual_string) or _note_cols(state, prev_bar))
     prev_content = _bar_content_width_for_cursor(state, prev_bar)
     prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
     prev_scaled = prev_map[prev_col]
@@ -197,6 +211,8 @@ def move_left_visual(state: EditorState) -> None:
     if state.cursor_bar != prev_bar:
         return
     while state.cursor_col > 0:
+        if state.cursor_col in note_stops:
+            break
         scaled = prev_map[state.cursor_col]
         if scaled != prev_scaled:
             break
@@ -206,6 +222,8 @@ def move_left_visual(state: EditorState) -> None:
 def move_right_visual(state: EditorState) -> None:
     prev_bar = state.cursor_bar
     prev_col = state.cursor_col
+    actual_string = string_index(state, state.cursor_string)
+    note_stops = set(_row_note_cols(state, prev_bar, actual_string) or _note_cols(state, prev_bar))
     prev_content = _bar_content_width_for_cursor(state, prev_bar)
     prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
     prev_scaled = prev_map[prev_col]
@@ -213,6 +231,8 @@ def move_right_visual(state: EditorState) -> None:
     if state.cursor_bar != prev_bar:
         return
     while state.cursor_col < state.bar_width - 1:
+        if state.cursor_col in note_stops:
+            break
         scaled = prev_map[state.cursor_col]
         if scaled != prev_scaled:
             break

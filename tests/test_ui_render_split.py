@@ -170,6 +170,23 @@ def test_render_header_hides_tuning_and_shows_readable_meta() -> None:
     assert not any("[1 bars]" in text for text in header_texts)
 
 
+def test_render_header_composer_aligns_with_score_right_edge() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(w=80, h=20)
+    kwargs["piece"].title = "T"
+    kwargs["piece"].composer = "ABCD"
+    kwargs["settings"]["linelen"] = "40"
+    render_piece(**kwargs)
+    composer_call = next(
+        (call for call in kwargs["stdscr"].calls if call[0] == 0 and call[2] == "ABCD"),
+        None,
+    )
+    assert composer_call is not None
+    _y, x, _text, _a = composer_call
+    # Right edge of score content is linelen-2 (one right padding column reserved).
+    assert x + len("ABCD") - 1 == 38
+
+
 def test_render_shows_time_signature_at_left_of_score_once() -> None:
     kwargs = _args("normal")
     kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O"), Bar()], strings=6)
@@ -204,6 +221,19 @@ def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None
     assert staff_y_values
     # Not on the first string row (header row offset + first staff line).
     assert min(staff_y_values) > 2
+
+
+def test_render_shows_time_signature_on_mid_system_change() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(title="T", bars=[Bar(), Bar(time_sig="3/4"), Bar()], strings=6)
+    kwargs["settings"]["barsperline"] = "3"
+    render_piece(**kwargs)
+    numeric_calls = [
+        (y, x, text)
+        for (y, x, text, _a) in kwargs["stdscr"].calls
+        if text.strip() == "3" and y >= 2 and x >= 3
+    ]
+    assert numeric_calls
 
 
 def test_render_draws_left_staff_barline() -> None:

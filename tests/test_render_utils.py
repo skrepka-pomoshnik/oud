@@ -9,6 +9,7 @@ from oud.core.render_utils import (
     spread_flag_positions,
     soft_beat_snap_map,
     stem_row_style,
+    trim_right_slack_for_onsets,
 )
 
 
@@ -166,6 +167,34 @@ def test_soft_beat_snap_map_does_not_reserve_trailing_empty_beat() -> None:
     assert cols == sorted(cols)
     # Last onset should reach into the right half, not be stuck in beat-3 area.
     assert cols[-1] >= 10
+
+
+def test_trim_right_slack_for_onsets_uses_visible_flags_not_hidden_redundant() -> None:
+    # Last onset is hidden-redundant (no visible tail), so only one trailing dash is needed.
+    all_positions = [(0, 16, False), (4, 16, False), (8, 16, False)]
+    visible_positions = [(0, 16, False)]
+    mapping = {0: 0, 4: 4, 8: 8}
+    trimmed = trim_right_slack_for_onsets(
+        mapping,
+        all_positions=all_positions,
+        visible_positions=visible_positions,
+        content_width=12,
+    )
+    assert trimmed[8] == 10
+
+
+def test_trim_right_slack_preserves_left_anchor_for_beat_aligned_bar() -> None:
+    mapping = {0: 0, 1: 1, 2: 2, 4: 4, 5: 5, 6: 6, 8: 8, 9: 9}
+    all_positions = [(c, 16, False) for c in [0, 1, 2, 4, 5, 6, 8, 9]]
+    visible_positions = [(0, 16, False)]
+    trimmed = trim_right_slack_for_onsets(
+        mapping,
+        all_positions=all_positions,
+        visible_positions=visible_positions,
+        content_width=16,
+    )
+    assert trimmed[0] == 0
+    assert trimmed[9] == 14
 
 
 def test_bar_cells_string_mapping() -> None:

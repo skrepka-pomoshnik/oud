@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import oud.editor.navigation as nav
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.init import init_state
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
@@ -145,6 +146,24 @@ def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
     assert mapping[state.cursor_col] != mapping[dup]
 
 
+def test_visual_move_right_stops_on_note_inside_duplicate_render_column(
+    monkeypatch,
+) -> None:
+    state = _state()
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 0
+    state.bar_width = 6
+    state.overrides[(0, 0, 1)] = "a"
+
+    monkeypatch.setattr(nav, "_bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr(nav, "_cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4])
+
+    move_right_visual(state)
+
+    assert state.cursor_col == 1
+
+
 def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     root = Path(__file__).resolve().parents[1]
     state = init_state(
@@ -161,7 +180,9 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     state.cursor_col = 0
     for _ in range(4):
         handle_normal(state, ord("l"))
-    assert state.cursor_col == 5
+    # Visual movement may stop on a real note inside a duplicate render column.
+    # Both raw cols 4 and 5 map to the same visible slot in this layout variant.
+    assert state.cursor_col in (4, 5)
 
 
 def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode() -> None:

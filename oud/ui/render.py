@@ -153,8 +153,6 @@ def render_piece(  # noqa: C901, PLR0912
 
     tuning_text = piece.tuning or settings.get("tuning", "")
     header_row = 0
-    _render_header_line(stdscr, width=width, piece=piece, settings=settings)
-
     left_margin = 3
     spacing_mode = settings.get("layout", "packed")
     spacing_fill = settings.get("justify", "stretch")
@@ -176,6 +174,12 @@ def render_piece(  # noqa: C901, PLR0912
         if line_limit > 0:
             max_width = min(max_width, line_limit)
             usable_width = max(0, max_width - left_margin - right_padding)
+    _render_header_line(
+        stdscr,
+        width=max(0, max_width - right_padding),
+        piece=piece,
+        settings=settings,
+    )
 
     default_duration = 4
     include_meta = True

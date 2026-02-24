@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from oud.core.render_utils import soft_beat_snap_map, smart_group_map, spread_flag_positions
+from oud.core.render_utils import (
+    soft_beat_snap_map,
+    smart_group_map,
+    spread_flag_positions,
+    trim_right_slack_for_onsets,
+)
 from oud.core.spacing import auto_bar_plan
 from oud.core.view_model import (
     _bar_annotations,
@@ -549,18 +554,17 @@ def render_systems(  # noqa: C901, PLR0912
             pad = barpad if scale_bar else 0
             wrote_time_sig = False
             show_time_sig_here = False
-            if local_idx == 0:
-                show_sig = abs_bar == 0
-                if not show_sig and abs_bar > 0:
-                    prev_bar = piece.bars[abs_bar - 1]
-                    prev_time = prev_bar.time_sig or time_setting
-                    if prev_time in ("auto", "detect"):
-                        inferred_prev = _infer_time_signature(prev_bar, default_duration)
-                        prev_time = inferred_prev or "C"
-                    show_sig = prev_time != time_value
-                if show_sig and _sig_label:
-                    show_time_sig_here = True
-                    wrote_time_sig = True
+            show_sig = abs_bar == 0
+            if not show_sig and abs_bar > 0:
+                prev_bar = piece.bars[abs_bar - 1]
+                prev_time = prev_bar.time_sig or time_setting
+                if prev_time in ("auto", "detect"):
+                    inferred_prev = _infer_time_signature(prev_bar, default_duration)
+                    prev_time = inferred_prev or "C"
+                show_sig = prev_time != time_value
+            if show_sig and _sig_label:
+                show_time_sig_here = True
+                wrote_time_sig = True
             cue_pad_extra = 2 if (show_time_sig_here and scale_bar) else 0
             draw_pad = pad + cue_pad_extra
             if rows["meta"] is not None:
@@ -638,6 +642,12 @@ def render_systems(  # noqa: C901, PLR0912
                             content_width=content_width,
                             beats=beats,
                             min_gap=flag_min_gap,
+                        )
+                        src_to_dest = trim_right_slack_for_onsets(
+                            src_to_dest,
+                            all_positions=positions,
+                            visible_positions=ordered_flags,
+                            content_width=content_width,
                         )
                     elif spacing_fill == "smart":
                         src_to_dest = smart_group_map(
@@ -912,7 +922,7 @@ def render_systems(  # noqa: C901, PLR0912
                 row_text = "".join(row_cells)
                 safe_addstr(stdscr, y, bar_x - 1, "|")
                 safe_addstr(stdscr, y, bar_x, row_text)
-                if local_idx == 0 and show_time_sig_here and _sig_label:
+                if show_time_sig_here and _sig_label:
                     ts_rows = _time_sig_inline_rows(time_value, _sig_label)
                     ts_top = 0
                     if ts_rows:

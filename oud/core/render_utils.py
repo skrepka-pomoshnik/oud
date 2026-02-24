@@ -455,3 +455,49 @@ def soft_beat_snap_map(
         raw: col
         for raw, (col, _denom, _dot) in zip(raw_cols, spread, strict=False)
     }
+
+
+def trim_right_slack_for_onsets(
+    src_to_dest: dict[int, int],
+    *,
+    all_positions: list[tuple[int, int, bool]],
+    visible_positions: list[tuple[int, int, bool]] | None,
+    content_width: int,
+) -> dict[int, int]:
+    if content_width <= 0 or not src_to_dest or not all_positions:
+        return src_to_dest
+    last_raw = max(col for (col, _denom, _dot) in all_positions)
+    if last_raw not in src_to_dest:
+        return src_to_dest
+    visible_map = {
+        col: (denom, dot) for (col, denom, dot) in (visible_positions or all_positions)
+    }
+    required_slack = 1
+    if last_raw in visible_map:
+        denom, dot = visible_map[last_raw]
+        required_slack = max(1, 1 + flag_count(denom) + (1 if dot else 0))
+    ordered_raws = sorted(raw for (raw, _denom, _dot) in all_positions if raw in src_to_dest)
+    if not ordered_raws:
+        return src_to_dest
+    first_raw = ordered_raws[0]
+    first_col = src_to_dest[first_raw]
+    current_last = src_to_dest[last_raw]
+    current_slack = (content_width - 1) - current_last
+    shift = current_slack - required_slack
+    if shift <= 0:
+        return src_to_dest
+    target_last = max(first_col, (content_width - 1) - required_slack)
+    if first_col <= 1 and current_last > first_col and target_last > current_last:
+        curr_span = max(1, current_last - first_col)
+        target_span = max(1, target_last - first_col)
+        seeded = []
+        for raw in ordered_raws:
+            col = src_to_dest[raw]
+            scaled = first_col + ((col - first_col) * target_span) // curr_span
+            seeded.append((max(0, min(content_width - 1, scaled)), 4, False))
+        spread = spread_flag_positions(seeded, content_width, min_gap=0)
+        trimmed = dict(src_to_dest)
+        for raw, (col, _denom, _dot) in zip(ordered_raws, spread, strict=False):
+            trimmed[raw] = col
+        return trimmed
+    return {raw: min(content_width - 1, col + shift) for raw, col in src_to_dest.items()}
