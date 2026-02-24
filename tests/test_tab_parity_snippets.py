@@ -253,3 +253,34 @@ def test_tab_snippet_time_cue_dense_auftact_no_glue_c_o_3() -> None:
         assert any(cue in line for line in head), (time_sig, style_mode)
         # Regression: cue must not glue directly to first notehead letter in dense auftact.
         assert not any(f"{cue}a" in line for line in head), (time_sig, style_mode, head)
+
+
+def test_tab_snippet_repeats_and_double_barline_render_without_breaking_staff() -> None:
+    piece = Piece(
+        title="Repeats",
+        bars=[
+            Bar(
+                repeat=".:",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(3, 2, 0)])],
+            ),
+            Bar(
+                barline="||",
+                repeat=":.",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    state = regression_state(piece, width=90, bar_width=10, justify="smart")
+    for key in ("showdur", "showextras", "showtactus"):
+        state.settings[key] = "off"
+    lines = _render_state_lines(state, height=18)
+    head = lines[:8]
+    assert any(".:" in line for line in head)
+    assert any(":." in line for line in head)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    # Double barline at the system edge is allowed, but staff rows must still draw a closing barline.
+    assert all(row.rstrip().endswith("|") for row in staff_rows)
+    assert any(row.rstrip().endswith("||") for row in staff_rows)
