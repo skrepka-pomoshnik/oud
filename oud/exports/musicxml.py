@@ -296,13 +296,13 @@ def _append_first_measure_attributes(
     SubElement(clef, "sign").text = "TAB"
     SubElement(clef, "line").text = "5"
     staff_details = SubElement(attributes, "staff-details")
-    SubElement(staff_details, "staff-lines").text = "6"
+    SubElement(staff_details, "staff-lines").text = str(max(1, piece.strings))
     style = settings.get("style") or piece.style or "french"
     if style == "french":
         staff_details.set("show-frets", "letters")
     for idx, pitch_value in enumerate(pitch_for_string, start=1):
         staff_tuning = SubElement(staff_details, "staff-tuning")
-        staff_tuning.set("line", str(6 - (idx - 1)))
+        staff_tuning.set("line", str(max(1, piece.strings - (idx - 1))))
         step, alter, octave = _midi_to_pitch(pitch_value)
         SubElement(staff_tuning, "tuning-step").text = step
         if alter:

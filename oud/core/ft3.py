@@ -274,7 +274,7 @@ def load_ft3(path: str) -> Piece:
     max_string = 0
     for bar in bars:
         for note in bar.notes:
-            max_string = max(max_string, note.string + 1)
+            max_string = max(max_string, note.string)
     strings = max(6, max_string) if max_string else 6
     piece = Piece(
         title=title,

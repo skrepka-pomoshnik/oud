@@ -40,7 +40,9 @@ def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C
             strings = int(DEFAULT_SETTINGS["strings"])
         if 4 <= strings <= 7:
             state.piece.strings = strings
-    elif not piece.tuning:
+    elif is_tab and not piece.tuning:
+        # Legacy .tab files often omit explicit tuning; keep default 6-course fallback
+        # only for TAB import, not FT3/MusicXML where parser may already infer >6 courses.
         state.piece.strings = int(DEFAULT_SETTINGS["strings"])
         if not state.settings.get("tuning"):
             state.settings["tuning"] = "g2c3f3a3d4g4"

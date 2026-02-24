@@ -20,6 +20,7 @@ def tuning_count(tuning: str) -> int:
 
 def tuning_preset(value: str) -> str | None:
     presets = {
+        "renaissance6": "g2c3f3a3d4g4",
         "renaissance": "g2c3f3a3d4g4",
         "renaissance7": "f2g2c3f3a3d4g4",
         "renaissance8": "e2f2g2c3f3a3d4g4",
@@ -34,7 +35,26 @@ def tuning_preset(value: str) -> str | None:
         "sharp": "c4d4e4f+4g4a3d3g3b2d2f+2",
         "flat": "c4d4e-4f4g4a3d3g3a+2d2f2",
     }
-    return presets.get(value)
+    aliases = {
+        # Common shorthand family aliases.
+        "ren6": "renaissance6",
+        "ren7": "renaissance7",
+        "ren8": "renaissance8",
+        "ren9": "renaissance9",
+        "ren10": "renaissance10",
+        "ren11": "renaissance11",
+        "ren12": "renaissance12",
+        "ren13": "renaissance13",
+        # Baroque lute family defaults (11c / 13c d-minor and variants).
+        "baroque": "dminor",
+        "baroque11": "dminor",
+        "baroque13": "dminor",
+        "baroque-dminor": "dminor",
+        "baroque-sharp": "sharp",
+        "baroque-flat": "flat",
+    }
+    key = aliases.get(value, value)
+    return presets.get(key)
 
 
 def parse_bass_strings(value: str) -> list[str]:
@@ -49,3 +69,12 @@ def parse_bass_strings(value: str) -> list[str]:
             continue
         tokens.append(token)
     return tokens
+
+
+def default_bass_strings(missing: int) -> list[str]:
+    # Conservative fallback for files with extra courses but no explicit tuning metadata.
+    # Starts from d2 (common 7-course extension in many lute sources) and descends.
+    series = ["d2", "c2", "b1", "a1", "g1", "f1", "e1", "d1", "c1", "b0", "a0"]
+    if missing <= 0:
+        return []
+    return series[:missing]

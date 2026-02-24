@@ -56,6 +56,12 @@ def test_frog_galliard_bar8_includes_bass() -> None:
     assert any(note.string >= 7 for note in bar.notes)
 
 
+def test_pavan_01_8c_infers_eight_courses() -> None:
+    piece = load_ft3("lutemusic/pavan_01_8C.ft3")
+    assert piece.strings == 8
+    assert any(note.string >= 7 for bar in piece.bars for note in bar.notes)
+
+
 def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
     piece = load_ft3("examples/26_lachrimae_galliard_in_G.ft3")
     bar = piece.bars[0]

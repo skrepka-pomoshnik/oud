@@ -12,6 +12,7 @@ from oud.exports.midi import (
     _note_off,
     _note_on,
     _parse_tuning,
+    _resolved_tuning_for_piece,
     _program_change,
     _vlq,
     _write_track,
@@ -65,6 +66,12 @@ def test_export_midi_start_bar_and_tempo(tmp_path) -> None:
 def test_parse_tuning_low_to_high() -> None:
     pitches = _parse_tuning("g2c3f3a3d4g4")
     assert pitches == [67, 62, 57, 53, 48, 43]
+
+
+def test_resolved_tuning_prepends_default_bass_strings_when_missing() -> None:
+    piece = Piece(title="T", bars=[Bar()], strings=7)
+    tuning = _resolved_tuning_for_piece(piece, {"tuning": "g2c3f3a3d4g4", "bassstrings": ""})
+    assert tuning.startswith("d2")
 
 
 def test_duration_ticks_dotted() -> None:

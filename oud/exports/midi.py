@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 
 from oud.core.model import Bar, Chord, Note, Piece
-from oud.core.playback_timeline import PlaybackCursor
+from oud.core.playback_timeline import PlaybackCursor, build_timeline_from_events
 from oud.core.time_utils import parse_time_signature_value
+from oud.core.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
 
 TICKS_PER_QUARTER = 480
 BASE_NOTE_VELOCITY = 80
@@ -86,6 +87,21 @@ def _default_tuning(strings: int) -> list[int]:
     ]
     pitches = _parse_tuning("".join(defaults))
     return pitches[:strings]
+
+
+def _resolved_tuning_for_piece(piece: Piece, settings: dict[str, str]) -> str:
+    tuning = (settings.get("tuning", "") or "").strip()
+    if not tuning:
+        return tuning
+    missing = max(0, piece.strings - tuning_count(tuning))
+    if missing <= 0:
+        return tuning
+    bass_tokens = parse_bass_strings(settings.get("bassstrings", ""))
+    if not bass_tokens:
+        bass_tokens = default_bass_strings(missing)
+    # Tuning strings are stored low->high before _parse_tuning() reverses them.
+    # Extra bass courses must be prepended (lower than the existing lowest course).
+    return "".join(bass_tokens[:missing]) + tuning
 
 
 def _fret_from_override(ch: str, style: str) -> int | None:
@@ -248,7 +264,7 @@ def build_playback_timeline(
     settings = settings or {}
     style = settings.get("style") or "french"
     default_duration = 4
-    timeline: list[PlaybackCursor] = []
+    timeline_events: list[tuple[int, int, int, int]] = []
     sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
     current_time = 0
     for b_idx, bar in enumerate(piece.bars):
@@ -271,15 +287,13 @@ def build_playback_timeline(
         for event_idx, (start, duration, col, notes) in enumerate(chord_events):
             if not notes:
                 continue
-            event_start = (current_time + start) * sec_per_tick
-            event_end = (current_time + start + duration) * sec_per_tick
             marker_col = event_idx if bar.chords else col
-            timeline.append(
-                PlaybackCursor(start=event_start, end=event_end, bar=b_idx, col=marker_col),
+            timeline_events.append(
+                (b_idx, current_time + start, duration, marker_col),
             )
             max_end = max(max_end, start + duration)
         current_time += max_end
-    return timeline
+    return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
 
 
 def _note_on(channel: int, pitch: int, velocity: int) -> bytes:
@@ -370,7 +384,7 @@ def export_midi(
     dotted: set[tuple[int, int]] | None = None,
 ) -> str:
     settings = settings or {}
-    tuning = settings.get("tuning", "") or ""
+    tuning = _resolved_tuning_for_piece(piece, settings)
     pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
     if len(pitches) < piece.strings:
         pitches.extend(_default_tuning(piece.strings)[len(pitches) :])
