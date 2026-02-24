@@ -4,6 +4,7 @@ from oud.core.model import Bar, Piece
 from oud.editor.state import EditorState
 from oud.tui.input import (
     complete_command,
+    complete_command_text,
     handle_command,
     handle_search,
     history_next,
@@ -78,6 +79,42 @@ def test_complete_command_basic(tmp_path) -> None:
     missing_dir = tmp_path / "missing"
     state.cmdline = f"e {missing_dir}{os.sep}x"
     assert complete_command(state) is True
+
+
+def test_complete_set_value_uses_legit_options_only() -> None:
+    state = _state()
+    text, msg = complete_command_text(state, "set tabnotation=")
+    assert text == "set tabnotation="
+    assert msg is not None and "full" in msg and "minimal" in msg
+
+    text, msg = complete_command_text(state, "set timesigstyle=n")
+    assert text == "set timesigstyle=numeric"
+    assert msg is None
+
+    text, msg = complete_command_text(state, "set beatsnap=")
+    assert text == "set beatsnap="
+    assert msg is not None and "off" in msg and "soft" in msg
+
+    text, msg = complete_command_text(state, "set minimumfret=")
+    assert text == "set minimumfret="
+    assert msg is not None and "0" in msg and "7" in msg
+
+    text, msg = complete_command_text(state, "set restrainopenstrings=")
+    assert text == "set restrainopenstrings=o"
+    assert msg is None
+
+    text, msg = complete_command_text(state, "set flagredundant=")
+    assert text == "set flagredundant=o"
+    assert msg is None
+
+    text, msg = complete_command_text(state, "set layout=s")
+    # layout accepts "spread" and legacy alias "stretch" route
+    assert text.startswith("set layout=s")
+    assert msg is None or msg.startswith("Options:")
+
+    text, msg = complete_command_text(state, "set madeup=")
+    assert text == "set madeup="
+    assert msg is None
 
 
 def test_handle_command_paths() -> None:

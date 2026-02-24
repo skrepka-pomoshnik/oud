@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from oud.core.tab_policy import apply_tabnotation_preset
 from oud.core.tuning_utils import tuning_preset
 from oud.editor.edit_ops import apply_override
 from oud.editor.ops import (
@@ -10,8 +11,9 @@ from oud.editor.ops import (
     fret_to_italian,
     italian_to_fret,
 )
+from oud.editor.preset_convert import apply_meta_preset_content_conversion
 from oud.editor.state import EditorState
-from oud.settings import save_settings
+from oud.settings import DEFAULT_SETTINGS, save_settings
 
 SetHandler = Callable[[EditorState, str], bool]
 
@@ -46,6 +48,7 @@ _BOOL_KEYS = {
     "italianmultifret",
     "viewinvert",
     "showtuning",
+    "restrainopenstrings",
 }
 
 _INT_KEYS = {
@@ -62,6 +65,8 @@ _INT_KEYS = {
     "midigate",
     "tempo",
     "newbars",
+    "minimumfret",
+    "maxstretch",
 }
 
 _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
@@ -91,6 +96,30 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "beatsnap": (
         {"off", "soft"},
         "Beatsnap must be off/soft",
+    ),
+    "timesigstyle": (
+        {"symbol", "numeric", "fraction"},
+        "Timesigstyle must be symbol/numeric/fraction",
+    ),
+    "tiecuestyle": (
+        {"bracket", "paren", "hide"},
+        "Tiecuestyle must be bracket/paren/hide",
+    ),
+    "tienoteheads": (
+        {"show", "hide", "parenthesize"},
+        "Tienoteheads must be show/hide/parenthesize",
+    ),
+    "slurcuestyle": (
+        {"paren", "bracket", "hide"},
+        "Slurcuestyle must be paren/bracket/hide",
+    ),
+    "holdcuestyle": (
+        {"angle", "paren", "hide"},
+        "Holdcuestyle must be angle/paren/hide",
+    ),
+    "tabnotation": (
+        {"minimal", "full"},
+        "Tabnotation must be minimal/full",
     ),
     "fontstyle": (
         {"modern", "renaissance", "baroque"},
@@ -126,6 +155,8 @@ def _set_enum(state: EditorState, key: str, value: str) -> bool:
         state.settings["layout"] = "auto"
         state.settings["justify"] = "edge"
         return True
+    if key == "tabnotation":
+        return apply_tabnotation_preset(state.settings, value)
     if key == "style":
         current = state.settings.get("style", "french")
         if value != current:
@@ -211,6 +242,7 @@ def _apply_meta_preset(state: EditorState, name: str) -> bool:
     preset = META_PRESETS.get(name)
     if preset is None:
         return False
+    conversion_note = apply_meta_preset_content_conversion(state, name, target_preset=preset)
     style = preset.get("style")
     if style is not None:
         _set_enum(state, "style", style)
@@ -224,12 +256,65 @@ def _apply_meta_preset(state: EditorState, name: str) -> bool:
         if key in {"style", "strings", "tuning"}:
             continue
         state.settings[key] = value
-    state.message = f"Applied preset: {name}"
+    state.message = f"Applied preset: {name}" + (f" ({conversion_note})" if conversion_note else "")
     return True
 
 
 def set_preset_names() -> tuple[str, ...]:
     return tuple(sorted(META_PRESETS.keys()))
+
+
+def set_key_names() -> tuple[str, ...]:
+    keys = set(DEFAULT_SETTINGS.keys())
+    keys.update(_HANDLERS.keys())
+    keys.update(_BOOL_KEYS)
+    keys.update(_INT_KEYS)
+    keys.update(_ENUM_VALUES.keys())
+    return tuple(sorted(keys))
+
+
+def set_value_options(key: str) -> tuple[str, ...]:  # noqa: PLR0911
+    if key in _BOOL_KEYS:
+        return ("on", "off")
+    if key in _ENUM_VALUES:
+        allowed, _error = _ENUM_VALUES[key]
+        return tuple(sorted(allowed))
+    if key == "tuning":
+        # Common presets + aliases accepted by tuning_preset(); free-form tuning still allowed.
+        presets = (
+            "renaissance",
+            "renaissance6",
+            "ren6",
+            "ren7",
+            "ren8",
+            "ren9",
+            "ren10",
+            "ren11",
+            "ren12",
+            "ren13",
+            "guitar",
+            "guitarlute",
+            "baroque",
+            "baroque11",
+            "baroque13",
+            "baroque-dminor",
+            "baroque-sharp",
+            "baroque-flat",
+        )
+        return tuple(sorted(set(presets)))
+    if key in {"time", "timesig"}:
+        return ("C", "O", "2/2", "3/4", "4/4", "6/8", "auto")
+    if key == "measuresstep":
+        return ("1", "5", "10")
+    if key == "minimumfret":
+        return ("0", "1", "2", "3", "5", "7")
+    if key == "maxstretch":
+        return ("0", "2", "3", "4", "5", "7")
+    if key in {"strings", "staff"}:
+        return tuple(str(v) for v in range(4, 14))
+    if key == "set":
+        return set_preset_names()
+    return ()
 
 
 _HANDLERS: dict[str, SetHandler] = {

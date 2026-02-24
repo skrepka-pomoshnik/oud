@@ -6,13 +6,17 @@ from pathlib import Path
 from oud.editor.keymap import command_bindings, search_bindings
 from oud.editor.prompt_state import (
     command_history_commit,
-    command_history_next as command_history_next_state,
-    command_history_prev as command_history_prev_state,
     command_history_reset_nav,
     search_history_commit,
     search_history_reset_nav,
 )
-from oud.editor.settings_ops import set_preset_names
+from oud.editor.prompt_state import (
+    command_history_next as command_history_next_state,
+)
+from oud.editor.prompt_state import (
+    command_history_prev as command_history_prev_state,
+)
+from oud.editor.settings_ops import set_key_names, set_preset_names, set_value_options
 from oud.editor.state import EditorState
 from oud.settings import DEFAULT_SETTINGS
 from oud.tui.commands import command_names, no_space_commands, path_commands
@@ -56,14 +60,25 @@ def complete_command_text(  # noqa: PLR0911, C901, PLR0912
 
     cmd, rest = cmdline.split(" ", 1)
     if cmd == "set":
-        keys = sorted({*DEFAULT_SETTINGS.keys(), *state.settings.keys()})
+        keys = sorted({*set_key_names(), *DEFAULT_SETTINGS.keys(), *state.settings.keys()})
         presets = list(set_preset_names())
         token = rest.strip()
         if not token:
             options = sorted(keys + presets)
             return cmdline, "Options: " + " ".join(options[:8])
         if "=" in token:
-            return cmdline, None
+            key, value_prefix = token.split("=", 1)
+            if not key:
+                return cmdline, None
+            options = [opt for opt in set_value_options(key) if opt.startswith(value_prefix)]
+            if not options:
+                return cmdline, None
+            if len(options) == 1:
+                return f"{cmd} {key}={options[0]}", None
+            common = os.path.commonprefix(options)
+            if common and common != value_prefix:
+                return f"{cmd} {key}={common}", None
+            return cmdline, "Options: " + " ".join(options[:8])
         matches = sorted([key for key in keys if key.startswith(token)])
         matches.extend([name for name in presets if name.startswith(token)])
         if not matches:

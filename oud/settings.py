@@ -32,7 +32,13 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "showtuning": "on",
     "flagstyle": "standard",
     "flagstems": "single",
+    "tabnotation": "minimal",
     "time": "C",
+    "timesigstyle": "symbol",
+    "tiecuestyle": "bracket",
+    "tienoteheads": "show",
+    "slurcuestyle": "paren",
+    "holdcuestyle": "angle",
     "key": "C",
     "countdots": "off",
     "keys": "vim+arrows",
@@ -64,6 +70,9 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "viewinvert": "off",
     "frenchc": "normal",
     "maxrepeats": "30",
+    "minimumfret": "0",
+    "maxstretch": "0",
+    "restrainopenstrings": "off",
     "newbars": "8",
 }
 

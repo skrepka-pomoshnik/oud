@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -45,7 +46,7 @@ def build_timeline_from_events(
 
 
 def cursor_at_time(
-    timeline: list[TimelineEntry],
+    timeline: Sequence[TimelineEntry],
     elapsed: float,
     *,
     start_index: int = 0,

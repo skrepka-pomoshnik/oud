@@ -18,6 +18,38 @@ def tuning_count(tuning: str) -> int:
     return count
 
 
+def parse_tuning_pitches(tuning: str) -> list[int]:
+    pitches: list[int] = []
+    idx = 0
+    text = (tuning or "").strip()
+    while idx < len(text):
+        ch = text[idx]
+        if ch.isalpha():
+            note = ch.upper()
+            idx += 1
+            accidental = ""
+            if idx < len(text) and text[idx] in "+-#b":
+                accidental = text[idx]
+                idx += 1
+            start = idx
+            while idx < len(text) and text[idx].isdigit():
+                idx += 1
+            octave_text = text[start:idx]
+            octave = int(octave_text) if octave_text else 3
+            semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(note, 0)
+            if accidental in ("+", "#"):
+                semis += 1
+            elif accidental in ("-", "b"):
+                semis -= 1
+            midi = (octave + 1) * 12 + semis
+            if 0 <= midi <= 127:
+                pitches.append(midi)
+        else:
+            idx += 1
+    pitches.reverse()  # return high -> low (string1..N)
+    return pitches
+
+
 def tuning_preset(value: str) -> str | None:
     presets = {
         "renaissance6": "g2c3f3a3d4g4",

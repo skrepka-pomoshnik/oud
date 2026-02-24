@@ -3,7 +3,11 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from oud.editor.playback import prime_playback_animation, reset_playback_animation, start_playback_clock
+from oud.editor.playback import (
+    prime_playback_animation,
+    reset_playback_animation,
+    start_playback_clock,
+)
 from oud.editor.state import EditorState
 from oud.exports.midi import build_playback_timeline, export_midi, play_midi
 

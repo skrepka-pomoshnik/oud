@@ -107,7 +107,8 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
         "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
-        "maxrepeats=30 scrollmode=page beatsnap=soft",
+        "maxrepeats=30 scrollmode=page beatsnap=soft timesigstyle=fraction "
+        "minimumfret=2 maxstretch=5 restrainopenstrings=on",
         str(tmp_path / "cfg.toml"),
     )
     assert state.settings["measures"] == "every"
@@ -142,6 +143,10 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["maxrepeats"] == "30"
     assert state.settings["scrollmode"] == "page"
     assert state.settings["beatsnap"] == "soft"
+    assert state.settings["timesigstyle"] == "fraction"
+    assert state.settings["minimumfret"] == "2"
+    assert state.settings["maxstretch"] == "5"
+    assert state.settings["restrainopenstrings"] == "on"
     assert state.piece.title == "Title"
     assert state.piece.author == "Author"
     assert state.piece.composer == "Composer"
@@ -159,8 +164,72 @@ def test_cmd_set_layout_stretch_alias(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert state.settings["justify"] == "edge"
 
 
+def test_cmd_set_tabnotation_full_preset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "tabnotation=full", str(tmp_path / "cfg.toml"))
+    assert state.settings["tabnotation"] == "full"
+    assert state.settings["showdur"] == "on"
+    assert state.settings["showextras"] == "on"
+    assert state.settings["showtactus"] == "on"
+    assert state.settings["flagredundant"] == "off"
+    assert state.settings["timesigstyle"] == "fraction"
+    assert state.settings["tiecuestyle"] == "paren"
+    assert state.settings["slurcuestyle"] == "paren"
+    assert state.settings["holdcuestyle"] == "angle"
+    assert state.settings["tienoteheads"] == "show"
+
+
+def test_cmd_set_tabnotation_full_reapply_overrides_user_toggles(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "tabnotation=full", str(tmp_path / "cfg.toml"))
+    assert state.settings["showdur"] == "on"
+    assert state.settings["timesigstyle"] == "fraction"
+    # User override after preset should stick until preset is reapplied.
+    cmd.cmd_set(state, "showdur=off timesigstyle=numeric tiecuestyle=hide", str(tmp_path / "cfg.toml"))
+    assert state.settings["showdur"] == "off"
+    assert state.settings["timesigstyle"] == "numeric"
+    assert state.settings["tiecuestyle"] == "hide"
+    cmd.cmd_set(state, "tabnotation=full", str(tmp_path / "cfg.toml"))
+    assert state.settings["showdur"] == "on"
+    assert state.settings["timesigstyle"] == "fraction"
+    assert state.settings["tiecuestyle"] == "paren"
+
+
+def test_cmd_set_tie_notehead_policy(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "tienoteheads=hide", str(tmp_path / "cfg.toml"))
+    assert state.settings["tienoteheads"] == "hide"
+    cmd.cmd_set(state, "tienoteheads=parenthesize", str(tmp_path / "cfg.toml"))
+    assert state.settings["tienoteheads"] == "parenthesize"
+
+
 def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
+    state.piece.bars[0].chords = [
+        Chord(
+            note_type=4,
+            dotted=False,
+            grid=None,
+            notes=[Note(4, 2, 0), Note(3, 2, 0), Note(1, 0, 0)],
+        ),
+    ]
 
     def _save(_path: str, _settings: dict[str, str]) -> None:
         return None
@@ -171,10 +240,125 @@ def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["tuning"] == "e2a2d3g3b3e4"
     assert state.settings["strings"] == "6"
     assert state.settings["italianorient"] == "reverse"
+    notes_after_guitar = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
+    assert (4, 1) in notes_after_guitar
+    assert (3, 2) in notes_after_guitar
+    assert "partial convert" in state.message
+    cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
+    notes_after_repeat = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
+    assert (4, 1) in notes_after_repeat
+    assert "partial convert" not in state.message
     cmd.cmd_set(state, "lute", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "french"
     assert state.settings["tuning"] == "g2c3f3a3d4g4"
     assert state.settings["strings"] == "6"
+    notes_after_lute = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
+    assert (3, 3) in notes_after_lute
+    assert "partial convert" in state.message
+
+
+def test_cmd_set_guitar_partial_convert_moves_open_bridge_course_to_next_course(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(
+            note_type=4,
+            dotted=False,
+            grid=None,
+            notes=[Note(4, 0, 0)],
+        ),
+    ]
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
+    notes = state.piece.bars[0].chords[0].notes
+    assert len(notes) == 1
+    # Temporary bridge keeps pitch by moving to the next course if -1 would go negative.
+    assert notes[0].string == 5
+    assert notes[0].fret >= 0
+    assert "partial convert" in state.message
+
+
+def test_cmd_set_guitar_partial_convert_negative_shift_uses_target_tuning_for_next_course(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(
+            note_type=4,
+            dotted=False,
+            grid=None,
+            notes=[Note(4, 0, 0)],
+        ),
+    ]
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
+    note = state.piece.bars[0].chords[0].notes[0]
+    # Equivalent pitch under target guitar tuning lands on the next course with
+    # a target-tuning fret (old source-tuning math produced a different fret).
+    assert (note.string, note.fret) == (5, 7)
+
+
+def test_cmd_set_guitar_partial_convert_drops_open_bridge_course_if_next_course_occupied(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(
+            note_type=4,
+            dotted=False,
+            grid=None,
+            notes=[Note(4, 0, 0), Note(5, 2, 0)],
+        ),
+    ]
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
+    notes = state.piece.bars[0].chords[0].notes
+    assert all(n.string != 4 for n in notes)
+    assert any(n.string == 5 for n in notes)
+    # The original next-course note remains; the negative-shift open note is dropped.
+    assert len(notes) == 1
+    assert "partial convert" in state.message
+
+
+def test_cmd_set_guitar_rescues_removed_bass_course_one_octave_up(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    state = _state()
+    state.piece.strings = 7
+    state.settings["strings"] = "7"
+    state.settings["tuning"] = "f2g2c3f3a3d4g4"
+    state.piece.bars[0].chords = [
+        Chord(
+            note_type=4,
+            dotted=False,
+            grid=None,
+            notes=[Note(7, 0, 0)],
+        ),
+    ]
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
+    notes = state.piece.bars[0].chords[0].notes
+    assert state.piece.strings == 6
+    assert len(notes) == 1
+    # 7th-course f2 is rescued as f3 on the target 6-string guitar layout.
+    assert (notes[0].string, notes[0].fret) == (4, 3)
 
 
 def test_cmd_set_bool_shortcuts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

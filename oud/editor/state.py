@@ -80,6 +80,8 @@ class EditorState:
         self.dirty_rows: set[int] = set()
         self.last_frame: Frame | None = None
         self.last_frame_size: tuple[int, int] | None = None
+        # Temporary bridge marker for preset-based partial conversion (guitar/lute).
+        self.partial_preset_convert_applied: str | None = None
 
     def clamp(self) -> None:
         clamp_cursor(self)
