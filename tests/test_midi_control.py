@@ -6,7 +6,13 @@ from typing import cast
 from oud.core.model import Bar, Piece
 from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.midi_control import midi_output_path, start_midi, stop_midi
-from oud.editor.playback import update_playback_animation
+from oud.editor.playback import (
+    advance_playback_cursor,
+    prime_playback_animation,
+    reset_playback_animation,
+    start_playback_clock,
+    update_playback_animation,
+)
 from oud.editor.state import EditorState
 
 
@@ -91,3 +97,30 @@ def test_update_playback_animation_accepts_legacy_tuple_entries(monkeypatch) -> 
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.6)
     update_playback_animation(state)
     assert state.playback_col == 5
+
+
+def test_playback_reducers_prime_start_advance_reset() -> None:
+    state = _state()
+    timeline = [PlaybackCursor(start=0.0, end=0.5, bar=2, col=3)]
+    prime_playback_animation(state, timeline)
+    assert state.playback.timeline == timeline
+    assert state.playback.started_at is None
+    assert state.playback.index == 0
+    assert state.playback.bar is None
+    assert state.playback.col is None
+
+    start_playback_clock(state, 10.0)
+    assert state.playback.started_at == 10.0
+
+    advance_playback_cursor(state, 0.25)
+    assert state.playback.bar == 2
+    assert state.playback.col == 3
+
+    advance_playback_cursor(state, 0.75)
+    assert state.playback.bar is None
+    assert state.playback.col is None
+
+    reset_playback_animation(state)
+    assert state.playback.timeline == []
+    assert state.playback.started_at is None
+    assert state.playback.index == 0

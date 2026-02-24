@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from oud.editor.playback import reset_playback_animation
+from oud.editor.playback import prime_playback_animation, reset_playback_animation, start_playback_clock
 from oud.editor.state import EditorState
 from oud.exports.midi import build_playback_timeline, export_midi, play_midi
 
@@ -53,7 +53,7 @@ def start_midi(
         start_bar=start_bar,
         dotted=state.dotted,
     )
-    state.playback_timeline = build_playback_timeline(
+    timeline = build_playback_timeline(
         state.piece,
         state.overrides,
         state.durations,
@@ -63,11 +63,8 @@ def start_midi(
         start_bar=start_bar,
         dotted=state.dotted,
     )
-    state.playback_index = 0
-    state.playback_bar = None
-    state.playback_col = None
-    state.playback_started_at = None
+    prime_playback_animation(state, timeline)
     soundfont = state.settings.get("soundfont", "") or None
     state.message, state.midi_proc = play_midi(path, soundfont=soundfont)
     if state.midi_proc is not None:
-        state.playback_started_at = time.monotonic()
+        start_playback_clock(state, time.monotonic())

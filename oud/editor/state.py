@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypedDict
 
 from oud.core.model import Bar, Piece
@@ -41,10 +41,7 @@ class EditorState:
         self.modified = False
         self.undo_stack: list[UndoAction] = []
         self.redo_stack: list[UndoAction] = []
-        self.command_history: list[str] = []
-        self.command_history_index: int | None = None
-        self.search_history: list[str] = []
-        self.search_history_index: int | None = None
+        self.history = PromptHistoryState()
         self.settings = settings
         self.replace_once = False
         self.insert_prefix = ""
@@ -64,11 +61,7 @@ class EditorState:
         self.screen_width = 0
         self.screen_height = 0
         self.midi_proc: subprocess.Popen[bytes] | None = None
-        self.playback_timeline: list[PlaybackCursor] = []
-        self.playback_started_at: float | None = None
-        self.playback_index = 0
-        self.playback_bar: int | None = None
-        self.playback_col: int | None = None
+        self.playback = PlaybackState()
         self.count_prefix = ""
         self.pending_key = ""
         self.pending_find = ""
@@ -81,15 +74,7 @@ class EditorState:
         self.stave_breaks: set[int] = set()
         self.config_path = config_path
         self.keycodes = keycodes or DEFAULT_KEYCODES
-        self.plugin_items: list[RemoteTab] = []
-        self.plugin_index = 0
-        self.plugin_offset = 0
-        self.plugin_title = "Plugins"
-        self.plugin_stack: list[tuple[str, list[RemoteTab], int, int, str | None]] = []
-        self.plugin_name: str | None = None
-        self.plugin_query = ""
-        self.plugin_query_active = False
-        self.plugin_pending = ""
+        self.plugins = PluginViewState()
         self.suspend_tui: Callable[[], None] | None = None
         self.resume_tui: Callable[[], None] | None = None
         self.dirty_rows: set[int] = set()
@@ -98,6 +83,150 @@ class EditorState:
 
     def clamp(self) -> None:
         clamp_cursor(self)
+
+    @property
+    def command_history(self) -> list[str]:
+        return self.history.command
+
+    @command_history.setter
+    def command_history(self, value: list[str]) -> None:
+        self.history.command = value
+
+    @property
+    def command_history_index(self) -> int | None:
+        return self.history.command_index
+
+    @command_history_index.setter
+    def command_history_index(self, value: int | None) -> None:
+        self.history.command_index = value
+
+    @property
+    def search_history(self) -> list[str]:
+        return self.history.search
+
+    @search_history.setter
+    def search_history(self, value: list[str]) -> None:
+        self.history.search = value
+
+    @property
+    def search_history_index(self) -> int | None:
+        return self.history.search_index
+
+    @search_history_index.setter
+    def search_history_index(self, value: int | None) -> None:
+        self.history.search_index = value
+
+    @property
+    def playback_timeline(self) -> list[PlaybackCursor]:
+        return self.playback.timeline
+
+    @playback_timeline.setter
+    def playback_timeline(self, value: list[PlaybackCursor]) -> None:
+        self.playback.timeline = value
+
+    @property
+    def playback_started_at(self) -> float | None:
+        return self.playback.started_at
+
+    @playback_started_at.setter
+    def playback_started_at(self, value: float | None) -> None:
+        self.playback.started_at = value
+
+    @property
+    def playback_index(self) -> int:
+        return self.playback.index
+
+    @playback_index.setter
+    def playback_index(self, value: int) -> None:
+        self.playback.index = value
+
+    @property
+    def playback_bar(self) -> int | None:
+        return self.playback.bar
+
+    @playback_bar.setter
+    def playback_bar(self, value: int | None) -> None:
+        self.playback.bar = value
+
+    @property
+    def playback_col(self) -> int | None:
+        return self.playback.col
+
+    @playback_col.setter
+    def playback_col(self, value: int | None) -> None:
+        self.playback.col = value
+
+    @property
+    def plugin_items(self) -> list[RemoteTab]:
+        return self.plugins.items
+
+    @plugin_items.setter
+    def plugin_items(self, value: list[RemoteTab]) -> None:
+        self.plugins.items = value
+
+    @property
+    def plugin_index(self) -> int:
+        return self.plugins.index
+
+    @plugin_index.setter
+    def plugin_index(self, value: int) -> None:
+        self.plugins.index = value
+
+    @property
+    def plugin_offset(self) -> int:
+        return self.plugins.offset
+
+    @plugin_offset.setter
+    def plugin_offset(self, value: int) -> None:
+        self.plugins.offset = value
+
+    @property
+    def plugin_title(self) -> str:
+        return self.plugins.title
+
+    @plugin_title.setter
+    def plugin_title(self, value: str) -> None:
+        self.plugins.title = value
+
+    @property
+    def plugin_stack(self) -> list[tuple[str, list[RemoteTab], int, int, str | None]]:
+        return self.plugins.stack
+
+    @plugin_stack.setter
+    def plugin_stack(self, value: list[tuple[str, list[RemoteTab], int, int, str | None]]) -> None:
+        self.plugins.stack = value
+
+    @property
+    def plugin_name(self) -> str | None:
+        return self.plugins.name
+
+    @plugin_name.setter
+    def plugin_name(self, value: str | None) -> None:
+        self.plugins.name = value
+
+    @property
+    def plugin_query(self) -> str:
+        return self.plugins.query
+
+    @plugin_query.setter
+    def plugin_query(self, value: str) -> None:
+        self.plugins.query = value
+
+    @property
+    def plugin_query_active(self) -> bool:
+        return self.plugins.query_active
+
+    @plugin_query_active.setter
+    def plugin_query_active(self, value: bool) -> None:
+        self.plugins.query_active = value
+
+    @property
+    def plugin_pending(self) -> str:
+        return self.plugins.pending
+
+    @plugin_pending.setter
+    def plugin_pending(self, value: str) -> None:
+        self.plugins.pending = value
 
 
 @dataclass
@@ -130,3 +259,33 @@ class BarSnapshot(TypedDict):
     slurs: list[tuple[int, int, int]]
     ties: list[tuple[int, int, int]]
     holds: list[tuple[int, int, int]]
+
+
+@dataclass
+class PromptHistoryState:
+    command: list[str] = field(default_factory=list)
+    command_index: int | None = None
+    search: list[str] = field(default_factory=list)
+    search_index: int | None = None
+
+
+@dataclass
+class PlaybackState:
+    timeline: list[PlaybackCursor] = field(default_factory=list)
+    started_at: float | None = None
+    index: int = 0
+    bar: int | None = None
+    col: int | None = None
+
+
+@dataclass
+class PluginViewState:
+    items: list[RemoteTab] = field(default_factory=list)
+    index: int = 0
+    offset: int = 0
+    title: str = "Plugins"
+    stack: list[tuple[str, list[RemoteTab], int, int, str | None]] = field(default_factory=list)
+    name: str | None = None
+    query: str = ""
+    query_active: bool = False
+    pending: str = ""

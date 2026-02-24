@@ -5,6 +5,7 @@ import curses
 from oud.editor.init import init_state
 from oud.editor.playback import update_playback_animation
 from oud.editor.status import status_line
+from oud.editor.view_state import view_commit_frame, view_merge_dirty, view_resize
 from oud.exports.export_tab import export_ascii
 from oud.tui.controller import handle_key as handle_key_impl
 from oud.tui.input import handle_command as handle_command_input
@@ -102,17 +103,12 @@ def run_loop(
             state.playback_col,
         )
         frame = frame_buffer.snapshot()
-        if state.last_frame_size != (height, width):
-            state.last_frame = None
-            state.last_frame_size = (height, width)
-            state.dirty_rows = set(range(height))
+        view_resize(state, height=height, width=width)
         dirty = frame_diff_rows(state.last_frame, frame)
-        if state.dirty_rows:
-            dirty |= state.dirty_rows
+        dirty = view_merge_dirty(state, dirty)
         draw_frame_rows(screen, frame, dirty)
         screen.refresh()
-        state.last_frame = frame
-        state.dirty_rows.clear()
+        view_commit_frame(state, frame)
 
         key = stdscr.getch()
         if key != -1:

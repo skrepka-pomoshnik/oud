@@ -4,13 +4,19 @@ import os
 from pathlib import Path
 
 from oud.editor.keymap import command_bindings, search_bindings
+from oud.editor.prompt_state import (
+    command_history_commit,
+    command_history_next as command_history_next_state,
+    command_history_prev as command_history_prev_state,
+    command_history_reset_nav,
+    search_history_commit,
+    search_history_reset_nav,
+)
 from oud.editor.settings_ops import set_preset_names
 from oud.editor.state import EditorState
 from oud.settings import DEFAULT_SETTINGS
 from oud.tui.commands import command_names, no_space_commands, path_commands
 from oud.tui.prompt import PromptBindings, update_prompt
-from oud.tui.prompt_history import history_next as history_next_impl
-from oud.tui.prompt_history import history_prev as history_prev_impl
 
 
 def _prompt_bindings(bindings) -> PromptBindings:
@@ -25,15 +31,11 @@ def _prompt_bindings(bindings) -> PromptBindings:
 
 
 def history_prev(state: EditorState) -> str | None:
-    text, index = history_prev_impl(state.command_history, state.command_history_index)
-    state.command_history_index = index
-    return text
+    return command_history_prev_state(state)
 
 
 def history_next(state: EditorState) -> str | None:
-    text, index = history_next_impl(state.command_history, state.command_history_index)
-    state.command_history_index = index
-    return text
+    return command_history_next_state(state)
 
 
 def complete_command_text(  # noqa: PLR0911, C901, PLR0912
@@ -148,15 +150,13 @@ def handle_command(state: EditorState, key: int, apply_command) -> bool:
     if result.cancel:
         state.mode = "normal"
         state.cmdline = ""
-        state.command_history_index = None
+        command_history_reset_nav(state)
         return True
     if result.submit:
         cmd = state.cmdline
         state.cmdline = ""
         state.mode = "normal"
-        state.command_history_index = None
-        if cmd:
-            state.command_history.append(cmd)
+        command_history_commit(state, cmd)
         apply_command(state, cmd)
         return True
     return True
@@ -189,16 +189,14 @@ def handle_search(state: EditorState, key: int) -> bool:
     if result.cancel:
         state.mode = "normal"
         state.searchline = ""
-        state.search_history_index = None
+        search_history_reset_nav(state)
         return True
     if result.submit:
         search_text = state.searchline
         target = parse_search(search_text)
         state.searchline = ""
         state.mode = "normal"
-        state.search_history_index = None
-        if search_text:
-            state.search_history.append(search_text)
+        search_history_commit(state, search_text)
         if target is None:
             state.message = "Invalid bar"
             return True

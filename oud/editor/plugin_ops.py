@@ -17,6 +17,18 @@ from oud.editor.list_menu import (
     menu_reduce_nav,
     menu_sync_offset,
 )
+from oud.editor.plugin_state import (
+    plugin_apply_nav,
+    plugin_enter_root,
+    plugin_open_list,
+    plugin_pop_view,
+    plugin_push_view,
+    plugin_search_append,
+    plugin_search_backspace,
+    plugin_search_cancel,
+    plugin_search_finish,
+    plugin_search_start,
+)
 from oud.editor.state import EditorState
 
 
@@ -75,40 +87,15 @@ def _load_plugin_module(name: str, path: Path):
 
 
 def enter_plugin_mode(state: EditorState) -> None:
-    state.mode = "plugin"
-    state.plugin_title = "Plugins"
-    state.plugin_items = _plugin_root()
-    state.plugin_index = 0
-    state.plugin_offset = 0
-    state.plugin_stack = []
-    state.plugin_name = None
-    state.plugin_query = ""
-    state.plugin_query_active = False
-    state.plugin_pending = ""
+    plugin_enter_root(state, _plugin_root())
 
 
 def _push_stack(state: EditorState) -> None:
-    state.plugin_stack.append(
-        (
-            state.plugin_title,
-            list(state.plugin_items),
-            state.plugin_index,
-            state.plugin_offset,
-            state.plugin_name,
-        ),
-    )
+    plugin_push_view(state)
 
 
 def _pop_stack(state: EditorState) -> bool:
-    if not state.plugin_stack:
-        return False
-    title, items, index, offset, plugin_name = state.plugin_stack.pop()
-    state.plugin_title = title
-    state.plugin_items = items
-    state.plugin_index = index
-    state.plugin_offset = offset
-    state.plugin_name = plugin_name
-    return True
+    return plugin_pop_view(state)
 
 
 def _select_index_item(state: EditorState, kind: str) -> None:
@@ -127,11 +114,12 @@ def _select_index_item(state: EditorState, kind: str) -> None:
         state.message = "No supported files found"
         return
     _push_stack(state)
-    state.plugin_title = f"{lutemusic.PLUGIN_TITLE}: {kind}"
-    state.plugin_items = items
-    state.plugin_index = 0
-    state.plugin_offset = 0
-    state.plugin_name = "lutemusic"
+    plugin_open_list(
+        state,
+        title=f"{lutemusic.PLUGIN_TITLE}: {kind}",
+        items=items,
+        plugin_name="lutemusic",
+    )
     state.message = f"Loaded {len(items)} entries"
 
 
@@ -172,11 +160,12 @@ def open_plugin_item(state: EditorState) -> None:  # noqa: PLR0911
             state.message = f"Failed to load plugin {name}"
             return
         _push_stack(state)
-        state.plugin_title = getattr(module, "PLUGIN_TITLE", name)
-        state.plugin_items = list(getattr(module, "root_items", list)())
-        state.plugin_index = 0
-        state.plugin_offset = 0
-        state.plugin_name = name
+        plugin_open_list(
+            state,
+            title=str(getattr(module, "PLUGIN_TITLE", name)),
+            items=list(getattr(module, "root_items", list)()),
+            plugin_name=name,
+        )
         if not state.plugin_items:
             state.message = "Plugin has no items"
         return
@@ -196,10 +185,7 @@ def open_plugin_item(state: EditorState) -> None:  # noqa: PLR0911
             state.message = "No supported files found"
             return
         _push_stack(state)
-        state.plugin_title = item.title
-        state.plugin_items = items
-        state.plugin_index = 0
-        state.plugin_offset = 0
+        plugin_open_list(state, title=item.title, items=items)
         state.message = f"Loaded {len(items)} entries"
         return
     if state.plugin_name and state.plugin_name != "lutemusic":
@@ -214,24 +200,21 @@ def open_plugin_item(state: EditorState) -> None:  # noqa: PLR0911
 def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: PLR0911
     bindings = plugin_bindings(state)
     if key in bindings.search:
-        state.plugin_query_active = True
-        state.plugin_query = ""
+        plugin_search_start(state)
         state.message = "Search: "
         return True
     if not state.plugin_query_active:
         return False
     if key in bindings.escape:
-        state.plugin_query_active = False
-        state.plugin_query = ""
+        plugin_search_cancel(state)
         state.message = ""
         return True
     if key in bindings.backspace:
-        state.plugin_query = state.plugin_query[:-1]
+        plugin_search_backspace(state)
         state.message = f"Search: {state.plugin_query}"
         return True
     if key in bindings.enter:
-        query = state.plugin_query.strip().lower()
-        state.plugin_query_active = False
+        query = plugin_search_finish(state)
         if not query:
             state.message = ""
             return True
@@ -250,7 +233,7 @@ def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: PLR091
         state.message = "No match"
         return True
     if 32 <= key <= 126:
-        state.plugin_query += chr(key)
+        plugin_search_append(state, chr(key))
         state.message = f"Search: {state.plugin_query}"
         return True
     return True
@@ -314,9 +297,7 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
         length=len(state.plugin_items),
         page_size=page_size,
     )
-    state.plugin_index = nav.index
-    state.plugin_offset = nav.offset
-    state.plugin_pending = nav.pending_prefix
+    plugin_apply_nav(state, index=nav.index, offset=nav.offset, pending=nav.pending_prefix)
     if handled:
         return True
     if action == "open":
