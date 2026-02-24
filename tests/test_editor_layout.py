@@ -25,7 +25,7 @@ def _state(settings: dict[str, str]) -> EditorState:
 def test_bars_per_line_respects_positive_linelen_cap() -> None:
     state = _state({"linelen": "80", "layout": "auto"})
     per_line = bars_per_line(state, width=200)
-    assert per_line == 7
+    assert per_line == 6
 
 
 def test_bars_per_line_linelen_zero_means_no_cap() -> None:

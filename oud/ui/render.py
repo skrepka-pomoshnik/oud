@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from oud.core.model import Piece
+from oud.core.tab_policy import rows_reversed
 from oud.core.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
 from oud.core.view_model import _block_height, _tuning_labels
 from oud.ui.adapter import A_REVERSE, Screen
@@ -34,7 +35,7 @@ def _render_header_line(
     *,
     width: int,
     piece: Piece,
-    settings: dict[str, str],
+    settings: dict[str, str],  # noqa: ARG001
 ) -> None:
     title = piece.title or "Untitled"
     right = _clean_text(piece.composer or "")
@@ -189,12 +190,10 @@ def render_piece(  # noqa: C901, PLR0912
     show_tactus = settings.get("showtactus", "off") == "on"
     hide_redundant = settings.get("flagredundant", "on") == "on"
     double_stems = settings.get("flagstems", "single") == "double"
-    reverse_strings = (
-        settings.get("viewinvert", "off") == "on"
-        or (
-            style == "italian"
-            and settings.get("italianorient", "normal") == "reverse"
-        )
+    reverse_strings = rows_reversed(
+        style=style,
+        italian_orient=settings.get("italianorient", "normal"),
+        viewinvert=settings.get("viewinvert", "off"),
     )
     show_octaves = settings.get("tuninglabels", "relative") == "absolute"
     used_bass = _bass_strings_used(piece, overrides)

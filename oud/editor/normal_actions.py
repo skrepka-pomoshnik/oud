@@ -74,7 +74,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         state.pending_find = ""
         return True
 
-    def handle_pending_key() -> bool:  # noqa: PLR0911
+    def handle_pending_key() -> bool:  # noqa: C901, PLR0911, PLR0912
         if not state.pending_key:
             return False
         if state.pending_key == "g" and key in pending_keys.gg:

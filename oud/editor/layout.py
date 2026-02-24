@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from oud.core.spacing import auto_bar_plan
 from oud.core.view_model import (
-    _bars_fit,
     _next_system_start,
 )
 from oud.editor.state import EditorState
@@ -119,7 +118,6 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
     right_padding = 1
     usable_width = max(1, max_width - left_margin - right_padding)
     spacing_mode = state.settings.get("layout", "packed")
-    spacing_fill = state.settings.get("justify", "stretch")
     bargap = state.settings.get("bargap", "")
     if bargap.isdigit():
         bar_gap = max(0, int(bargap))
@@ -142,15 +140,6 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
                 if bars_per_line_limit <= 0
                 else min(bars_per_line_limit, limit)
             )
-    max_chords = 0
-    max_chords_text = state.settings.get("maxchords", "")
-    if max_chords_text.isdigit():
-        max_chords = int(max_chords_text)
-    chord_wrap_limit = 0
-    chord_wrap_text = state.settings.get("chordwrap", "")
-    if chord_wrap_text.isdigit():
-        chord_wrap_limit = int(chord_wrap_text)
-
     starts = [0]
     current = 0
     while current < total:

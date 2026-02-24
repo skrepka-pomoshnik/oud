@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from oud.core.model import Bar
+from oud.core.tab_policy import fret_label
 
 
 def format_fret(
@@ -12,37 +13,7 @@ def format_fret(
     legacy_c = legacy.get("french_c") or legacy.get("frenchc")
     if legacy_c and french_c_shape == "normal":
         french_c_shape = legacy_c
-    if style == "italian":
-        if fret == 10:
-            return "x"
-        return str(fret)
-    letters = [
-        "a",
-        "b",
-        "c",
-        "d",
-        "e",
-        "f",
-        "g",
-        "h",
-        "i",
-        "k",
-        "l",
-        "m",
-        "n",
-        "o",
-        "p",
-        "q",
-        "r",
-        "s",
-        "t",
-    ]
-    if not 0 <= fret < len(letters):
-        return "?"
-    letter = letters[fret]
-    if french_c_shape in ("historical", "alt") and letter == "c":
-        return "r"
-    return letter
+    return fret_label(style, fret, french_c_shape=french_c_shape)
 
 
 def bar_cells(
@@ -193,11 +164,13 @@ def duration_flag(duration: int) -> str:
 
 
 def flag_count(denom: int) -> int:
-    if denom <= 4:
+    # Historical tablature rhythm cue style:
+    # minim (2) = plain stem, crotchet (4) = 1 flag, quaver (8) = 2 flags, ...
+    if denom <= 2:
         return 0
     count = 0
-    value = denom // 4
-    while value > 1:
+    value = max(1, denom)
+    while value > 2:
         count += 1
         value //= 2
     return count
@@ -360,6 +333,8 @@ def smart_group_map(
     all_positions: list[tuple[int, int, bool]],
     group_positions: list[tuple[int, int, bool]],
     content_width: int,
+    *,
+    min_gap: int = 1,
 ) -> dict[int, int]:
     if content_width <= 0 or not all_positions:
         return {}
@@ -372,7 +347,8 @@ def smart_group_map(
     groups = sorted({col for col, _denom, _dot in group_positions})
     boundaries = [col for col in groups if col in set(raw_cols[1:])]
 
-    base_span = len(raw_cols) - 1
+    gap = max(1, min_gap)
+    base_span = (len(raw_cols) - 1) * gap
     extra = max(0, content_width - (base_span + 1))
     gap_before: dict[int, int] = {}
 
@@ -395,7 +371,7 @@ def smart_group_map(
     cursor = 0
     mapping[raw_cols[0]] = 0
     for raw in raw_cols[1:]:
-        cursor += 1 + gap_before.get(raw, 0)
+        cursor += gap + gap_before.get(raw, 0)
         cursor = min(cursor, content_width - 1)
         mapping[raw] = cursor
     return mapping
@@ -431,12 +407,10 @@ def soft_beat_snap_map(
         active_bucket = bucket - min_bucket
         dst_start = (active_bucket * content_width) // active_bucket_count
         dst_end = ((active_bucket + 1) * content_width) // active_bucket_count - 1
-        if dst_end < dst_start:
-            dst_end = dst_start
+        dst_end = max(dst_end, dst_start)
         raw_start = (bucket * width) // bucket_count
         raw_end = ((bucket + 1) * width) // bucket_count - 1
-        if raw_end < raw_start:
-            raw_end = raw_start
+        raw_end = max(raw_end, raw_start)
         if raw_end == raw_start:
             target = dst_start
         else:
@@ -449,7 +423,9 @@ def soft_beat_snap_map(
     # Soft beat snap arranges note onsets; visible flag tails are placed later.
     # Using full flag spans here (especially with hidden redundant flags) over-reserves
     # width and leaves misleading trailing dash space.
-    unit_seeded = [(col, 4, False) for (col, _denom, _dot) in seeded]
+    # Use a stem-only placeholder (minim-like) so this pass spaces note anchors only,
+    # not visible flag tails.
+    unit_seeded = [(col, 2, False) for (col, _denom, _dot) in seeded]
     spread = spread_flag_positions(unit_seeded, content_width, min_gap=max(0, min_gap))
     return {
         raw: col
@@ -463,6 +439,7 @@ def trim_right_slack_for_onsets(
     all_positions: list[tuple[int, int, bool]],
     visible_positions: list[tuple[int, int, bool]] | None,
     content_width: int,
+    min_gap: int = 1,
 ) -> dict[int, int]:
     if content_width <= 0 or not src_to_dest or not all_positions:
         return src_to_dest
@@ -495,7 +472,7 @@ def trim_right_slack_for_onsets(
             col = src_to_dest[raw]
             scaled = first_col + ((col - first_col) * target_span) // curr_span
             seeded.append((max(0, min(content_width - 1, scaled)), 4, False))
-        spread = spread_flag_positions(seeded, content_width, min_gap=0)
+        spread = spread_flag_positions(seeded, content_width, min_gap=max(0, min_gap))
         trimmed = dict(src_to_dest)
         for raw, (col, _denom, _dot) in zip(ordered_raws, spread, strict=False):
             trimmed[raw] = col

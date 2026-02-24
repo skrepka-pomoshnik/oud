@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 from oud.core.render_utils import (
-    soft_beat_snap_map,
     smart_group_map,
+    soft_beat_snap_map,
     spread_flag_positions,
     trim_right_slack_for_onsets,
 )
 from oud.core.spacing import auto_bar_plan
+from oud.core.tab_policy import (
+    hold_span_chars,
+    show_time_cue_for_bar,
+    slur_span_chars,
+    system_display_indices_for_bars,
+    tie_notehead_hidden_cols,
+    tie_notehead_parenthesize_cols,
+    tie_span_chars,
+    time_cue_reserved_width,
+    time_cue_side_pad,
+    time_sig_inline_rows,
+    visual_row_indices,
+)
 from oud.core.view_model import (
     _bar_annotations,
     _bar_durations,
@@ -36,32 +49,12 @@ from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
 
 
-def _time_sig_inline_rows(raw_time_value: str, sig_label: str) -> list[str]:
-    raw = (raw_time_value or "").strip()
-    if "/" in raw:
-        num = raw.split("/", 1)[0].strip()
-        if num:
-            return [num[:2].rjust(2)]
-    text = (sig_label or "").strip()
-    if not text:
-        return []
-    if text in {"C", "O"}:
-        # Common/cut time cue centered in staff without stem clutter.
-        return [" ", text[:1], " "]
-    if "/" in text:
-        left, right = text.split("/", 1)
-        top = f"{left[:2]:>2}"
-        bot = f"{right[:2]:>2}"
-        return [top, " /", bot]
-    return [f"{text[:2]:>2}", "  ", "  "]
-
-
 def _build_chord_scale_map(
     positions: list[tuple[int, int, bool]],
     bar_width: int,
     content_width: int,
     *,
-    min_gap: int = 1,
+    min_gap: int = 2,
 ) -> tuple[list[tuple[int, int, bool]], dict[int, int]]:
     scaled_positions = [
         (_scale_col(pos, bar_width, content_width), denom, dot)
@@ -161,6 +154,8 @@ def _required_auto_display_width_for_bar(
     hide_redundant: bool,
     barpad: int,
     flag_gap: int = 1,
+    event_gap: int = 2,
+    cue_pad_total: int = 0,
 ) -> int:
     if not bar.chords:
         return 1
@@ -177,16 +172,17 @@ def _required_auto_display_width_for_bar(
     )
     min_content = _required_flag_content_width(ordered_flags, min_gap=flag_gap)
     note_cols = _note_event_columns(cells, total_strings, grid_width)
-    # Keep at least one visible dash between the last note and the right barline.
-    # Reserving two cells avoids endpoint scaling from placing the last note into
-    # the final content column.
-    min_content = max(min_content, (len(note_cols) + 2) if note_cols else 1)
+    # Keep at least one visible dash between noteheads and also before the right barline.
+    # Required note span plus one trailing dash before the closing barline.
+    if note_cols:
+        min_note_content = 2 + (max(0, len(note_cols) - 1) * max(1, event_gap))
+        min_content = max(min_content, min_note_content)
     if show_dur:
         min_content = max(
             min_content,
             _required_duration_content_width(ordered_flags, min_gap=flag_gap),
         )
-    return max(1, min_content + (barpad * 2))
+    return max(1, min_content + (barpad * 2) + max(0, cue_pad_total))
 
 
 def _redistribute_extra_width(  # noqa: C901, PLR0912
@@ -305,6 +301,19 @@ def _playback_in_range(bar, playback_col: int, bar_width: int) -> bool:
     return playback_col < bar_width
 
 
+def _resolved_bar_time_value(
+    piece,
+    bar_index: int,
+    time_setting: str,
+    default_duration: int,
+) -> str:
+    value = piece.bars[bar_index].time_sig or time_setting
+    if value in ("auto", "detect"):
+        inferred = _infer_time_signature(piece.bars[bar_index], default_duration)
+        value = inferred or "C"
+    return value
+
+
 def render_systems(  # noqa: C901, PLR0912
     stdscr: Screen,
     *,
@@ -315,7 +324,7 @@ def render_systems(  # noqa: C901, PLR0912
     block_h: int,
     systems: int,
     total_strings: int,
-    display_indices: list[int],
+    display_indices: list[int],  # noqa: ARG001
     display_strings: int,
     bar_offset: int,
     cursor_bar: int,
@@ -393,21 +402,43 @@ def render_systems(  # noqa: C901, PLR0912
             )
             # Enforce per-bar minimums up-front so later rendering never expands
             # bars after fit (which can visually split bars in stretch modes).
-            min_widths = [
-                _required_auto_display_width_for_bar(
-                    piece.bars[abs_bar],
-                    total_strings=total_strings,
-                    bar_width=bar_width,
-                    default_duration=default_duration,
-                    style=settings.get("style", "french"),
-                    french_c=settings.get("frenchc", "normal"),
-                    show_dur=show_dur and rows_proto["dur"] is not None,
-                    hide_redundant=hide_redundant,
-                    barpad=barpad,
-                    flag_gap=2 if spacing_fill == "smart" else 1,
+            time_setting = settings.get("time", "C")
+            min_widths: list[int] = []
+            for abs_bar in bar_indices:
+                current_time = _resolved_bar_time_value(
+                    piece, abs_bar, time_setting, default_duration,
                 )
-                for abs_bar in bar_indices
-            ]
+                _beats, _unit, sig_label = _parse_time_signature(current_time)
+                prev_time = (
+                    _resolved_bar_time_value(piece, abs_bar - 1, time_setting, default_duration)
+                    if abs_bar > 0
+                    else None
+                )
+                show_cue = show_time_cue_for_bar(
+                    bar_index=abs_bar,
+                    current_time_value=current_time,
+                    prev_time_value=prev_time,
+                    sig_label=sig_label,
+                )
+                min_widths.append(
+                    _required_auto_display_width_for_bar(
+                        piece.bars[abs_bar],
+                        total_strings=total_strings,
+                        bar_width=bar_width,
+                        default_duration=default_duration,
+                        style=settings.get("style", "french"),
+                        french_c=settings.get("frenchc", "normal"),
+                        show_dur=show_dur and rows_proto["dur"] is not None,
+                        hide_redundant=hide_redundant,
+                        barpad=barpad,
+                        flag_gap=2 if spacing_fill == "smart" else 1,
+                        event_gap=2,
+                        cue_pad_total=time_cue_reserved_width(
+                            show_time_cue=show_cue,
+                            scale_bar=True,
+                        ),
+                    ),
+                )
             bar_widths = [
                 max(width, min_width)
                 for width, min_width in zip(bar_widths, min_widths, strict=False)
@@ -431,21 +462,15 @@ def render_systems(  # noqa: C901, PLR0912
             bar_end = min(total_bars, bar_end)
             bar_indices = list(range(bar_start, bar_end))
         # Show extra bass rows only when they are used in this rendered system.
-        base_strings = min(6, total_strings)
-        system_display_indices = list(range(base_strings))
-        system_used_bass: set[int] = set()
-        for scan_bar in piece.bars[bar_start:bar_end]:
-            for note in scan_bar.notes:
-                idx = note.string - 1
-                if base_strings <= idx < total_strings:
-                    system_used_bass.add(idx)
-            for chord in scan_bar.chords:
-                for note in chord.notes:
-                    idx = note.string - 1
-                    if base_strings <= idx < total_strings:
-                        system_used_bass.add(idx)
-        system_display_indices.extend(sorted(system_used_bass))
+        system_display_indices = system_display_indices_for_bars(
+            piece.bars[bar_start:bar_end],
+            total_strings=total_strings,
+        )
         system_display_strings = len(system_display_indices)
+        system_visual_indices = visual_row_indices(
+            system_display_indices,
+            reverse=reverse_strings,
+        )
         rows = _layout_block_rows(
             system_display_strings,
             include_meta,
@@ -457,10 +482,7 @@ def render_systems(  # noqa: C901, PLR0912
         for display_idx in range(system_display_strings):
             label = "  "
             if sys_idx == 0:
-                if reverse_strings:
-                    actual = system_display_indices[system_display_strings - 1 - display_idx]
-                else:
-                    actual = system_display_indices[display_idx]
+                actual = system_visual_indices[display_idx]
                 label = _string_label(actual, total_strings, tuning_labels, basslabels)
             safe_addstr(stdscr, row_start + (rows["staff"] or 0) + display_idx, 0, label)
 
@@ -512,10 +534,7 @@ def render_systems(  # noqa: C901, PLR0912
                 step_value,
             )
             time_setting = settings.get("time", "C")
-            time_value = bar.time_sig or time_setting
-            if time_value in ("auto", "detect"):
-                inferred = _infer_time_signature(bar, default_duration)
-                time_value = inferred or "C"
+            time_value = _resolved_bar_time_value(piece, abs_bar, time_setting, default_duration)
             beats, _unit, _sig_label = _parse_time_signature(time_value)
             tactus = _tactus_row(grid_width, beats)
             barline = bar.barline or "|"
@@ -524,10 +543,48 @@ def render_systems(  # noqa: C901, PLR0912
             repeat_cue = repeat if not repeat_glyph else ""
             ann_cells = _bar_annotations(annotations, abs_bar, grid_width)
             orn_cells = _bar_ornaments(ornaments, abs_bar, grid_width)
-            slur_cells = _bar_span_row(slurs, abs_bar, grid_width, "(", ")", "~")
-            tie_cells = _bar_span_row(ties, abs_bar, grid_width, "[", "]", "-")
-            hold_cells = _bar_span_row(holds, abs_bar, grid_width, "<", ">", "_")
+            slur_chars = slur_span_chars(settings.get("slurcuestyle", "paren"))
+            if slur_chars is None:
+                slur_cells = [" " for _ in range(grid_width)]
+            else:
+                slur_cells = _bar_span_row(slurs, abs_bar, grid_width, *slur_chars)
+            tie_chars = tie_span_chars(settings.get("tiecuestyle", "bracket"))
+            if tie_chars is None:
+                tie_cells = [" " for _ in range(grid_width)]
+            else:
+                tie_cells = _bar_span_row(ties, abs_bar, grid_width, *tie_chars)
+            hold_chars = hold_span_chars(settings.get("holdcuestyle", "angle"))
+            if hold_chars is None:
+                hold_cells = [" " for _ in range(grid_width)]
+            else:
+                hold_cells = _bar_span_row(holds, abs_bar, grid_width, *hold_chars)
             apply_overrides(cells, overrides, abs_bar, total_strings, grid_width)
+            hidden_tie_cols = tie_notehead_hidden_cols(
+                ties,
+                bar_index=abs_bar,
+                mode=settings.get("tienoteheads", "show"),
+            )
+            paren_tie_cols = tie_notehead_parenthesize_cols(
+                ties,
+                bar_index=abs_bar,
+                mode=settings.get("tienoteheads", "show"),
+            )
+            if hidden_tie_cols:
+                for hide_col in hidden_tie_cols:
+                    if not (0 <= hide_col < grid_width):
+                        continue
+                    for row_cells in cells:
+                        if row_cells[hide_col] != "-":
+                            row_cells[hide_col] = "-"
+            if paren_tie_cols:
+                for end_col in paren_tie_cols:
+                    if not (0 <= end_col < grid_width):
+                        continue
+                    if tie_cells[end_col] == " ":
+                        tie_cells[end_col] = ")"
+                    left = end_col - 1
+                    if left >= 0 and tie_cells[left] == " ":
+                        tie_cells[left] = "("
             display_width = bar_width
             if spacing_mode == "auto":
                 display_width = bar_widths[local_idx]
@@ -552,20 +609,19 @@ def render_systems(  # noqa: C901, PLR0912
                     display_width = min_display
                     scale_bar = True
             pad = barpad if scale_bar else 0
-            wrote_time_sig = False
-            show_time_sig_here = False
-            show_sig = abs_bar == 0
-            if not show_sig and abs_bar > 0:
-                prev_bar = piece.bars[abs_bar - 1]
-                prev_time = prev_bar.time_sig or time_setting
-                if prev_time in ("auto", "detect"):
-                    inferred_prev = _infer_time_signature(prev_bar, default_duration)
-                    prev_time = inferred_prev or "C"
-                show_sig = prev_time != time_value
-            if show_sig and _sig_label:
-                show_time_sig_here = True
-                wrote_time_sig = True
-            cue_pad_extra = 2 if (show_time_sig_here and scale_bar) else 0
+            prev_time = (
+                _resolved_bar_time_value(piece, abs_bar - 1, time_setting, default_duration)
+                if abs_bar > 0
+                else None
+            )
+            show_time_sig_here = show_time_cue_for_bar(
+                bar_index=abs_bar,
+                current_time_value=time_value,
+                prev_time_value=prev_time,
+                sig_label=_sig_label,
+            )
+            wrote_time_sig = show_time_sig_here
+            cue_pad_extra = time_cue_side_pad(show_time_cue=show_time_sig_here, scale_bar=scale_bar)
             draw_pad = pad + cue_pad_extra
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
@@ -633,6 +689,8 @@ def render_systems(  # noqa: C901, PLR0912
                 dur_source_positions: list[tuple[int, int]] = []
                 if scale_bar:
                     content_width = max(1, display_width - draw_pad * 2)
+                    event_min_gap = 2
+                    unit_anchor_min_gap = 1
                     flag_min_gap = 1 if spacing_fill == "smart" else 0
                     beatsnap_mode = settings.get("beatsnap", "off")
                     if beatsnap_mode == "soft" and beats > 1:
@@ -641,30 +699,61 @@ def render_systems(  # noqa: C901, PLR0912
                             grid_width=grid_width,
                             content_width=content_width,
                             beats=beats,
-                            min_gap=flag_min_gap,
+                            min_gap=unit_anchor_min_gap,
                         )
                         src_to_dest = trim_right_slack_for_onsets(
                             src_to_dest,
                             all_positions=positions,
                             visible_positions=ordered_flags,
                             content_width=content_width,
+                            min_gap=unit_anchor_min_gap,
                         )
                     elif spacing_fill == "smart":
                         src_to_dest = smart_group_map(
                             positions,
                             ordered_flags,
                             content_width,
+                            min_gap=event_min_gap,
                         )
                     else:
                         _, src_to_dest = _build_chord_scale_map(
                             positions,
                             grid_width,
                             content_width,
-                            min_gap=1,
+                            min_gap=event_min_gap,
                         )
-                    if content_width > 1:
-                        max_mapped = content_width - 2
-                        src_to_dest = {key: min(value, max_mapped) for key, value in src_to_dest.items()}
+                    if content_width > 1 and src_to_dest:
+                        # Reserve one trailing cell for the right-side dash, but preserve
+                        # event spacing while doing so (simple clamping can re-glue notes).
+                        anchor_width = max(1, content_width - 1)
+                        seeded_event_positions = [
+                            (
+                                _scale_col(
+                                    src_to_dest.get(
+                                        col,
+                                        _scale_col(col, grid_width, content_width),
+                                    ),
+                                    content_width,
+                                    anchor_width,
+                                ),
+                                2,  # unit anchor spacing only; do not reserve flag tails here
+                                False,
+                            )
+                            for (col, denom, dot) in positions
+                        ]
+                        spread_event_positions = spread_flag_positions(
+                            seeded_event_positions,
+                            anchor_width,
+                            min_gap=unit_anchor_min_gap,
+                        )
+                        src_to_dest = {
+                            raw_col: scaled_col
+                            for (raw_col, _d1, _dot1), (scaled_col, _d2, _dot2) in zip(
+                                positions,
+                                spread_event_positions,
+                                strict=False,
+                            )
+                        }
                     final_flag_positions = [
                         (
                             src_to_dest.get(col, _scale_col(col, grid_width, content_width)),
@@ -896,10 +985,7 @@ def render_systems(  # noqa: C901, PLR0912
                     safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
             cursor_display_index = cursor_string if cursor_string < system_display_strings else None
             for display_idx in range(system_display_strings):
-                if reverse_strings:
-                    actual = system_display_indices[system_display_strings - 1 - display_idx]
-                else:
-                    actual = system_display_indices[display_idx]
+                actual = system_visual_indices[display_idx]
                 y = row_start + (rows["staff"] or 0) + display_idx
                 row_cells = cells[actual]
                 fill_char = "-"
@@ -923,7 +1009,11 @@ def render_systems(  # noqa: C901, PLR0912
                 safe_addstr(stdscr, y, bar_x - 1, "|")
                 safe_addstr(stdscr, y, bar_x, row_text)
                 if show_time_sig_here and _sig_label:
-                    ts_rows = _time_sig_inline_rows(time_value, _sig_label)
+                    ts_rows = time_sig_inline_rows(
+                        time_value,
+                        _sig_label,
+                        style_mode=settings.get("timesigstyle", "symbol"),
+                    )
                     ts_top = 0
                     if ts_rows:
                         ts_top = max(0, (system_display_strings - len(ts_rows)) // 2)

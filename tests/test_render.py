@@ -238,6 +238,165 @@ def test_build_bar_view_shows_slur_tie_hold() -> None:
     assert view["hold"][0].startswith("<")
 
 
+def test_build_bar_view_tie_cue_style_variants() -> None:
+    bar = Bar()
+    paren = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tiecuestyle="paren",
+    )
+    hidden = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tiecuestyle="hide",
+    )
+    assert paren["tie"][0][1] == "("
+    assert paren["tie"][0][3] == ")"
+    assert hidden["tie"][0].strip() == ""
+
+
+def test_build_bar_view_tie_noteheads_hide_hides_continued_column_noteheads() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        ],
+    )
+    shown = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tienoteheads="show",
+    )
+    hidden = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tienoteheads="hide",
+    )
+    # Column 3 has a notehead in show mode and is blanked in hide mode.
+    assert any(row[3] != "-" for row in shown["rows"])
+    assert all(row[3] == "-" for row in hidden["rows"])
+
+
+def test_build_bar_view_tie_noteheads_parenthesize_marks_tie_row_but_keeps_noteheads() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        ],
+    )
+    paren = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tiecuestyle="hide",
+        tienoteheads="parenthesize",
+    )
+    assert any(row[3] != "-" for row in paren["rows"])
+    assert "(" in paren["tie"][0] and ")" in paren["tie"][0]
+
+
+def test_build_bar_view_slur_and_hold_cue_style_variants() -> None:
+    bar = Bar()
+    alt = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[(0, 0, 2)],
+        ties=[],
+        holds=[(0, 0, 3)],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        slurcuestyle="bracket",
+        holdcuestyle="paren",
+    )
+    hidden = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[(0, 0, 2)],
+        ties=[],
+        holds=[(0, 0, 3)],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        slurcuestyle="hide",
+        holdcuestyle="hide",
+    )
+    assert alt["slur"][0][0] == "["
+    assert alt["slur"][0][2] == "]"
+    assert alt["hold"][0][0] == "("
+    assert alt["hold"][0][3] == ")"
+    assert hidden["slur"][0].strip() == ""
+    assert hidden["hold"][0].strip() == ""
+
+
 def test_bar_number_for_index() -> None:
     b0 = Bar()
     b1 = Bar()

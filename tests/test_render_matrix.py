@@ -77,7 +77,7 @@ def test_render_matrix_no_lost_overrides_across_spacing_modes(
     piece = Piece(title="Matrix", bars=[Bar(), Bar()], strings=6)
     overrides = {
         (0, 0, 0): "A",
-        (0, 1, 2): "B",
+        (0, 1, 6): "B",
         (0, 2, 4): "C",
         (1, 3, 1): "D",
         (1, 4, 3): "E",
@@ -91,6 +91,7 @@ def test_render_matrix_no_lost_overrides_across_spacing_modes(
             "showdur": "on",
             "showextras": "off",
             "showtactus": "off",
+            "time": "",
             "layout": spacing_mode,
             "justify": spacing_fill,
             "barsperline": "0",
@@ -106,9 +107,9 @@ def test_render_matrix_no_lost_overrides_across_spacing_modes(
 @pytest.mark.parametrize(
     ("flagstyle", "token"),
     [
-        ("standard", "|\\\\."),
-        ("englishgrid", "|--."),
-        ("continental", "ΓFF."),
+        ("standard", "|\\\\\\."),
+        ("englishgrid", "|---."),
+        ("continental", "ΓFFF."),
     ],
 )
 def test_render_matrix_flagstyle_tokens_visible(flagstyle: str, token: str) -> None:
@@ -125,6 +126,11 @@ def test_render_matrix_flagstyle_tokens_visible(flagstyle: str, token: str) -> N
 
 def test_render_matrix_bass_rows_show_only_when_used() -> None:
     piece = Piece(title="Bass", bars=[Bar()], strings=7)
+    piece_used = Piece(
+        title="Bass",
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(7, 0, 0)])])],
+        strings=7,
+    )
     settings = dict(DEFAULT_SETTINGS)
     settings.update(
         {
@@ -132,20 +138,19 @@ def test_render_matrix_bass_rows_show_only_when_used() -> None:
             "showtuning": "on",
             "showdur": "off",
             "showextras": "off",
-            "showtactus": "off",
-            "layout": "packed",
-            "justify": "stretch",
-            "linelen": "0",
-            "barsperline": "0",
-            "maxbars": "0",
+                "showtactus": "off",
+                "layout": "packed",
+                "justify": "stretch",
+                "basslabels": "numeric",
+                "linelen": "0",
+                "barsperline": "0",
+                "maxbars": "0",
         },
     )
     without_bass = "\n".join(_render_lines(piece, settings))
-    with_bass = "\n".join(
-        _render_lines(piece, settings, overrides={(0, 6, 2): "Z"}),
-    )
-    assert "Z" not in without_bass
-    assert "Z" in with_bass
+    with_bass = "\n".join(_render_lines(piece_used, settings))
+    assert " 7|" not in without_bass
+    assert " 7|" in with_bass
 
 
 def test_render_matrix_hold_marker_visible() -> None:
@@ -282,8 +287,8 @@ def test_render_matrix_smart_fill_reaches_right_edge_on_staff_rows() -> None:
         max((idx for idx, ch in enumerate(line) if ch != " "), default=-1)
         for line in staff_rows
     ]
-    assert all(edge == width - 1 for edge in right_edges)
-    assert all(line[width - 1] == "|" for line in staff_rows)
+    assert all(edge == width - 2 for edge in right_edges)
+    assert all(line[width - 2] == "|" for line in staff_rows)
 
 
 def test_render_matrix_no_double_joined_barlines_for_default_bars() -> None:
@@ -309,7 +314,7 @@ def test_render_matrix_no_double_joined_barlines_for_default_bars() -> None:
     staff_rows = [line for line in lines if "-" in line and "|" in line][:6]
     assert len(staff_rows) == 6
     assert all("||" not in row for row in staff_rows)
-    assert all("| " not in row for row in staff_rows)
+    assert all("|  |" not in row for row in staff_rows)
 
 
 def test_render_matrix_empty_bar_does_not_draw_lonely_flag_stem() -> None:

@@ -8,6 +8,11 @@ from oud.core.render_utils import (
     spread_flag_positions,
     trim_right_slack_for_onsets,
 )
+from oud.core.tab_policy import (
+    rows_reversed,
+    system_display_indices_for_bars,
+    visual_row_indices,
+)
 from oud.core.view_model import _filter_redundant_positions, _parse_time_signature, _scale_col
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import (
@@ -167,10 +172,8 @@ def _cursor_display_map_for_bar(
 
 def _system_display_indices_for_bar(state: EditorState, bar_index: int) -> list[int]:
     total_strings = state.piece.strings
-    base_strings = min(6, total_strings)
-    indices = list(range(base_strings))
     if bar_index < 0 or bar_index >= len(state.piece.bars):
-        return indices
+        return system_display_indices_for_bars([], total_strings=total_strings)
     if state.settings.get("layout", "packed") == "auto":
         starts = dynamic_system_starts(state, state.screen_width)
         start = 0
@@ -184,19 +187,10 @@ def _system_display_indices_for_bar(state: EditorState, bar_index: int) -> list[
     else:
         per_line = bars_per_line(state, state.screen_width)
         start, end = system_range(state, bar_index, per_line)
-    used_bass: set[int] = set()
-    for bar in state.piece.bars[start:end]:
-        for note in bar.notes:
-            idx = note.string - 1
-            if base_strings <= idx < total_strings:
-                used_bass.add(idx)
-        for chord in bar.chords:
-            for note in chord.notes:
-                idx = note.string - 1
-                if base_strings <= idx < total_strings:
-                    used_bass.add(idx)
-    indices.extend(sorted(used_bass))
-    return indices
+    return system_display_indices_for_bars(
+        state.piece.bars[start:end],
+        total_strings=total_strings,
+    )
 
 
 def move_left_visual(state: EditorState) -> None:
@@ -239,22 +233,17 @@ def move_right_visual(state: EditorState) -> None:
         move_right(state)
 
 
-def jump_row_visual(state: EditorState, delta: int) -> None:
+def jump_row_visual(state: EditorState, delta: int) -> None:  # noqa: C901, PLR0912
     prev_bar = state.cursor_bar
     prev_col = state.cursor_col
     prev_actual_string = string_index(state, state.cursor_string)
-    reverse_strings = (
-        state.settings.get("viewinvert", "off") == "on"
-        or (
-            state.settings.get("style") == "italian"
-            and state.settings.get("italianorient", "normal") == "reverse"
-        )
+    reverse_strings = rows_reversed(
+        style=state.settings.get("style", "french"),
+        italian_orient=state.settings.get("italianorient", "normal"),
+        viewinvert=state.settings.get("viewinvert", "off"),
     )
     prev_display_indices = _system_display_indices_for_bar(state, prev_bar)
-    if reverse_strings:
-        prev_visual_rows = list(reversed(prev_display_indices))
-    else:
-        prev_visual_rows = prev_display_indices
+    prev_visual_rows = visual_row_indices(prev_display_indices, reverse=reverse_strings)
     if prev_actual_string in prev_visual_rows:
         prev_visual_row = prev_visual_rows.index(prev_actual_string)
     else:
@@ -334,7 +323,7 @@ def jump_row_visual(state: EditorState, delta: int) -> None:
 
     state.cursor_bar = target_bar
     target_display_indices = _system_display_indices_for_bar(state, target_bar)
-    target_visual_rows = list(reversed(target_display_indices)) if reverse_strings else target_display_indices
+    target_visual_rows = visual_row_indices(target_display_indices, reverse=reverse_strings)
     if target_visual_rows:
         chosen_row = min(prev_visual_row, len(target_visual_rows) - 1)
         target_actual_string = target_visual_rows[chosen_row]

@@ -57,7 +57,7 @@ def build_status_lines(
     if message and mode not in ("command", "search"):
         status = f"{status}  {message}"
     if mode in ("command", "search"):
-        if message and (message.startswith("Matches:") or message.startswith("Options:")):
+        if message and message.startswith(("Matches:", "Options:")):
             return f"{status}  {message}".strip()
         return status
     status_line_text = status_line

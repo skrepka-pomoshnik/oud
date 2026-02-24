@@ -2,7 +2,11 @@ from oud.core.model import Bar, Piece
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 from oud.tui.viewport import ensure_cursor_visible
-from tests.helpers_regression_cases import multi_bar_spacing_piece, piece_with_unused_then_used_bass_rows, regression_state
+from tests.helpers_regression_cases import (
+    multi_bar_spacing_piece,
+    piece_with_unused_then_used_bass_rows,
+    regression_state,
+)
 
 
 def _state(bars: int = 40) -> EditorState:
@@ -84,3 +88,23 @@ def test_ensure_cursor_visible_uses_dynamic_auto_system_rows() -> None:
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
     # Must scroll according to dynamic starts, not fixed per-line heuristic.
     assert state.bar_offset > 0
+
+
+def test_scrollmode_smooth_vs_page_use_same_fixture_with_different_offsets() -> None:
+    smooth = regression_state(multi_bar_spacing_piece(), width=36, bar_width=12, justify="smart")
+    page = regression_state(multi_bar_spacing_piece(), width=36, bar_width=12, justify="smart")
+    for state, mode in ((smooth, "smooth"), (page, "page")):
+        state.settings["layout"] = "auto"
+        state.settings["scrollmode"] = mode
+        for key in ("showdur", "showextras", "showtactus"):
+            state.settings[key] = "off"
+        state.screen_height = 24  # 2 rows on this fixture
+        state.bar_offset = 0
+        state.cursor_bar = 3      # third auto system row on the same fixture
+
+    ensure_cursor_visible(smooth, smooth.screen_width, smooth.screen_height)
+    ensure_cursor_visible(page, page.screen_width, page.screen_height)
+
+    assert smooth.bar_offset == 1
+    assert page.bar_offset == 3
+    assert page.bar_offset > smooth.bar_offset

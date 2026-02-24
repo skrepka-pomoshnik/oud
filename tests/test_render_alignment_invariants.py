@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from oud.core.ft3 import build_durations
+from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.render_utils import bar_cells_from_chords, smart_group_map
 from oud.core.view_model import _filter_redundant_positions, _scale_col
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
@@ -54,13 +55,13 @@ def _flag_cols_and_rows(state, bar_index: int) -> tuple[list[int], list[str]]:
     content_width = _content_width_for_bar(state, bar_index)
     justify = state.settings.get("justify", "stretch")
     if justify == "smart":
-        src_to_dest = smart_group_map(positions, ordered_flags, content_width)
+        src_to_dest = smart_group_map(positions, ordered_flags, content_width, min_gap=2)
     else:
         _, src_to_dest = _build_chord_scale_map(
             positions,
             bar_width=grid_width,
             content_width=content_width,
-            min_gap=1,
+            min_gap=2,
         )
     flag_cols = [
         src_to_dest.get(raw_col, _scale_col(raw_col, grid_width, content_width))
@@ -79,6 +80,86 @@ def _flag_cols_and_rows(state, bar_index: int) -> tuple[list[int], list[str]]:
         for s_idx in range(state.piece.strings)
     ]
     return flag_cols, scaled_rows
+
+
+def test_synthetic_first_bar_time_cue_does_not_glue_equal_noteheads() -> None:
+    piece = Piece(
+        title="NoGlue",
+        bars=[
+            Bar(
+                time_sig="O",
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                ],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+        ],
+        strings=6,
+        style="french",
+    )
+    state = regression_state(piece, justify="smart", width=80, bar_width=10)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "smart"
+    state.settings["beatsnap"] = "soft"
+    state.settings["flagredundant"] = "on"
+    lines = _render_state_lines(state, height=18)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    first_staff = staff_rows[0]
+    first_bar_start = first_staff.find("|") + 1
+    first_bar_end = first_staff.find("|", first_bar_start)
+    assert first_bar_end > first_bar_start
+    seg = first_staff[first_bar_start:first_bar_end]
+    assert "cc" not in seg, seg
+
+
+def test_synthetic_first_bar_time_cue_no_glue_under_denmark_like_compression() -> None:
+    # Regression for the Denmark Galliard first tact shape:
+    # auto/smart + beatsnap=soft + time cue in bar 1 + many bars on row can squeeze
+    # repeated equal noteheads into "cc" if width planning/mapping trims too hard.
+    filler = [
+        Bar(
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 0, 0)]),
+            ],
+        )
+        for _ in range(10)
+    ]
+    piece = Piece(
+        title="NoGlueDenmarkLike",
+        bars=[
+            Bar(
+                time_sig="O",
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                ],
+            ),
+            *filler,
+        ],
+        strings=8,
+        style="french",
+    )
+    state = regression_state(piece, justify="smart", width=121, bar_width=10)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "smart"
+    state.settings["beatsnap"] = "soft"
+    state.settings["flagredundant"] = "on"
+    state.settings["flagstems"] = "double"
+    state.settings["timesigstyle"] = "symbol"
+    lines = _render_state_lines(state, height=24)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    first_staff = staff_rows[0]
+    first_bar_start = first_staff.find("|") + 1
+    first_bar_end = first_staff.find("|", first_bar_start)
+    assert first_bar_end > first_bar_start
+    seg = first_staff[first_bar_start:first_bar_end]
+    assert "cc" not in seg, seg
 
 
 @pytest.mark.parametrize("justify", ["smart", "stretch", "compact"])

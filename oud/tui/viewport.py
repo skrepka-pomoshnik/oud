@@ -34,7 +34,7 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     return max(1, available // block_h)
 
 
-def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
+def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:  # noqa: C901
     per_line = bars_per_line(state, width)
     rows = rows_per_screen(state, height)
     if state.settings.get("layout", "packed") == "auto":
@@ -61,7 +61,8 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
     else:
         cursor_row = system_index(state, state.cursor_bar, per_line)
         first_row = system_index(state, state.bar_offset, per_line)
-        _start_for_row = lambda row_index: system_start_index(state, row_index, per_line)
+        def _start_for_row(row_index: int) -> int:
+            return system_start_index(state, row_index, per_line)
     scroll_mode = state.settings.get("scrollmode", "smooth")
 
     def _page_start_row(row: int) -> int:
@@ -73,10 +74,7 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
         target_row = cursor_row if scroll_mode != "page" else _page_start_row(cursor_row)
         state.bar_offset = _start_for_row(target_row)
     if cursor_row >= first_row + rows:
-        if scroll_mode == "page":
-            target_row = _page_start_row(cursor_row)
-        else:
-            target_row = cursor_row - rows + 1
+        target_row = _page_start_row(cursor_row) if scroll_mode == "page" else cursor_row - rows + 1
         state.bar_offset = _start_for_row(target_row)
 
     # Clamp cursor to rows that are actually visible in the current rendered system.

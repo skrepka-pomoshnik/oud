@@ -15,6 +15,14 @@ from oud.core.render_utils import (
     note_type_to_denom,
     place_duration_cells,
 )
+from oud.core.tab_policy import (
+    hold_span_chars,
+    slur_span_chars,
+    tie_notehead_hidden_cols,
+    tie_notehead_parenthesize_cols,
+    tie_span_chars,
+)
+from oud.core.tab_policy import string_label as tab_string_label
 from oud.ui.layout_map import (
     block_height as _block_height,
 )
@@ -194,7 +202,6 @@ def _tuning_labels(  # noqa: C901, PLR0912
                     label += digits
                 bass_labels.append(label)
         if bass_labels:
-            bass_labels = list(reversed(bass_labels))
             labels = bass_labels[:missing] + labels
             if len(labels) < strings:
                 labels = [""] * (strings - len(labels)) + labels
@@ -211,20 +218,13 @@ def _string_label(
     tuning_labels: list[str],
     basslabels: str,
 ) -> str:
-    def _bass_fallback() -> str:
-        if basslabels == "slash":
-            return "/" * max(1, actual - 5)
-        return str(actual + 1)
-
-    if actual >= 6 and basslabels != "tuning":
-        label_value = _bass_fallback()
-    elif actual < len(tuning_labels):
-        label_value = tuning_labels[actual] or (_bass_fallback() if actual >= 6 else str(total_strings - actual))
-    else:
-        label_value = _bass_fallback() if actual >= 6 else str(total_strings - actual)
-    if len(label_value) > 2:
-        label_value = label_value[:2]
-    return f"{label_value:>2}"
+    return tab_string_label(
+        actual=actual,
+        total_strings=total_strings,
+        tuning_labels=tuning_labels,
+        basslabels=basslabels,
+        width=2,
+    )
 
 
 def _inline_bass_row(row: list[str]) -> list[str]:
@@ -733,6 +733,10 @@ def build_bar_view(
     style: str,
     *,
     french_c: str = "normal",
+    slurcuestyle: str = "paren",
+    tiecuestyle: str = "bracket",
+    tienoteheads: str = "show",
+    holdcuestyle: str = "angle",
 ) -> dict[str, list[str]]:
     bar_cells_data = (
         bar_cells_from_chords(
@@ -758,6 +762,14 @@ def build_bar_view(
         if s >= strings or col >= bar_width:
             continue
         bar_cells_data[s][col] = ch
+    hidden_tie_cols = tie_notehead_hidden_cols(ties, bar_index=bar_index, mode=tienoteheads)
+    paren_tie_cols = tie_notehead_parenthesize_cols(ties, bar_index=bar_index, mode=tienoteheads)
+    for hide_col in hidden_tie_cols:
+        if not (0 <= hide_col < bar_width):
+            continue
+        for row_cells in bar_cells_data:
+            if row_cells[hide_col] != "-":
+                row_cells[hide_col] = "-"
     flag_cells = _bar_flags(
         durations,
         bar_index,
@@ -780,9 +792,32 @@ def build_bar_view(
             dur_cells[col] = duration_display(default_duration)
     ann_cells = _bar_annotations(annotations, bar_index, bar_width)
     orn_cells = _bar_ornaments(ornaments, bar_index, bar_width)
-    slur_cells = _bar_span_row(slurs, bar_index, bar_width, "(", ")", "~")
-    tie_cells = _bar_span_row(ties, bar_index, bar_width, "[", "]", "-")
-    hold_cells = _bar_span_row(holds, bar_index, bar_width, "<", ">", "_")
+    slur_chars = slur_span_chars(slurcuestyle)
+    slur_cells = (
+        [" " for _ in range(bar_width)]
+        if slur_chars is None
+        else _bar_span_row(slurs, bar_index, bar_width, *slur_chars)
+    )
+    tie_chars = tie_span_chars(tiecuestyle)
+    tie_cells = (
+        [" " for _ in range(bar_width)]
+        if tie_chars is None
+        else _bar_span_row(ties, bar_index, bar_width, *tie_chars)
+    )
+    for end_col in paren_tie_cols:
+        if not (0 <= end_col < bar_width):
+            continue
+        if tie_cells[end_col] == " ":
+            tie_cells[end_col] = ")"
+        left = end_col - 1
+        if left >= 0 and tie_cells[left] == " ":
+            tie_cells[left] = "("
+    hold_chars = hold_span_chars(holdcuestyle)
+    hold_cells = (
+        [" " for _ in range(bar_width)]
+        if hold_chars is None
+        else _bar_span_row(holds, bar_index, bar_width, *hold_chars)
+    )
     rows = ["".join(bar_cells_data[s_idx]) for s_idx in range(strings)]
     return {
         "ann": ["".join(ann_cells)],

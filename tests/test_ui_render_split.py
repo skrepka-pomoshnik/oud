@@ -223,6 +223,25 @@ def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None
     assert min(staff_y_values) > 2
 
 
+def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O"), Bar()], strings=6)
+    kwargs["settings"]["timesigstyle"] = "numeric"
+    render_piece(**kwargs)
+    numeric_calls = [
+        (y, x, text)
+        for (y, x, text, _a) in kwargs["stdscr"].calls
+        if text.strip() == "3" and y >= 2 and x >= 3
+    ]
+    symbol_calls = [
+        (y, x, text)
+        for (y, x, text, _a) in kwargs["stdscr"].calls
+        if text.strip() == "O" and y >= 2 and x >= 3
+    ]
+    assert numeric_calls
+    assert not symbol_calls
+
+
 def test_render_shows_time_signature_on_mid_system_change() -> None:
     kwargs = _args("normal")
     kwargs["piece"] = Piece(title="T", bars=[Bar(), Bar(time_sig="3/4"), Bar()], strings=6)
