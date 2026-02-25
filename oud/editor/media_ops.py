@@ -178,13 +178,18 @@ def print_pdf(
     if state.path:
         base = str(Path(state.path).with_suffix(""))
     ly_path = base + ".ly"
+    # PDF output should be readable by default: force full tab notation so
+    # stems/flags are visible in LilyPond output, but do not persist this in
+    # editor settings/config.
+    pdf_settings = dict(state.settings)
+    pdf_settings["tabnotation"] = "full"
     state.message = export_lilypond_fn(
         ly_path,
         state.piece,
         state.overrides,
         state.durations,
         state.bar_width,
-        settings=state.settings,
+        settings=pdf_settings,
         ornaments=state.ornaments,
         annotations=state.annotations,
         slurs=state.slurs,

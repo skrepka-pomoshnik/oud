@@ -74,6 +74,42 @@ def test_export_lilypond_extends_6_course_tuning_for_8_course_piece_in_low_to_hi
     )
     text = path.read_text(encoding="utf-8")
     assert r"stringTunings = \stringTuning <e, f, g, c f a d' g'>" in text
+    # Regression: extra-course note must not be silently dropped from the exported chord.
+    assert "<" in text and ">" in text
+    chord_line = next(line for line in text.splitlines() if line.strip().startswith("<"))
+    assert chord_line.count(" ") >= 2  # at least two pitch tokens + duration suffix
+
+
+def test_export_lilypond_uses_source_tuning_pitch_fallback_when_target_tuning_differs(tmp_path) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[Note(7, 12, 0)],  # out of 6-course main range, but pitch is assignable
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=7, tuning="g2c3f3a3d4g4d2")
+    path = tmp_path / "fallback.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4"},  # shorter target tuning; exporter extends for TabStaff
+    )
+    text = path.read_text(encoding="utf-8")
+    # Regression: do not emit a rest just because source note is on an extra course.
+    assert "  r4" not in text
+    note_line = next(
+        line
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith(("\\", "%", "{")) and "4" in line
+    )
+    assert "r4" not in note_line
 
 
 def test_export_lilypond_petrucci_notehead_style_setting(tmp_path) -> None:
@@ -219,8 +255,8 @@ def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -
     text = path.read_text(encoding="utf-8")
     assert "\\tiny" in text
     assert '"#"' in text
-    assert '"t"' in text
     assert "-4" in text
+    assert r'\rightHandFinger \markup { "t" }' in text
 
 
 def test_export_lilypond_uses_native_fingering_attachments_for_numeric_ft3_fingerings(
@@ -256,6 +292,39 @@ def test_export_lilypond_uses_native_fingering_attachments_for_numeric_ft3_finge
     assert "-4" in text
     assert r"\rightHandFinger #2" in text
     assert "\\tiny" not in text
+
+
+def test_export_lilypond_uses_native_thumb_pluck_attachment_for_ft3_thumb(tmp_path) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[Note(1, 1, 0, right_fingering="thumb")],
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "native_thumb.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "showfingerings": "on",
+            "showornaments": "off",
+            "ft3fingering": "right",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert r'\rightHandFinger \markup { "t" }' in text
+    assert r'_\markup { \tiny "t" }' not in text
+    assert r'^\markup { \tiny "t" }' not in text
 
 
 def test_export_lilypond_ft3_extras_collects_multiple_notes_and_suppresses_open_lh_digits(

@@ -136,6 +136,19 @@ def _time_for_bar(bar: Bar, settings: dict[str, str]) -> tuple[int, int]:
     return 4, 4
 
 
+def _raw_time_sig_for_bar(bar: Bar, settings: dict[str, str]) -> str:
+    return (bar.time_sig or settings.get("time", "") or "").strip()
+
+
+def _time_symbol_attr(raw_time: str) -> str | None:
+    text = raw_time.strip().upper()
+    if text == "C":
+        return "common"
+    if text in {"C|", "C/"}:
+        return "cut"
+    return None
+
+
 def _key_name(value: str) -> str:
     text = value.strip()
     if not text:
@@ -220,7 +233,7 @@ def _events_for_bar(
     return _events_from_overrides(bar_index, strings, overrides, durations, style, dotted)
 
 
-def _add_note(
+def _add_note(  # noqa: C901
     measure: Element,
     note: tuple[int, int],
     *,
@@ -229,6 +242,8 @@ def _add_note(
     dotted: bool,
     pitch_for_string: list[int],
     chord: bool,
+    note_model: object | None = None,
+    fermata: bool = False,
 ) -> None:
     string, fret = note
     xml_note = SubElement(measure, "note")
@@ -240,6 +255,9 @@ def _add_note(
         SubElement(xml_note, "type").text = duration_type
         if dotted:
             SubElement(xml_note, "dot")
+        if fermata:
+            notations = SubElement(xml_note, "notations")
+            SubElement(notations, "fermata").text = "normal"
         return
     pitch_value = pitch_for_string[string - 1] + max(0, fret)
     step, alter, octave = _midi_to_pitch(pitch_value)
@@ -253,9 +271,19 @@ def _add_note(
     if dotted:
         SubElement(xml_note, "dot")
     notations = SubElement(xml_note, "notations")
+    if fermata:
+        SubElement(notations, "fermata").text = "normal"
     technical = SubElement(notations, "technical")
     SubElement(technical, "string").text = str(string)
     SubElement(technical, "fret").text = str(max(0, fret))
+    if note_model is not None:
+        left_f = getattr(note_model, "left_fingering", None)
+        if left_f:
+            SubElement(technical, "fingering").text = str(left_f)
+        right_f = getattr(note_model, "right_fingering", None)
+        if right_f:
+            pluck = "p" if right_f == "thumb" else str(right_f)
+            SubElement(technical, "pluck").text = pluck
 
 
 def _add_barline(measure: Element, *, location: str, style: str, repeat: str | None = None) -> None:
@@ -290,6 +318,9 @@ def _append_first_measure_attributes(
     SubElement(key, "fifths").text = str(_key_fifths(settings.get("key") or piece.key or "C"))
     beats, beat_type = _time_for_bar(bar, settings)
     time = SubElement(attributes, "time")
+    symbol = _time_symbol_attr(_raw_time_sig_for_bar(bar, settings))
+    if symbol:
+        time.set("symbol", symbol)
     SubElement(time, "beats").text = str(beats)
     SubElement(time, "beat-type").text = str(beat_type)
     clef = SubElement(attributes, "clef")
@@ -316,6 +347,9 @@ def _append_time_change(measure: Element, bar: Bar, settings: dict[str, str]) ->
     parsed = _time_for_bar(bar, settings)
     attributes = SubElement(measure, "attributes")
     time = SubElement(attributes, "time")
+    symbol = _time_symbol_attr(_raw_time_sig_for_bar(bar, settings))
+    if symbol:
+        time.set("symbol", symbol)
     SubElement(time, "beats").text = str(parsed[0])
     SubElement(time, "beat-type").text = str(parsed[1])
 
@@ -339,6 +373,49 @@ def _add_direction_words(measure: Element, words: str) -> None:
     direction = SubElement(measure, "direction")
     direction_type = SubElement(direction, "direction-type")
     SubElement(direction_type, "words").text = words
+
+
+def _add_direction_symbol(measure: Element, symbol: str) -> None:
+    direction = SubElement(measure, "direction")
+    direction_type = SubElement(direction, "direction-type")
+    SubElement(direction_type, symbol)
+
+
+def _add_repeat_directions(measure: Element, repeat: str) -> None:
+    text = repeat.strip()
+    if not text:
+        return
+    upper = text.upper()
+    if upper.startswith("DS"):
+        _add_direction_symbol(measure, "segno")
+    if "CODA" in upper:
+        _add_direction_symbol(measure, "coda")
+
+
+def _add_direction_dynamic(measure: Element, dynamic: str) -> None:
+    value = (dynamic or "").strip().lower()
+    if not value:
+        return
+    direction = SubElement(measure, "direction")
+    direction_type = SubElement(direction, "direction-type")
+    known = {
+        "ppp",
+        "pp",
+        "p",
+        "mp",
+        "mf",
+        "f",
+        "ff",
+        "fff",
+        "sfz",
+        "fz",
+        "fp",
+    }
+    if value in known:
+        dynamics = SubElement(direction_type, "dynamics")
+        SubElement(dynamics, value)
+        return
+    SubElement(direction_type, "words").text = dynamic
 
 
 def export_musicxml(
@@ -410,7 +487,7 @@ def export_mxl(
     return f"Wrote {path}"
 
 
-def _musicxml_text(  # noqa: C901
+def _musicxml_text(  # noqa: C901, PLR0912
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -450,9 +527,13 @@ def _musicxml_text(  # noqa: C901
             _add_barline(measure, location="left", style="heavy-light", repeat="forward")
             carry_repeat_forward = False
         repeat = (bar.repeat or "").strip()
+        if repeat:
+            _add_repeat_directions(measure, repeat)
         repeat_words = _repeat_words(repeat)
         if repeat_words:
             _add_direction_words(measure, repeat_words)
+        if bar.dynamic:
+            _add_direction_dynamic(measure, bar.dynamic)
         if b_idx == 1:
             _append_first_measure_attributes(
                 measure,
@@ -464,37 +545,80 @@ def _musicxml_text(  # noqa: C901
         else:
             _append_time_change(measure, bar, settings_map)
 
-        for denom, is_dotted, notes in _events_for_bar(
-            bar,
-            b_idx - 1,
-            piece.strings,
-            overrides,
-            durations,
-            style,
-            dotted,
-        ):
-            duration_units = _duration_units(denom, is_dotted)
-            note_type = _duration_type(denom)
-            if not notes:
-                xml_note = SubElement(measure, "note")
-                SubElement(xml_note, "rest")
-                SubElement(xml_note, "duration").text = str(duration_units)
-                SubElement(xml_note, "type").text = note_type
-                if is_dotted:
-                    SubElement(xml_note, "dot")
-                continue
-            first = True
-            for note in notes:
-                _add_note(
-                    measure,
-                    note,
-                    duration_units=duration_units,
-                    duration_type=note_type,
-                    dotted=is_dotted,
-                    pitch_for_string=pitch_for_string,
-                    chord=not first,
-                )
-                first = False
+        fermata_pending = bool(bar.fermata)
+        if bar.chords:
+            for chord in bar.chords:
+                denom = _note_type_to_denom(chord.note_type)
+                is_dotted = bool(chord.dotted)
+                duration_units = _duration_units(denom, is_dotted)
+                note_type = _duration_type(denom)
+                if not chord.notes:
+                    _add_note(
+                        measure,
+                        (0, 0),
+                        duration_units=duration_units,
+                        duration_type=note_type,
+                        dotted=is_dotted,
+                        pitch_for_string=pitch_for_string,
+                        chord=False,
+                        fermata=fermata_pending,
+                    )
+                    fermata_pending = False
+                    continue
+                first = True
+                for note_model in chord.notes:
+                    _add_note(
+                        measure,
+                        (note_model.string, note_model.fret),
+                        duration_units=duration_units,
+                        duration_type=note_type,
+                        dotted=is_dotted,
+                        pitch_for_string=pitch_for_string,
+                        chord=not first,
+                        note_model=note_model,
+                        fermata=fermata_pending and first,
+                    )
+                    first = False
+                fermata_pending = False
+        else:
+            for denom, is_dotted, notes in _events_for_bar(
+                bar,
+                b_idx - 1,
+                piece.strings,
+                overrides,
+                durations,
+                style,
+                dotted,
+            ):
+                duration_units = _duration_units(denom, is_dotted)
+                note_type = _duration_type(denom)
+                if not notes:
+                    _add_note(
+                        measure,
+                        (0, 0),
+                        duration_units=duration_units,
+                        duration_type=note_type,
+                        dotted=is_dotted,
+                        pitch_for_string=pitch_for_string,
+                        chord=False,
+                        fermata=fermata_pending,
+                    )
+                    fermata_pending = False
+                    continue
+                first = True
+                for note in notes:
+                    _add_note(
+                        measure,
+                        note,
+                        duration_units=duration_units,
+                        duration_type=note_type,
+                        dotted=is_dotted,
+                        pitch_for_string=pitch_for_string,
+                        chord=not first,
+                        fermata=fermata_pending and first,
+                    )
+                    first = False
+                fermata_pending = False
 
         if repeat in (".:", ":|:"):
             carry_repeat_forward = True

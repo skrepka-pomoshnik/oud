@@ -7,6 +7,7 @@ from pathlib import Path
 
 from oud.core.model import Bar, Piece
 from oud.core.render_utils import chord_positions, note_type_to_denom
+from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 
 
 def _escape_lilypond(text: str) -> str:
@@ -178,6 +179,92 @@ def _duration_token(denom: int, dotted: bool) -> str:
     if dotted:
         token += "."
     return token
+
+
+def _assignment_policy_from_settings(settings: dict[str, str]) -> AssignmentPolicy:
+    minimum_fret = int(settings.get("minimumfret", "0") or "0")
+    max_stretch_raw = int(settings.get("maxstretch", "0") or "0")
+    max_stretch = max_stretch_raw if max_stretch_raw > 0 else None
+    restrain_open = settings.get("restrainopenstrings", "off") == "on"
+    return AssignmentPolicy(
+        minimum_fret=minimum_fret,
+        max_stretch=max_stretch,
+        restrain_open_strings=restrain_open,
+    )
+
+
+def _normalize_tuning_length(pitches: list[int], strings: int) -> list[int]:
+    if len(pitches) >= strings:
+        return pitches[:]
+    defaults = _default_tuning(strings)
+    missing = strings - len(pitches)
+    return defaults[:missing] + pitches
+
+
+def _note_pitch_from_lookup(note, tuning_lookup: list[int]) -> int | None:
+    s_idx = note.string - 1
+    if 0 <= s_idx < len(tuning_lookup):
+        return tuning_lookup[s_idx] + note.fret
+    return None
+
+
+def _lily_pitches_for_chord_notes(
+    notes: list,
+    *,
+    source_tuning_lookup: list[int],
+    target_tuning_pitches: list[int],
+    settings: dict[str, str],
+) -> list[str]:
+    pitch_notes: list[tuple[object, int]] = []
+    for note in notes:
+        pitch = _note_pitch_from_lookup(note, source_tuning_lookup)
+        if pitch is not None:
+            pitch_notes.append((note, pitch))
+    if not pitch_notes:
+        return []
+    pitches = [pitch for _note, pitch in pitch_notes]
+    # LilyPond performs final TabStaff assignment, but we validate/routinely check
+    # assignability through the same core policy used by editor transforms so
+    # pitch->string fallback behavior stays deterministic across formats.
+    policy = _assignment_policy_from_settings(settings)
+    result = assign_chord_pitches(pitches, target_tuning_pitches, policy=policy)
+    if not result.ok:
+        # Export should degrade gracefully; keep pitches if policy is too strict.
+        result = assign_chord_pitches(pitches, target_tuning_pitches)
+    # Final fallback keeps source-derived pitches even if assignment policy rejects them.
+    keep = [True] * len(pitches)
+    out: list[str] = []
+    for (note, pitch), keep_note in zip(pitch_notes, keep, strict=False):
+        if not keep_note:
+            continue
+        base = _midi_to_lilypond(pitch)
+        native = (
+            _note_native_lh_fingering_suffix(note, settings)
+            + _note_native_rh_fingering_suffix(note, settings)
+        )
+        out.append(base + native)
+    return out
+
+
+def _lily_pitches_for_override_event(
+    notes: list[tuple[int, int]],
+    *,
+    target_tuning_lookup: list[int],
+    target_tuning_pitches: list[int],
+    settings: dict[str, str],
+) -> list[str]:
+    pitches: list[int] = []
+    for s_idx, fret in notes:
+        if 0 <= s_idx < len(target_tuning_lookup):
+            pitches.append(target_tuning_lookup[s_idx] + fret)
+    if not pitches:
+        return []
+    policy = _assignment_policy_from_settings(settings)
+    result = assign_chord_pitches(pitches, target_tuning_pitches, policy=policy)
+    if not result.ok:
+        result = assign_chord_pitches(pitches, target_tuning_pitches)
+    _ = result
+    return [_midi_to_lilypond(pitch) for pitch in pitches]
 
 
 def _span_maps(
@@ -359,6 +446,8 @@ def _note_native_rh_fingering_suffix(note, settings: dict[str, str]) -> str:
     value = _ft3_fingering_text(getattr(note, "right_fingering", None))
     if value and value.isdigit():
         return f"\\rightHandFinger #{value}"
+    if value == "t":
+        return r'\rightHandFinger \markup { "t" }'
     return ""
 
 
@@ -385,8 +474,8 @@ def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C
         if finger_mode in {"right", "both"}:
             for note in chord.notes:
                 right_f = _ft3_fingering_text(getattr(note, "right_fingering", None))
-                # Numeric RH fingerings are exported natively via \rightHandFinger.
-                if right_f and not right_f.isdigit():
+                # Numeric RH fingerings and thumb are exported natively.
+                if right_f and not (right_f.isdigit() or right_f == "t"):
                     below.append(right_f)
     if show_ornaments and orn_mode != "off":
         if orn_mode in {"left", "both"}:
@@ -441,16 +530,18 @@ def export_lilypond(  # noqa: PLR0912, C901
     composer = piece.composer or piece.author or ""
     tuning = settings.get("tuning", "") or ""
     tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
-    if len(tuning_pitches) < piece.strings:
-        defaults = _default_tuning(piece.strings)
-        missing = piece.strings - len(tuning_pitches)
-        # If user provides only main-course tuning (e.g. 6-course) for a larger piece,
-        # prepend the missing lower courses so order remains low -> high.
-        tuning_pitches = defaults[:missing] + tuning_pitches
+    tuning_pitches = _normalize_tuning_length(tuning_pitches, piece.strings)
+    source_tuning_text = piece.tuning or tuning
+    source_tuning_pitches = _parse_tuning(source_tuning_text) if source_tuning_text else []
+    source_tuning_pitches = _normalize_tuning_length(
+        source_tuning_pitches or tuning_pitches,
+        piece.strings,
+    )
     main_pitches, bass_pitches = _split_tuning(tuning_pitches, piece.strings)
     tuning_names = [_midi_to_lilypond(p) for p in main_pitches]
     tuning_text = " ".join(tuning_names)
     tuning_lookup = list(reversed(main_pitches))
+    source_tuning_lookup = list(reversed(source_tuning_pitches))
     bass_text = ""
     extra_bass = settings.get("basstuning", "") or settings.get("bassstrings", "") or ""
     if extra_bass:
@@ -504,17 +595,12 @@ def export_lilypond(  # noqa: PLR0912, C901
             for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
                 denom = note_type_to_denom(chord.note_type) or default_duration
                 dur = _duration_token(denom, chord.dotted)
-                pitches: list[str] = []
-                for note in chord.notes:
-                    s_idx = note.string - 1
-                    if 0 <= s_idx < len(tuning_lookup):
-                        pitch = tuning_lookup[s_idx] + note.fret
-                        base = _midi_to_lilypond(pitch)
-                        native = (
-                            _note_native_lh_fingering_suffix(note, settings)
-                            + _note_native_rh_fingering_suffix(note, settings)
-                        )
-                        pitches.append(base + native)
+                pitches = _lily_pitches_for_chord_notes(
+                    chord.notes,
+                    source_tuning_lookup=source_tuning_lookup,
+                    target_tuning_pitches=tuning_pitches,
+                    settings=settings,
+                )
                 suffix = ""
                 if col in tie_starts:
                     suffix += "~"
@@ -546,10 +632,12 @@ def export_lilypond(  # noqa: PLR0912, C901
                 body.append("  r4")
             for _col, notes, denom in events:
                 dur = _duration_token(denom, False)
-                pitches: list[str] = []
-                for s_idx, fret in notes:
-                    if 0 <= s_idx < len(tuning_lookup):
-                        pitches.append(_midi_to_lilypond(tuning_lookup[s_idx] + fret))
+                pitches = _lily_pitches_for_override_event(
+                    notes,
+                    target_tuning_lookup=tuning_lookup,
+                    target_tuning_pitches=tuning_pitches,
+                    settings=settings,
+                )
                 suffix = ""
                 if _col in tie_starts:
                     suffix += "~"
