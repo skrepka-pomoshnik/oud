@@ -24,24 +24,35 @@ P1 (Core architecture + stable editing)
 
 P2 (Notation + formats)
 - [ ] Tablature full-notation preset bundle (LilyPond-like): coherent enable/disable for stems/beams/dots/rests/ties/slurs/tuplet cues.
-  - [ ] Expand `tabnotation=full` coverage to ties/slurs/rests/tuplet cues (not only `show*` bundle toggles).
-  - [ ] Add preset interaction tests for user overrides after preset + preset reapply precedence (documented behavior).
-  - [ ] Add preset matrix tests across `flagstyle` families (standard/board/englishgrid/continental).
-- [ ] Flag styles parity: English grid beams and continental flags.
+  - [x] Add preset interaction tests for user overrides after preset + preset reapply precedence (documented behavior).
+  - [x] Add preset matrix tests across `flagstyle` families (standard/board/englishgrid/continental).
+  - [x] Cover ties/slurs/rests in `tabnotation=full` with synthetic regressions.
+  - [ ] Add tuplet cue support + integrate it into `tabnotation=full`.
+- [x] Flag styles parity: English grid beams and continental flags.
 - [ ] Beamify algorithm for grouped beams and partial beams.
 - [ ] Slur/line styles: up/down, vertical/diagonal, thickness controls.
-- [ ] Ornaments and signs: LH/RH fingerings, arpeggio/separee, rests/dynamics/fermata/coda/repeats.
+- [ ] Ornaments and signs:
+  - [x] Repeats and repeat-word signs (`dc/ds/fine/coda/tocoda/...`).
+  - [x] Rest entry/render in tablature (`r` insert mode, ASCII/TUI visibility).
+  - [x] FT3 LH/RH fingerings + basic ornaments import and TUI display toggles.
+  - [x] Manual bar-level dynamics (`:dynamic`) and fermata (`:fermata`) cues in TUI.
+  - [ ] Arpeggio/separee signs (entry + rendering).
+  - [ ] Richer sign export parity (LilyPond/MusicXML): dynamics/fermata/fingerings/pluck.
 - [ ] Double/halve rhythm values and normalization at barlines/intervals.
 - [ ] Tablature formatting parity: configurable fret label policies (numeric/letter/custom labels), multi-digit fret collision rules, bass-label policies.
   - [ ] Add configurable multi-digit fret spacing policy (tight / separated / collision-safe).
   - [ ] Add configurable bass-label policy matrix (numeric / slash / tuning / hidden when unused).
   - [ ] Add tests for `1-2-12` style separation in Italian mode and no accidental glyph merging.
 - [ ] Tablature tie/slur/gliss parity: tied-note visibility/parenthesize cues and follow-up behavior across system breaks.
-  - [ ] Extend tied-note notehead display policy to `parenthesize` for continued notes (current `tienoteheads=show|hide` implemented; parenthesize needs wider notehead representation).
-  - [ ] Handle tie-followed-by-slur/gliss notehead display cues explicitly.
-  - [ ] Add system-break regressions for tied note visibility and cue placement.
-  - [ ] Add collision tests for gliss/slur lines against fret glyphs and parentheses.
+  - [x] Handle tie-followed-by-slur/gliss notehead display cues explicitly.
+  - [x] Add system-break regressions for tied note visibility and cue placement.
+  - [x] Add broader collision tests for gliss/slur lines against fret glyphs and parenthesized noteheads (including system-break cases).
 - [ ] MusicXML notation parity: fermata/fingering/pluck + richer barline/repeat/time symbols.
+- [ ] FT3 -> LilyPond/PDF export parity track: preserve imported FT3 semantics in `.ly`/PDF output.
+  - [ ] Export imported FT3 fingerings/ornaments (when present) to LilyPond tablature annotations.
+  - [ ] Export FT3 repeat/barline markers with correct LilyPond barline/repeat constructs across real corpus cases.
+  - [ ] Export FT3 meter changes (`C/O/fractions`) with configurable style mapping parity.
+  - [ ] Add real-file FT3 -> `.ly` smoke matrix (parse + export) and `:pdf` command integration checks.
 - [ ] Add Spanish tab support (Italian-like with inverted string order).
 - [ ] LilyPond tab parity audit matrix: map supported/unsupported TabStaff features and track parity status per feature.
   - [ ] Keep `DOCS` parity table current as features land (status + linked tests).
@@ -77,17 +88,17 @@ P4 (Optional)
 
 Testing backlog
 - [ ] Navigation regressions for `J/K` on uneven rows and mixed spacing modes (including visible-row targeting under hidden bass rows).
-  - [ ] Add fullscreen-width synthetic cases with alternating system row counts (bass rows appear/disappear).
+  - [x] Add fullscreen-width synthetic cases with alternating system row counts (bass rows appear/disappear).
 - [ ] Rendering matrix tests (synthetic): mixed durations/chords, collisions, bass rows on/off, all spacing modes.
   - [ ] Build a reusable synthetic bar/system factory (durations, rows, dots, ties/slurs, meter changes).
   - [ ] Matrix over `justify` (`compact/smart/stretch/edge`) and `beatsnap` (`off/soft`).
   - [ ] Matrix over `flagstyle` (standard/board/englishgrid/continental/italian/thin/capirola).
   - [ ] Assert invariants first (alignment/no lonely stems/no overflow), snapshots second.
 - [ ] Layout/spacing tests: per-bar width allocation, row alignment, right-justify behavior, beat-snap (`off/soft`) fill/trim behavior.
-  - [ ] Per-system width accounting: sum(bar widths + gaps) exactly matches usable width.
-  - [ ] Right-edge padding invariant (`|` at width-2) under all layouts.
-  - [ ] Left/right trim invariants for `beatsnap=soft` (no fake empty trailing beat, no introduced left slack on beat-aligned bars).
-  - [ ] At least one `-` before right `|` when staff content exists.
+  - [x] Per-system width accounting: sum(bar widths + gaps) exactly matches usable width.
+  - [x] Right-edge padding invariant (`|` at width-2) under all layouts.
+  - [x] Left/right trim invariants for `beatsnap=soft` (no fake empty trailing beat, no introduced left slack on beat-aligned bars).
+  - [x] At least one `-` before right `|` when staff content exists.
 - [ ] Conversion tests: `.tab/.ft3 -> model -> .tab/.ft3` goldens.
 - [ ] Conversion matrix tests for `.ft3/.tab/.musicxml/.mei` (supported subset).
 - [ ] Geometry tests: multi-digit frets, tick spacing, stem-through-staff, ties/slides on notes/chords.
@@ -97,8 +108,7 @@ Testing backlog
 - [ ] LilyPond-inspired snippet regressions (synthetic): stem/beam behavior, polyphony, letter tablature formatting, slides/gliss, harmonics.
   - [ ] `stem-and-beam-behavior` analogue: stem direction/beam shape options in tab rows.
   - [ ] `polyphony-in-tablature` analogue: two voices, independent rhythms, same staff.
-  - [ ] `slides/gliss/harmonics` analogues: cue/collision placement and visibility rules.
-- [ ] LilyPond-style visual regression workflow (optional): snapshot/signature diff for ASCII renderer outputs across known cases.
-  - [ ] Define canonical ASCII snapshot normalization (trim volatile header/status/cursor/playback marks).
-  - [ ] Add snapshot update/check script for selected synthetic cases.
-  - [ ] Optional structural “signature” diff (onset columns, flag columns, row widths) before full snapshot diff.
+- [x] LilyPond-style visual regression workflow (optional): snapshot/signature diff for ASCII renderer outputs across known cases.
+  - [x] Define canonical ASCII snapshot normalization (trim volatile header/status/cursor/playback marks).
+  - [x] Add snapshot update/check script for selected synthetic cases.
+  - [x] Optional structural “signature” diff (onset columns, flag columns, row widths) before full snapshot diff.
