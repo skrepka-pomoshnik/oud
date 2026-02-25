@@ -43,12 +43,21 @@ _BOOL_KEYS = {
     "flagredundant",
     "grid",
     "showdur",
+    "showspans",
+    "showfingerings",
+    "showornaments",
     "showextras",
+    "showft3extras",
     "showtactus",
     "italianmultifret",
     "viewinvert",
     "showtuning",
     "restrainopenstrings",
+}
+
+_DEPRECATED_SET_ALIASES = {
+    "showextras": "showspans",
+    "showft3extras": "__ft3extras_bundle__",
 }
 
 _INT_KEYS = {
@@ -117,6 +126,18 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"angle", "paren", "hide"},
         "Holdcuestyle must be angle/paren/hide",
     ),
+    "glisscuestyle": (
+        {"slash", "paren", "angle", "hide"},
+        "Glisscuestyle must be slash/paren/angle/hide",
+    ),
+    "ft3fingering": (
+        {"off", "left", "right", "both"},
+        "Ft3fingering must be off/left/right/both",
+    ),
+    "ft3ornaments": (
+        {"off", "left", "right", "both"},
+        "Ft3ornaments must be off/left/right/both",
+    ),
     "tabnotation": (
         {"minimal", "full"},
         "Tabnotation must be minimal/full",
@@ -124,6 +145,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "fontstyle": (
         {"modern", "renaissance", "baroque"},
         "Fontstyle must be modern/renaissance/baroque",
+    ),
+    "lynoteheads": (
+        {"classic", "petrucci"},
+        "Lynoteheads must be classic/petrucci",
     ),
     "basslabels": ({"numeric", "slash", "tuning"}, "Basslabels must be numeric/slash/tuning"),
     "italianorient": ({"normal", "reverse"}, "Italianorient must be normal/reverse"),
@@ -135,6 +160,14 @@ def _set_bool(state: EditorState, key: str, value: str) -> bool:
         state.message = f"{key.capitalize()} must be on/off"
         return False
     state.settings[key] = value
+    if key == "showspans":
+        state.settings["showextras"] = value
+    elif key in {"showfingerings", "showornaments"}:
+        both_on = (
+            state.settings.get("showfingerings", "on") == "on"
+            and state.settings.get("showornaments", "on") == "on"
+        )
+        state.settings["showft3extras"] = "on" if both_on else "off"
     return True
 
 
@@ -270,10 +303,16 @@ def set_key_names() -> tuple[str, ...]:
     keys.update(_BOOL_KEYS)
     keys.update(_INT_KEYS)
     keys.update(_ENUM_VALUES.keys())
+    keys.discard("showextras")
+    keys.discard("showft3extras")
     return tuple(sorted(keys))
 
 
-def set_value_options(key: str) -> tuple[str, ...]:  # noqa: PLR0911
+def set_value_options(key: str) -> tuple[str, ...]:  # noqa: PLR0911, C901
+    if key in _DEPRECATED_SET_ALIASES:
+        key = _DEPRECATED_SET_ALIASES[key]
+    if key == "__ft3extras_bundle__":
+        return ("on", "off")
     if key in _BOOL_KEYS:
         return ("on", "off")
     if key in _ENUM_VALUES:
@@ -334,7 +373,7 @@ _HANDLERS: dict[str, SetHandler] = {
 }
 
 
-def apply_set_command(  # noqa: C901
+def apply_set_command(  # noqa: C901, PLR0912
     state: EditorState,
     args: str,
     config_path: str,
@@ -359,6 +398,18 @@ def apply_set_command(  # noqa: C901
             state.message = f"Invalid set token: {token}"
             continue
         key, value = token.split("=", 1)
+        alias = _DEPRECATED_SET_ALIASES.get(key)
+        if alias == "__ft3extras_bundle__":
+            if value not in ("on", "off"):
+                state.message = "showft3extras must be on/off"
+                continue
+            state.settings["showfingerings"] = value
+            state.settings["showornaments"] = value
+            # Keep deprecated key mirrored for config/read compatibility during transition.
+            state.settings["showft3extras"] = value
+            continue
+        if alias is not None:
+            key = alias
         if key in _HANDLERS:
             _HANDLERS[key](state, value)
             continue

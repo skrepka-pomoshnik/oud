@@ -144,6 +144,18 @@ def cmd_repeat(state: EditorState, args: str) -> None:
     _cmd_repeat(state, args.strip())
 
 
+def cmd_dynamic(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_dynamic as _cmd_dynamic_local
+
+    _cmd_dynamic_local(state, args.strip())
+
+
+def cmd_fermata(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_fermata as _cmd_fermata_local
+
+    _cmd_fermata_local(state, args.strip())
+
+
 def cmd_tool(state: EditorState, args: str, config_path: str) -> None:
     _cmd_tool(state, args, config_path)
 
@@ -315,6 +327,8 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("hold", _no_config(cmd_hold)),
         CommandSpec("barline", _no_config(cmd_barline)),
         CommandSpec("repeat", _no_config(cmd_repeat)),
+        CommandSpec("dynamic", _no_config(cmd_dynamic)),
+        CommandSpec("fermata", _no_config(cmd_fermata)),
         CommandSpec("tool", _with_config(cmd_tool)),
     )
 

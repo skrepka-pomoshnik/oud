@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Piece
+from pathlib import Path
+
+import pytest
+
+from oud.core.ft3 import load_ft3
+from oud.core.model import Bar, Chord, Note, Piece
 from oud.ui.adapter import Screen
+from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import _apply_overrides, render_piece
 
 
@@ -78,6 +84,17 @@ def _args(mode: str = "normal"):
         "playback_bar": None,
         "playback_col": None,
     }
+
+
+def _render_lines(kwargs: dict) -> list[str]:
+    stdscr = kwargs.get("stdscr")
+    h = getattr(stdscr, "h", 24)
+    w = getattr(stdscr, "w", 80)
+    fb = FrameBuffer(h, w)
+    run_kwargs = dict(kwargs)
+    run_kwargs["stdscr"] = fb
+    render_piece(**run_kwargs)
+    return fb.snapshot().lines
 
 
 def test_apply_overrides_wrapper() -> None:
@@ -264,3 +281,247 @@ def test_render_draws_left_staff_barline() -> None:
         if text == "|" and x == 2 and y >= 2
     ]
     assert left_bar_calls
+
+
+def test_render_new_sheet_first_note_flag_does_not_overlap_time_cue_lane() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="T",
+        bars=[
+            Bar(
+                time_sig="O",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    render_piece(**kwargs)
+
+    screen = kwargs["stdscr"]
+    width = screen.w
+    height = screen.h
+    canvas = [[" " for _ in range(width)] for _ in range(height)]
+    for y, x, text, _a in screen.calls:
+        if not (0 <= y < height):
+            continue
+        for idx, ch in enumerate(text):
+            tx = x + idx
+            if 0 <= tx < width:
+                canvas[y][tx] = ch
+    lines = ["".join(row) for row in canvas]
+
+    cue_cells = [
+        (y, x)
+        for y, row in enumerate(lines)
+        for x, ch in enumerate(row)
+        if ch == "O"
+    ]
+    assert cue_cells
+    cue_y, cue_x = cue_cells[0]
+    # Find a flag row above the staff with visible rhythm glyphs.
+    flag_row_y = next(
+        y
+        for y in range(max(0, cue_y - 4), cue_y)
+        if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
+    )
+    assert lines[flag_row_y][cue_x] == " "
+
+
+def test_render_repeat_glyphs_visible_on_real_ft3_file() -> None:
+    path = Path("lutemusic/wu_sol_ich_mich_hin_keren.ft3")
+    if not path.exists():
+        pytest.skip("local FT3 corpus file not available")
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=39, w=121)
+    kwargs["piece"] = load_ft3(str(path))
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any(".:" in text for text in texts)
+    assert any(":." in text for text in texts)
+
+
+def test_render_repeat_words_visible_on_loaded_real_file() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=24, w=100)
+    kwargs["piece"] = load_ft3("examples/26_lachrimae_galliard_in_G.ft3")
+    kwargs["piece"].bars[0].repeat = "DC al Fine"
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("DC al Fine" in text for text in texts)
+
+
+def test_imported_fingering_renders_right_subscript_in_french() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="T",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(3, 1, 0, left_fingering="4")],
+                    ),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("b₄" in text for text in texts)
+
+
+def test_imported_fingering_renders_right_superscript_in_italian() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="T",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(3, 1, 0, left_fingering="4")],
+                    ),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["style"] = "italian"
+    kwargs["settings"]["italianorient"] = "reverse"
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("1⁴" in text for text in texts)
+
+
+@pytest.mark.parametrize(
+    ("style", "italian_orient", "expected"),
+    [
+        ("french", None, "b₄"),
+        ("italian", "reverse", "1⁴"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("layout", "justify", "width"),
+    [
+        ("packed", "stretch", 80),
+        ("auto", "stretch", 96),
+        ("auto", "smart", 96),
+    ],
+)
+def test_imported_fingering_render_matrix_stays_adjacent(
+    style: str,
+    italian_orient: str | None,
+    expected: str,
+    layout: str,
+    justify: str,
+    width: int,
+) -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=24, w=width)
+    kwargs["piece"] = Piece(
+        title="FingeringMatrix",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=8, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                    Chord(note_type=8, dotted=False, grid=None, notes=[Note(3, 1, 0, left_fingering="4")]),
+                    Chord(note_type=8, dotted=False, grid=None, notes=[Note(4, 2, 0)]),
+                    Chord(note_type=8, dotted=False, grid=None, notes=[Note(5, 3, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["style"] = style
+    if italian_orient is not None:
+        kwargs["settings"]["italianorient"] = italian_orient
+    kwargs["settings"]["layout"] = layout
+    kwargs["settings"]["justify"] = justify
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    kwargs["settings"]["showspans"] = "off"
+    lines = _render_lines(kwargs)
+    score_text = "\n".join(lines)
+    assert expected in score_text
+    mark = expected[-1]
+    base = expected[:-1]
+    assert f"{mark}{base}" not in score_text
+
+
+def test_imported_open_string_left_hand_fingering_digits_are_suppressed() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="OpenSanity",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 0, 0, left_fingering="4")]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    lines = _render_lines(kwargs)
+    text = "\n".join(lines)
+    assert "₄" not in text
+    assert "⁴" not in text
+
+
+@pytest.mark.parametrize(
+    ("style", "italian_orient", "base"),
+    [
+        ("french", None, "b"),
+        ("italian", "reverse", "1"),
+    ],
+)
+def test_imported_dot_left_ornament_renders_inline_as_unicode_dot(
+    style: str,
+    italian_orient: str | None,
+    base: str,
+) -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="DotLeft",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0, left_ornament="dot-left")]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["style"] = style
+    if italian_orient is not None:
+        kwargs["settings"]["italianorient"] = italian_orient
+    kwargs["settings"]["showfingerings"] = "off"
+    kwargs["settings"]["showornaments"] = "on"
+    lines = _render_lines(kwargs)
+    text = "\n".join(lines)
+    assert f"{base}˙" in text
+
+
+def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(monkeypatch) -> None:
+    captured: dict[str, bool] = {}
+
+    def _fake_render_systems(*_args, **kwargs):
+        captured["show_extras"] = kwargs["show_extras"]
+
+    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    kwargs = _args("normal")
+    kwargs["settings"]["showextras"] = "on"
+    kwargs["settings"]["showspans"] = "off"
+    render_piece(**kwargs)
+    assert captured["show_extras"] is False

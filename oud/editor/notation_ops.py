@@ -74,6 +74,22 @@ def cmd_repeat(state: EditorState, value: str) -> None:
     set_repeat(state, normalized)
 
 
+def cmd_dynamic(state: EditorState, value: str) -> None:
+    normalized = value.strip().lower()
+    if not normalized:
+        state.message = "Dynamic must be clear/ppp/pp/p/mp/mf/f/ff/fff/sfz/rfz"
+        return
+    set_dynamic(state, normalized)
+
+
+def cmd_fermata(state: EditorState, value: str) -> None:
+    normalized = value.strip().lower() or "toggle"
+    if normalized not in {"on", "off", "toggle"}:
+        state.message = "Fermata must be on/off/toggle"
+        return
+    set_fermata(state, normalized)
+
+
 def set_ornament(state: EditorState, value: str) -> None:
     key = (state.cursor_bar, state.cursor_col)
     prev = state.ornaments.get(key)
@@ -231,6 +247,49 @@ def set_repeat(state: EditorState, value: str) -> None:
     bar.repeat = new
     state.modified = True
     state.message = f"Repeat {normalized}"
+
+
+def set_dynamic(state: EditorState, value: str) -> None:
+    if not state.piece.bars:
+        state.message = NO_BARS
+        return
+    normalized = value.strip().lower()
+    allowed = {"clear", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "sfz", "rfz"}
+    if normalized not in allowed:
+        state.message = "Dynamic must be clear/ppp/pp/p/mp/mf/f/ff/fff/sfz/rfz"
+        return
+    bar = state.piece.bars[state.cursor_bar]
+    prev = bar.dynamic
+    new = None if normalized == "clear" else normalized
+    record_action(
+        state,
+        UndoAction(
+            kind="dynamic",
+            data={"bar": state.cursor_bar, "prev": prev, "new": new},
+        ),
+    )
+    bar.dynamic = new
+    state.modified = True
+    state.message = "Dynamic cleared" if new is None else f"Dynamic {new}"
+
+
+def set_fermata(state: EditorState, value: str) -> None:
+    if not state.piece.bars:
+        state.message = NO_BARS
+        return
+    bar = state.piece.bars[state.cursor_bar]
+    prev = bar.fermata
+    new = (not prev) if value == "toggle" else (value == "on")
+    record_action(
+        state,
+        UndoAction(
+            kind="fermata",
+            data={"bar": state.cursor_bar, "prev": prev, "new": new},
+        ),
+    )
+    bar.fermata = new
+    state.modified = True
+    state.message = "Fermata on" if new else "Fermata off"
 
 
 def set_slur(state: EditorState, value: str) -> None:

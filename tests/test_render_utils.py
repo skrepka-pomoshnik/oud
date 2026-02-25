@@ -288,7 +288,7 @@ def test_bar_cells_from_chords_multidigit_italian_tokens_do_not_merge() -> None:
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 10, 0)]),
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 11, 0)]),
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 12, 0)]),
-        ]
+        ],
     )
     row = bar_cells_from_chords(bar, strings=6, bar_width=12, default_duration=4, style="italian")[0]
     text = "".join(str(ch) for ch in row)
@@ -304,7 +304,7 @@ def test_bar_cells_from_chords_multidigit_french_tokens_do_not_merge() -> None:
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 10, 0)]),
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 11, 0)]),
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 12, 0)]),
-        ]
+        ],
     )
     row = bar_cells_from_chords(bar, strings=6, bar_width=12, default_duration=4, style="french")[0]
     text = "".join(str(ch) for ch in row)

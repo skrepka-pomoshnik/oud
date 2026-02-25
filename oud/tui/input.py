@@ -18,7 +18,6 @@ from oud.editor.prompt_state import (
 )
 from oud.editor.settings_ops import set_key_names, set_preset_names, set_value_options
 from oud.editor.state import EditorState
-from oud.settings import DEFAULT_SETTINGS
 from oud.tui.commands import command_names, no_space_commands, path_commands
 from oud.tui.prompt import PromptBindings, update_prompt
 
@@ -43,7 +42,7 @@ def history_next(state: EditorState) -> str | None:
 
 
 def complete_command_text(  # noqa: PLR0911, C901, PLR0912
-    state: EditorState,
+    _state: EditorState,
     cmdline: str,
 ) -> tuple[str, str | None]:
     commands = command_names()
@@ -60,7 +59,7 @@ def complete_command_text(  # noqa: PLR0911, C901, PLR0912
 
     cmd, rest = cmdline.split(" ", 1)
     if cmd == "set":
-        keys = sorted({*set_key_names(), *DEFAULT_SETTINGS.keys(), *state.settings.keys()})
+        keys = sorted(set(set_key_names()))
         presets = list(set_preset_names())
         token = rest.strip()
         if not token:

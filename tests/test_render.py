@@ -216,6 +216,97 @@ def test_build_bar_view_shows_annotations_and_ornaments() -> None:
     assert view["ann"][0][2] == "x"
 
 
+def test_build_bar_view_shows_imported_ft3_extras_and_user_overrides_win() -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[
+                    Note(
+                        1,
+                        0,
+                        0,
+                        left_fingering="2",
+                        right_fingering="thumb",
+                        left_ornament="#",
+                    ),
+                ],
+            ),
+        ],
+    )
+    view = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={(0, 0): "*"},
+        annotations={(0, 0): "x"},
+        slurs=[],
+        ties=[],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        showft3extras="on",
+        ft3fingering="both",
+        ft3ornaments="both",
+    )
+    assert "x" in view["ann"][0]
+    assert "*" in view["orn"][0]
+
+
+def test_build_bar_view_can_hide_imported_ft3_extras() -> None:
+    bar = Bar(
+        chords=[
+                Chord(
+                    note_type=4,
+                    dotted=False,
+                    grid=None,
+                    notes=[Note(1, 1, 0, left_fingering="1", left_ornament="#")],
+                ),
+            ],
+        )
+    shown = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        showft3extras="on",
+    )
+    hidden = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        showft3extras="off",
+    )
+    assert any(ch != " " for ch in shown["ann"][0])
+    assert any(ch != " " for ch in shown["orn"][0])
+    assert hidden["ann"][0].strip() == ""
+    assert hidden["orn"][0].strip() == ""
+
+
 def test_build_bar_view_shows_slur_tie_hold() -> None:
     bar = Bar()
     view = build_bar_view(
@@ -323,7 +414,7 @@ def test_build_bar_view_tie_noteheads_hide_hides_continued_column_noteheads() ->
     assert all(row[3] == "-" for row in hidden["rows"])
 
 
-def test_build_bar_view_tie_noteheads_parenthesize_marks_tie_row_but_keeps_noteheads() -> None:
+def test_build_bar_view_tie_noteheads_parenthesize_marks_cue_rows_keeps_width() -> None:
     bar = Bar(
         chords=[
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
@@ -350,7 +441,76 @@ def test_build_bar_view_tie_noteheads_parenthesize_marks_tie_row_but_keeps_noteh
         tienoteheads="parenthesize",
     )
     assert any(row[3] != "-" for row in paren["rows"])
-    assert "(" in paren["tie"][0] and ")" in paren["tie"][0]
+    assert all(len(row) == 4 for row in paren["rows"])
+    assert paren["ann"][0][3] == "("
+    assert ")" in paren["tie"][0]
+
+
+def test_build_bar_view_tie_noteheads_parenthesize_falls_back_on_cue_collisions() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        ],
+    )
+    view = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={(0, 3): "x"},  # occupy preferred opening-cue slot
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tiecuestyle="bracket",  # occupy preferred closing-cue slot
+        tienoteheads="parenthesize",
+    )
+    # Opening cue falls back to left side of tie row.
+    assert "(" in view["tie"][0]
+    # Closing cue falls back to ornament row when tie row end already has ']'.
+    assert view["orn"][0][3] == ")"
+    assert view["ann"][0][3] == "x"
+
+
+def test_build_bar_view_tie_parenthesize_uses_slur_hold_rows_when_tie_row_busy() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        ],
+    )
+    view = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={(0, 3): "*"},  # occupy ornament fallback for close cue
+        annotations={(0, 3): "x"},  # occupy annotation preferred open slot
+        slurs=[(0, 0, 3)],  # fills slur row end with ')' when paren style
+        ties=[(0, 1, 3)],
+        holds=[(0, 0, 3)],  # provides another fallback row
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        tiecuestyle="bracket",
+        slurcuestyle="paren",
+        holdcuestyle="paren",
+        tienoteheads="parenthesize",
+    )
+    # Opening cue should still appear somewhere despite annotation+tierow pressure.
+    assert any("(" in view[key][0] for key in ("tie", "slur", "hold"))
+    # Closing cue should still appear despite tie+ornament pressure.
+    assert any(")" in view[key][0] for key in ("tie", "slur", "hold"))
 
 
 def test_build_bar_view_slur_and_hold_cue_style_variants() -> None:
@@ -395,6 +555,57 @@ def test_build_bar_view_slur_and_hold_cue_style_variants() -> None:
     assert alt["hold"][0][3] == ")"
     assert hidden["slur"][0].strip() == ""
     assert hidden["hold"][0].strip() == ""
+
+
+def test_build_bar_view_gliss_cue_style_variants_and_tie_parenthesize_fallback() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 3, 0)]),
+        ],
+    )
+    shown = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={(0, 3): "*"},
+        annotations={(0, 3): "x"},
+        slurs=[],
+        ties=[(0, 1, 3)],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        glisses=[(0, 0, 3)],
+        tiecuestyle="bracket",
+        tienoteheads="parenthesize",
+        glisscuestyle="slash",
+    )
+    hidden = build_bar_view(
+        bar=bar,
+        overrides={},
+        durations={},
+        ornaments={},
+        annotations={},
+        slurs=[],
+        ties=[],
+        holds=[],
+        bar_index=0,
+        strings=6,
+        bar_width=4,
+        default_duration=4,
+        style="french",
+        glisses=[(0, 0, 3)],
+        glisscuestyle="hide",
+    )
+    assert shown["gliss"][0][0] == "/"
+    assert shown["gliss"][0][3] == "\\"
+    assert any("(" in shown[key][0] for key in ("tie", "gliss"))
+    assert hidden["gliss"][0].strip() == ""
 
 
 def test_bar_number_for_index() -> None:
@@ -487,3 +698,157 @@ def test_render_auto_mode_not_forced_to_one_bar_per_row() -> None:
     frame = fb.snapshot()
     note_line = next(line for line in frame.lines if "-a-" in line)
     assert note_line.count("|") >= 3
+
+
+def test_render_shows_imported_ft3_extras_rows_by_default() -> None:
+    piece = Piece(
+        title="T",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(1, 0, 0, left_fingering="2", left_ornament="#")],
+                    ),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    settings = {
+        "layout": "auto",
+        "justify": "compact",
+        "style": "french",
+        "linelen": "0",
+        "bargap": "1",
+        "barpad": "1",
+        "barsperline": "0",
+        "maxbars": "0",
+        "showdur": "off",
+        "showextras": "off",
+        "showft3extras": "on",
+        "ft3fingering": "both",
+        "ft3ornaments": "both",
+        "showtactus": "off",
+        "flagredundant": "on",
+        "flagstems": "single",
+        "tuning": "g2c3f3a3d4g4",
+        "showtuning": "on",
+        "tuninglabels": "relative",
+        "bassstrings": "",
+        "basslabels": "tuning",
+        "measures": "start",
+        "countdots": "off",
+        "time": "C",
+        "timesigstyle": "symbol",
+        "key": "C",
+        "flagstyle": "standard",
+    }
+    fb = FrameBuffer(20, 80)
+    render_piece(
+        fb,
+        piece,
+        0,
+        0,
+        0,
+        0,
+        10,
+        {},
+        {},
+        {},
+        {},
+        set(),
+        set(),
+        [],
+        [],
+        [],
+        "normal",
+        "",
+        "",
+        "",
+        "",
+        settings,
+        None,
+        set(),
+        "",
+        [],
+        0,
+        0,
+    )
+    lines = fb.snapshot().lines
+    assert any("#" in line for line in lines)
+
+
+def test_render_meta_row_shows_dynamic_and_fermata_signs() -> None:
+    piece = Piece(
+        title="T",
+        bars=[
+            Bar(
+                dynamic="mf",
+                fermata=True,
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    settings = {
+        "layout": "auto",
+        "justify": "compact",
+        "style": "french",
+        "linelen": "0",
+        "bargap": "1",
+        "barpad": "1",
+        "barsperline": "0",
+        "maxbars": "0",
+        "showdur": "off",
+        "showextras": "off",
+        "showft3extras": "off",
+        "showtactus": "off",
+        "flagredundant": "on",
+        "flagstems": "single",
+        "tuning": "g2c3f3a3d4g4",
+        "showtuning": "on",
+        "tuninglabels": "relative",
+        "bassstrings": "",
+        "basslabels": "tuning",
+        "measures": "start",
+        "countdots": "off",
+        "time": "C",
+        "timesigstyle": "symbol",
+        "key": "C",
+        "flagstyle": "standard",
+    }
+    fb = FrameBuffer(16, 80)
+    render_piece(
+        fb,
+        piece,
+        0,
+        0,
+        0,
+        0,
+        8,
+        {},
+        {},
+        {},
+        {},
+        set(),
+        set(),
+        [],
+        [],
+        [],
+        "normal",
+        "",
+        "",
+        "",
+        "",
+        settings,
+        None,
+        set(),
+        "",
+        [],
+        0,
+        0,
+    )
+    assert any("^ mf" in line or "mf ^" in line for line in fb.snapshot().lines)

@@ -28,10 +28,14 @@ from oud.editor.media_ops import cmd_play as _cmd_play
 from oud.editor.media_ops import print_pdf as _print_pdf
 from oud.editor.messages import MISSING_LESS, NO_PATH
 from oud.editor.notation_ops import cmd_barline as _cmd_barline
+from oud.editor.notation_ops import cmd_dynamic as _cmd_dynamic
+from oud.editor.notation_ops import cmd_fermata as _cmd_fermata
 from oud.editor.notation_ops import cmd_repeat as _cmd_repeat
 from oud.editor.notation_ops import cmd_time as _cmd_time
 from oud.editor.notation_ops import set_annotation as _set_annotation
 from oud.editor.notation_ops import set_barline as _set_barline
+from oud.editor.notation_ops import set_dynamic as _set_dynamic
+from oud.editor.notation_ops import set_fermata as _set_fermata
 from oud.editor.notation_ops import set_highlight as _set_highlight
 from oud.editor.notation_ops import set_hold as _set_hold
 from oud.editor.notation_ops import set_ornament as _set_ornament
@@ -245,6 +249,14 @@ def cmd_repeat(state: EditorState, value: str) -> None:
     _cmd_repeat(state, value)
 
 
+def cmd_dynamic(state: EditorState, value: str) -> None:
+    _cmd_dynamic(state, value)
+
+
+def cmd_fermata(state: EditorState, value: str) -> None:
+    _cmd_fermata(state, value)
+
+
 def cmd_verify(state: EditorState) -> None:
     from oud.editor.verify_ops import verify_bar  # noqa: PLC0415
 
@@ -301,6 +313,14 @@ def set_barline(state: EditorState, value: str) -> None:
 
 def set_repeat(state: EditorState, value: str) -> None:
     _set_repeat(state, value)
+
+
+def set_dynamic(state: EditorState, value: str) -> None:
+    _set_dynamic(state, value)
+
+
+def set_fermata(state: EditorState, value: str) -> None:
+    _set_fermata(state, value)
 
 
 def set_slur(state: EditorState, value: str) -> None:

@@ -19,6 +19,16 @@ from tests.helpers_regression_cases import (
 )
 
 
+def _usable_width_for_state(state) -> int:
+    left_margin = 3
+    max_width = state.screen_width
+    linelen = state.settings.get("linelen", "")
+    if linelen.isdigit() and int(linelen) > 0:
+        max_width = min(max_width, int(linelen))
+    right_padding = 1
+    return max(1, max_width - left_margin - right_padding)
+
+
 def _content_width_for_bar(state, bar_index: int) -> int:
     starts = dynamic_system_starts(state, state.screen_width)
     start = max(value for value in starts if value <= bar_index)
@@ -80,6 +90,37 @@ def _flag_cols_and_rows(state, bar_index: int) -> tuple[list[int], list[str]]:
         for s_idx in range(state.piece.strings)
     ]
     return flag_cols, scaled_rows
+
+
+@pytest.mark.parametrize("justify", ["stretch", "smart", "edge"])
+def test_auto_system_plan_width_accounting_matches_usable_width_for_fill_modes(justify: str) -> None:
+    state = regression_state(multi_bar_spacing_piece(), justify=justify, width=121, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = justify
+    usable_width = _usable_width_for_state(state)
+    starts = dynamic_system_starts(state, state.screen_width)
+    assert starts
+    for start in starts:
+        bar_indices, bar_widths, gaps = auto_system_bar_plan_with_gaps(state, start, state.screen_width)
+        if not bar_indices:
+            continue
+        assert len(bar_indices) == len(bar_widths)
+        assert len(gaps) == max(0, len(bar_widths) - 1)
+        assert sum(bar_widths) + sum(gaps) == usable_width
+
+
+def test_auto_system_plan_compact_does_not_exceed_usable_width() -> None:
+    state = regression_state(multi_bar_spacing_piece(), justify="compact", width=121, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = "compact"
+    usable_width = _usable_width_for_state(state)
+    starts = dynamic_system_starts(state, state.screen_width)
+    assert starts
+    for start in starts:
+        _idx, bar_widths, gaps = auto_system_bar_plan_with_gaps(state, start, state.screen_width)
+        if not bar_widths:
+            continue
+        assert sum(bar_widths) + sum(gaps) <= usable_width
 
 
 def test_synthetic_first_bar_time_cue_does_not_glue_equal_noteheads() -> None:
@@ -240,6 +281,41 @@ def test_synthetic_system_inlines_time_sig() -> None:
     # Time signature should be inlined into a staff row, not on a standalone row.
     assert any(("C" in line or "O" in line) and "|" in line and "-" in line for line in lines)
     assert not any(line.strip() in {"C", "O", "3/4", "4/4"} for line in lines[:10])
+
+
+def test_synthetic_beatsnap_soft_does_not_introduce_left_slack_on_cue_free_bar() -> None:
+    piece = Piece(
+        title="BeatSnapNoSlack",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])], time_sig="C"),
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    state = regression_state(piece, justify="smart", width=90, bar_width=10)
+    state.settings["layout"] = "auto"
+    state.settings["beatsnap"] = "soft"
+    state.settings["showdur"] = "off"
+    state.settings["showtactus"] = "off"
+    state.settings["showextras"] = "off"
+    lines = _render_state_lines(state, height=18)
+    staff_rows = [line for line in lines if line.count("|") >= 3 and "-" in line]
+    assert staff_rows
+    row = staff_rows[0]
+    bars = [idx for idx, ch in enumerate(row) if ch == "|"]
+    assert len(bars) >= 3
+    second_seg = row[bars[1] + 1 : bars[2]]
+    first_note = next((i for i, ch in enumerate(second_seg) if ch not in ("-", " ")), None)
+    assert first_note is not None
+    assert first_note <= 2, second_seg
 
 
 @pytest.mark.parametrize("justify", ["smart", "stretch"])

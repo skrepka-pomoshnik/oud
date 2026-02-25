@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from oud.core.model import Bar, Piece
+from oud.core.model import Bar, Note, Piece
 from oud.core.render_utils import (
     bar_cells,
     bar_cells_from_chords,
@@ -16,6 +16,7 @@ from oud.core.render_utils import (
     place_duration_cells,
 )
 from oud.core.tab_policy import (
+    gliss_span_chars,
     hold_span_chars,
     slur_span_chars,
     tie_notehead_hidden_cols,
@@ -43,6 +44,8 @@ __all__ = [  # noqa: RUF022
     "_bar_note_count",
     "_bar_number_for_index",
     "_bar_ornaments",
+    "_bar_imported_ft3_annotations",
+    "_bar_imported_ft3_ornaments",
     "_bar_span_row",
     "_bars_fit",
     "_block_height",
@@ -663,6 +666,159 @@ def _bar_ornaments(
     return row
 
 
+def _pick_side_value(
+    *,
+    left: str | None,
+    right: str | None,
+    mode: str,
+) -> str | None:
+    if mode == "off":
+        return None
+    if mode == "left":
+        return left
+    if mode == "right":
+        return right
+    # "both" still has one cell; prefer left if both exist.
+    return left or right
+
+
+def _ft3_fingering_glyph(value: str | None) -> str | None:
+    if not value:
+        return None
+    if value == "thumb":
+        return "t"
+    return value[0]
+
+
+def _ft3_display_fingering_for_note(note: Note, *, fingering_mode: str) -> str | None:
+    left_value = note.left_fingering
+    # Sanity rule: LH 1-4 on an open string is usually not a usable fingering cue.
+    # Keep RH markers / thumb, but suppress LH digit clutter until barre semantics exist.
+    if note.fret == 0 and left_value in {"1", "2", "3", "4"}:
+        left_value = None
+    picked = _pick_side_value(
+        left=left_value,
+        right=note.right_fingering,
+        mode=fingering_mode,
+    )
+    return _ft3_fingering_glyph(picked)
+
+
+def _ft3_ornament_glyph(value: str | None) -> str | None:
+    if not value:
+        return None
+    mapping = {
+        "dot-left": "˙",
+        "brackets": "[",
+    }
+    return mapping.get(value, value[0])
+
+
+def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
+    if len(base) != len(user):
+        return user
+    out = list(base)
+    for idx, ch in enumerate(user):
+        if ch != " ":
+            out[idx] = ch
+    return out
+
+
+def _place_parenthesize_tie_cues(  # noqa: C901
+    *,
+    ann_cells: list[str],
+    orn_cells: list[str],
+    tie_cells: list[str],
+    slur_cells: list[str] | None,
+    hold_cells: list[str] | None,
+    gliss_cells: list[str] | None,
+    paren_tie_cols: set[int],
+    allow_ann_row: bool = True,
+) -> None:
+    def _place_open(end_col: int) -> None:
+        if allow_ann_row and 0 <= end_col < len(ann_cells) and ann_cells[end_col] == " ":
+            ann_cells[end_col] = "("
+            return
+        for row in (tie_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
+            left = end_col - 1
+            while 0 <= left < len(row):
+                if row[left] == " ":
+                    row[left] = "("
+                    return
+                left -= 1
+
+    def _place_close(end_col: int) -> None:
+        for row in (tie_cells, orn_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
+            if 0 <= end_col < len(row) and row[end_col] == " ":
+                row[end_col] = ")"
+                return
+
+    for end_col in paren_tie_cols:
+        if not (0 <= end_col < len(tie_cells)):
+            continue
+        _place_open(end_col)
+        _place_close(end_col)
+
+
+def _bar_imported_ft3_annotations(
+    bar: Bar,
+    *,
+    bar_width: int,
+    default_duration: int,
+    fingering_mode: str = "both",
+) -> list[str]:
+    row = [" " for _ in range(bar_width)]
+    if fingering_mode == "off" or not bar.chords:
+        return row
+    positions = chord_positions(bar, bar_width, default_duration)
+    for idx, chord in enumerate(bar.chords):
+        if idx >= len(positions):
+            break
+        col = positions[idx][0]
+        if not (0 <= col < bar_width):
+            continue
+        glyph = None
+        for note in chord.notes:
+            glyph = _ft3_display_fingering_for_note(note, fingering_mode=fingering_mode)
+            if glyph:
+                break
+        if glyph and row[col] == " ":
+            row[col] = glyph
+    return row
+
+
+def _bar_imported_ft3_ornaments(
+    bar: Bar,
+    *,
+    bar_width: int,
+    default_duration: int,
+    ornament_mode: str = "both",
+) -> list[str]:
+    row = [" " for _ in range(bar_width)]
+    if ornament_mode == "off" or not bar.chords:
+        return row
+    positions = chord_positions(bar, bar_width, default_duration)
+    for idx, chord in enumerate(bar.chords):
+        if idx >= len(positions):
+            break
+        col = positions[idx][0]
+        if not (0 <= col < bar_width):
+            continue
+        glyph = None
+        for note in chord.notes:
+            picked = _pick_side_value(
+                left=note.left_ornament,
+                right=note.right_ornament,
+                mode=ornament_mode,
+            )
+            glyph = _ft3_ornament_glyph(picked)
+            if glyph:
+                break
+        if glyph and row[col] == " ":
+            row[col] = glyph
+    return row
+
+
 def _bar_span_row(
     spans: list[tuple[int, int, int]],
     bar_index: int,
@@ -717,7 +873,7 @@ def _bar_flags(
     return row
 
 
-def build_bar_view(
+def build_bar_view(  # noqa: C901
     bar: Bar,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -737,7 +893,16 @@ def build_bar_view(
     tiecuestyle: str = "bracket",
     tienoteheads: str = "show",
     holdcuestyle: str = "angle",
+    glisses: list[tuple[int, int, int]] | None = None,
+    glisscuestyle: str = "hide",
+    showft3extras: str = "on",
+    ft3fingering: str = "both",
+    ft3ornaments: str = "both",
+    showfingerings: str | None = None,
+    showornaments: str | None = None,
 ) -> dict[str, list[str]]:
+    if glisses is None:
+        glisses = []
     bar_cells_data = (
         bar_cells_from_chords(
             bar,
@@ -790,8 +955,31 @@ def build_bar_view(
         }
         for col in override_cols:
             dur_cells[col] = duration_display(default_duration)
-    ann_cells = _bar_annotations(annotations, bar_index, bar_width)
-    orn_cells = _bar_ornaments(ornaments, bar_index, bar_width)
+    imported_ann = [" " for _ in range(bar_width)]
+    imported_orn = [" " for _ in range(bar_width)]
+    show_fingerings = (showfingerings or showft3extras) == "on"
+    show_ornaments_value = (showornaments or showft3extras) == "on"
+    if show_fingerings:
+        imported_ann = _bar_imported_ft3_annotations(
+            bar,
+            bar_width=bar_width,
+            default_duration=default_duration,
+            fingering_mode=ft3fingering,
+        )
+    if show_ornaments_value:
+        imported_orn = _bar_imported_ft3_ornaments(
+            bar,
+            bar_width=bar_width,
+            default_duration=default_duration,
+            ornament_mode=ft3ornaments,
+        )
+    ann_cells = _merge_mark_rows(imported_ann, _bar_annotations(annotations, bar_index, bar_width))
+    local_orn_cells = (
+        _bar_ornaments(ornaments, bar_index, bar_width)
+        if show_ornaments_value
+        else [" " for _ in range(bar_width)]
+    )
+    orn_cells = _merge_mark_rows(imported_orn, local_orn_cells)
     slur_chars = slur_span_chars(slurcuestyle)
     slur_cells = (
         [" " for _ in range(bar_width)]
@@ -804,19 +992,26 @@ def build_bar_view(
         if tie_chars is None
         else _bar_span_row(ties, bar_index, bar_width, *tie_chars)
     )
-    for end_col in paren_tie_cols:
-        if not (0 <= end_col < bar_width):
-            continue
-        if tie_cells[end_col] == " ":
-            tie_cells[end_col] = ")"
-        left = end_col - 1
-        if left >= 0 and tie_cells[left] == " ":
-            tie_cells[left] = "("
     hold_chars = hold_span_chars(holdcuestyle)
     hold_cells = (
         [" " for _ in range(bar_width)]
         if hold_chars is None
         else _bar_span_row(holds, bar_index, bar_width, *hold_chars)
+    )
+    gliss_chars = gliss_span_chars(glisscuestyle)
+    gliss_cells = (
+        [" " for _ in range(bar_width)]
+        if gliss_chars is None
+        else _bar_span_row(glisses, bar_index, bar_width, *gliss_chars)
+    )
+    _place_parenthesize_tie_cues(
+        ann_cells=ann_cells,
+        orn_cells=orn_cells,
+        tie_cells=tie_cells,
+        slur_cells=slur_cells,
+        hold_cells=hold_cells,
+        gliss_cells=gliss_cells,
+        paren_tie_cols=paren_tie_cols,
     )
     rows = ["".join(bar_cells_data[s_idx]) for s_idx in range(strings)]
     return {
@@ -825,6 +1020,7 @@ def build_bar_view(
         "slur": ["".join(slur_cells)],
         "tie": ["".join(tie_cells)],
         "hold": ["".join(hold_cells)],
+        "gliss": ["".join(gliss_cells)],
         "flag": ["".join(flag_cells)],
         "dur": ["".join(dur_cells)],
         "rows": rows,

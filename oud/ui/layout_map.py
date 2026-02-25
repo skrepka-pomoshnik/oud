@@ -43,14 +43,15 @@ def layout_block_rows(
     tactus = offset if show_tactus else None
     if show_tactus:
         offset += 1
-    ann = orn = slur = tie = hold = None
+    ann = orn = slur = tie = hold = gliss = None
     if show_extras:
-        ann = offset
-        orn = offset + 1
-        slur = offset + 2
-        tie = offset + 2
-        hold = offset + 2
-        offset += 3
+        # Local marks (annotations/ornaments/fingerings) are rendered inline; reserve
+        # only one shared cue row for spans (slur/tie/hold/gliss).
+        slur = offset
+        tie = offset
+        hold = offset
+        gliss = offset
+        offset += 1
     flag = offset
     flag2 = offset + 1 if double_stems else None
     offset += 2 if double_stems else 1
@@ -64,6 +65,7 @@ def layout_block_rows(
         "slur": slur,
         "tie": tie,
         "hold": hold,
+        "gliss": gliss,
         "flag": flag,
         "flag2": flag2,
         "dur": dur,
@@ -90,5 +92,5 @@ def block_height(
     if show_dur:
         height += 1
     if show_extras:
-        height += 3
+        height += 1
     return height

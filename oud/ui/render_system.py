@@ -8,6 +8,7 @@ from oud.core.render_utils import (
 )
 from oud.core.spacing import auto_bar_plan
 from oud.core.tab_policy import (
+    gliss_span_chars,
     hold_span_chars,
     show_time_cue_for_bar,
     slur_span_chars,
@@ -23,11 +24,15 @@ from oud.core.tab_policy import (
 from oud.core.view_model import (
     _bar_annotations,
     _bar_durations,
+    _bar_imported_ft3_annotations,
+    _bar_imported_ft3_ornaments,
     _bar_number_for_index,
     _bar_ornaments,
     _bar_span_row,
     _filter_redundant_positions,
     _flag_positions_all,
+    _ft3_display_fingering_for_note,
+    _ft3_ornament_glyph,
     _infer_time_signature,
     _inline_bass_row,
     _next_system_start,
@@ -47,6 +52,246 @@ from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
+
+
+def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
+    if len(base) != len(user):
+        return user
+    out = list(base)
+    for idx, ch in enumerate(user):
+        if ch != " ":
+            out[idx] = ch
+    return out
+
+
+def _overlay_sparse_mark_chars(
+    stdscr: Screen,
+    *,
+    y: int,
+    bar_x: int,
+    draw_pad: int,
+    grid_map: list[int],
+    row_cells: list[str],
+    keep: set[str],
+) -> None:
+    if not row_cells or not grid_map:
+        return
+    for src_col, ch in enumerate(row_cells):
+        if ch not in keep:
+            continue
+        if not (0 <= src_col < len(grid_map)):
+            continue
+        dst_col = grid_map[src_col]
+        safe_addstr(stdscr, y, bar_x + draw_pad + dst_col, ch)
+
+
+def _place_parenthesize_tie_cues(  # noqa: C901
+    *,
+    ann_cells: list[str],
+    orn_cells: list[str],
+    tie_cells: list[str],
+    slur_cells: list[str] | None,
+    hold_cells: list[str] | None,
+    gliss_cells: list[str] | None,
+    paren_tie_cols: set[int],
+    allow_ann_row: bool = True,
+) -> None:
+    def _place_open(end_col: int) -> None:
+        if allow_ann_row and 0 <= end_col < len(ann_cells) and ann_cells[end_col] == " ":
+            ann_cells[end_col] = "("
+            return
+        for row in (tie_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
+            left = end_col - 1
+            while 0 <= left < len(row):
+                if row[left] == " ":
+                    row[left] = "("
+                    return
+                left -= 1
+
+    def _place_close(end_col: int) -> None:
+        for row in (tie_cells, orn_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
+            if 0 <= end_col < len(row) and row[end_col] == " ":
+                row[end_col] = ")"
+                return
+
+    for end_col in paren_tie_cols:
+        if not (0 <= end_col < len(tie_cells)):
+            continue
+        _place_open(end_col)
+        _place_close(end_col)
+
+
+def _merge_nonspace_rows(*rows: list[str]) -> list[str]:
+    if not rows:
+        return []
+    width = len(rows[0])
+    out = [" " for _ in range(width)]
+    for row in rows:
+        if len(row) != width:
+            continue
+        for idx, ch in enumerate(row):
+            if ch != " ":
+                out[idx] = ch
+    return out
+
+
+def _inline_fingering_glyph(ch: str, *, style: str = "french") -> str:
+    supers = {
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+        "t": "ᵗ",
+        "T": "ᵀ",
+    }
+    subs = {
+        "0": "₀",
+        "1": "₁",
+        "2": "₂",
+        "3": "₃",
+        "4": "₄",
+        "5": "₅",
+        "6": "₆",
+        "7": "₇",
+        "8": "₈",
+        "9": "₉",
+        "t": "ₜ",
+        "T": "ₜ",
+    }
+    if style == "italian":
+        return supers.get(ch, ch)
+    return subs.get(ch, ch)
+
+
+def _overlay_inline_local_marks(
+    *,
+    cells: list[list[str]],
+    ann_cells: list[str],
+    orn_cells: list[str],
+    style: str = "french",
+) -> None:
+    if not cells:
+        return
+    strings = len(cells)
+    width = len(cells[0])
+    for col in range(min(width, len(ann_cells), len(orn_cells))):
+        note_rows = [row for row in range(strings) if cells[row][col] != "-"]
+        if not note_rows:
+            continue
+        target_row = note_rows[0]
+        ann = ann_cells[col]
+        orn = orn_cells[col]
+
+        # Ornament/grace marker sits immediately to the right of the note (a#).
+        if orn != " ":
+            right = col + 1
+            if right < width and cells[target_row][right] == "-":
+                cells[target_row][right] = orn
+
+        # Fingering/annotation marker uses compact unicode and must stay adjacent.
+        # If there is no adjacent free slot, drop it instead of drifting.
+        if ann != " ":
+            mark = _inline_fingering_glyph(ann, style=style)
+            right = col + 1
+            if right < width and cells[target_row][right] == "-":
+                cells[target_row][right] = mark
+
+
+def _overlay_inline_local_marks_on_display_row(  # noqa: C901
+    *,
+    display_row_cells: list[str],
+    source_row_cells: list[str],
+    ann_cells: list[str],
+    orn_cells: list[str],
+    draw_pad: int,
+    grid_map: dict[int, int] | list[int],
+    style: str = "french",
+    source_row_index: int | None = None,
+    ann_target_rows: list[int] | None = None,
+    orn_target_rows: list[int] | None = None,
+) -> None:
+    width = len(source_row_cells)
+    for col in range(min(width, len(ann_cells), len(orn_cells))):
+        if source_row_cells[col] == "-":
+            continue
+        if isinstance(grid_map, dict):
+            mapped = grid_map.get(col, col)
+        else:
+            mapped = grid_map[col] if 0 <= col < len(grid_map) else col
+        disp_col = draw_pad + mapped
+        if not (0 <= disp_col < len(display_row_cells)):
+            continue
+        orn = orn_cells[col]
+        if (
+            orn != " "
+            and orn_target_rows is not None
+            and source_row_index is not None
+            and (col >= len(orn_target_rows) or orn_target_rows[col] != source_row_index)
+        ):
+            orn = " "
+        if orn != " ":
+            right = disp_col + 1
+            if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
+                display_row_cells[right] = orn
+        ann = ann_cells[col]
+        if (
+            ann != " "
+            and ann_target_rows is not None
+            and source_row_index is not None
+            and (col >= len(ann_target_rows) or ann_target_rows[col] != source_row_index)
+        ):
+            ann = " "
+        if ann != " ":
+            mark = _inline_fingering_glyph(ann, style=style)
+            right = disp_col + 1
+            if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
+                display_row_cells[right] = mark
+
+
+def _merge_span_rows_with_cue_priority(
+    *,
+    slur_row: list[str] | None,
+    hold_row: list[str] | None,
+    gliss_row: list[str] | None,
+    tie_row: list[str] | None,
+) -> list[str]:
+    base_rows = [row for row in (slur_row, hold_row, gliss_row, tie_row) if row is not None]
+    if not base_rows:
+        return []
+    width = len(base_rows[0])
+    out = [" " for _ in range(width)]
+    for idx in range(width):
+        chars = [
+            row[idx]
+            for row in (slur_row, hold_row, tie_row)
+            if row is not None and idx < len(row) and row[idx] != " "
+        ]
+        if not chars:
+            continue
+        if ")" in chars:
+            out[idx] = ")"
+            continue
+        if "(" in chars:
+            out[idx] = "("
+            continue
+        if tie_row is not None and idx < len(tie_row) and tie_row[idx] != " ":
+            out[idx] = tie_row[idx]
+            continue
+        if gliss_row is not None and idx < len(gliss_row) and gliss_row[idx] != " ":
+            out[idx] = gliss_row[idx]
+            continue
+        if hold_row is not None and idx < len(hold_row) and hold_row[idx] != " ":
+            out[idx] = hold_row[idx]
+            continue
+        if slur_row is not None and idx < len(slur_row) and slur_row[idx] != " ":
+            out[idx] = slur_row[idx]
+    return out
 
 
 def _build_chord_scale_map(
@@ -73,6 +318,66 @@ def _build_chord_scale_map(
         )
     }
     return spread_positions, src_to_dest
+
+
+def _target_note_rows_by_col(cells: list[list[str]]) -> list[int]:
+    if not cells:
+        return []
+    width = len(cells[0])
+    targets = [-1 for _ in range(width)]
+    for col in range(width):
+        for row_idx, row in enumerate(cells):
+            if col < len(row) and row[col] != "-":
+                targets[col] = row_idx
+                break
+    return targets
+
+
+def _imported_ft3_mark_target_rows(  # noqa: C901, PLR0912
+    *,
+    bar,
+    total_strings: int,
+    grid_width: int,
+    default_duration: int,
+    fingering_mode: str,
+    ornament_mode: str,
+) -> tuple[list[int], list[int]]:
+    ann_targets = [-1 for _ in range(grid_width)]
+    orn_targets = [-1 for _ in range(grid_width)]
+    if not getattr(bar, "chords", None):
+        return ann_targets, orn_targets
+    positions = chord_positions(bar, grid_width, default_duration)
+    for idx, chord in enumerate(bar.chords):
+        if idx >= len(positions):
+            break
+        col = positions[idx][0]
+        if not (0 <= col < grid_width):
+            continue
+        if ann_targets[col] < 0:
+            for note in chord.notes:
+                if not (1 <= note.string <= total_strings):
+                    continue
+                if _ft3_display_fingering_for_note(note, fingering_mode=fingering_mode):
+                    ann_targets[col] = note.string - 1
+                    break
+        if orn_targets[col] < 0:
+            for note in chord.notes:
+                if not (1 <= note.string <= total_strings):
+                    continue
+                left = note.left_ornament
+                right = note.right_ornament
+                if ornament_mode == "left":
+                    picked = left
+                elif ornament_mode == "right":
+                    picked = right
+                elif ornament_mode == "both":
+                    picked = left or right
+                else:
+                    picked = None
+                if _ft3_ornament_glyph(picked):
+                    orn_targets[col] = note.string - 1
+                    break
+    return ann_targets, orn_targets
 
 
 def _note_event_columns(cells: list[list[str]], total_strings: int, grid_width: int) -> list[int]:
@@ -245,11 +550,12 @@ def _grid_display_map(
     mapping: list[int] = []
     prev = 0
     for grid_col in range(width):
+        is_event_col = grid_col in src_to_dest
         dest = src_to_dest.get(grid_col, _scale_col(grid_col, width, content))
         dest = max(0, min(content - 1, dest))
         if grid_col > 0 and dest < prev:
             dest = prev
-        if grid_col > 0 and dest > prev + 1:
+        if (not is_event_col) and grid_col > 0 and dest > prev + 1:
             dest = prev + 1
         mapping.append(dest)
         prev = dest
@@ -340,6 +646,7 @@ def render_systems(  # noqa: C901, PLR0912
     slurs: list[tuple[int, int, int]],
     ties: list[tuple[int, int, int]],
     holds: list[tuple[int, int, int]],
+    glisses: list[tuple[int, int, int]] | None,
     settings: dict[str, str],
     stave_breaks: set[int],
     playback_bar: int | None,
@@ -363,6 +670,8 @@ def render_systems(  # noqa: C901, PLR0912
     basslabels: str,
     chord_wrap_limit: int,
 ) -> None:
+    if glisses is None:
+        glisses = []
     total_bars = len(piece.bars)
     current_bar_start = bar_offset
     for sys_idx in range(systems):
@@ -541,8 +850,59 @@ def render_systems(  # noqa: C901, PLR0912
             repeat = bar.repeat or ""
             repeat_glyph = repeat if repeat in {".:", ":.", "."} else ""
             repeat_cue = repeat if not repeat_glyph else ""
-            ann_cells = _bar_annotations(annotations, abs_bar, grid_width)
-            orn_cells = _bar_ornaments(ornaments, abs_bar, grid_width)
+            sign_cues: list[str] = []
+            if bar.fermata:
+                sign_cues.append("^")
+            if bar.dynamic:
+                sign_cues.append(bar.dynamic)
+            imported_ann = [" " for _ in range(grid_width)]
+            imported_orn = [" " for _ in range(grid_width)]
+            imported_ann_targets = [-1 for _ in range(grid_width)]
+            imported_orn_targets = [-1 for _ in range(grid_width)]
+            show_fingerings = settings.get(
+                "showfingerings",
+                settings.get("showft3extras", "on"),
+            ) == "on"
+            show_ornaments = settings.get(
+                "showornaments",
+                settings.get("showft3extras", "on"),
+            ) == "on"
+            if show_fingerings:
+                imported_ann = _bar_imported_ft3_annotations(
+                    bar,
+                    bar_width=grid_width,
+                    default_duration=default_duration,
+                    fingering_mode=settings.get("ft3fingering", "both"),
+                )
+            if show_ornaments:
+                imported_orn = _bar_imported_ft3_ornaments(
+                    bar,
+                    bar_width=grid_width,
+                    default_duration=default_duration,
+                    ornament_mode=settings.get("ft3ornaments", "both"),
+                )
+            if show_fingerings or show_ornaments:
+                imported_ann_targets, imported_orn_targets = _imported_ft3_mark_target_rows(
+                    bar=bar,
+                    total_strings=total_strings,
+                    grid_width=grid_width,
+                    default_duration=default_duration,
+                    fingering_mode=settings.get("ft3fingering", "both"),
+                    ornament_mode=settings.get("ft3ornaments", "both"),
+                )
+            ann_cells = _merge_mark_rows(
+                imported_ann,
+                _bar_annotations(annotations, abs_bar, grid_width),
+            )
+            local_orn = (
+                _bar_ornaments(ornaments, abs_bar, grid_width)
+                if show_ornaments
+                else [" " for _ in range(grid_width)]
+            )
+            orn_cells = _merge_mark_rows(
+                imported_orn,
+                local_orn,
+            )
             slur_chars = slur_span_chars(settings.get("slurcuestyle", "paren"))
             if slur_chars is None:
                 slur_cells = [" " for _ in range(grid_width)]
@@ -558,7 +918,21 @@ def render_systems(  # noqa: C901, PLR0912
                 hold_cells = [" " for _ in range(grid_width)]
             else:
                 hold_cells = _bar_span_row(holds, abs_bar, grid_width, *hold_chars)
+            gliss_chars = gliss_span_chars(settings.get("glisscuestyle", "hide"))
+            if gliss_chars is None:
+                gliss_cells = [" " for _ in range(grid_width)]
+            else:
+                gliss_cells = _bar_span_row(glisses, abs_bar, grid_width, *gliss_chars)
             apply_overrides(cells, overrides, abs_bar, total_strings, grid_width)
+            top_note_targets = _target_note_rows_by_col(cells)
+            ann_target_rows = list(top_note_targets)
+            orn_target_rows = list(top_note_targets)
+            for col, row_idx in enumerate(imported_ann_targets):
+                if row_idx >= 0 and col < len(ann_target_rows) and imported_ann[col] != " ":
+                    ann_target_rows[col] = row_idx
+            for col, row_idx in enumerate(imported_orn_targets):
+                if row_idx >= 0 and col < len(orn_target_rows) and imported_orn[col] != " ":
+                    orn_target_rows[col] = row_idx
             hidden_tie_cols = tie_notehead_hidden_cols(
                 ties,
                 bar_index=abs_bar,
@@ -577,14 +951,16 @@ def render_systems(  # noqa: C901, PLR0912
                         if row_cells[hide_col] != "-":
                             row_cells[hide_col] = "-"
             if paren_tie_cols:
-                for end_col in paren_tie_cols:
-                    if not (0 <= end_col < grid_width):
-                        continue
-                    if tie_cells[end_col] == " ":
-                        tie_cells[end_col] = ")"
-                    left = end_col - 1
-                    if left >= 0 and tie_cells[left] == " ":
-                        tie_cells[left] = "("
+                _place_parenthesize_tie_cues(
+                    ann_cells=ann_cells,
+                    orn_cells=orn_cells,
+                    tie_cells=tie_cells,
+                    slur_cells=slur_cells,
+                    hold_cells=hold_cells,
+                    gliss_cells=gliss_cells,
+                    paren_tie_cols=paren_tie_cols,
+                    allow_ann_row=rows["ann"] is not None,
+                )
             display_width = bar_width
             if spacing_mode == "auto":
                 display_width = bar_widths[local_idx]
@@ -622,6 +998,13 @@ def render_systems(  # noqa: C901, PLR0912
             )
             wrote_time_sig = show_time_sig_here
             cue_pad_extra = time_cue_side_pad(show_time_cue=show_time_sig_here, scale_bar=scale_bar)
+            if show_time_sig_here and not scale_bar:
+                # Packed/fixed layout also needs an auftact lane; otherwise the first
+                # rhythm flag starts directly above the in-staff time cue.
+                cue_pad_extra = max(
+                    cue_pad_extra,
+                    time_cue_side_pad(show_time_cue=True, scale_bar=True),
+                )
             draw_pad = pad + cue_pad_extra
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
@@ -631,9 +1014,14 @@ def render_systems(  # noqa: C901, PLR0912
                 meta_x = bar_x
                 if number is not None:
                     safe_addstr(stdscr, meta_row, meta_x, number)
+                cue_parts: list[str] = []
                 if repeat_cue:
+                    cue_parts.append(repeat_cue)
+                cue_parts.extend(sign_cues)
+                if cue_parts:
+                    cue_text = " ".join(cue_parts)
                     cue_x = meta_x + (len(number) + 1 if number is not None else 0)
-                    safe_addstr(stdscr, meta_row, cue_x, repeat_cue)
+                    safe_addstr(stdscr, meta_row, cue_x, cue_text)
             if rows["ann"] is not None:
                 ann_row = ann_cells
                 if scale_bar:
@@ -655,27 +1043,34 @@ def render_systems(  # noqa: C901, PLR0912
                     tactus_row = _scale_row(tactus, content_width, " ")
                     tactus_row = pad_row(tactus_row, display_width, draw_pad)
                 safe_addstr(stdscr, row_start + (rows["tactus"] or 0), bar_x, "".join(tactus_row))
+            scaled_slur_row: list[str] | None = None
+            scaled_tie_row: list[str] | None = None
+            scaled_hold_row: list[str] | None = None
+            scaled_gliss_row: list[str] | None = None
             if rows["slur"] is not None:
-                slur_row = slur_cells
+                scaled_slur_row = slur_cells
                 if scale_bar:
                     content_width = max(1, display_width - draw_pad * 2)
-                    slur_row = _scale_row(slur_cells, content_width, " ")
-                    slur_row = pad_row(slur_row, display_width, draw_pad)
-                safe_addstr(stdscr, row_start + (rows["slur"] or 0), bar_x, "".join(slur_row))
+                    scaled_slur_row = _scale_row(slur_cells, content_width, " ")
+                    scaled_slur_row = pad_row(scaled_slur_row, display_width, draw_pad)
             if rows["tie"] is not None:
-                tie_row = tie_cells
+                scaled_tie_row = tie_cells
                 if scale_bar:
                     content_width = max(1, display_width - draw_pad * 2)
-                    tie_row = _scale_row(tie_cells, content_width, " ")
-                    tie_row = pad_row(tie_row, display_width, draw_pad)
-                safe_addstr(stdscr, row_start + (rows["tie"] or 0), bar_x, "".join(tie_row))
+                    scaled_tie_row = _scale_row(tie_cells, content_width, " ")
+                    scaled_tie_row = pad_row(scaled_tie_row, display_width, draw_pad)
             if rows["hold"] is not None:
-                hold_row = hold_cells
+                scaled_hold_row = hold_cells
                 if scale_bar:
                     content_width = max(1, display_width - draw_pad * 2)
-                    hold_row = _scale_row(hold_cells, content_width, " ")
-                    hold_row = pad_row(hold_row, display_width, draw_pad)
-                safe_addstr(stdscr, row_start + (rows["hold"] or 0), bar_x, "".join(hold_row))
+                    scaled_hold_row = _scale_row(hold_cells, content_width, " ")
+                    scaled_hold_row = pad_row(scaled_hold_row, display_width, draw_pad)
+            if rows.get("gliss") is not None:
+                scaled_gliss_row = gliss_cells
+                if scale_bar:
+                    content_width = max(1, display_width - draw_pad * 2)
+                    scaled_gliss_row = _scale_row(gliss_cells, content_width, " ")
+                    scaled_gliss_row = pad_row(scaled_gliss_row, display_width, draw_pad)
             if bar.chords:
                 visible_note_cols = set(_note_event_columns(cells, total_strings, grid_width))
                 positions = [
@@ -806,12 +1201,161 @@ def render_systems(  # noqa: C901, PLR0912
                         barpad=barpad,
                         flagstyle=flagstyle,
                     )
+                    if draw_pad:
+                        flag_cells = pad_row(flag_cells, display_width, draw_pad)
+                        stem_cells = pad_row(stem_cells, display_width, draw_pad)
                 content_width = max(1, display_width - draw_pad * 2)
                 grid_map = _grid_display_map(
                     grid_width=grid_width,
                     content_width=content_width,
                     src_to_dest=src_to_dest,
                 )
+                # Generic row scaling can drop sparse cue endpoints. Re-overlay them using
+                # the same chord/display map so parenthesize/tie/slur cue punctuation survives.
+                if scale_bar:
+                    sparse_cues = {"(", ")", "[", "]", "<", ">", "/", "\\"}
+                    if rows["ann"] is not None:
+                        _overlay_sparse_mark_chars(
+                            stdscr,
+                            y=row_start + (rows["ann"] or 0),
+                            bar_x=bar_x,
+                            draw_pad=draw_pad,
+                            grid_map=grid_map,
+                            row_cells=ann_cells,
+                            keep=sparse_cues,
+                        )
+                    tie_row_is_distinct = (
+                        rows["tie"] is not None
+                        and rows["tie"] != rows["slur"]
+                        and rows["tie"] != rows["hold"]
+                    )
+                    if tie_row_is_distinct:
+                        _overlay_sparse_mark_chars(
+                            stdscr,
+                            y=row_start + (rows["tie"] or 0),
+                            bar_x=bar_x,
+                            draw_pad=draw_pad,
+                            grid_map=grid_map,
+                            row_cells=tie_cells,
+                            keep=sparse_cues,
+                        )
+                    slur_row_is_distinct = (
+                        rows["slur"] is not None
+                        and rows["slur"] != rows["tie"]
+                        and rows["slur"] != rows["hold"]
+                    )
+                    if slur_row_is_distinct:
+                        _overlay_sparse_mark_chars(
+                            stdscr,
+                            y=row_start + (rows["slur"] or 0),
+                            bar_x=bar_x,
+                            draw_pad=draw_pad,
+                            grid_map=grid_map,
+                            row_cells=slur_cells,
+                            keep=sparse_cues,
+                        )
+                    hold_row_is_distinct = (
+                        rows["hold"] is not None
+                        and rows["hold"] != rows["slur"]
+                        and rows["hold"] != rows["tie"]
+                    )
+                    if hold_row_is_distinct:
+                        _overlay_sparse_mark_chars(
+                            stdscr,
+                            y=row_start + (rows["hold"] or 0),
+                            bar_x=bar_x,
+                            draw_pad=draw_pad,
+                            grid_map=grid_map,
+                            row_cells=hold_cells,
+                            keep=sparse_cues,
+                        )
+                    gliss_row = rows.get("gliss")
+                    gliss_row_is_distinct = (
+                        gliss_row is not None
+                        and gliss_row not in {rows["slur"], rows["tie"], rows["hold"]}
+                    )
+                    if gliss_row_is_distinct:
+                        _overlay_sparse_mark_chars(
+                            stdscr,
+                            y=row_start + (gliss_row or 0),
+                            bar_x=bar_x,
+                            draw_pad=draw_pad,
+                            grid_map=grid_map,
+                            row_cells=gliss_cells,
+                            keep=sparse_cues,
+                        )
+                span_rows_to_draw: dict[int, list[str]] = {}
+                span_y_values = {
+                    row_start + (rows[key] or 0)
+                    for key in ("slur", "hold", "gliss", "tie")
+                    if rows[key] is not None
+                }
+                for y in span_y_values:
+                    row_slur = (
+                        scaled_slur_row
+                        if rows["slur"] is not None and y == row_start + (rows["slur"] or 0)
+                        else None
+                    )
+                    row_hold = (
+                        scaled_hold_row
+                        if rows["hold"] is not None and y == row_start + (rows["hold"] or 0)
+                        else None
+                    )
+                    row_tie = (
+                        scaled_tie_row
+                        if rows["tie"] is not None and y == row_start + (rows["tie"] or 0)
+                        else None
+                    )
+                    row_gliss = (
+                        scaled_gliss_row
+                        if rows.get("gliss") is not None and y == row_start + (rows["gliss"] or 0)
+                        else None
+                    )
+                    span_rows_to_draw[y] = _merge_span_rows_with_cue_priority(
+                        slur_row=row_slur,
+                        hold_row=row_hold,
+                        gliss_row=row_gliss,
+                        tie_row=row_tie,
+                    )
+                for y, merged_row in span_rows_to_draw.items():
+                    safe_addstr(stdscr, y, bar_x, "".join(merged_row))
+                    span_overlay_rows = _merge_nonspace_rows(
+                        (
+                            ann_cells
+                            if rows["ann"] is not None and y == row_start + (rows["ann"] or 0)
+                            else [" " for _ in range(grid_width)]
+                        ),
+                        (
+                            slur_cells
+                            if rows["slur"] is not None and y == row_start + (rows["slur"] or 0)
+                            else [" " for _ in range(grid_width)]
+                        ),
+                        (
+                            hold_cells
+                            if rows["hold"] is not None and y == row_start + (rows["hold"] or 0)
+                            else [" " for _ in range(grid_width)]
+                        ),
+                        (
+                            gliss_cells
+                            if rows.get("gliss") is not None
+                            and y == row_start + (rows["gliss"] or 0)
+                            else [" " for _ in range(grid_width)]
+                        ),
+                        (
+                            tie_cells
+                            if rows["tie"] is not None and y == row_start + (rows["tie"] or 0)
+                            else [" " for _ in range(grid_width)]
+                        ),
+                    )
+                    _overlay_sparse_mark_chars(
+                        stdscr,
+                        y=y,
+                        bar_x=bar_x,
+                        draw_pad=draw_pad,
+                        grid_map=grid_map,
+                        row_cells=span_overlay_rows,
+                        keep=sparse_cues,
+                    )
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
                 if (
                     playback_bar is not None
@@ -874,6 +1418,9 @@ def render_systems(  # noqa: C901, PLR0912
                                 target_col,
                                 duration_display(denom, dot),
                             )
+                        if draw_pad:
+                            dur_cells = pad_row(dur_cells, display_width, draw_pad)
+                            dur_padded = True
                     safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
                 if abs_bar == cursor_bar:
                     for col, _denom, _dot in positions:
@@ -908,6 +1455,41 @@ def render_systems(  # noqa: C901, PLR0912
                                     )
                             break
             else:
+                span_rows_to_draw: dict[int, list[str]] = {}
+                span_y_values = {
+                    row_start + (rows[key] or 0)
+                    for key in ("slur", "hold", "gliss", "tie")
+                    if rows[key] is not None
+                }
+                for y in span_y_values:
+                    row_slur = (
+                        scaled_slur_row
+                        if rows["slur"] is not None and y == row_start + (rows["slur"] or 0)
+                        else None
+                    )
+                    row_hold = (
+                        scaled_hold_row
+                        if rows["hold"] is not None and y == row_start + (rows["hold"] or 0)
+                        else None
+                    )
+                    row_tie = (
+                        scaled_tie_row
+                        if rows["tie"] is not None and y == row_start + (rows["tie"] or 0)
+                        else None
+                    )
+                    row_gliss = (
+                        scaled_gliss_row
+                        if rows.get("gliss") is not None and y == row_start + (rows["gliss"] or 0)
+                        else None
+                    )
+                    span_rows_to_draw[y] = _merge_span_rows_with_cue_priority(
+                        slur_row=row_slur,
+                        hold_row=row_hold,
+                        gliss_row=row_gliss,
+                        tie_row=row_tie,
+                    )
+                for y, merged_row in span_rows_to_draw.items():
+                    safe_addstr(stdscr, y, bar_x, "".join(merged_row))
                 has_explicit_content = bool(bar.notes)
                 if not has_explicit_content:
                     has_explicit_content = any(
@@ -1005,6 +1587,21 @@ def render_systems(  # noqa: C901, PLR0912
                     else:
                         row_cells = _scale_row(row_cells, content_width, fill_char)
                     row_cells = pad_row(row_cells, display_width, draw_pad, pad_char=fill_char)
+                elif draw_pad:
+                    row_cells = pad_row(row_cells, display_width, draw_pad, pad_char=fill_char)
+                if bar.chords:
+                    _overlay_inline_local_marks_on_display_row(
+                        display_row_cells=row_cells,
+                        source_row_cells=cells[actual],
+                        ann_cells=ann_cells,
+                        orn_cells=orn_cells,
+                        draw_pad=draw_pad,
+                        grid_map=grid_map,
+                        style=style,
+                        source_row_index=actual,
+                        ann_target_rows=ann_target_rows,
+                        orn_target_rows=orn_target_rows,
+                    )
                 row_text = "".join(row_cells)
                 safe_addstr(stdscr, y, bar_x - 1, "|")
                 safe_addstr(stdscr, y, bar_x, row_text)

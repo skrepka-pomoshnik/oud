@@ -108,3 +108,32 @@ def test_scrollmode_smooth_vs_page_use_same_fixture_with_different_offsets() -> 
     assert smooth.bar_offset == 1
     assert page.bar_offset == 3
     assert page.bar_offset > smooth.bar_offset
+
+
+def test_jk_fullscreen_alternating_bass_rows_keeps_cursor_visible_and_scrolls() -> None:
+    base = piece_with_unused_then_used_bass_rows()
+    piece = Piece(title="T", bars=base.bars * 10, strings=7, style="french")
+    state = regression_state(piece, width=121, bar_width=10, justify="smart")
+    state.settings["layout"] = "auto"
+    state.settings["scrollmode"] = "page"
+    state.settings["tuning"] = "g2c3f3a3d4g4d2"
+    state.screen_height = 39
+    state.cursor_bar = 1
+    state.cursor_string = 6
+    state.cursor_col = 0
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    start_offset = state.bar_offset
+
+    # Move across alternating systems several times; cursor must remain on-screen.
+    for _ in range(4):
+        handle_normal(state, ord("J"))
+        ensure_cursor_visible(state, state.screen_width, state.screen_height)
+        assert 0 <= state.cursor_string < state.piece.strings
+        assert state.bar_offset >= 0
+    assert state.bar_offset >= start_offset
+
+    # And back up; hidden bass-row systems should clamp but not lose cursor.
+    for _ in range(3):
+        handle_normal(state, ord("K"))
+        ensure_cursor_visible(state, state.screen_width, state.screen_height)
+        assert 0 <= state.cursor_string < state.piece.strings

@@ -165,7 +165,7 @@ def test_render_matrix_hold_marker_visible() -> None:
             "style": "french",
             "showtuning": "off",
             "showdur": "off",
-            "showextras": "on",
+            "showspans": "on",
             "showtactus": "off",
             "layout": "packed",
             "justify": "stretch",

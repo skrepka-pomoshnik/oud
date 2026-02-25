@@ -10,7 +10,13 @@ TAB_NOTATION_PRESETS: dict[str, dict[str, str]] = {
     # LilyPond-like default tab: compact cues, minimal rhythm extras.
     "minimal": {
         "showdur": "off",
+        "showspans": "off",
+        "showfingerings": "off",
+        "showornaments": "off",
         "showextras": "off",
+        "showft3extras": "off",
+        "ft3fingering": "both",
+        "ft3ornaments": "both",
         "showtactus": "off",
         "flagredundant": "on",
         "timesigstyle": "symbol",
@@ -18,11 +24,18 @@ TAB_NOTATION_PRESETS: dict[str, dict[str, str]] = {
         "tienoteheads": "show",
         "slurcuestyle": "paren",
         "holdcuestyle": "angle",
+        "glisscuestyle": "hide",
     },
     # Approximation of \\tabFullNotation in our ASCII/TUI model.
     "full": {
         "showdur": "on",
+        "showspans": "on",
+        "showfingerings": "on",
+        "showornaments": "on",
         "showextras": "on",
+        "showft3extras": "on",
+        "ft3fingering": "both",
+        "ft3ornaments": "both",
         "showtactus": "on",
         "flagredundant": "off",
         "timesigstyle": "fraction",
@@ -30,6 +43,7 @@ TAB_NOTATION_PRESETS: dict[str, dict[str, str]] = {
         "tienoteheads": "show",
         "slurcuestyle": "paren",
         "holdcuestyle": "angle",
+        "glisscuestyle": "slash",
     },
 }
 
@@ -242,6 +256,17 @@ def hold_span_chars(style_mode: str) -> tuple[str, str, str] | None:
     if mode == "paren":
         return ("(", ")", "_")
     return ("<", ">", "_")
+
+
+def gliss_span_chars(style_mode: str) -> tuple[str, str, str] | None:
+    mode = (style_mode or "slash").strip().lower()
+    if mode == "hide":
+        return None
+    if mode == "paren":
+        return ("(", ")", "/")
+    if mode == "angle":
+        return ("<", ">", "/")
+    return ("/", "\\", "/")
 
 
 def tie_notehead_hidden_cols(

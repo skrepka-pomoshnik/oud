@@ -11,7 +11,10 @@ from oud.ui.render import _bass_strings_used
 def rows_per_screen(state: EditorState, height: int) -> int:
     include_meta = True
     show_dur = state.settings.get("showdur", "off") == "on"
-    show_extras = state.settings.get("showextras", "off") == "on"
+    show_extras = (
+        state.settings.get("showspans", "off") == "on"
+        or state.settings.get("showextras", "off") == "on"
+    )
     show_tactus = state.settings.get("showtactus", "off") == "on"
     double_stems = state.settings.get("flagstems", "single") == "double"
     used_bass = _bass_strings_used(state.piece, state.overrides)

@@ -179,8 +179,10 @@ def test_cmd_set_tabnotation_full_preset(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert state.settings["flagredundant"] == "off"
     assert state.settings["timesigstyle"] == "fraction"
     assert state.settings["tiecuestyle"] == "paren"
+    assert state.settings["showft3extras"] == "on"
     assert state.settings["slurcuestyle"] == "paren"
     assert state.settings["holdcuestyle"] == "angle"
+    assert state.settings["glisscuestyle"] == "slash"
     assert state.settings["tienoteheads"] == "show"
 
 
@@ -218,6 +220,46 @@ def test_cmd_set_tie_notehead_policy(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert state.settings["tienoteheads"] == "hide"
     cmd.cmd_set(state, "tienoteheads=parenthesize", str(tmp_path / "cfg.toml"))
     assert state.settings["tienoteheads"] == "parenthesize"
+    cmd.cmd_set(state, "glisscuestyle=paren", str(tmp_path / "cfg.toml"))
+    assert state.settings["glisscuestyle"] == "paren"
+
+
+def test_cmd_set_ft3_extra_display_policies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(
+        state,
+        "showspans=on showfingerings=off showornaments=on ft3fingering=right ft3ornaments=left",
+        str(tmp_path / "cfg.toml"),
+    )
+    assert state.settings["showspans"] == "on"
+    assert state.settings["showextras"] == "on"  # mirrored compatibility key
+    assert state.settings["showfingerings"] == "off"
+    assert state.settings["showornaments"] == "on"
+    assert state.settings["showft3extras"] == "off"  # bundle mirror follows both_on rule
+    assert state.settings["ft3fingering"] == "right"
+    assert state.settings["ft3ornaments"] == "left"
+
+
+def test_cmd_set_deprecated_show_aliases_map_to_explicit_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "showextras=on showft3extras=off", str(tmp_path / "cfg.toml"))
+    assert state.settings["showspans"] == "on"
+    assert state.settings["showextras"] == "on"
+    assert state.settings["showfingerings"] == "off"
+    assert state.settings["showornaments"] == "off"
+    assert state.settings["showft3extras"] == "off"
 
 
 def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -493,7 +535,10 @@ def test_cmd_midi_lilypond_pdf_play_source(
     def _export_mxl(_path: str, *_args: object, **_kwargs: object) -> str:
         return "Mxl ok"
 
+    pdf_called: dict[str, str] = {}
+
     def _print_pdf(_path: str) -> str:
+        pdf_called["path"] = _path
         return "Pdf ok"
 
     def _save(_path: str, _settings: dict[str, str]) -> None:
@@ -518,12 +563,15 @@ def test_cmd_midi_lilypond_pdf_play_source(
     assert state.message == "Xml ok"
     cmd.apply_command(state, "musicxml out.mxl", str(tmp_path / "cfg.toml"))
     assert state.message == "Mxl ok"
+    state.path = str(tmp_path / "score.ft3")
     cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Pdf ok"
+    assert pdf_called["path"].endswith("score.ly")
     cmd.cmd_play(state, "2 120", str(tmp_path / "cfg.toml"))
     assert state.settings["tempo"] == "120"
     assert state.message.startswith("Played 1")
 
+    state.path = None
     cmd.cmd_source(state, "")
     assert state.message == "No source path"
     state.path = str(tmp_path / "src.tab")
@@ -554,6 +602,18 @@ def test_cmd_midi_lilypond_pdf_play_source(
         "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
         "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
     )
+    cmd.cmd_dynamic(state, "mf")
+    assert state.piece.bars[state.cursor_bar].dynamic == "mf"
+    cmd.cmd_dynamic(state, "clear")
+    assert state.piece.bars[state.cursor_bar].dynamic is None
+    cmd.cmd_fermata(state, "on")
+    assert state.piece.bars[state.cursor_bar].fermata is True
+    cmd.cmd_fermata(state, "toggle")
+    assert state.piece.bars[state.cursor_bar].fermata is False
+    cmd.cmd_dynamic(state, "bad")
+    assert state.message == "Dynamic must be clear/ppp/pp/p/mp/mf/f/ff/fff/sfz/rfz"
+    cmd.cmd_fermata(state, "bad")
+    assert state.message == "Fermata must be on/off/toggle"
 
 
 def test_tui_notation_commands_export_to_musicxml_and_mxl(tmp_path: Path) -> None:
@@ -623,6 +683,8 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_hold",
         "cmd_barline",
         "cmd_repeat",
+        "cmd_dynamic",
+        "cmd_fermata",
         "cmd_time",
         "cmd_verify",
     }
@@ -689,6 +751,8 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "hold": "0 0 0",
         "barline": "thin",
         "repeat": "start",
+        "dynamic": "mf",
+        "fermata": "on",
         "tool": "gridflags",
     }
     specs = cmd._command_specs()

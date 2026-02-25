@@ -53,6 +53,7 @@ class EditorState:
         self.slurs: list[tuple[int, int, int]] = []
         self.ties: list[tuple[int, int, int]] = []
         self.holds: list[tuple[int, int, int]] = []
+        self.glisses: list[tuple[int, int, int]] = []
         self._slur_start: tuple[int, int] | None = None
         self._tie_start: tuple[int, int] | None = None
         self._hold_start: tuple[int, int] | None = None

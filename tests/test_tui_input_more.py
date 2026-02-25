@@ -117,6 +117,18 @@ def test_complete_set_value_uses_legit_options_only() -> None:
     assert msg is None
 
 
+def test_complete_set_hides_deprecated_show_keys_and_offers_explicit_ones() -> None:
+    state = _state()
+    text, msg = complete_command_text(state, "set show")
+    assert text == "set show"
+    assert msg is not None
+    assert "showspans" in msg
+    assert "showfingerings" in msg
+    assert "showornaments" in msg
+    assert "showextras" not in msg
+    assert "showft3extras" not in msg
+
+
 def test_handle_command_paths() -> None:
     state = _state()
     calls: list[str] = []

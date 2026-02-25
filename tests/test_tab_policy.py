@@ -3,6 +3,7 @@ from oud.core.tab_policy import (
     TAB_NOTATION_PRESETS,
     apply_tabnotation_preset,
     fret_label,
+    gliss_span_chars,
     hold_span_chars,
     rows_reversed,
     show_time_cue_for_bar,
@@ -102,6 +103,10 @@ def test_slur_and_hold_span_chars_policy() -> None:
     assert hold_span_chars("angle") == ("<", ">", "_")
     assert hold_span_chars("paren") == ("(", ")", "_")
     assert hold_span_chars("hide") is None
+    assert gliss_span_chars("slash") == ("/", "\\", "/")
+    assert gliss_span_chars("paren") == ("(", ")", "/")
+    assert gliss_span_chars("angle") == ("<", ">", "/")
+    assert gliss_span_chars("hide") is None
 
 
 def test_tie_notehead_hidden_cols_policy() -> None:

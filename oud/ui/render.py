@@ -71,6 +71,23 @@ def _apply_overrides(
     _apply_overrides_impl(cells, overrides, bar_index, strings, bar_width)
 
 
+def _piece_has_imported_ft3_extras(piece: Piece) -> bool:
+    for bar in piece.bars:
+        notes = list(bar.notes)
+        if not notes and bar.chords:
+            for chord in bar.chords:
+                notes.extend(chord.notes)
+        for note in notes:
+            if (
+                note.right_fingering
+                or note.left_fingering
+                or note.right_ornament
+                or note.left_ornament
+            ):
+                return True
+    return False
+
+
 def _render_ascii_preview(
     stdscr: Screen,
     ascii_lines: list[str],
@@ -122,6 +139,7 @@ def render_piece(  # noqa: C901, PLR0912
     help_offset: int = 0,
     playback_bar: int | None = None,
     playback_col: int | None = None,
+    glisses: list[tuple[int, int, int]] | None = None,
 ) -> None:
     stdscr.erase()
     height, width = stdscr.getmaxyx()
@@ -186,7 +204,20 @@ def render_piece(  # noqa: C901, PLR0912
     include_meta = True
     style = settings.get("style", "french")
     show_dur = settings.get("showdur", "off") == "on"
-    show_extras = settings.get("showextras", "off") == "on"
+    show_fingerings = settings.get(
+        "showfingerings",
+        settings.get("showft3extras", "on"),
+    ) == "on"
+    show_ornaments = settings.get(
+        "showornaments",
+        settings.get("showft3extras", "on"),
+    ) == "on"
+    imported_extras_visible = (
+        show_fingerings or show_ornaments
+    ) and _piece_has_imported_ft3_extras(piece)
+    # Imported FT3 local extras render inline; they should not force reserve extra rows.
+    _ = imported_extras_visible
+    show_extras = settings.get("showspans", "off") == "on"
     show_tactus = settings.get("showtactus", "off") == "on"
     hide_redundant = settings.get("flagredundant", "on") == "on"
     double_stems = settings.get("flagstems", "single") == "double"
@@ -276,6 +307,7 @@ def render_piece(  # noqa: C901, PLR0912
         slurs=slurs,
         ties=ties,
         holds=holds,
+        glisses=glisses,
         settings=settings,
         stave_breaks=stave_breaks,
         playback_bar=playback_bar,
