@@ -113,7 +113,9 @@ def cmd_pdf(
     print_lilypond_pdf_fn: Callable[..., str],
 ) -> None:
     cmd_lilypond_fn(state, "", config_path)
-    state.message = print_lilypond_pdf_fn(state.path or "out.ly")
+    source = state.path or "out"
+    ly_path = str(Path(source).with_suffix(".ly"))
+    state.message = print_lilypond_pdf_fn(ly_path)
 
 
 def cmd_play(

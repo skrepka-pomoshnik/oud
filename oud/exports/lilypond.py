@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -63,14 +64,72 @@ def _normalize_time_sig(value: str) -> str:
     return text
 
 
-def _normalize_key(value: str) -> str:
+def _normalized_time_sig_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
     text = value.strip()
     if not text:
-        return ""
+        return None
+    return _normalize_time_sig(text)
+
+
+def _time_sig_style_command(settings: dict[str, str]) -> str | None:
+    mode = (settings.get("timesigstyle") or "symbol").strip().lower()
+    if mode in {"numeric", "fraction"}:
+        return r"\numericTimeSignature"
+    if mode == "symbol":
+        return r"\defaultTimeSignature"
+    return None
+
+
+def _ly_notehead_style_override(settings: dict[str, str]) -> str | None:
+    mode = (settings.get("lynoteheads") or "classic").strip().lower()
+    if mode == "petrucci":
+        return r"  \override NoteHead.style = #'petrucci"
+    return None
+
+
+def _normalize_key_pitch(value: str) -> str | None:
+    text = value.strip()
+    if not text:
+        return None
     note = text[0].lower()
+    if note not in "abcdefg":
+        return None
     acc = text[1:]
+    if acc not in ("", "#", "b"):
+        return None
     acc = acc.replace("#", "is").replace("b", "es")
     return note + acc
+
+
+def _parse_key_signature(value: str) -> tuple[str, str] | None:
+    text = value.strip()
+    if not text:
+        return None
+    compact = re.sub(r"\s+", "", text)
+
+    # FT3 metadata often uses compact major/minor forms like "GM", "Dm".
+    match = re.fullmatch(r"([A-Ga-g])([#b]?)(M|m)?", compact)
+    if match:
+        note = _normalize_key_pitch(f"{match.group(1)}{match.group(2)}")
+        if note is None:
+            return None
+        suffix = match.group(3) or ""
+        mode = "minor" if suffix == "m" else "major"
+        return note, mode
+
+    # Also accept spaced forms like "D minor" / "Bb major".
+    match = re.fullmatch(r"([A-Ga-g])([#b]?)\s*(maj(?:or)?|min(?:or)?)", text, re.I)
+    if match:
+        note = _normalize_key_pitch(f"{match.group(1)}{match.group(2)}")
+        if note is None:
+            return None
+        kind = match.group(3).lower()
+        mode = "minor" if kind.startswith("min") else "major"
+        return note, mode
+
+    return None
 
 
 def _parse_fret_labels(value: str) -> list[str]:
@@ -81,19 +140,21 @@ def _parse_fret_labels(value: str) -> list[str]:
 
 
 def _default_tuning(strings: int) -> list[int]:
+    # Low -> high order (matches settings tuning order and TabStaff stringTunings).
     defaults = [
-        "g4",
-        "d4",
-        "a3",
-        "f3",
-        "c3",
-        "g2",
-        "f2",
-        "e2",
-        "d2",
         "c2",
+        "d2",
+        "e2",
+        "f2",
+        "g2",
+        "c3",
+        "f3",
+        "a3",
+        "d4",
+        "g4",
     ]
-    return _parse_tuning("".join(defaults))[:strings]
+    pitches = _parse_tuning("".join(defaults))
+    return pitches[-max(0, strings) :] if strings > 0 else []
 
 
 def _midi_to_lilypond(midi: int) -> str:
@@ -215,6 +276,86 @@ def _repeat_mark_token(bar: Bar) -> str | None:
     return None
 
 
+def _ft3_fingering_text(value: str | None) -> str | None:
+    if not value:
+        return None
+    if value == "thumb":
+        return "t"
+    return value[:1]
+
+
+def _ft3_ornament_text(value: str | None) -> str | None:
+    if not value:
+        return None
+    mapping = {"dot-left": ".", "brackets": "[]"}
+    return mapping.get(value, value[:1])
+
+
+def _first_note_attr(notes, attr: str) -> str | None:
+    for note in notes:
+        value = getattr(note, attr, None)
+        if value:
+            return value
+    return None
+
+
+def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C901, PLR0912
+    if settings.get("tabnotation", "minimal") != "full":
+        return ""
+    show_fingerings = settings.get(
+        "showfingerings",
+        settings.get("showft3extras", "on"),
+    ) == "on"
+    show_ornaments = settings.get(
+        "showornaments",
+        settings.get("showft3extras", "on"),
+    ) == "on"
+    if not (show_fingerings or show_ornaments):
+        return ""
+
+    finger_mode = settings.get("ft3fingering", "both")
+    orn_mode = settings.get("ft3ornaments", "both")
+    above: list[str] = []
+    below: list[str] = []
+
+    if show_fingerings and finger_mode != "off":
+        if finger_mode in {"left", "both"}:
+            left_f = _ft3_fingering_text(_first_note_attr(chord.notes, "left_fingering"))
+            if left_f:
+                above.append(left_f)
+        if finger_mode in {"right", "both"}:
+            right_f = _ft3_fingering_text(_first_note_attr(chord.notes, "right_fingering"))
+            if right_f:
+                below.append(right_f)
+    if show_ornaments and orn_mode != "off":
+        if orn_mode in {"left", "both"}:
+            left_o = _ft3_ornament_text(_first_note_attr(chord.notes, "left_ornament"))
+            if left_o:
+                above.append(left_o)
+        if orn_mode in {"right", "both"}:
+            right_o = _ft3_ornament_text(_first_note_attr(chord.notes, "right_ornament"))
+            if right_o:
+                below.append(right_o)
+
+    parts: list[str] = []
+    if above:
+        text = _escape_lilypond(" ".join(above))
+        parts.append(f'^\\markup {{ \\tiny "{text}" }}')
+    if below:
+        text = _escape_lilypond(" ".join(below))
+        parts.append(f'_\\markup {{ \\tiny "{text}" }}')
+    return (" " + " ".join(parts)) if parts else ""
+
+
+def _bar_sign_mark_tokens(bar: Bar) -> list[str]:
+    marks: list[str] = []
+    if bar.dynamic:
+        marks.append(f'\\mark \\markup {{ "{_escape_lilypond(bar.dynamic)}" }}')
+    if bar.fermata:
+        marks.append(r'\mark \markup { \musicglyph "scripts.ufermata" }')
+    return marks
+
+
 def export_lilypond(  # noqa: PLR0912, C901
     path: str,
     piece: Piece,
@@ -235,7 +376,11 @@ def export_lilypond(  # noqa: PLR0912, C901
     tuning = settings.get("tuning", "") or ""
     tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
     if len(tuning_pitches) < piece.strings:
-        tuning_pitches.extend(_default_tuning(piece.strings)[len(tuning_pitches) :])
+        defaults = _default_tuning(piece.strings)
+        missing = piece.strings - len(tuning_pitches)
+        # If user provides only main-course tuning (e.g. 6-course) for a larger piece,
+        # prepend the missing lower courses so order remains low -> high.
+        tuning_pitches = defaults[:missing] + tuning_pitches
     main_pitches, bass_pitches = _split_tuning(tuning_pitches, piece.strings)
     tuning_names = [_midi_to_lilypond(p) for p in main_pitches]
     tuning_text = " ".join(tuning_names)
@@ -261,18 +406,30 @@ def export_lilypond(  # noqa: PLR0912, C901
     header.append("}")
 
     body: list[str] = []
-    if time_sig:
-        body.append(f"  \\time {_normalize_time_sig(time_sig)}")
+    current_time_sig = _normalized_time_sig_or_none(time_sig)
+    time_sig_style_cmd = _time_sig_style_command(settings)
+    if time_sig_style_cmd:
+        body.append(f"  {time_sig_style_cmd}")
+    if current_time_sig:
+        body.append(f"  \\time {current_time_sig}")
     if key_sig:
-        body.append(f"  \\key {_normalize_key(key_sig)} \\major")
+        parsed_key = _parse_key_signature(key_sig)
+        if parsed_key is not None:
+            key_pitch, key_mode = parsed_key
+            body.append(f"  \\key {key_pitch} \\{key_mode}")
 
     default_duration = 4
     style = settings.get("style") or "french"
     french_c = settings.get("frenchc") or "normal"
     for b_idx, bar in enumerate(piece.bars):
+        bar_time_sig = _normalized_time_sig_or_none(bar.time_sig)
+        if bar_time_sig and bar_time_sig != current_time_sig:
+            body.append(f"  \\time {bar_time_sig}")
+            current_time_sig = bar_time_sig
         repeat_mark = _repeat_mark_token(bar)
         if repeat_mark:
             body.append(f"  {repeat_mark}")
+        body.extend(f"  {mark}" for mark in _bar_sign_mark_tokens(bar))
         slur_starts, slur_ends = _span_maps(slurs, b_idx)
         tie_starts, _tie_ends = _span_maps(ties, b_idx)
         hold_starts, _hold_ends = _span_maps(holds, b_idx)
@@ -296,13 +453,14 @@ def export_lilypond(  # noqa: PLR0912, C901
                     suffix += "("
                 if col in slur_ends:
                     suffix += ")"
+                extra_suffix = _chord_ft3_markup_suffix(chord, settings)
                 if not pitches:
                     body.append(f"  r{dur}")
                 elif len(pitches) == 1:
-                    body.append(f"  {pitches[0]}{dur}{suffix}")
+                    body.append(f"  {pitches[0]}{dur}{suffix}{extra_suffix}")
                 else:
                     chord_text = " ".join(pitches)
-                    body.append(f"  <{chord_text}>{dur}{suffix}")
+                    body.append(f"  <{chord_text}>{dur}{suffix}{extra_suffix}")
         else:
             events = _collect_override_chords(
                 overrides,
@@ -346,6 +504,9 @@ def export_lilypond(  # noqa: PLR0912, C901
     if style == "french":
         layout.append("    tablatureFormat = #fret-letter-tablature-format")
     layout += [r"  }", r"  \context {", r"    \TabStaff"]
+    # Hide the default "TAB" clef label/glyph in exported tab staves.
+    layout.append(r"    \override Clef.stencil = ##f")
+    layout.append(r"    \override ClefModifier.stencil = ##f")
     if style == "french":
         labels = _parse_fret_labels(settings.get("fretlabels", "") or "")
         if not labels:
@@ -357,6 +518,12 @@ def export_lilypond(  # noqa: PLR0912, C901
         layout.append(f"    additionalBassStrings = \\stringTuning <{bass_text}>")
     layout += [r"  }", r"}"]
 
+    tab_body_prefix: list[str] = []
+    if settings.get("tabnotation", "minimal") == "full":
+        tab_body_prefix.append(r"  \tabFullNotation")
+    notehead_override = _ly_notehead_style_override(settings)
+    if notehead_override:
+        tab_body_prefix.append(notehead_override)
     content = "\n".join(
         [
             *header,
@@ -364,7 +531,7 @@ def export_lilypond(  # noqa: PLR0912, C901
             r"\paper { indent = 0\mm }",
             "",
             r"\new TabStaff {",
-            r"  \tabFullNotation",
+            *tab_body_prefix,
             *body,
             r"}",
             "",
@@ -380,17 +547,34 @@ def print_lilypond_pdf(ly_path: str, output_base: str | None = None) -> str:
     lilypond = shutil.which("lilypond")
     if lilypond is None:
         return "LilyPond not found on PATH"
-    cmd = [lilypond]
-    if output_base:
-        cmd += ["-o", output_base]
-    cmd.append(ly_path)
+    ly_file = Path(ly_path)
+    out_base = Path(output_base) if output_base else ly_file.with_suffix("")
+    workdir = (out_base.parent if output_base else ly_file.parent) or Path()
+    workdir = workdir.resolve()
+    cmd = [lilypond, "-o", out_base.name, str(ly_file.resolve())]
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)  # noqa: S603
+        subprocess.run(  # noqa: S603
+            cmd,
+            check=True,
+            capture_output=True,
+            text=False,
+            cwd=workdir,
+        )
     except subprocess.CalledProcessError as exc:
-        err = (exc.stderr or "").strip()
+        stderr = exc.stderr or b""
+        if isinstance(stderr, bytes):
+            err = stderr.decode("utf-8", errors="replace").strip()
+        else:
+            err = str(stderr).strip()
         detail = err.splitlines()[-1] if err else "unknown error"
         return f"LilyPond failed: {detail}"
-    if output_base:
-        return f"Printed {output_base}.pdf"
-    pdf_path = str(Path(ly_path).with_suffix(".pdf"))
+    pdf_path = (workdir / f"{out_base.name}.pdf").resolve()
+    if not pdf_path.exists():
+        # Some LilyPond builds ignore directory components in -o when passed odd paths;
+        # check the process cwd fallback basename before reporting failure.
+        cwd_fallback = Path.cwd() / f"{out_base.name}.pdf"
+        if cwd_fallback.exists():
+            pdf_path = cwd_fallback.resolve()
+    if not pdf_path.exists():
+        return f"LilyPond finished but PDF not found: {pdf_path}"
     return f"Printed {pdf_path}"

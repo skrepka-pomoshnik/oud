@@ -14,7 +14,7 @@ from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.init import init_state
 from oud.editor.load_ops import load_piece_data
 from oud.exports.export_tab import export_tab_to_file
-from oud.exports.lilypond import export_lilypond
+from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import export_midi
 from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.settings import DEFAULT_SETTINGS, load_settings
@@ -184,6 +184,20 @@ def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:  # noqa:
                 settings=settings,
             ),
         )
+        return 0
+    if suffix == ".pdf":
+        ly_path = str(Path(path_out).with_suffix(".ly"))
+        print(
+            export_lilypond(
+                ly_path,
+                piece,
+                overrides,
+                durations,
+                bar_width,
+                settings=settings,
+            ),
+        )
+        print(print_lilypond_pdf(ly_path, str(Path(path_out).with_suffix(""))))
         return 0
     if suffix in {".musicxml", ".xml"}:
         print(

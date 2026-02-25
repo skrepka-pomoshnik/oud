@@ -1,4 +1,11 @@
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from oud.core.ft3 import build_durations, load_ft3
 from oud.core.model import Bar, Chord, Note, Piece
+from oud.exports import lilypond as lp
 from oud.exports.lilypond import export_lilypond
 
 
@@ -19,6 +26,88 @@ def test_export_lilypond_writes_tabstaff(tmp_path) -> None:
     assert "\\new TabStaff" in text
     assert "stringTunings" in text
     assert "\\time 4/4" in text
+    assert "\\tabFullNotation" not in text
+    assert "\\override Clef.stencil = ##f" in text
+    assert "\\override ClefModifier.stencil = ##f" in text
+
+
+def test_export_lilypond_tabnotation_full_emits_tab_full_notation(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "full.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "tabnotation": "full"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\tabFullNotation" in text
+
+
+def test_export_lilypond_extends_6_course_tuning_for_8_course_piece_in_low_to_high_order(
+    tmp_path,
+) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[Note(1, 0, 0), Note(8, 0, 0)],
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=8)
+    path = tmp_path / "eight.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert r"stringTunings = \stringTuning <e, f, g, c f a d' g'>" in text
+
+
+def test_export_lilypond_petrucci_notehead_style_setting(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "petrucci.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "lynoteheads": "petrucci",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\tabFullNotation" in text
+    assert "\\override NoteHead.style = #'petrucci" in text
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "lynoteheads": "classic",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\override NoteHead.style = #'petrucci" not in text
 
 
 def test_export_lilypond_barline_and_repeat(tmp_path) -> None:
@@ -56,6 +145,79 @@ def test_export_lilypond_repeat_cue_marks(tmp_path) -> None:
     )
     text = path.read_text(encoding="utf-8")
     assert 'D.C. al Fine' in text
+
+
+def test_export_lilypond_bar_dynamic_and_fermata_marks(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    bar.dynamic = "mf"
+    bar.fermata = True
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "signs.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert '\\mark \\markup { "mf" }' in text
+    assert 'scripts.ufermata' in text
+
+
+def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[
+                    Note(
+                        1,
+                        0,
+                        0,
+                        left_fingering="4",
+                        right_fingering="thumb",
+                        left_ornament="#",
+                    ),
+                ],
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "extras.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "tabnotation": "minimal"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\tiny" not in text
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "showfingerings": "on",
+            "showornaments": "on",
+            "ft3fingering": "both",
+            "ft3ornaments": "left",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\tiny" in text
+    assert '"4 #"' in text or '"# 4"' in text
+    assert '"t"' in text
 
 
 def test_export_lilypond_repeat_both_and_ds_coda(tmp_path) -> None:
@@ -103,3 +265,209 @@ def test_export_lilypond_slur_tie_hold(tmp_path) -> None:
     assert ")" in text
     assert "~" in text
     assert "\\laissezVibrer" in text
+
+
+def test_print_lilypond_pdf_handles_non_utf8_stderr(monkeypatch) -> None:
+    monkeypatch.setattr(lp.shutil, "which", lambda _name: "/usr/bin/lilypond")
+
+    def _run(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(
+            1,
+            ["lilypond", "x.ly"],
+            stderr=b"warning...\nboom:\x8b\xff\n",
+        )
+
+    monkeypatch.setattr(lp.subprocess, "run", _run)
+    msg = lp.print_lilypond_pdf("x.ly")
+    assert msg.startswith("LilyPond failed:")
+    assert "boom:" in msg
+
+
+def test_print_lilypond_pdf_reports_missing_pdf_after_success(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(lp.shutil, "which", lambda _name: "/usr/bin/lilypond")
+
+    def _run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(["lilypond", "x.ly"], 0)
+
+    monkeypatch.setattr(lp.subprocess, "run", _run)
+    ly_path = tmp_path / "x.ly"
+    ly_path.write_text("%", encoding="utf-8")
+    msg = lp.print_lilypond_pdf(str(ly_path))
+    assert msg.startswith("LilyPond finished but PDF not found:")
+
+
+def test_print_lilypond_pdf_runs_in_output_dir_and_finds_pdf(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(lp.shutil, "which", lambda _name: "/usr/bin/lilypond")
+    calls: dict[str, object] = {}
+
+    def _run(cmd, **kwargs):
+        calls["cmd"] = cmd
+        calls["cwd"] = kwargs.get("cwd")
+        cwd = Path(kwargs["cwd"])
+        out_stem = cmd[2]
+        (cwd / f"{out_stem}.pdf").write_bytes(b"%PDF-1.4\n")
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(lp.subprocess, "run", _run)
+    out_dir = tmp_path / "nested"
+    out_dir.mkdir()
+    ly_path = out_dir / "score.ly"
+    ly_path.write_text("%", encoding="utf-8")
+    msg = lp.print_lilypond_pdf(str(ly_path), str(out_dir / "score"))
+    assert calls["cwd"] == out_dir.resolve()
+    assert msg == f"Printed {(out_dir / 'score.pdf').resolve()}"
+
+
+def test_export_lilypond_parses_ft3_style_key_major_minor_tokens(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "keys.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "key": "GM"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\key g \\major" in text
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "key": "Dm"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\key d \\minor" in text
+
+
+def test_export_lilypond_parses_spaced_key_names_and_skips_invalid_key(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "keys2.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "key": "Bb major"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\key bes \\major" in text
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "key": "GM?"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\key " not in text
+
+
+def test_export_lilypond_respects_timesigstyle_display_intent(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])], time_sig="C")
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "time_style.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "timesigstyle": "numeric"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\numericTimeSignature" in text
+    assert "\\time 4/4" in text
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "timesigstyle": "symbol"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\defaultTimeSignature" in text
+
+
+def test_export_lilypond_emits_midpiece_time_changes_for_real_ft3_if_available(tmp_path) -> None:
+    src = Path("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    if not src.exists():
+        pytest.skip("local FT3 corpus file not available")
+
+    piece = load_ft3(str(src))
+    path = tmp_path / "ichbin.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations=build_durations(piece),
+        bar_width=12,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french", "key": piece.key or "C"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert text.count("\\time ") >= 3
+    assert "\\time 3/4" in text
+    assert "\\time 2/2" in text
+    assert "\\time 6/8" in text
+
+
+def test_export_lilypond_keeps_ft3_repeat_barlines_from_real_file_if_available(tmp_path) -> None:
+    src = Path("lutemusic/wu_sol_ich_mich_hin_keren.ft3")
+    if not src.exists():
+        pytest.skip("local FT3 corpus file not available")
+
+    piece = load_ft3(str(src))
+    path = tmp_path / "wusol.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations=build_durations(piece),
+        bar_width=12,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french", "key": piece.key or "C"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert '\\bar ".|:"' in text
+    assert '\\bar ":|."' in text
+
+
+@pytest.mark.parametrize(
+    ("src_name", "expected_tokens"),
+    [
+        ("wu_sol_ich_mich_hin_keren.ft3", ('\\bar ".|:"', '\\bar ":|."')),
+        ("czarna_krowa.ft3", ('\\bar ".|:"', '\\bar ":|."', '\\bar "||"')),
+        ("can_she_excuse.ft3", ('\\bar ".|:"', '\\bar ":|."', '\\bar "||"')),
+    ],
+)
+def test_export_lilypond_real_ft3_repeat_barline_matrix_if_available(
+    tmp_path,
+    src_name: str,
+    expected_tokens: tuple[str, ...],
+) -> None:
+    src = Path("lutemusic") / src_name
+    if not src.exists():
+        pytest.skip("local FT3 corpus file not available")
+    piece = load_ft3(str(src))
+    path = tmp_path / f"{src.stem}.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations=build_durations(piece),
+        bar_width=12,
+        settings={"tuning": "g2c3f3a3d4g4", "style": "french", "key": piece.key or "C"},
+    )
+    text = path.read_text(encoding="utf-8")
+    for token in expected_tokens:
+        assert token in text

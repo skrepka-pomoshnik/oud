@@ -103,6 +103,32 @@ def test_cmd_convert_mxl(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
     assert "Wrote out.mxl" in capsys.readouterr().out
 
 
+def test_cmd_convert_pdf(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    calls: dict[str, list[str]] = {"export": [], "print": []}
+    monkeypatch.setattr(
+        oud_app,
+        "_export_context",
+        lambda _in, _cfg: ({}, 8, "piece", {}, {}, set()),
+    )
+    monkeypatch.setattr(
+        oud_app,
+        "export_lilypond",
+        lambda path, *_args, **_kwargs: calls["export"].append(path) or f"Wrote {path}",
+    )
+    monkeypatch.setattr(
+        oud_app,
+        "print_lilypond_pdf",
+        lambda ly_path, out_base: calls["print"].append(f"{ly_path}|{out_base}") or "Printed out.pdf",
+    )
+    rc = oud_app._cmd_convert("in.ft3", "out.pdf", "cfg.toml")
+    assert rc == 0
+    assert calls["export"] == ["out.ly"]
+    assert calls["print"] == ["out.ly|out"]
+    out = capsys.readouterr().out
+    assert "Wrote out.ly" in out
+    assert "Printed out.pdf" in out
+
+
 def test_main_tui_no_path_when_only_config(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[object, str | None, str]] = []
 
