@@ -105,3 +105,104 @@ def multi_bar_spacing_piece() -> Piece:
         ),
     ]
     return Piece(title="Spacing", bars=bars, strings=6, style="french")
+
+
+def repeat_and_meter_change_piece() -> Piece:
+    bars = [
+        Bar(
+            time_sig="C",
+            repeat=".:",
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(3, 2, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            ],
+        ),
+        Bar(
+            time_sig="3/4",
+            chords=[
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 3, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 1, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(4, 0, 0)]),
+            ],
+        ),
+        Bar(
+            repeat=":.",
+            barline="||",
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 4, 0), Note(6, 0, 0)]),
+            ],
+        ),
+    ]
+    return Piece(title="RepeatMeter", bars=bars, strings=6, style="french")
+
+
+def mapped_column_transition_piece() -> Piece:
+    # Mimics the Earl-of-Essex type failure: one row with an early 8th -> 16th shift.
+    bar = Bar(
+        chords=[
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 1, 0)]),
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 2, 0), Note(4, 0, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 3, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 4, 0), Note(5, 1, 0)]),
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        ],
+        time_sig="O",
+    )
+    return Piece(title="MappedCols", bars=[bar], strings=6, style="french")
+
+
+def stem_alignment_problem_piece() -> Piece:
+    # Synthetic bars capturing "Lachrimae-like" stem/flag alignment and density issues.
+    bars = [
+        Bar(
+            time_sig="O",
+            chords=[
+                Chord(note_type=2, dotted=True, grid=None, notes=[Note(2, 3, 0), Note(6, 0, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            ],
+        ),
+        Bar(
+            chords=[
+                Chord(note_type=6, dotted=True, grid=None, notes=[Note(1, 4, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 5, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 3, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(4, 2, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(5, 1, 0)]),
+            ],
+        ),
+    ]
+    # Extend to many bars to imitate multi-system smart layout checks.
+    bars.extend(
+        [
+            Bar(
+                chords=[
+                    Chord(note_type=5 if i % 2 else 6, dotted=False, grid=None, notes=[Note(1, (i + 2) % 6, 0)]),
+                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, (i + 3) % 5, 0), Note(7 if i % 3 == 0 else 6, i % 4, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, (i + 1) % 4, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, (i + 2) % 4, 0)]),
+                ],
+            )
+            for i in range(18)
+        ],
+    )
+    return Piece(title="StemAlign", bars=bars, strings=8, style="french")
+
+
+def long_width_fill_piece(bars_count: int = 32, *, strings: int = 7) -> Piece:
+    bars: list[Bar] = [
+        Bar(
+            time_sig="O" if i == 0 else None,
+            chords=[
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, (i + 2) % 6, 0)]),
+                Chord(note_type=6, dotted=(i % 5 == 0), grid=None, notes=[Note(2, (i + 1) % 5, 0), Note(4, i % 4, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, (i + 3) % 5, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(min(strings, 7), i % 3, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, (i + 4) % 6, 0)]),
+            ],
+        )
+        for i in range(bars_count)
+    ]
+    return Piece(title="WidthFill", bars=bars, strings=strings, style="french")

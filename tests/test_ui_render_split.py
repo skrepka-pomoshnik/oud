@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-from oud.core.ft3 import load_ft3
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.ui.adapter import Screen
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import _apply_overrides, render_piece
+from tests.helpers_regression_cases import repeat_and_meter_change_piece
 
 
 class _Screen(Screen):
@@ -327,23 +325,20 @@ def test_render_new_sheet_first_note_flag_does_not_overlap_time_cue_lane() -> No
     assert lines[flag_row_y][cue_x] == " "
 
 
-def test_render_repeat_glyphs_visible_on_real_ft3_file() -> None:
-    path = Path("lutemusic/wu_sol_ich_mich_hin_keren.ft3")
-    if not path.exists():
-        pytest.skip("local FT3 corpus file not available")
+def test_render_repeat_glyphs_visible_on_synthetic_piece() -> None:
     kwargs = _args("normal")
     kwargs["stdscr"] = _Screen(h=39, w=121)
-    kwargs["piece"] = load_ft3(str(path))
+    kwargs["piece"] = repeat_and_meter_change_piece()
     render_piece(**kwargs)
     texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
     assert any(".:" in text for text in texts)
     assert any(":." in text for text in texts)
 
 
-def test_render_repeat_words_visible_on_loaded_real_file() -> None:
+def test_render_repeat_words_visible_on_synthetic_piece() -> None:
     kwargs = _args("normal")
     kwargs["stdscr"] = _Screen(h=24, w=100)
-    kwargs["piece"] = load_ft3("examples/26_lachrimae_galliard_in_G.ft3")
+    kwargs["piece"] = repeat_and_meter_change_piece()
     kwargs["piece"].bars[0].repeat = "DC al Fine"
     render_piece(**kwargs)
     texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]

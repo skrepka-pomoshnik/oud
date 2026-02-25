@@ -4,13 +4,14 @@ from itertools import pairwise
 
 import pytest
 
-from oud.core.ft3 import build_durations, load_ft3
+from oud.core.ft3 import build_durations
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.render_utils import flag_row_style
 from oud.settings import DEFAULT_SETTINGS
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import render_piece
 from oud.ui.render_helpers import flag_symbols
+from tests.helpers_regression_cases import long_width_fill_piece
 
 
 def _render_lines(
@@ -231,7 +232,7 @@ def test_render_matrix_duration_text_stays_aligned_with_flags() -> None:
 
 @pytest.mark.parametrize("spacing_fill", ["stretch", "compact", "smart", "center"])
 def test_render_matrix_lines_are_always_terminal_width(spacing_fill: str) -> None:
-    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    piece = long_width_fill_piece(bars_count=24, strings=7)
     settings = dict(DEFAULT_SETTINGS)
     settings.update(
         {
@@ -259,7 +260,7 @@ def test_render_matrix_lines_are_always_terminal_width(spacing_fill: str) -> Non
 
 
 def test_render_matrix_smart_fill_reaches_right_edge_on_staff_rows() -> None:
-    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    piece = long_width_fill_piece(bars_count=20, strings=7)
     settings = dict(DEFAULT_SETTINGS)
     settings.update(
         {

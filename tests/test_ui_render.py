@@ -1,4 +1,3 @@
-from oud.core.ft3 import load_ft3
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.render_utils import bar_cells_from_chords
 from oud.core.tuning_utils import default_bass_strings
@@ -20,6 +19,7 @@ from oud.ui.render_system import (
     _playback_scaled_col_for_chords,
     _scale_chord_row,
 )
+from tests.helpers_regression_cases import mapped_column_transition_piece
 
 
 def test_parse_time_signature() -> None:
@@ -279,9 +279,9 @@ def test_scale_chord_row_keeps_dash_between_equal_noteheads() -> None:
     assert "cc" not in rendered
 
 
-def test_earl_of_essex_bar29_noteheads_follow_mapped_event_columns() -> None:
-    piece = load_ft3("lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3")
-    bar = piece.bars[28]
+def test_noteheads_follow_mapped_event_columns_in_transition_bar() -> None:
+    piece = mapped_column_transition_piece()
+    bar = piece.bars[0]
     default_duration = 4
     bar_width = 12
     positions, grid_width = _chord_positions_distinct(bar, bar_width, default_duration)
