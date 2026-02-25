@@ -23,15 +23,17 @@ from oud.editor.media_ops import cmd_midi as _cmd_midi
 from oud.editor.media_ops import cmd_midicmd as _cmd_midicmd
 from oud.editor.media_ops import cmd_midicmd_default as _cmd_midicmd_default
 from oud.editor.media_ops import cmd_musicxml as _cmd_musicxml
-from oud.editor.media_ops import cmd_pdf as _cmd_pdf
 from oud.editor.media_ops import cmd_play as _cmd_play
 from oud.editor.media_ops import print_pdf as _print_pdf
 from oud.editor.messages import MISSING_LESS, NO_PATH
+from oud.editor.notation_ops import cmd_arpeggio as _cmd_arpeggio
 from oud.editor.notation_ops import cmd_barline as _cmd_barline
 from oud.editor.notation_ops import cmd_dynamic as _cmd_dynamic
 from oud.editor.notation_ops import cmd_fermata as _cmd_fermata
 from oud.editor.notation_ops import cmd_repeat as _cmd_repeat
+from oud.editor.notation_ops import cmd_separee as _cmd_separee
 from oud.editor.notation_ops import cmd_time as _cmd_time
+from oud.editor.notation_ops import cmd_tuplet as _cmd_tuplet
 from oud.editor.notation_ops import set_annotation as _set_annotation
 from oud.editor.notation_ops import set_barline as _set_barline
 from oud.editor.notation_ops import set_dynamic as _set_dynamic
@@ -53,6 +55,9 @@ from oud.editor.state import EditorState
 from oud.editor.tool_ops import cmd_info as _cmd_info
 from oud.editor.tool_ops import cmd_plugins as _cmd_plugins
 from oud.editor.tool_ops import cmd_tool as _cmd_tool
+from oud.editor.transform_ops import cmd_courseshift as _cmd_courseshift
+from oud.editor.transform_ops import cmd_retune as _cmd_retune
+from oud.editor.transform_ops import cmd_transpose as _cmd_transpose
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import _midi_command, export_midi
 from oud.exports.musicxml import export_musicxml, export_mxl
@@ -174,11 +179,10 @@ def cmd_musicxml(state: EditorState, args: str, config_path: str) -> None:
 
 
 def cmd_pdf(state: EditorState, _args: str, config_path: str) -> None:
-    _cmd_pdf(
+    _ = (_args, config_path)
+    _print_pdf(
         state,
-        _args,
-        config_path,
-        cmd_lilypond_fn=cmd_lilypond,
+        export_lilypond_fn=export_lilypond,
         print_lilypond_pdf_fn=print_lilypond_pdf,
     )
 
@@ -255,6 +259,30 @@ def cmd_dynamic(state: EditorState, value: str) -> None:
 
 def cmd_fermata(state: EditorState, value: str) -> None:
     _cmd_fermata(state, value)
+
+
+def cmd_arpeggio(state: EditorState, value: str) -> None:
+    _cmd_arpeggio(state, value)
+
+
+def cmd_separee(state: EditorState, value: str) -> None:
+    _cmd_separee(state, value)
+
+
+def cmd_tuplet(state: EditorState, value: str) -> None:
+    _cmd_tuplet(state, value)
+
+
+def cmd_transpose(state: EditorState, value: str) -> None:
+    _cmd_transpose(state, value)
+
+
+def cmd_retune(state: EditorState, value: str) -> None:
+    _cmd_retune(state, value)
+
+
+def cmd_courseshift(state: EditorState, value: str) -> None:
+    _cmd_courseshift(state, value)
 
 
 def cmd_verify(state: EditorState) -> None:

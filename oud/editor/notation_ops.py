@@ -90,6 +90,36 @@ def cmd_fermata(state: EditorState, value: str) -> None:
     set_fermata(state, normalized)
 
 
+def cmd_arpeggio(state: EditorState, value: str) -> None:
+    normalized = (value.strip().lower() or "toggle")
+    if normalized not in {"on", "off", "toggle"}:
+        state.message = "Arpeggio must be on/off/toggle"
+        return
+    set_arpeggio(state, normalized)
+
+
+def cmd_separee(state: EditorState, value: str) -> None:
+    normalized = (value.strip().lower() or "toggle")
+    if normalized not in {"on", "off", "toggle"}:
+        state.message = "Separee must be on/off/toggle"
+        return
+    set_separee(state, normalized)
+
+
+def cmd_tuplet(state: EditorState, value: str) -> None:
+    normalized = value.strip().lower()
+    if not normalized:
+        state.message = "Tuplet must be 2-9 or clear"
+        return
+    if normalized == "clear":
+        set_tuplet(state, "clear")
+        return
+    if normalized.isdigit() and 2 <= int(normalized) <= 9:
+        set_tuplet(state, normalized)
+        return
+    state.message = "Tuplet must be 2-9 or clear"
+
+
 def set_ornament(state: EditorState, value: str) -> None:
     key = (state.cursor_bar, state.cursor_col)
     prev = state.ornaments.get(key)
@@ -290,6 +320,57 @@ def set_fermata(state: EditorState, value: str) -> None:
     bar.fermata = new
     state.modified = True
     state.message = "Fermata on" if new else "Fermata off"
+
+
+def _toggle_local_ornament_sign(state: EditorState, value: str, *, glyph: str, label: str) -> None:
+    key = (state.cursor_bar, state.cursor_col)
+    prev = state.ornaments.get(key)
+    if value == "toggle":
+        value = "off" if prev == glyph else "on"
+    if value == "off":
+        if prev == glyph:
+            set_ornament(state, "clear")
+        else:
+            state.message = f"{label} off"
+            return
+        state.message = f"{label} off"
+        return
+    set_ornament(state, glyph)
+    state.message = f"{label} on"
+
+
+def set_arpeggio(state: EditorState, value: str) -> None:
+    _toggle_local_ornament_sign(state, value, glyph="~", label="Arpeggio")
+
+
+def set_separee(state: EditorState, value: str) -> None:
+    _toggle_local_ornament_sign(state, value, glyph=":", label="Separee")
+
+
+def set_tuplet(state: EditorState, value: str) -> None:
+    key = (state.cursor_bar, state.cursor_col)
+    prev = state.annotations.get(key)
+    if value == "clear":
+        if prev and prev in {"²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"}:
+            set_annotation(state, "clear")
+        else:
+            state.message = "Tuplet cleared"
+            return
+        state.message = "Tuplet cleared"
+        return
+    supers = {
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+    }
+    glyph = supers.get(value, value[:1])
+    set_annotation(state, glyph)
+    state.message = f"Tuplet {value}"
 
 
 def set_slur(state: EditorState, value: str) -> None:

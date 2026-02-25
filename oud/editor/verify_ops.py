@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from oud.core.render_utils import note_type_to_denom
+from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 from oud.core.time_utils import parse_time_signature_value
+from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor.rule_pipeline import BarRule, RuleContext, RuleIssue, run_rules
 from oud.editor.state import EditorState
 
@@ -67,8 +69,86 @@ def _rule_bar_duration(state: EditorState, context: RuleContext) -> RuleIssue | 
     )
 
 
+def _assignment_policy_from_state(state: EditorState) -> AssignmentPolicy:
+    minimum_fret = int(state.settings.get("minimumfret", "0") or "0")
+    max_stretch_raw = int(state.settings.get("maxstretch", "0") or "0")
+    max_stretch = max_stretch_raw if max_stretch_raw > 0 else None
+    restrain_open = state.settings.get("restrainopenstrings", "off") == "on"
+    return AssignmentPolicy(
+        minimum_fret=minimum_fret,
+        max_stretch=max_stretch,
+        restrain_open_strings=restrain_open,
+    )
+
+
+def _assignment_issue_from_result(result) -> RuleIssue:
+    msg = "Placement violates constraints."
+    if result.diagnostics:
+        msg = result.diagnostics[0].message
+    return RuleIssue(
+        code="assignment.constraints",
+        message=f"Assignment constraints: {msg}",
+        level="warning",
+    )
+
+
+def _rule_assignment_constraints(  # noqa: C901, PLR0911
+    state: EditorState,
+    context: RuleContext,
+) -> RuleIssue | None:
+    if context.bar_index < 0 or context.bar_index >= len(state.piece.bars):
+        return None
+    tuning = parse_tuning_pitches(state.settings.get("tuning", ""))[: state.piece.strings]
+    if not tuning:
+        return None
+    bar = state.piece.bars[context.bar_index]
+    policy = _assignment_policy_from_state(state)
+
+    def _note_pitch(note) -> int | None:
+        idx = note.string - 1
+        if idx < 0 or idx >= len(tuning):
+            return None
+        return tuning[idx] + note.fret
+
+    for chord in bar.chords:
+        if not chord.notes:
+            continue
+        pitches: list[int] = []
+        forced: dict[int, int] = {}
+        for i, note in enumerate(chord.notes):
+            pitch = _note_pitch(note)
+            if pitch is None:
+                return RuleIssue(
+                    code="assignment.string_out_of_range",
+                    message="Note string is outside current tuning.",
+                    level="warning",
+                )
+            pitches.append(pitch)
+            forced[i] = note.string
+        result = assign_chord_pitches(pitches, tuning, policy=policy, forced_strings=forced)
+        if not result.ok:
+            return _assignment_issue_from_result(result)
+    for note in bar.notes:
+        pitch = _note_pitch(note)
+        if pitch is None:
+            return RuleIssue(
+                code="assignment.string_out_of_range",
+                message="Note string is outside current tuning.",
+                level="warning",
+            )
+        result = assign_chord_pitches(
+            [pitch],
+            tuning,
+            policy=policy,
+            forced_strings={0: note.string},
+        )
+        if not result.ok:
+            return _assignment_issue_from_result(result)
+    return None
+
+
 def default_bar_rules() -> tuple[BarRule, ...]:
-    return (_rule_time_signature, _rule_bar_duration)
+    return (_rule_time_signature, _rule_assignment_constraints, _rule_bar_duration)
 
 
 def verify_bar_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:

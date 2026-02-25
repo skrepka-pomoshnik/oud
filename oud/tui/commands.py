@@ -156,6 +156,42 @@ def cmd_fermata(state: EditorState, args: str) -> None:
     _cmd_fermata_local(state, args.strip())
 
 
+def cmd_arpeggio(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_arpeggio as _cmd_arpeggio_local
+
+    _cmd_arpeggio_local(state, args.strip())
+
+
+def cmd_separee(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_separee as _cmd_separee_local
+
+    _cmd_separee_local(state, args.strip())
+
+
+def cmd_tuplet(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_tuplet as _cmd_tuplet_local
+
+    _cmd_tuplet_local(state, args.strip())
+
+
+def cmd_transpose(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_transpose as _cmd_transpose_local
+
+    _cmd_transpose_local(state, args.strip())
+
+
+def cmd_retune(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_retune as _cmd_retune_local
+
+    _cmd_retune_local(state, args.strip())
+
+
+def cmd_courseshift(state: EditorState, args: str) -> None:
+    from oud.editor.command_ops import cmd_courseshift as _cmd_courseshift_local
+
+    _cmd_courseshift_local(state, args.strip())
+
+
 def cmd_tool(state: EditorState, args: str, config_path: str) -> None:
     _cmd_tool(state, args, config_path)
 
@@ -329,6 +365,12 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("repeat", _no_config(cmd_repeat)),
         CommandSpec("dynamic", _no_config(cmd_dynamic)),
         CommandSpec("fermata", _no_config(cmd_fermata)),
+        CommandSpec("arpeggio", _no_config(cmd_arpeggio)),
+        CommandSpec("separee", _no_config(cmd_separee)),
+        CommandSpec("tuplet", _no_config(cmd_tuplet)),
+        CommandSpec("transpose", _no_config(cmd_transpose)),
+        CommandSpec("retune", _no_config(cmd_retune)),
+        CommandSpec("courseshift", _no_config(cmd_courseshift)),
         CommandSpec("tool", _with_config(cmd_tool)),
     )
 

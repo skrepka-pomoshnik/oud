@@ -50,7 +50,9 @@ HELP_LINES = [
     ),
     ":annot <text>|clear               :highlight on/off",
     ":slur start/end/clear             :tie start/end/clear",
-    ":hold start/end/clear",
+    ":hold start/end/clear             :tuplet 2..9|clear",
+    ":arpeggio on/off/toggle           :separee on/off/toggle",
+    ":transpose <int>  :retune <tuning/preset>  :courseshift up|down",
     (
         ":set style=... strings=... tuning=... tuninglabels=... "
         "flagstyle=... flagstems=... time=... (or auto)"

@@ -1,11 +1,13 @@
 import subprocess
 import zipfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.tab_parser import TabData
+from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor import command_ops as cmd_ops
 from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.state import EditorState
@@ -91,6 +93,43 @@ def test_cmd_set_and_convert(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     cmd.cmd_convert(state, "french", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "french"
 
+
+def test_cmd_transpose_retune_and_courseshift_with_undo(tmp_path: Path) -> None:
+    state = _state(bars=1)
+    state.piece.bars[0].chords = [
+        Chord(
+            note_type=4,
+            dotted=False,
+            grid=None,
+            notes=[Note(1, 0, 0), Note(3, 2, 0)],
+        ),
+    ]
+    state.cursor_bar = 0
+    state.cursor_col = 0
+    state.cursor_string = 0
+    cmd.apply_command(state, "transpose 2", str(tmp_path / "cfg.toml"))
+    notes = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
+    assert notes != {(1, 0), (3, 2)}
+    assert "Transposed +2" in state.message
+    cmd.apply_command(state, "undo", str(tmp_path / "cfg.toml"))
+    notes = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
+    assert notes == {(1, 0), (3, 2)}
+
+    cmd.apply_command(state, "retune e2a2d3g3b3e4", str(tmp_path / "cfg.toml"))
+    assert sorted(parse_tuning_pitches(state.settings["tuning"])) == sorted(
+        parse_tuning_pitches("e2a2d3g3b3e4"),
+    )
+    assert state.settings["strings"] == "6"
+    assert "Retuned:" in state.message
+    cmd.apply_command(state, "undo", str(tmp_path / "cfg.toml"))
+    assert state.settings["tuning"] == "g2c3f3a3d4g4"
+
+    # Shift cursor note (top string) down one course while preserving pitch.
+    cmd.apply_command(state, "courseshift down", str(tmp_path / "cfg.toml"))
+    shifted = state.piece.bars[0].chords[0].notes
+    assert any(n.string == 2 for n in shifted)
+    assert "Course shift down" in state.message
+
 def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
 
@@ -107,7 +146,8 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
         "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
-        "maxrepeats=30 scrollmode=page beatsnap=soft timesigstyle=fraction "
+        "maxrepeats=30 scrollmode=page beatsnap=soft timesigstyle=fraction flaglean=left "
+        "multifretspacing=separated fretlabelmode=letters "
         "minimumfret=2 maxstretch=5 restrainopenstrings=on",
         str(tmp_path / "cfg.toml"),
     )
@@ -144,6 +184,9 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["scrollmode"] == "page"
     assert state.settings["beatsnap"] == "soft"
     assert state.settings["timesigstyle"] == "fraction"
+    assert state.settings["flaglean"] == "left"
+    assert state.settings["multifretspacing"] == "separated"
+    assert state.settings["fretlabelmode"] == "letters"
     assert state.settings["minimumfret"] == "2"
     assert state.settings["maxstretch"] == "5"
     assert state.settings["restrainopenstrings"] == "on"
@@ -175,6 +218,7 @@ def test_cmd_set_tabnotation_full_preset(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert state.settings["tabnotation"] == "full"
     assert state.settings["showdur"] == "on"
     assert state.settings["showextras"] == "on"
+    assert state.settings["showtuplets"] == "on"
     assert state.settings["showtactus"] == "on"
     assert state.settings["flagredundant"] == "off"
     assert state.settings["timesigstyle"] == "fraction"
@@ -257,9 +301,28 @@ def test_cmd_set_deprecated_show_aliases_map_to_explicit_keys(
     cmd.cmd_set(state, "showextras=on showft3extras=off", str(tmp_path / "cfg.toml"))
     assert state.settings["showspans"] == "on"
     assert state.settings["showextras"] == "on"
-    assert state.settings["showfingerings"] == "off"
-    assert state.settings["showornaments"] == "off"
-    assert state.settings["showft3extras"] == "off"
+
+
+def test_sign_commands_arpeggio_separee_and_tuplet() -> None:
+    state = _state()
+    state.cursor_bar = 0
+    state.cursor_col = 3
+
+    cmd.apply_command(state, "arpeggio on", "cfg.toml")
+    assert state.ornaments[(0, 3)] == "~"
+    assert state.message == "Arpeggio on"
+
+    cmd.apply_command(state, "separee on", "cfg.toml")
+    assert state.ornaments[(0, 3)] == ":"
+    assert state.message == "Separee on"
+
+    cmd.apply_command(state, "tuplet 3", "cfg.toml")
+    assert state.annotations[(0, 3)] == "³"
+    assert state.message == "Tuplet 3"
+
+    cmd.apply_command(state, "tuplet clear", "cfg.toml")
+    assert (0, 3) not in state.annotations
+    assert state.message == "Tuplet cleared"
 
 
 def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -277,29 +340,34 @@ def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         return None
 
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    src_tuning = parse_tuning_pitches(state.settings["tuning"])
+    before_pitches = sorted(src_tuning[n.string - 1] + n.fret for n in state.piece.bars[0].chords[0].notes)
     cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "italian"
     assert state.settings["tuning"] == "e2a2d3g3b3e4"
     assert state.settings["strings"] == "6"
     assert state.settings["italianorient"] == "reverse"
     notes_after_guitar = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
-    assert (4, 1) in notes_after_guitar
-    assert (3, 2) in notes_after_guitar
-    assert "partial convert" in state.message
+    assert len(notes_after_guitar) == 3
+    guitar_tuning = parse_tuning_pitches(state.settings["tuning"])
+    after_guitar_pitches = sorted(guitar_tuning[n.string - 1] + n.fret for n in state.piece.bars[0].chords[0].notes)
+    assert after_guitar_pitches == before_pitches
+    assert "converted content" in state.message
     cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
     notes_after_repeat = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
-    assert (4, 1) in notes_after_repeat
-    assert "partial convert" not in state.message
+    assert notes_after_repeat == notes_after_guitar
+    assert "converted content" not in state.message
     cmd.cmd_set(state, "lute", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "french"
     assert state.settings["tuning"] == "g2c3f3a3d4g4"
     assert state.settings["strings"] == "6"
-    notes_after_lute = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
-    assert (3, 3) in notes_after_lute
-    assert "partial convert" in state.message
+    lute_tuning = parse_tuning_pitches(state.settings["tuning"])
+    after_lute_pitches = sorted(lute_tuning[n.string - 1] + n.fret for n in state.piece.bars[0].chords[0].notes)
+    assert after_lute_pitches == before_pitches
+    assert "converted content" in state.message
 
 
-def test_cmd_set_guitar_partial_convert_moves_open_bridge_course_to_next_course(
+def test_cmd_set_guitar_preset_retunes_content_preserving_pitch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     state = _state()
@@ -316,16 +384,16 @@ def test_cmd_set_guitar_partial_convert_moves_open_bridge_course_to_next_course(
         return None
 
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    source_pitch = parse_tuning_pitches(state.settings["tuning"])[3]  # course 4 open
     cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
     notes = state.piece.bars[0].chords[0].notes
     assert len(notes) == 1
-    # Temporary bridge keeps pitch by moving to the next course if -1 would go negative.
-    assert notes[0].string == 5
-    assert notes[0].fret >= 0
-    assert "partial convert" in state.message
+    target_tuning = parse_tuning_pitches(state.settings["tuning"])
+    assert target_tuning[notes[0].string - 1] + notes[0].fret == source_pitch
+    assert "converted content" in state.message
 
 
-def test_cmd_set_guitar_partial_convert_negative_shift_uses_target_tuning_for_next_course(
+def test_cmd_set_guitar_preset_retune_uses_target_tuning_mapping(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     state = _state()
@@ -344,12 +412,10 @@ def test_cmd_set_guitar_partial_convert_negative_shift_uses_target_tuning_for_ne
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
     cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
     note = state.piece.bars[0].chords[0].notes[0]
-    # Equivalent pitch under target guitar tuning lands on the next course with
-    # a target-tuning fret (old source-tuning math produced a different fret).
-    assert (note.string, note.fret) == (5, 7)
+    assert (note.string, note.fret) == (4, 3)
 
 
-def test_cmd_set_guitar_partial_convert_drops_open_bridge_course_if_next_course_occupied(
+def test_cmd_set_guitar_preset_retune_preserves_chord_without_string_collisions(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     state = _state()
@@ -366,16 +432,18 @@ def test_cmd_set_guitar_partial_convert_drops_open_bridge_course_if_next_course_
         return None
 
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    src_tuning = parse_tuning_pitches(state.settings["tuning"])
+    before_pitches = sorted(src_tuning[n.string - 1] + n.fret for n in state.piece.bars[0].chords[0].notes)
     cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
     notes = state.piece.bars[0].chords[0].notes
-    assert all(n.string != 4 for n in notes)
-    assert any(n.string == 5 for n in notes)
-    # The original next-course note remains; the negative-shift open note is dropped.
-    assert len(notes) == 1
-    assert "partial convert" in state.message
+    assert len({n.string for n in notes}) == len(notes)
+    tgt_tuning = parse_tuning_pitches(state.settings["tuning"])
+    after_pitches = sorted(tgt_tuning[n.string - 1] + n.fret for n in notes)
+    assert after_pitches == before_pitches
+    assert "converted content" in state.message
 
 
-def test_cmd_set_guitar_rescues_removed_bass_course_one_octave_up(
+def test_cmd_set_guitar_reassigns_removed_bass_course_under_target_tuning(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     state = _state()
@@ -395,12 +463,14 @@ def test_cmd_set_guitar_rescues_removed_bass_course_one_octave_up(
         return None
 
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    src_tuning = parse_tuning_pitches(state.settings["tuning"])
+    before_pitch = src_tuning[6]
     cmd.cmd_set(state, "guitar", str(tmp_path / "cfg.toml"))
     notes = state.piece.bars[0].chords[0].notes
     assert state.piece.strings == 6
     assert len(notes) == 1
-    # 7th-course f2 is rescued as f3 on the target 6-string guitar layout.
-    assert (notes[0].string, notes[0].fret) == (4, 3)
+    tgt_tuning = parse_tuning_pitches(state.settings["tuning"])
+    assert tgt_tuning[notes[0].string - 1] + notes[0].fret == before_pitch
 
 
 def test_cmd_set_bool_shortcuts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -537,7 +607,7 @@ def test_cmd_midi_lilypond_pdf_play_source(
 
     pdf_called: dict[str, str] = {}
 
-    def _print_pdf(_path: str) -> str:
+    def _print_pdf(_path: str, _base: str | None = None) -> str:
         pdf_called["path"] = _path
         return "Pdf ok"
 
@@ -605,7 +675,7 @@ def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
         called["ly"] = path
         return f"Wrote {path}"
 
-    def _print_pdf(path: str) -> str:
+    def _print_pdf(path: str, _base: str | None = None) -> str:
         called["pdf"] = path
         return f"Printed {Path(path).with_suffix('.pdf')}"
 
@@ -617,6 +687,39 @@ def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
     assert called["ly"].endswith("czarna_krowa.ly")
     assert called["pdf"].endswith("czarna_krowa.ly")
     assert state.message.endswith("czarna_krowa.pdf")
+
+
+def test_cmd_pdf_forces_full_tabnotation_only_for_pdf_export(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = _state()
+    state.path = str(tmp_path / "score.ft3")
+    state.settings["tabnotation"] = "minimal"
+    captured: dict[str, object] = {}
+
+    def _export_lilypond(
+        _path: str,
+        *_args: object,
+        **kwargs: object,
+    ) -> str:
+        captured["settings"] = kwargs["settings"]
+        return "Ly ok"
+
+    def _print_pdf(_ly_path: str, _base: str | None = None) -> str:
+        return "Pdf ok"
+
+    monkeypatch.setattr(cmd_ops, "export_lilypond", _export_lilypond)
+    monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
+
+    cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
+    assert state.message == "Pdf ok"
+    exported_settings_obj = captured["settings"]
+    assert isinstance(exported_settings_obj, dict)
+    exported_settings = cast("dict[str, str]", exported_settings_obj)
+    assert exported_settings["tabnotation"] == "full"
+    # Editor settings are not mutated/persisted by :pdf defaulting behavior.
+    assert state.settings["tabnotation"] == "minimal"
     cmd.cmd_tool(state, "unknown", str(tmp_path / "cfg.toml"))
     assert state.message == "Tool: reflow|gridflags|flagstyle|comments"
     cmd.cmd_barline(state, "thin")
@@ -714,6 +817,12 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_repeat",
         "cmd_dynamic",
         "cmd_fermata",
+        "cmd_arpeggio",
+        "cmd_separee",
+        "cmd_tuplet",
+        "cmd_transpose",
+        "cmd_retune",
+        "cmd_courseshift",
         "cmd_time",
         "cmd_verify",
     }
@@ -782,6 +891,12 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "repeat": "start",
         "dynamic": "mf",
         "fermata": "on",
+        "arpeggio": "on",
+        "separee": "on",
+        "tuplet": "3",
+        "transpose": "2",
+        "retune": "guitar",
+        "courseshift": "down",
         "tool": "gridflags",
     }
     specs = cmd._command_specs()

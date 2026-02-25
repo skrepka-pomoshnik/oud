@@ -11,7 +11,6 @@ from oud.editor.ops import (
     fret_to_italian,
     italian_to_fret,
 )
-from oud.editor.preset_convert import apply_meta_preset_content_conversion
 from oud.editor.state import EditorState
 from oud.settings import DEFAULT_SETTINGS, save_settings
 
@@ -44,6 +43,7 @@ _BOOL_KEYS = {
     "grid",
     "showdur",
     "showspans",
+    "showtuplets",
     "showfingerings",
     "showornaments",
     "showextras",
@@ -86,6 +86,7 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         "Flagstyle must be standard/italian/thin/board/capirola/englishgrid/continental",
     ),
     "flagstems": ({"single", "double"}, "Flagstems must be single/double"),
+    "flaglean": ({"right", "left"}, "Flaglean must be right/left"),
     "keys": (
         {"vim", "vim+arrows", "casual", "casual+arrows"},
         "Keys must be vim/vim+arrows/casual/casual+arrows",
@@ -109,6 +110,14 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "timesigstyle": (
         {"symbol", "numeric", "fraction"},
         "Timesigstyle must be symbol/numeric/fraction",
+    ),
+    "multifretspacing": (
+        {"tight", "separated", "collision-safe"},
+        "Multifretspacing must be tight/separated/collision-safe",
+    ),
+    "fretlabelmode": (
+        {"auto", "numeric", "letters"},
+        "Fretlabelmode must be auto/numeric/letters",
     ),
     "tiecuestyle": (
         {"bracket", "paren", "hide"},
@@ -271,11 +280,37 @@ def _set_soundfont(state: EditorState, value: str) -> bool:
     return True
 
 
-def _apply_meta_preset(state: EditorState, name: str) -> bool:
+def _apply_meta_preset(state: EditorState, name: str) -> bool:  # noqa: C901
     preset = META_PRESETS.get(name)
     if preset is None:
         return False
-    conversion_note = apply_meta_preset_content_conversion(state, name, target_preset=preset)
+    conversion_note: str | None = None
+    target_tuning = preset.get("tuning")
+    target_strings_raw = preset.get("strings")
+    if target_tuning and any(bar.notes or bar.chords for bar in state.piece.bars):
+        from oud.editor.transform_ops import transform_score_to_tuning  # noqa: PLC0415
+
+        target_strings = None
+        if target_strings_raw is not None:
+            try:
+                target_strings = int(target_strings_raw)
+            except ValueError:
+                target_strings = None
+        report = transform_score_to_tuning(
+            state,
+            target_tuning_text=target_tuning,
+            target_strings=target_strings,
+            semitones=0,
+            label=f"preset {name}",
+            update_settings_tuning=False,
+        )
+        if report.total > 0:
+            diag = ""
+            if report.skipped and report.first_diagnostic:
+                diag = f" ({report.first_diagnostic})"
+            conversion_note = (
+                f"converted content: changed {report.changed}, skipped {report.skipped}{diag}"
+            )
     style = preset.get("style")
     if style is not None:
         _set_enum(state, "style", style)

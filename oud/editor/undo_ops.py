@@ -157,6 +157,25 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
                 state.settings[key] = str(value)
             save_settings(config_path, state.settings)
         return
+    if kind == "score-transform":
+        payload = cast(dict[str, object], data["after"] if redo else data["before"])
+        piece = payload.get("piece")
+        overrides = payload.get("overrides")
+        if piece is not None:
+            state.piece = copy.deepcopy(piece)
+        if overrides is not None:
+            state.overrides = dict(cast(dict[tuple[int, int, int], str], overrides))
+        tuning_value = payload.get("settings_tuning")
+        strings_value = payload.get("settings_strings")
+        if tuning_value is None:
+            state.settings.pop("tuning", None)
+        else:
+            state.settings["tuning"] = str(tuning_value)
+        if strings_value is None:
+            state.settings.pop("strings", None)
+        else:
+            state.settings["strings"] = str(strings_value)
+        return
 
 
 def undo(state: EditorState, *, config_path: str) -> None:
