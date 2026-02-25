@@ -5,6 +5,7 @@ from oud.core.view_model import (
     _bar_flags,
     _bar_number_for_index,
     _bar_span_row,
+    _beamified_chord_flag_positions,
     _filter_redundant_positions,
     _flag_positions_all,
     _layout_rows,
@@ -173,6 +174,33 @@ def test_flag_positions_filter_redundant_tracks_dot_state_changes() -> None:
     positions = [(0, 16, True), (1, 16, False), (2, 16, False)]
     filtered = _filter_redundant_positions(positions)
     assert filtered == [(0, 16, True), (1, 16, False)]
+
+
+def test_beamified_chord_flag_positions_suppresses_equal_flags_inside_grid_group() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=6, dotted=False, grid="start", notes=[Note(1, 0, 0)]),
+            Chord(note_type=6, dotted=False, grid="mid", notes=[Note(1, 1, 0)]),
+            Chord(note_type=6, dotted=False, grid="end", notes=[Note(1, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)]),
+        ],
+    )
+    positions = chord_positions(bar, bar_width=8, default_duration=4)
+    filtered = _beamified_chord_flag_positions(bar, positions, hide_redundant=True, default_duration=4)
+    assert [den for _col, den, _dot in filtered] == [16, 4]
+
+
+def test_beamified_chord_flag_positions_keeps_partial_beam_changes_inside_group() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=6, dotted=False, grid="start", notes=[Note(1, 0, 0)]),
+            Chord(note_type=7, dotted=False, grid="mid", notes=[Note(1, 1, 0)]),
+            Chord(note_type=6, dotted=False, grid="end", notes=[Note(1, 2, 0)]),
+        ],
+    )
+    positions = chord_positions(bar, bar_width=8, default_duration=4)
+    filtered = _beamified_chord_flag_positions(bar, positions, hide_redundant=True, default_duration=4)
+    assert [den for _col, den, _dot in filtered] == [16, 32, 16]
 
 
 def test_bar_durations_reveals_dot_state_reset() -> None:

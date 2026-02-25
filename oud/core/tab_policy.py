@@ -11,6 +11,7 @@ TAB_NOTATION_PRESETS: dict[str, dict[str, str]] = {
     "minimal": {
         "showdur": "off",
         "showspans": "off",
+        "showtuplets": "off",
         "showfingerings": "off",
         "showornaments": "off",
         "showextras": "off",
@@ -30,6 +31,7 @@ TAB_NOTATION_PRESETS: dict[str, dict[str, str]] = {
     "full": {
         "showdur": "on",
         "showspans": "on",
+        "showtuplets": "on",
         "showfingerings": "on",
         "showornaments": "on",
         "showextras": "on",
@@ -62,8 +64,12 @@ def fret_label(
     fret: int,
     *,
     french_c_shape: str = "normal",
+    label_mode: str = "auto",
 ) -> str:
-    if style == "italian":
+    mode = (label_mode or "auto").strip().lower()
+    if mode == "numeric":
+        return str(fret)
+    if style == "italian" and mode != "letters":
         if fret == 10:
             return "x"
         return str(fret)
@@ -94,6 +100,61 @@ def fret_label(
     if french_c_shape in ("historical", "alt") and letter == "c":
         return "r"
     return letter
+
+
+def bar_has_multifret_tokens(
+    bar: Bar,
+    *,
+    style: str,
+    french_c_shape: str = "normal",
+    label_mode: str = "auto",
+) -> bool:
+    for note in bar.notes:
+        if (
+            len(
+                fret_label(
+                    style,
+                    note.fret,
+                    french_c_shape=french_c_shape,
+                    label_mode=label_mode,
+                ),
+            )
+            > 1
+        ):
+            return True
+    for chord in bar.chords:
+        for note in chord.notes:
+            if (
+                len(
+                    fret_label(
+                        style,
+                        note.fret,
+                        french_c_shape=french_c_shape,
+                        label_mode=label_mode,
+                    ),
+                )
+                > 1
+            ):
+                return True
+    return False
+
+
+def multifret_event_gap(
+    *,
+    style: str,
+    policy: str,
+    has_multifret: bool,
+) -> int:
+    if not has_multifret:
+        return 2
+    if style != "italian":
+        return 2
+    mode = (policy or "collision-safe").strip().lower()
+    if mode == "tight":
+        return 2
+    if mode == "separated":
+        return 3
+    return 4
 
 
 def rows_reversed(*, style: str, italian_orient: str, viewinvert: str) -> bool:

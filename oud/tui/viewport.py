@@ -16,6 +16,7 @@ def rows_per_screen(state: EditorState, height: int) -> int:
         or state.settings.get("showextras", "off") == "on"
     )
     show_tactus = state.settings.get("showtactus", "off") == "on"
+    show_tuplets = state.settings.get("showtuplets", "off") == "on"
     double_stems = state.settings.get("flagstems", "single") == "double"
     used_bass = _bass_strings_used(state.piece, state.overrides)
     total_strings = state.piece.strings
@@ -30,6 +31,7 @@ def rows_per_screen(state: EditorState, height: int) -> int:
         display_strings,
         show_dur,
         show_extras,
+        show_tuplets,
         show_tactus,
         double_stems,
     )

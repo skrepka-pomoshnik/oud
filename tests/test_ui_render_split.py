@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from oud.core.model import Bar, Chord, Note, Piece
@@ -65,6 +67,8 @@ def _args(mode: str = "normal"):
             "showtactus": "off",
             "flagredundant": "on",
             "flagstems": "single",
+            "flaglean": "right",
+            "fretlabelmode": "auto",
             "tuninglabels": "relative",
             "basslabels": "tuning",
             "tuning": "g2c3f3a3d4g4",
@@ -255,6 +259,111 @@ def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
     ]
     assert numeric_calls
     assert not symbol_calls
+
+
+@pytest.mark.parametrize("justify", ["compact", "smart", "stretch"])
+def test_render_italian_multi_digit_frets_do_not_glue_1_2_12(justify: str) -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="ItalianSpacing",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 12, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+        style="italian",
+    )
+    kwargs["settings"]["style"] = "italian"
+    kwargs["settings"]["showtuning"] = "off"
+    kwargs["settings"]["layout"] = "auto"
+    kwargs["settings"]["justify"] = justify
+    kwargs["settings"]["timesigstyle"] = "numeric"
+    kwargs["settings"]["showdur"] = "off"
+    kwargs["settings"]["showspans"] = "off"
+    kwargs["settings"]["showtactus"] = "off"
+    kwargs["settings"]["flagredundant"] = "on"
+    kwargs["settings"]["barsperline"] = "0"
+    kwargs["settings"]["maxbars"] = "0"
+    kwargs["stdscr"] = _Screen(w=80, h=18)
+    lines = _render_lines(kwargs)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    normalized = "\n".join(staff_rows)
+    assert re.search(r"1-+2-+12", normalized) or re.search(r"12-+2-+1", normalized)
+    assert "12-12" not in normalized
+
+
+def test_render_italian_multifretspacing_collision_safe_spreads_more_than_tight() -> None:
+    base_kwargs = _args("normal")
+    base_kwargs["piece"] = Piece(
+        title="ItalianSpacingPolicy",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 12, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+        style="italian",
+    )
+    base_kwargs["settings"]["style"] = "italian"
+    base_kwargs["settings"]["showtuning"] = "off"
+    base_kwargs["settings"]["layout"] = "auto"
+    base_kwargs["settings"]["justify"] = "smart"
+    base_kwargs["settings"]["barsperline"] = "0"
+    base_kwargs["settings"]["maxbars"] = "0"
+    base_kwargs["stdscr"] = _Screen(w=36, h=18)
+
+    tight_kwargs = {**base_kwargs, "settings": dict(base_kwargs["settings"])}
+    tight_kwargs["settings"]["multifretspacing"] = "tight"
+    safe_kwargs = {**base_kwargs, "settings": dict(base_kwargs["settings"])}
+    safe_kwargs["settings"]["multifretspacing"] = "collision-safe"
+
+    tight_text = "\n".join(_render_lines(tight_kwargs))
+    safe_text = "\n".join(_render_lines(safe_kwargs))
+    tight_match = re.search(r"1(-+)2(-+)12", tight_text) or re.search(r"12(-+)2(-+)1", tight_text)
+    safe_match = re.search(r"1(-+)2(-+)12", safe_text) or re.search(r"12(-+)2(-+)1", safe_text)
+    assert tight_match is not None and safe_match is not None
+    tight_gaps = tuple(len(group) for group in tight_match.groups())
+    safe_gaps = tuple(len(group) for group in safe_match.groups())
+    assert sum(safe_gaps) >= sum(tight_gaps)
+
+
+def test_render_fretlabelmode_switches_italian_glyph_policy() -> None:
+    piece = Piece(
+        title="FretLabels",
+        bars=[
+            Bar(
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 10, 0)])],
+            ),
+        ],
+        strings=6,
+        style="italian",
+    )
+
+    auto_kwargs = _args("normal")
+    auto_kwargs["piece"] = piece
+    auto_kwargs["settings"]["style"] = "italian"
+    auto_kwargs["settings"]["showtuning"] = "off"
+    auto_lines = _render_lines(auto_kwargs)
+    assert any("x" in line for line in auto_lines)
+
+    letters_kwargs = _args("normal")
+    letters_kwargs["piece"] = piece
+    letters_kwargs["settings"]["style"] = "italian"
+    letters_kwargs["settings"]["showtuning"] = "off"
+    letters_kwargs["settings"]["fretlabelmode"] = "letters"
+    letters_lines = _render_lines(letters_kwargs)
+    assert any("l" in line for line in letters_lines)
+    assert not any("x" in line for line in letters_lines)
 
 
 def test_render_shows_time_signature_on_mid_system_change() -> None:

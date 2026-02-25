@@ -32,6 +32,7 @@ def layout_block_rows(
     include_meta: bool,
     show_dur: bool,
     show_extras: bool,
+    show_tuplets: bool,
     show_tactus: bool,
     double_stems: bool,
 ) -> dict[str, int | None]:
@@ -43,14 +44,17 @@ def layout_block_rows(
     tactus = offset if show_tactus else None
     if show_tactus:
         offset += 1
-    ann = orn = slur = tie = hold = gliss = None
-    if show_extras:
+    ann = orn = slur = tie = hold = gliss = tuplet = None
+    if show_extras or show_tuplets:
         # Local marks (annotations/ornaments/fingerings) are rendered inline; reserve
-        # only one shared cue row for spans (slur/tie/hold/gliss).
-        slur = offset
-        tie = offset
-        hold = offset
-        gliss = offset
+        # only one shared cue row for spans/tuplet cues.
+        if show_extras:
+            slur = offset
+            tie = offset
+            hold = offset
+            gliss = offset
+        if show_tuplets:
+            tuplet = offset
         offset += 1
     flag = offset
     flag2 = offset + 1 if double_stems else None
@@ -66,6 +70,7 @@ def layout_block_rows(
         "tie": tie,
         "hold": hold,
         "gliss": gliss,
+        "tuplet": tuplet,
         "flag": flag,
         "flag2": flag2,
         "dur": dur,
@@ -78,6 +83,7 @@ def block_height(
     strings: int,
     show_dur: bool,
     show_extras: bool,
+    show_tuplets: bool,
     show_tactus: bool,
     double_stems: bool,
 ) -> int:
@@ -91,6 +97,6 @@ def block_height(
         height += 1
     if show_dur:
         height += 1
-    if show_extras:
+    if show_extras or show_tuplets:
         height += 1
     return height

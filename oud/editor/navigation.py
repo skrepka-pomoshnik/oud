@@ -9,6 +9,8 @@ from oud.core.render_utils import (
     trim_right_slack_for_onsets,
 )
 from oud.core.tab_policy import (
+    bar_has_multifret_tokens,
+    multifret_event_gap,
     rows_reversed,
     system_display_indices_for_bars,
     visual_row_indices,
@@ -118,6 +120,18 @@ def _cursor_display_map_for_bar(
     if not bar.chords:
         return [_scale_col(col, state.bar_width, content_width) for col in range(state.bar_width)]
     positions, grid_width = _chord_positions_distinct_for_nav(bar, state.bar_width, 4)
+    style = state.settings.get("style", "french")
+    event_min_gap = multifret_event_gap(
+        style=style,
+        policy=state.settings.get("multifretspacing", "collision-safe"),
+        has_multifret=bar_has_multifret_tokens(
+            bar,
+            style=style,
+            french_c_shape=state.settings.get("frenchc", "normal"),
+            label_mode=state.settings.get("fretlabelmode", "auto"),
+        ),
+    )
+    unit_anchor_min_gap = max(1, event_min_gap - 1)
     beatsnap_mode = state.settings.get("beatsnap", "off")
     time_setting = state.settings.get("time", "C")
     time_value = bar.time_sig or time_setting
@@ -133,7 +147,7 @@ def _cursor_display_map_for_bar(
             grid_width=grid_width,
             content_width=content_width,
             beats=beats,
-            min_gap=1 if state.settings.get("justify", "stretch") == "smart" else 0,
+            min_gap=unit_anchor_min_gap,
         )
         src_to_dest = trim_right_slack_for_onsets(
             src_to_dest,
@@ -143,13 +157,17 @@ def _cursor_display_map_for_bar(
         )
     elif state.settings.get("justify", "stretch") == "smart":
         groups = spread_flag_positions(positions, grid_width, min_gap=0)
-        src_to_dest = smart_group_map(positions, groups, content_width)
+        src_to_dest = smart_group_map(positions, groups, content_width, min_gap=event_min_gap)
     else:
         scaled_positions = [
             (_scale_col(pos, grid_width, content_width), denom, dot)
             for (pos, denom, dot) in positions
         ]
-        spread_positions = spread_flag_positions(scaled_positions, content_width, min_gap=1)
+        spread_positions = spread_flag_positions(
+            scaled_positions,
+            content_width,
+            min_gap=event_min_gap,
+        )
         ordered_raw = sorted(positions, key=lambda item: item[0])
         src_to_dest = {
             raw_col: scaled_col

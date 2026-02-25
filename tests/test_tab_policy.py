@@ -2,9 +2,11 @@ from oud.core.model import Bar, Chord, Note
 from oud.core.tab_policy import (
     TAB_NOTATION_PRESETS,
     apply_tabnotation_preset,
+    bar_has_multifret_tokens,
     fret_label,
     gliss_span_chars,
     hold_span_chars,
+    multifret_event_gap,
     rows_reversed,
     show_time_cue_for_bar,
     slur_span_chars,
@@ -30,10 +32,38 @@ def test_fret_label_french_alt_c() -> None:
     assert fret_label("french", 2, french_c_shape="alt") == "r"
 
 
+def test_fret_label_mode_overrides_style_default() -> None:
+    assert fret_label("italian", 10, label_mode="numeric") == "10"
+    assert fret_label("italian", 10, label_mode="letters") == "l"
+    assert fret_label("french", 12, label_mode="numeric") == "12"
+
+
+def test_multifret_spacing_policy_gap_matrix() -> None:
+    assert multifret_event_gap(style="french", policy="collision-safe", has_multifret=True) == 2
+    assert multifret_event_gap(style="italian", policy="tight", has_multifret=True) == 2
+    assert multifret_event_gap(style="italian", policy="separated", has_multifret=True) == 3
+    assert multifret_event_gap(style="italian", policy="collision-safe", has_multifret=True) == 4
+    assert multifret_event_gap(style="italian", policy="collision-safe", has_multifret=False) == 2
+
+
+def test_bar_has_multifret_tokens_detects_italian_two_digit_frets() -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 12, 0)])])
+    assert bar_has_multifret_tokens(bar, style="italian") is True
+    assert bar_has_multifret_tokens(bar, style="french") is False
+    assert bar_has_multifret_tokens(bar, style="italian", label_mode="letters") is False
+
+
 def test_string_label_uses_bass_fallback_when_tuning_missing() -> None:
     labels = ["g", "d", "a", "f", "c", "g", "", ""]
     assert string_label(actual=6, total_strings=8, tuning_labels=labels, basslabels="numeric") == " 7"
     assert string_label(actual=7, total_strings=8, tuning_labels=labels, basslabels="slash") == "//"
+
+
+def test_string_label_bass_policy_matrix_numeric_slash_tuning() -> None:
+    labels = ["g", "d", "a", "f", "c", "g", "d", "c"]
+    assert string_label(actual=6, total_strings=8, tuning_labels=labels, basslabels="numeric") == " 7"
+    assert string_label(actual=6, total_strings=8, tuning_labels=labels, basslabels="slash") == " /"
+    assert string_label(actual=6, total_strings=8, tuning_labels=labels, basslabels="tuning") == " d"
 
 
 def test_time_sig_inline_rows_formats_common_and_numeric() -> None:
@@ -127,3 +157,30 @@ def test_apply_tabnotation_preset_is_idempotent_and_overridable() -> None:
     settings["showdur"] = "off"
     assert settings["tabnotation"] == "full"
     assert settings["showdur"] == "off"
+
+
+def test_tabnotation_presets_cover_explicit_visibility_and_span_style_bundle() -> None:
+    settings: dict[str, str] = {}
+    assert apply_tabnotation_preset(settings, "minimal") is True
+    assert settings["showspans"] == "off"
+    assert settings["showtuplets"] == "off"
+    assert settings["showfingerings"] == "off"
+    assert settings["showornaments"] == "off"
+    assert settings["flagredundant"] == "on"
+    assert settings["timesigstyle"] == "symbol"
+    assert settings["tiecuestyle"] == "bracket"
+    assert settings["slurcuestyle"] == "paren"
+    assert settings["holdcuestyle"] == "angle"
+    assert settings["glisscuestyle"] == "hide"
+
+    assert apply_tabnotation_preset(settings, "full") is True
+    assert settings["showspans"] == "on"
+    assert settings["showtuplets"] == "on"
+    assert settings["showfingerings"] == "on"
+    assert settings["showornaments"] == "on"
+    assert settings["flagredundant"] == "off"
+    assert settings["timesigstyle"] == "fraction"
+    assert settings["tiecuestyle"] == "paren"
+    assert settings["slurcuestyle"] == "paren"
+    assert settings["holdcuestyle"] == "angle"
+    assert settings["glisscuestyle"] == "slash"

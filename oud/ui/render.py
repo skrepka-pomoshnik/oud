@@ -218,6 +218,7 @@ def render_piece(  # noqa: C901, PLR0912
     # Imported FT3 local extras render inline; they should not force reserve extra rows.
     _ = imported_extras_visible
     show_extras = settings.get("showspans", "off") == "on"
+    show_tuplets = settings.get("showtuplets", "off") == "on"
     show_tactus = settings.get("showtactus", "off") == "on"
     hide_redundant = settings.get("flagredundant", "on") == "on"
     double_stems = settings.get("flagstems", "single") == "double"
@@ -250,6 +251,7 @@ def render_piece(  # noqa: C901, PLR0912
         display_strings,
         show_dur,
         show_extras,
+        show_tuplets,
         show_tactus,
         double_stems,
     )
@@ -315,6 +317,7 @@ def render_piece(  # noqa: C901, PLR0912
         include_meta=include_meta,
         show_dur=show_dur,
         show_extras=show_extras,
+        show_tuplets=show_tuplets,
         show_tactus=show_tactus,
         hide_redundant=hide_redundant,
         double_stems=double_stems,

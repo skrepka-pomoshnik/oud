@@ -11,7 +11,10 @@ from oud.settings import DEFAULT_SETTINGS
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import render_piece
 from oud.ui.render_helpers import flag_symbols
-from tests.helpers_regression_cases import long_width_fill_piece
+from tests.helpers_regression_cases import (
+    long_width_fill_piece,
+    piece_with_unused_then_used_bass_rows,
+)
 
 
 def _render_lines(
@@ -61,6 +64,22 @@ def _render_lines(
         None,
     )
     return fb.snapshot().lines
+
+
+def _assert_basic_staff_invariants(
+    lines: list[str],
+    *,
+    width: int,
+    forbid_split_gap: bool = True,
+) -> None:
+    assert all(len(line) == width for line in lines)
+    staff_rows = [line for line in lines if "-" in line and "|" in line]
+    assert staff_rows
+    if forbid_split_gap:
+        assert all("|  |" not in row for row in staff_rows)
+    for row in staff_rows:
+        rightmost = max((idx for idx, ch in enumerate(row) if ch != " "), default=-1)
+        assert rightmost <= width - 2
 
 
 @pytest.mark.parametrize(
@@ -125,11 +144,24 @@ def test_render_matrix_flagstyle_tokens_visible(flagstyle: str, token: str) -> N
     assert token in "".join(flags)
 
 
-def test_render_matrix_bass_rows_show_only_when_used() -> None:
+@pytest.mark.parametrize(
+    "flagstyle",
+    ["standard", "board", "englishgrid", "continental", "italian", "thin", "capirola"],
+)
+def test_render_matrix_flagstyle_all_supported_styles_render_visible_cues(flagstyle: str) -> None:
+    positions = [(0, 16, True), (4, 32, False), (8, 16, False)]
+    stem, flag = flag_symbols(flagstyle)
+    flags = "".join(flag_row_style(positions, 16, stem=stem, flag=flag))
+    assert any(ch != " " for ch in flags)
+    assert stem in flags
+
+
+@pytest.mark.parametrize("basslabels", ["numeric", "slash", "tuning"])
+def test_render_matrix_bass_rows_show_only_when_used_across_label_policies(basslabels: str) -> None:
     piece = Piece(title="Bass", bars=[Bar()], strings=7)
     piece_used = Piece(
         title="Bass",
-        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(7, 0, 0)])])],
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(7, 0, 0)])], notes=[Note(7, 0, 0)])],
         strings=7,
     )
     settings = dict(DEFAULT_SETTINGS)
@@ -142,7 +174,7 @@ def test_render_matrix_bass_rows_show_only_when_used() -> None:
                 "showtactus": "off",
                 "layout": "packed",
                 "justify": "stretch",
-                "basslabels": "numeric",
+                "basslabels": basslabels,
                 "linelen": "0",
                 "barsperline": "0",
                 "maxbars": "0",
@@ -151,7 +183,34 @@ def test_render_matrix_bass_rows_show_only_when_used() -> None:
     without_bass = "\n".join(_render_lines(piece, settings))
     with_bass = "\n".join(_render_lines(piece_used, settings))
     assert " 7|" not in without_bass
-    assert " 7|" in with_bass
+    if basslabels == "numeric":
+        assert " 7|" in with_bass
+    elif basslabels == "slash":
+        assert " /|" in with_bass
+    else:
+        assert any(token in with_bass for token in (" d|", " c|", " g|"))
+
+
+def test_render_matrix_bass_rows_hidden_when_unused_in_system_even_if_later_used() -> None:
+    piece = piece_with_unused_then_used_bass_rows()
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "style": "french",
+            "showtuning": "on",
+            "showdur": "off",
+            "showspans": "off",
+            "showtactus": "off",
+            "layout": "packed",
+            "justify": "stretch",
+            "basslabels": "numeric",
+            "barsperline": "1",
+            "linelen": "0",
+            "maxbars": "1",
+        },
+    )
+    first_system = "\n".join(_render_lines(piece, settings, height=18))
+    assert " 7|" not in first_system
 
 
 def test_render_matrix_hold_marker_visible() -> None:
@@ -257,6 +316,86 @@ def test_render_matrix_lines_are_always_terminal_width(spacing_fill: str) -> Non
     )
     assert len(lines) == height
     assert all(len(line) == width for line in lines)
+
+
+@pytest.mark.parametrize("justify", ["compact", "smart", "stretch", "edge"])
+@pytest.mark.parametrize("beatsnap", ["off", "soft"])
+def test_render_matrix_justify_beatsnap_matrix_keeps_staff_invariants(
+    justify: str,
+    beatsnap: str,
+) -> None:
+    piece = long_width_fill_piece(bars_count=18, strings=7)
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "layout": "auto",
+            "justify": justify,
+            "beatsnap": beatsnap,
+            "showdur": "on",
+            "showspans": "on",
+            "showtactus": "on",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+            "flagredundant": "on",
+        },
+    )
+    width = 109
+    lines = _render_lines(
+        piece,
+        settings,
+        durations=build_durations(piece),
+        width=width,
+        height=30,
+    )
+    _assert_basic_staff_invariants(
+        lines,
+        width=width,
+        forbid_split_gap=(justify != "edge"),
+    )
+    staff_rows = [line for line in lines if "-" in line and "|" in line]
+    # Fill modes should still close at the padded right edge.
+    if justify != "compact":
+        assert any(row[width - 2] == "|" for row in staff_rows), (justify, beatsnap)
+
+
+@pytest.mark.parametrize("justify", ["compact", "smart", "stretch"])
+@pytest.mark.parametrize("beatsnap", ["off", "soft"])
+def test_render_matrix_invariants_first_on_dense_piece_across_modes(
+    justify: str,
+    beatsnap: str,
+) -> None:
+    piece = long_width_fill_piece(bars_count=10, strings=8)
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update(
+        {
+            "layout": "auto",
+            "justify": justify,
+            "beatsnap": beatsnap,
+            "showdur": "on",
+            "showspans": "on",
+            "showtactus": "on",
+            "flagredundant": "on",
+            "barsperline": "0",
+            "maxbars": "0",
+            "linelen": "0",
+        },
+    )
+    width = 97
+    lines = _render_lines(
+        piece,
+        settings,
+        durations=build_durations(piece),
+        width=width,
+        height=28,
+    )
+    _assert_basic_staff_invariants(lines, width=width, forbid_split_gap=True)
+    # Flag rows should not contain stems when staff is visually empty on the corresponding system rows.
+    # Lightweight invariant: no line that looks like a pure flag row should overflow frame.
+    flagish_rows = [line for line in lines if ("|" in line and "-" not in line and "\\" in line) or "=" in line]
+    for row in flagish_rows:
+        rightmost = max((idx for idx, ch in enumerate(row) if ch != " "), default=-1)
+        assert rightmost <= width - 2
 
 
 def test_render_matrix_smart_fill_reaches_right_edge_on_staff_rows() -> None:

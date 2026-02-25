@@ -8,12 +8,18 @@ def format_fret(
     style: str,
     fret: int,
     french_c_shape: str = "normal",
+    label_mode: str = "auto",
     **legacy: str,
 ) -> str:
     legacy_c = legacy.get("french_c") or legacy.get("frenchc")
     if legacy_c and french_c_shape == "normal":
         french_c_shape = legacy_c
-    return fret_label(style, fret, french_c_shape=french_c_shape)
+    return fret_label(
+        style,
+        fret,
+        french_c_shape=french_c_shape,
+        label_mode=label_mode,
+    )
 
 
 def bar_cells(
@@ -22,6 +28,7 @@ def bar_cells(
     bar_width: int,
     style: str,
     french_c_shape: str = "normal",
+    label_mode: str = "auto",
     **legacy: str,
 ) -> list[list[str]]:
     legacy_c = legacy.get("french_c") or legacy.get("frenchc")
@@ -37,7 +44,12 @@ def bar_cells(
         col = next_col[s_idx]
         if col >= bar_width:
             continue
-        text = format_fret(style, note.fret, french_c_shape=french_c_shape)
+        text = format_fret(
+            style,
+            note.fret,
+            french_c_shape=french_c_shape,
+            label_mode=label_mode,
+        )
         if len(text) > 2:
             text = text[-2:]
         for offset, ch in enumerate(text):
@@ -106,6 +118,7 @@ def bar_cells_from_chords(
     default_duration: int,
     style: str,
     french_c_shape: str = "normal",
+    label_mode: str = "auto",
     **legacy: str,
 ) -> list[list[str]]:
     legacy_c = legacy.get("french_c") or legacy.get("frenchc")
@@ -124,6 +137,7 @@ def bar_cells_from_chords(
                     style,
                     note.fret,
                     french_c_shape=french_c_shape,
+                    label_mode=label_mode,
                 )
     return cells
 

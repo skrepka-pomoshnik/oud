@@ -250,6 +250,7 @@ def auto_system_bar_plan_with_gaps(
         hide_redundant = state.settings.get("flagredundant", "on") == "on"
         style = state.settings.get("style", "french")
         french_c = state.settings.get("frenchc", "normal")
+        fretlabelmode = state.settings.get("fretlabelmode", "auto")
         spacing_fill = state.settings.get("justify", "stretch")
         min_widths = [
             _required_auto_display_width_for_bar(
@@ -259,6 +260,7 @@ def auto_system_bar_plan_with_gaps(
                 default_duration=4,
                 style=style,
                 french_c=french_c,
+                fretlabelmode=fretlabelmode,
                 show_dur=show_dur,
                 hide_redundant=hide_redundant,
                 barpad=barpad,

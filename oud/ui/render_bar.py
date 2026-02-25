@@ -13,9 +13,10 @@ def build_flag_rows(
     bar_width: int,
     barpad: int,
     flagstyle: str,
+    flaglean: str = "right",
     min_gap: int = 1,
 ) -> tuple[list[str], list[str]]:
-    stem, flag = flag_symbols(flagstyle)
+    stem, flag = flag_symbols(flagstyle, flaglean)
     if spacing_mode == "fixed":
         clamped = [
             (max(0, min(bar_width - 1, pos)), denom, dotted)

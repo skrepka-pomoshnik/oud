@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import pytest
+
 from oud.core.ft3 import build_durations
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.tab_policy import apply_tabnotation_preset
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import render_piece
-from tests.helpers_regression_cases import dense_flag_alignment_piece, regression_state
+from tests.helpers_regression_cases import (
+    dense_auftact_piece,
+    dense_flag_alignment_piece,
+    polyphony_analogue_piece,
+    regression_state,
+)
 
 
 def _render_state_lines(state, *, height: int = 24) -> list[str]:
@@ -64,30 +71,6 @@ def _simple_piece() -> Piece:
                 chords=[
                     Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 4, 0)]),
                     Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 5, 0)]),
-                ],
-            ),
-        ],
-        strings=6,
-        style="french",
-    )
-
-
-def _dense_auftact_piece(time_sig: str) -> Piece:
-    return Piece(
-        title="AuftactDense",
-        bars=[
-            Bar(
-                time_sig=time_sig,
-                chords=[
-                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(3, 2, 0)]),
-                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
-                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
-                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
-                ],
-            ),
-            Bar(
-                chords=[
-                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 0, 0)]),
                 ],
             ),
         ],
@@ -181,6 +164,64 @@ def test_tab_snippet_stem_beam_behavior_in_tablature_full_mode() -> None:
     assert all(row.rfind("|") == state.screen_width - 2 for row in staff_rows)
 
 
+@pytest.mark.parametrize("flagstyle", ["standard", "englishgrid", "continental"])
+@pytest.mark.parametrize("flagstems", ["single", "double"])
+@pytest.mark.parametrize("flaglean", ["right", "left"])
+def test_tab_snippet_stem_beam_analogue_flagshape_and_stem_rows_matrix(
+    flagstyle: str,
+    flagstems: str,
+    flaglean: str,
+) -> None:
+    piece = dense_flag_alignment_piece()
+    piece.bars[0].time_sig = None  # avoid cue rows confusing the stem-row count
+    state = regression_state(piece, justify="smart", width=96, bar_width=12)
+    apply_tabnotation_preset(state.settings, "full")
+    state.settings["flagstyle"] = flagstyle
+    state.settings["flagstems"] = flagstems
+    state.settings["flaglean"] = flaglean
+    lines = _render_state_lines(state, height=20)
+    staff_start = next(i for i, line in enumerate(lines) if line.count("|") >= 2 and "-" in line)
+    head = lines[:staff_start]
+    stem_like_rows = [
+        line
+        for line in head
+        if "|" in line
+        and "-" not in line
+        and any(ch in line for ch in ("|", "\\", "/", "=", "Γ", "F"))
+    ]
+    assert stem_like_rows, (flagstyle, flagstems, flaglean)
+    if flagstems == "double" and flagstyle == "standard":
+        assert len(stem_like_rows) >= 2, (flagstyle, flaglean, head)
+    if flagstyle == "standard":
+        joined = "\n".join(stem_like_rows)
+        if flaglean == "left":
+            assert "/" in joined
+        else:
+            assert "\\" in joined
+
+
+def test_tab_snippet_polyphony_in_tablature_analogue_two_voice_texture_stays_aligned() -> None:
+    state = regression_state(polyphony_analogue_piece(), justify="smart", width=88, bar_width=10)
+    apply_tabnotation_preset(state.settings, "full")
+    state.settings["layout"] = "auto"
+    state.settings["flagstyle"] = "standard"
+    state.settings["flagstems"] = "double"
+    lines = _render_state_lines(state, height=28)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    assert all(row.rfind("|") == state.screen_width - 2 for row in staff_rows)
+    # Mixed durations should produce visible flag/tail rows.
+    assert any(("\\" in line or "=" in line) for line in lines[:12])
+    # Two-voice-like texture should preserve multiple independent note rows.
+    note_rows = [
+        row for row in staff_rows
+        if any(ch.isalnum() for ch in row if ch not in {"|"})
+    ]
+    assert len(note_rows) >= 3
+    # No obvious split gaps or glued repeated noteheads in dense areas.
+    assert all("|  |" not in row for row in staff_rows)
+
+
 def test_tab_snippet_mid_system_meter_change_cue_fraction_style() -> None:
     piece = Piece(
         title="MeterChange",
@@ -259,6 +300,18 @@ def test_tab_snippet_tab_full_notation_sets_tie_cue_style() -> None:
     assert state.settings["tiecuestyle"] == "paren"
 
 
+def test_tab_snippet_tab_full_notation_shows_tuplet_cue() -> None:
+    state = regression_state(_simple_piece(), width=90, bar_width=10)
+    assert apply_tabnotation_preset(state.settings, "full") is True
+    state.annotations = {(0, 0): "³"}
+    lines = _render_state_lines(state, height=18)
+    cue_rows = [line for line in lines[:10] if "³" in line]
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert cue_rows
+    assert staff_rows
+    assert not any("³" in row for row in staff_rows)
+
+
 def test_tab_snippet_tab_full_notation_flagstyle_matrix_renders() -> None:
     for flagstyle in ("standard", "board", "englishgrid", "continental"):
         state = regression_state(dense_flag_alignment_piece(), justify="smart", width=100, bar_width=12)
@@ -285,7 +338,7 @@ def test_tab_snippet_time_cue_dense_auftact_no_glue_c_o_3() -> None:
         ("3/4", "numeric", "3"),
     ]
     for time_sig, style_mode, cue in cases:
-        state = regression_state(_dense_auftact_piece(time_sig), width=100, bar_width=10, justify="smart")
+        state = regression_state(dense_auftact_piece(time_sig), width=100, bar_width=10, justify="smart")
         state.settings["timesigstyle"] = style_mode
         lines = _render_state_lines(state, height=18)
         head = lines[:14]

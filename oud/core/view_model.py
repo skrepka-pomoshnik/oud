@@ -50,6 +50,7 @@ __all__ = [  # noqa: RUF022
     "_bars_fit",
     "_block_height",
     "_filter_redundant_positions",
+    "_beamified_chord_flag_positions",
     "_flag_positions_all",
     "_inline_bass_row",
     "_layout_block_rows",
@@ -552,6 +553,84 @@ def _filter_redundant_positions(
             filtered.append((col, denom, dot))
             prev_denom = denom
             prev_dot = dot
+    return filtered
+
+
+def _fallback_redundant_positions(
+    positions: list[tuple[int, int, bool]],
+    *,
+    hide_redundant: bool,
+    default_duration: int,
+) -> list[tuple[int, int, bool]]:
+    if hide_redundant:
+        return _filter_redundant_positions(positions, default_duration)
+    return positions
+
+
+def _beamified_chord_flag_positions(  # noqa: C901, PLR0912
+    bar: Bar,
+    positions: list[tuple[int, int, bool]],
+    *,
+    hide_redundant: bool = True,
+    default_duration: int = 4,
+) -> list[tuple[int, int, bool]]:
+    if not positions:
+        return []
+    chords = [chord for chord in (bar.chords or []) if chord.notes]
+    if not chords or len(chords) != len(positions):
+        return _fallback_redundant_positions(
+            positions,
+            hide_redundant=hide_redundant,
+            default_duration=default_duration,
+        )
+    if not any(chord.grid for chord in chords):
+        return _fallback_redundant_positions(
+            positions,
+            hide_redundant=hide_redundant,
+            default_duration=default_duration,
+        )
+
+    filtered: list[tuple[int, int, bool]] = []
+    prev_global_denom = default_duration
+    prev_global_dot = False
+    in_group = False
+    prev_group_denom: int | None = None
+    prev_group_dot: bool | None = None
+
+    for idx, (chord, pos) in enumerate(zip(chords, positions, strict=False)):
+        col, denom, dot = pos
+        marker = chord.grid
+        show = False
+        if idx == 0 and not hide_redundant:
+            show = True
+        if marker == "start":
+            in_group = True
+            prev_group_denom = None
+            prev_group_dot = None
+            show = True
+        elif marker in {"mid", "end"} and in_group:
+            if not hide_redundant or denom != prev_group_denom or dot != prev_group_dot:
+                show = True
+            if marker == "end":
+                in_group = False
+        else:
+            if in_group:
+                in_group = False
+            if (
+                idx == 0
+                or not hide_redundant
+                or denom != prev_global_denom
+                or dot != prev_global_dot
+            ):
+                show = True
+
+        if show:
+            filtered.append((col, denom, dot))
+        prev_global_denom = denom
+        prev_global_dot = dot
+        if marker in {"start", "mid", "end"}:
+            prev_group_denom = denom
+            prev_group_dot = dot
     return filtered
 
 

@@ -8,8 +8,10 @@ from oud.core.render_utils import (
 )
 from oud.core.spacing import auto_bar_plan
 from oud.core.tab_policy import (
+    bar_has_multifret_tokens,
     gliss_span_chars,
     hold_span_chars,
+    multifret_event_gap,
     show_time_cue_for_bar,
     slur_span_chars,
     system_display_indices_for_bars,
@@ -29,6 +31,7 @@ from oud.core.view_model import (
     _bar_number_for_index,
     _bar_ornaments,
     _bar_span_row,
+    _beamified_chord_flag_positions,
     _filter_redundant_positions,
     _flag_positions_all,
     _ft3_display_fingering_for_note,
@@ -254,14 +257,16 @@ def _overlay_inline_local_marks_on_display_row(  # noqa: C901
                 display_row_cells[right] = mark
 
 
-def _merge_span_rows_with_cue_priority(
+def _merge_span_rows_with_cue_priority(  # noqa: C901
     *,
     slur_row: list[str] | None,
     hold_row: list[str] | None,
     gliss_row: list[str] | None,
     tie_row: list[str] | None,
+    tuplet_row: list[str] | None = None,
 ) -> list[str]:
-    base_rows = [row for row in (slur_row, hold_row, gliss_row, tie_row) if row is not None]
+    source_rows = (slur_row, hold_row, gliss_row, tie_row, tuplet_row)
+    base_rows = [row for row in source_rows if row is not None]
     if not base_rows:
         return []
     width = len(base_rows[0])
@@ -269,7 +274,7 @@ def _merge_span_rows_with_cue_priority(
     for idx in range(width):
         chars = [
             row[idx]
-            for row in (slur_row, hold_row, tie_row)
+            for row in (slur_row, hold_row, tie_row, tuplet_row)
             if row is not None and idx < len(row) and row[idx] != " "
         ]
         if not chars:
@@ -279,6 +284,13 @@ def _merge_span_rows_with_cue_priority(
             continue
         if "(" in chars:
             out[idx] = "("
+            continue
+        if (
+            tuplet_row is not None
+            and idx < len(tuplet_row)
+            and tuplet_row[idx] != " "
+        ):
+            out[idx] = tuplet_row[idx]
             continue
         if tie_row is not None and idx < len(tie_row) and tie_row[idx] != " ":
             out[idx] = tie_row[idx]
@@ -292,6 +304,25 @@ def _merge_span_rows_with_cue_priority(
         if slur_row is not None and idx < len(slur_row) and slur_row[idx] != " ":
             out[idx] = slur_row[idx]
     return out
+
+
+_TUPLET_CUE_GLYPHS = {"²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"}
+
+
+def _split_tuplet_cues_from_annotations(
+    ann_cells: list[str],
+    *,
+    show_tuplets: bool,
+) -> tuple[list[str], list[str]]:
+    inline = list(ann_cells)
+    tuplet = [" " for _ in ann_cells]
+    for idx, ch in enumerate(ann_cells):
+        if ch not in _TUPLET_CUE_GLYPHS:
+            continue
+        inline[idx] = " "
+        if show_tuplets:
+            tuplet[idx] = ch
+    return inline, tuplet
 
 
 def _build_chord_scale_map(
@@ -455,6 +486,7 @@ def _required_auto_display_width_for_bar(
     default_duration: int,
     style: str,
     french_c: str,
+    fretlabelmode: str,
     show_dur: bool,
     hide_redundant: bool,
     barpad: int,
@@ -474,6 +506,7 @@ def _required_auto_display_width_for_bar(
         default_duration,
         style,
         french_c=french_c,
+        label_mode=fretlabelmode,
     )
     min_content = _required_flag_content_width(ordered_flags, min_gap=flag_gap)
     note_cols = _note_event_columns(cells, total_strings, grid_width)
@@ -654,6 +687,7 @@ def render_systems(  # noqa: C901, PLR0912
     include_meta: bool,
     show_dur: bool,
     show_extras: bool,
+    show_tuplets: bool,
     show_tactus: bool,
     hide_redundant: bool,
     double_stems: bool,
@@ -681,6 +715,7 @@ def render_systems(  # noqa: C901, PLR0912
             include_meta,
             show_dur,
             show_extras,
+            show_tuplets,
             show_tactus,
             double_stems,
         )
@@ -737,6 +772,7 @@ def render_systems(  # noqa: C901, PLR0912
                         default_duration=default_duration,
                         style=settings.get("style", "french"),
                         french_c=settings.get("frenchc", "normal"),
+                        fretlabelmode=settings.get("fretlabelmode", "auto"),
                         show_dur=show_dur and rows_proto["dur"] is not None,
                         hide_redundant=hide_redundant,
                         barpad=barpad,
@@ -785,6 +821,7 @@ def render_systems(  # noqa: C901, PLR0912
             include_meta,
             show_dur,
             show_extras,
+            show_tuplets,
             show_tactus,
             double_stems,
         )
@@ -805,6 +842,7 @@ def render_systems(  # noqa: C901, PLR0912
             abs_bar = bar_start + local_idx
             style = settings.get("style", "french")
             french_c = settings.get("frenchc", "normal")
+            fretlabelmode = settings.get("fretlabelmode", "auto")
             chord_positions_all: list[tuple[int, int, bool]] = []
             grid_width = bar_width
             if bar.chords:
@@ -820,6 +858,7 @@ def render_systems(  # noqa: C901, PLR0912
                     default_duration,
                     style,
                     french_c=french_c,
+                    label_mode=fretlabelmode,
                 )
             else:
                 cells = bar_cells(
@@ -828,6 +867,7 @@ def render_systems(  # noqa: C901, PLR0912
                     bar_width,
                     style,
                     french_c=french_c,
+                    label_mode=fretlabelmode,
                 )
             measures = settings.get("measures", "start")
             countdots = settings.get("countdots", "off")
@@ -893,6 +933,10 @@ def render_systems(  # noqa: C901, PLR0912
             ann_cells = _merge_mark_rows(
                 imported_ann,
                 _bar_annotations(annotations, abs_bar, grid_width),
+            )
+            ann_cells, tuplet_cells = _split_tuplet_cues_from_annotations(
+                ann_cells,
+                show_tuplets=show_tuplets,
             )
             local_orn = (
                 _bar_ornaments(ornaments, abs_bar, grid_width)
@@ -1043,6 +1087,13 @@ def render_systems(  # noqa: C901, PLR0912
                     tactus_row = _scale_row(tactus, content_width, " ")
                     tactus_row = pad_row(tactus_row, display_width, draw_pad)
                 safe_addstr(stdscr, row_start + (rows["tactus"] or 0), bar_x, "".join(tactus_row))
+            scaled_tuplet_row: list[str] | None = None
+            if rows.get("tuplet") is not None:
+                scaled_tuplet_row = tuplet_cells
+                if scale_bar:
+                    content_width = max(1, display_width - draw_pad * 2)
+                    scaled_tuplet_row = _scale_row(tuplet_cells, content_width, " ")
+                    scaled_tuplet_row = pad_row(scaled_tuplet_row, display_width, draw_pad)
             scaled_slur_row: list[str] | None = None
             scaled_tie_row: list[str] | None = None
             scaled_hold_row: list[str] | None = None
@@ -1076,16 +1127,29 @@ def render_systems(  # noqa: C901, PLR0912
                 positions = [
                     item for item in chord_positions_all if item[0] in visible_note_cols
                 ]
-                flag_positions = (
-                    _filter_redundant_positions(positions) if hide_redundant else positions
+                flag_positions = _beamified_chord_flag_positions(
+                    bar,
+                    positions,
+                    hide_redundant=hide_redundant,
+                    default_duration=default_duration,
                 )
                 ordered_flags = sorted(flag_positions, key=lambda item: item[0])
                 flagstyle = settings.get("flagstyle", "standard")
+                flaglean = settings.get("flaglean", "right")
                 dur_source_positions: list[tuple[int, int]] = []
                 if scale_bar:
                     content_width = max(1, display_width - draw_pad * 2)
-                    event_min_gap = 2
-                    unit_anchor_min_gap = 1
+                    event_min_gap = multifret_event_gap(
+                        style=style,
+                        policy=settings.get("multifretspacing", "collision-safe"),
+                            has_multifret=bar_has_multifret_tokens(
+                                bar,
+                                style=style,
+                                french_c_shape=french_c,
+                                label_mode=fretlabelmode,
+                            ),
+                        )
+                    unit_anchor_min_gap = max(1, event_min_gap - 1)
                     flag_min_gap = 1 if spacing_fill == "smart" else 0
                     beatsnap_mode = settings.get("beatsnap", "off")
                     if beatsnap_mode == "soft" and beats > 1:
@@ -1174,6 +1238,7 @@ def render_systems(  # noqa: C901, PLR0912
                         bar_width=content_width,
                         barpad=0,
                         flagstyle=flagstyle,
+                        flaglean=flaglean,
                         min_gap=flag_min_gap,
                     )
                     flag_cells = pad_row(flag_cells, display_width, draw_pad)
@@ -1200,6 +1265,7 @@ def render_systems(  # noqa: C901, PLR0912
                         bar_width=bar_width,
                         barpad=barpad,
                         flagstyle=flagstyle,
+                        flaglean=flaglean,
                     )
                     if draw_pad:
                         flag_cells = pad_row(flag_cells, display_width, draw_pad)
@@ -1213,7 +1279,7 @@ def render_systems(  # noqa: C901, PLR0912
                 # Generic row scaling can drop sparse cue endpoints. Re-overlay them using
                 # the same chord/display map so parenthesize/tie/slur cue punctuation survives.
                 if scale_bar:
-                    sparse_cues = {"(", ")", "[", "]", "<", ">", "/", "\\"}
+                    sparse_cues = {"(", ")", "[", "]", "<", ">", "/", "\\"} | _TUPLET_CUE_GLYPHS
                     if rows["ann"] is not None:
                         _overlay_sparse_mark_chars(
                             stdscr,
@@ -1284,10 +1350,31 @@ def render_systems(  # noqa: C901, PLR0912
                             row_cells=gliss_cells,
                             keep=sparse_cues,
                         )
+                    tuplet_row = rows.get("tuplet")
+                    gliss_row_idx = rows.get("gliss")
+                    tuplet_row_is_distinct = (
+                        tuplet_row is not None
+                        and tuplet_row not in {
+                            rows["slur"],
+                            rows["tie"],
+                            rows["hold"],
+                            gliss_row_idx,
+                        }
+                    )
+                    if tuplet_row_is_distinct:
+                        _overlay_sparse_mark_chars(
+                            stdscr,
+                            y=row_start + (tuplet_row or 0),
+                            bar_x=bar_x,
+                            draw_pad=draw_pad,
+                            grid_map=grid_map,
+                            row_cells=tuplet_cells,
+                            keep=sparse_cues,
+                        )
                 span_rows_to_draw: dict[int, list[str]] = {}
                 span_y_values = {
                     row_start + (rows[key] or 0)
-                    for key in ("slur", "hold", "gliss", "tie")
+                    for key in ("slur", "hold", "gliss", "tie", "tuplet")
                     if rows[key] is not None
                 }
                 for y in span_y_values:
@@ -1311,11 +1398,17 @@ def render_systems(  # noqa: C901, PLR0912
                         if rows.get("gliss") is not None and y == row_start + (rows["gliss"] or 0)
                         else None
                     )
+                    row_tuplet = (
+                        scaled_tuplet_row
+                        if rows.get("tuplet") is not None and y == row_start + (rows["tuplet"] or 0)
+                        else None
+                    )
                     span_rows_to_draw[y] = _merge_span_rows_with_cue_priority(
                         slur_row=row_slur,
                         hold_row=row_hold,
                         gliss_row=row_gliss,
                         tie_row=row_tie,
+                        tuplet_row=row_tuplet,
                     )
                 for y, merged_row in span_rows_to_draw.items():
                     safe_addstr(stdscr, y, bar_x, "".join(merged_row))
@@ -1344,6 +1437,12 @@ def render_systems(  # noqa: C901, PLR0912
                         (
                             tie_cells
                             if rows["tie"] is not None and y == row_start + (rows["tie"] or 0)
+                            else [" " for _ in range(grid_width)]
+                        ),
+                        (
+                            tuplet_cells
+                            if rows.get("tuplet") is not None
+                            and y == row_start + (rows["tuplet"] or 0)
                             else [" " for _ in range(grid_width)]
                         ),
                     )
@@ -1458,7 +1557,7 @@ def render_systems(  # noqa: C901, PLR0912
                 span_rows_to_draw: dict[int, list[str]] = {}
                 span_y_values = {
                     row_start + (rows[key] or 0)
-                    for key in ("slur", "hold", "gliss", "tie")
+                    for key in ("slur", "hold", "gliss", "tie", "tuplet")
                     if rows[key] is not None
                 }
                 for y in span_y_values:
@@ -1482,11 +1581,17 @@ def render_systems(  # noqa: C901, PLR0912
                         if rows.get("gliss") is not None and y == row_start + (rows["gliss"] or 0)
                         else None
                     )
+                    row_tuplet = (
+                        scaled_tuplet_row
+                        if rows.get("tuplet") is not None and y == row_start + (rows["tuplet"] or 0)
+                        else None
+                    )
                     span_rows_to_draw[y] = _merge_span_rows_with_cue_priority(
                         slur_row=row_slur,
                         hold_row=row_hold,
                         gliss_row=row_gliss,
                         tie_row=row_tie,
+                        tuplet_row=row_tuplet,
                     )
                 for y, merged_row in span_rows_to_draw.items():
                     safe_addstr(stdscr, y, bar_x, "".join(merged_row))
@@ -1519,6 +1624,7 @@ def render_systems(  # noqa: C901, PLR0912
                         dotted=dotted,
                     )
                 flagstyle = settings.get("flagstyle", "standard")
+                flaglean = settings.get("flaglean", "right")
                 flag_cells, stem_cells = build_flag_rows(
                     flag_positions,
                     spacing_mode="auto" if scale_bar else spacing_mode,
@@ -1526,6 +1632,7 @@ def render_systems(  # noqa: C901, PLR0912
                     bar_width=bar_width,
                     barpad=pad,
                     flagstyle=flagstyle,
+                    flaglean=flaglean,
                 )
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
                 if (

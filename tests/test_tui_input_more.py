@@ -91,9 +91,21 @@ def test_complete_set_value_uses_legit_options_only() -> None:
     assert text == "set timesigstyle=numeric"
     assert msg is None
 
+    text, msg = complete_command_text(state, "set multifretspacing=s")
+    assert text in {"set multifretspacing=separated", "set multifretspacing=s"}
+    assert msg is None or msg.startswith("Options:")
+
+    text, msg = complete_command_text(state, "set fretlabelmode=l")
+    assert text in {"set fretlabelmode=letters", "set fretlabelmode=l"}
+    assert msg is None or msg.startswith("Options:")
+
     text, msg = complete_command_text(state, "set beatsnap=")
     assert text == "set beatsnap="
     assert msg is not None and "off" in msg and "soft" in msg
+
+    text, msg = complete_command_text(state, "set flaglean=l")
+    assert text in {"set flaglean=left", "set flaglean=l"}
+    assert msg is None or msg.startswith("Options:")
 
     text, msg = complete_command_text(state, "set minimumfret=")
     assert text == "set minimumfret="

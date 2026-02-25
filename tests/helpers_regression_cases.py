@@ -4,6 +4,63 @@ from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.state import EditorState
 
 
+def _flatten_notes(chords: list[Chord]) -> list[Note]:
+    return [note for chord in chords for note in chord.notes]
+
+
+def mk_note(string: int, fret: int, midi_pitch: int = 0) -> Note:
+    return Note(string, fret, midi_pitch)
+
+
+def mk_chord(
+    note_type: int,
+    notes: list[tuple[int, int]] | list[Note],
+    *,
+    dotted: bool = False,
+    grid: str | None = None,
+) -> Chord:
+    chord_notes: list[Note] = []
+    for item in notes:
+        if isinstance(item, Note):
+            chord_notes.append(item)
+        else:
+            string, fret = item
+            chord_notes.append(mk_note(string, fret))
+    return Chord(note_type=note_type, dotted=dotted, grid=grid, notes=chord_notes)
+
+
+def mk_bar(
+    chords: list[Chord] | None = None,
+    *,
+    notes: list[Note] | None = None,
+    time_sig: str | None = None,
+    repeat: str | None = None,
+    barline: str | None = None,
+    dynamic: str | None = None,
+    fermata: bool = False,
+) -> Bar:
+    return Bar(
+        chords=chords or [],
+        notes=notes or [],
+        time_sig=time_sig,
+        repeat=repeat or "",
+        barline=barline or "|",
+        dynamic=dynamic,
+        fermata=fermata,
+    )
+
+
+def mk_piece(
+    bars: list[Bar],
+    *,
+    strings: int = 6,
+    title: str = "Synthetic",
+    style: str = "french",
+    tuning: str | None = None,
+) -> Piece:
+    return Piece(title=title, bars=bars, strings=strings, style=style, tuning=tuning)
+
+
 def regression_state(
     piece: Piece,
     *,
@@ -48,7 +105,7 @@ def dense_flag_alignment_piece() -> Piece:
         ],
         time_sig="C",
     )
-    return Piece(title="Dense", bars=[bar], strings=6, style="french")
+    return mk_piece([bar], title="Dense")
 
 
 def piece_with_unused_then_used_bass_rows() -> Piece:
@@ -137,6 +194,30 @@ def repeat_and_meter_change_piece() -> Piece:
     return Piece(title="RepeatMeter", bars=bars, strings=6, style="french")
 
 
+def dense_auftact_piece(time_sig: str) -> Piece:
+    return Piece(
+        title="AuftactDense",
+        bars=[
+            Bar(
+                time_sig=time_sig,
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(3, 2, 0)]),
+                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                ],
+            ),
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 0, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+
+
 def mapped_column_transition_piece() -> Piece:
     # Mimics the Earl-of-Essex type failure: one row with an early 8th -> 16th shift.
     bar = Bar(
@@ -150,6 +231,183 @@ def mapped_column_transition_piece() -> Piece:
         time_sig="O",
     )
     return Piece(title="MappedCols", bars=[bar], strings=6, style="french")
+
+
+def import_fixture_extra_courses_piece() -> Piece:
+    """Synthetic parsed-piece fixture with fretted 7th/8th-course notes."""
+    bar1_chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(7, 2, 0)]),
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 1, 0), Note(8, 4, 0)]),
+    ]
+    bar2_chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(7, 0, 0)]),
+    ]
+    return Piece(
+        title="Import8Course",
+        bars=[
+            Bar(
+                time_sig="C",
+                chords=bar1_chords,
+                notes=_flatten_notes(bar1_chords),
+            ),
+            Bar(
+                chords=bar2_chords,
+                notes=_flatten_notes(bar2_chords),
+            ),
+        ],
+        strings=8,
+        style="french",
+        tuning="g2c3f3a3d4g4d2c2",
+    )
+
+
+def import_fixture_multisection_tab_piece() -> Piece:
+    """Synthetic parsed TAB fixture with section-like metadata and bar markers."""
+    bar0_chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+    ]
+    bar1_chords = [
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 3, 0)]),
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 1, 0)]),
+    ]
+    bar2_chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+    ]
+    bar3_chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 4, 0)])]
+    piece = Piece(
+        title="MultiSection",
+        composer="Anon",
+        bars=[
+            Bar(
+                time_sig="C",
+                repeat=".:",
+                chords=bar0_chords,
+                notes=_flatten_notes(bar0_chords),
+            ),
+            Bar(
+                chords=bar1_chords,
+                notes=_flatten_notes(bar1_chords),
+            ),
+            Bar(
+                time_sig="3/4",
+                chords=bar2_chords,
+                notes=_flatten_notes(bar2_chords),
+            ),
+            Bar(
+                repeat=":.",
+                barline="||",
+                chords=bar3_chords,
+                notes=_flatten_notes(bar3_chords),
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    piece.section_annotations = {"2": "Section B", "4": "Fine"}
+    return piece
+
+
+def import_fixture_no_break_header_body_piece() -> Piece:
+    """Synthetic parsed result for TAB source that had no blank header/body separator."""
+    chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+    ]
+    return Piece(
+        title="NoSeparator",
+        composer="Composer",
+        bars=[
+            Bar(
+                time_sig="C",
+                chords=chords,
+                notes=_flatten_notes(chords),
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+
+
+def import_fixture_meter_change_mid_system_piece() -> Piece:
+    """Synthetic parsed piece with meter changes intended to occur mid rendered system."""
+    bar0 = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+    ]
+    bar1 = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 0, 0)]),
+    ]
+    bar2 = [
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 3, 0)]),
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 4, 0)]),
+        Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+    ]
+    bar3 = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, 0, 0)]),
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+    ]
+    bars = [
+        Bar(
+            time_sig="C",
+            chords=bar0,
+            notes=_flatten_notes(bar0),
+        ),
+        Bar(
+            chords=bar1,
+            notes=_flatten_notes(bar1),
+        ),
+        Bar(
+            time_sig="O",
+            chords=bar2,
+            notes=_flatten_notes(bar2),
+        ),
+        Bar(
+            chords=bar3,
+            notes=_flatten_notes(bar3),
+        ),
+    ]
+    return Piece(title="MeterMidSystem", bars=bars, strings=6, style="french")
+
+
+def polyphony_analogue_piece() -> Piece:
+    """Synthetic two-voice-like texture on one tab staff (interleaved rhythms/crossings)."""
+    bars = [
+        Bar(
+            time_sig="C",
+            chords=[
+                # lower "voice" held-like quarter + upper moving line
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(5, 0, 0), Note(2, 3, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 4, 0), Note(4, 2, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 0, 0)]),
+            ],
+        ),
+        Bar(
+            chords=[
+                # crossing-like texture: upper row rests while middle/lower move, then rejoin
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 2, 0), Note(6, 1, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 4, 0)]),
+                Chord(note_type=6, dotted=False, grid=None, notes=[Note(4, 3, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 1, 0), Note(5, 2, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 0, 0)]),
+            ],
+        ),
+        Bar(
+            chords=[
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(4, 1, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 2, 0)]),
+                Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 3, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 4, 0), Note(6, 0, 0)]),
+            ],
+        ),
+    ]
+    return Piece(title="PolyphonyAnalogue", bars=bars, strings=6, style="french")
 
 
 def stem_alignment_problem_piece() -> Piece:

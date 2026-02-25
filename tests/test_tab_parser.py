@@ -1,4 +1,33 @@
+import random
+import string
+
+import pytest
+
 from oud.core.tab_parser import load_tab, load_tab_data
+
+
+def _piece_signature(piece) -> tuple:
+    return (
+        piece.title,
+        piece.author,
+        piece.composer,
+        piece.style,
+        tuple(
+            (
+                bar.time_sig,
+                tuple(
+                    (
+                        chord.note_type,
+                        chord.dotted,
+                        chord.grid,
+                        tuple((note.string, note.fret) for note in chord.notes),
+                    )
+                    for chord in bar.chords
+                ),
+            )
+            for bar in piece.bars
+        ),
+    )
 
 
 def test_load_tab_simple(tmp_path) -> None:
@@ -114,3 +143,142 @@ def test_load_tab_without_header_body_separator(tmp_path) -> None:
     assert piece.composer == "Composer"
     assert piece.bars
     assert len(piece.bars[0].chords) == 2
+
+
+def test_load_tab_malformed_fuzz_smoke_does_not_crash(tmp_path) -> None:
+    rnd = random.Random(1337)  # noqa: S311 - deterministic parser fuzz smoke seed
+    alphabet = string.ascii_letters + string.digits + "{}[]#:/|-% \t"
+    for idx in range(40):
+        lines = ["{Fuzz}"]
+        for _ in range(rnd.randint(1, 12)):
+            line_len = rnd.randint(0, 18)
+            lines.append("".join(rnd.choice(alphabet) for _ in range(line_len)))
+        path = tmp_path / f"fuzz_{idx}.tab"
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Parser should degrade gracefully on malformed input and never crash.
+        piece = load_tab(str(path))
+        assert piece is not None
+
+
+@pytest.mark.parametrize(
+    "body_lines",
+    [
+        # malformed hash flag/rhythm tokens
+        ["b", "#x ???", "#999", "e"],
+        # broken rhythm prefixes + junk spacing
+        ["b", "S", "  ", "\t\t", "x  --", "e"],
+        # repeated section/bar markers and stray comment-ish syntax
+        ["b", "%bad", "b", "e", "e", "b", "0a", "e"],
+        # mixed malformed whitespace around plausible content
+        ["b", "   0a   ", "", " \t1b\t ", "   ", "e"],
+        # impossible duration-like noise around note rows
+        ["b", "##2", "###", "r??", "0----", "e"],
+    ],
+)
+def test_load_tab_malformed_flags_rhythms_whitespace_cases_do_not_crash(tmp_path, body_lines) -> None:
+    path = tmp_path / "malformed_cases.tab"
+    path.write_text("{Malformed}\n" + "\n".join(body_lines) + "\n", encoding="utf-8")
+    piece = load_tab(str(path))
+    assert piece is not None
+
+
+def test_load_tab_whitespace_comment_option_noise_preserves_parse_signature(tmp_path) -> None:
+    canonical_lines = [
+        "{Norm/Composer}",
+        "#time: Sc",
+        "b",
+        "0a   ",
+        "1 b  ",
+        "x c  ",
+        "e",
+    ]
+    noisy_lines = [
+        "{Norm/Composer}",
+        "",
+        "-C",
+        "#time: Sc",
+        "% ignored comment",
+        "b",
+        "0a   ",
+        "",
+        "1 b  ",
+        "  ",  # blank-ish line
+        "% another comment",
+        "x c  ",
+        "\t",
+        "e",
+        "",
+    ]
+    canonical = tmp_path / "canonical.tab"
+    noisy = tmp_path / "noisy.tab"
+    canonical.write_text("\n".join(canonical_lines) + "\n", encoding="utf-8")
+    noisy.write_text("\n".join(noisy_lines) + "\n", encoding="utf-8")
+    assert _piece_signature(load_tab(str(noisy))) == _piece_signature(load_tab(str(canonical)))
+
+
+def test_load_tab_rhythm_alias_x_matches_explicit_repeat_flag(tmp_path) -> None:
+    alias = tmp_path / "alias.tab"
+    explicit = tmp_path / "explicit.tab"
+    alias.write_text(
+        "\n".join(
+            [
+                "{Alias}",
+                "b",
+                "1a",
+                "x b",
+                "x  c",
+                "e",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    explicit.write_text(
+        "\n".join(
+            [
+                "{Alias}",
+                "b",
+                "1a",
+                "1 b",
+                "1  c",
+                "e",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert _piece_signature(load_tab(str(alias))) == _piece_signature(load_tab(str(explicit)))
+
+
+def test_load_tab_y_prefix_normalization_preserves_semantics(tmp_path) -> None:
+    prefixed = tmp_path / "prefixed.tab"
+    normalized = tmp_path / "normalized.tab"
+    prefixed.write_text(
+        "\n".join(
+            [
+                "{YPrefix}",
+                "b",
+                "ya",
+                "Y1b",
+                "Y2c",
+                "e",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    normalized.write_text(
+        "\n".join(
+            [
+                "{YPrefix}",
+                "b",
+                "0a",
+                "1b",
+                "2c",
+                "e",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert _piece_signature(load_tab(str(prefixed))) == _piece_signature(load_tab(str(normalized)))

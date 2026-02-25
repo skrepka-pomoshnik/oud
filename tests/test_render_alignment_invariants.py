@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from itertools import pairwise
+
 import pytest
 
 from oud.core.ft3 import build_durations
@@ -12,7 +14,11 @@ from oud.ui.render import render_piece
 from oud.ui.render_helpers import apply_overrides
 from oud.ui.render_system import _build_chord_scale_map, _chord_positions_distinct, _scale_chord_row
 from tests.helpers_regression_cases import (
+    dense_auftact_piece,
     dense_flag_alignment_piece,
+    mk_bar,
+    mk_chord,
+    mk_piece,
     multi_bar_spacing_piece,
     piece_with_unused_then_used_bass_rows,
     regression_state,
@@ -236,6 +242,30 @@ def test_synthetic_dense_bar_flags_anchor_to_note_onsets_strict(justify: str) ->
         assert any(ch not in ("-", " ", "|") for ch in col_glyphs), (justify, col, col_glyphs)
 
 
+@pytest.mark.parametrize("time_sig", ["C", "O", "3/4"])
+@pytest.mark.parametrize("justify", ["smart", "stretch"])
+def test_geometry_time_cue_auftact_dense_first_beats_no_overlap(
+    time_sig: str,
+    justify: str,
+) -> None:
+    state = regression_state(dense_auftact_piece(time_sig), justify=justify, width=100, bar_width=10)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = justify
+    state.settings["beatsnap"] = "soft"
+    state.settings["flagredundant"] = "on"
+    state.settings["timesigstyle"] = "numeric" if time_sig == "3/4" else "symbol"
+    lines = _render_state_lines(state, height=20)
+    staff_rows = [line for line in lines if "-" in line and line.count("|") >= 2]
+    assert staff_rows
+    first_staff = staff_rows[0]
+    first_bar_start = first_staff.find("|") + 1
+    first_bar_end = first_staff.find("|", first_bar_start)
+    assert first_bar_end > first_bar_start
+    seg = first_staff[first_bar_start:first_bar_end]
+    # Cue is in the auftact lane and must not glue to first note glyph in dense starts.
+    assert "Ca" not in seg and "Oa" not in seg and "3a" not in seg, (time_sig, justify, seg)
+
+
 def _render_state_lines(state, *, height: int = 24) -> list[str]:
     fb = FrameBuffer(height, state.screen_width or 120)
     render_piece(
@@ -375,6 +405,92 @@ def test_synthetic_final_frame_smart_stem_anchors_have_notes_under() -> None:
                 continue
             under = [row[col] for row in seg_staff]
             assert any(g not in ("-", " ", "|") for g in under), (i, col, seg_flag, under)
+
+
+def test_geometry_double_stem_rows_anchor_to_dense_chords() -> None:
+    piece = mk_piece(
+        [
+            mk_bar(
+                [
+                    mk_chord(6, [(1, 0), (3, 2)]),
+                    mk_chord(6, [(2, 1), (4, 0)]),
+                    mk_chord(5, [(1, 2), (5, 1)]),
+                    mk_chord(6, [(3, 3), (6, 0)]),
+                    mk_chord(5, [(1, 4), (2, 2)]),
+                ],
+                time_sig="C",
+            ),
+        ],
+        strings=6,
+        title="DoubleStemDense",
+    )
+    state = regression_state(piece, justify="smart", width=100, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["showdur"] = "off"
+    state.settings["showspans"] = "off"
+    state.settings["showtactus"] = "off"
+    state.settings["flagstems"] = "double"
+    lines = _render_state_lines(state, height=18)
+    staff_start = next(
+        idx for idx, line in enumerate(lines) if line.count("|") >= 2 and line.count("-") >= 8
+    )
+    flag_row = lines[staff_start - 2]
+    stem_row = lines[staff_start - 1]
+    staff_rows = lines[staff_start : staff_start + 6]
+    assert "|" in flag_row
+    assert "|" in stem_row
+    barlines = [idx for idx, ch in enumerate(staff_rows[0]) if ch == "|"]
+    assert len(barlines) >= 2
+    for x0, x1 in pairwise(barlines):
+        seg_flag = flag_row[x0 + 1 : x1]
+        seg_stem = stem_row[x0 + 1 : x1]
+        seg_staff = [row[x0 + 1 : x1] for row in staff_rows]
+        for col, ch in enumerate(seg_stem):
+            if ch != "|":
+                continue
+            assert seg_flag[col] == "|" or seg_flag[col] in {"\\", "/", "="}
+            under = [row[col] for row in seg_staff]
+            assert any(g not in ("-", " ", "|") for g in under), (col, seg_flag, seg_stem, under)
+
+
+def test_geometry_tie_and_gliss_cues_on_chords_preserve_noteheads() -> None:
+    piece = mk_piece(
+        [
+            mk_bar(
+                [
+                    mk_chord(5, [(1, 10), (3, 2), (6, 0)]),
+                    mk_chord(6, [(1, 11), (4, 1)]),
+                    mk_chord(6, [(1, 12), (2, 3), (5, 0)]),
+                    mk_chord(5, [(1, 10), (3, 4)]),
+                ],
+                time_sig="O",
+            ),
+            mk_bar(
+                [mk_chord(4, [(2, 2), (4, 0)])],
+            ),
+        ],
+        strings=6,
+        title="SpanChordGeom",
+    )
+    state = regression_state(piece, justify="smart", width=110, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["showspans"] = "on"
+    state.settings["showtactus"] = "off"
+    state.settings["showdur"] = "off"
+    state.settings["glisscuestyle"] = "slash"
+    state.settings["tiecuestyle"] = "bracket"
+    state.settings["tienoteheads"] = "parenthesize"
+    state.settings["style"] = "french"
+    state.ties = [(0, 0, 2)]
+    state.glisses = [(0, 1, 3)]
+    lines = _render_state_lines(state, height=20)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    # Multi-digit French frets 10/11/12 => l/m/n should survive cue pressure.
+    text = "\n".join(lines)
+    assert "l" in text and "m" in text and "n" in text
+    # Tie/gliss cues should also be visible.
+    assert any(ch in text for ch in ["[", "]", "(", ")", "/", "\\"])
 
 
 @pytest.mark.parametrize("justify", ["smart", "stretch"])

@@ -151,16 +151,18 @@ def render_info(
     safe_addstr(stdscr, height - 1, 0, clean_text(status), status_attr)
 
 
-def flag_symbols(style: str) -> tuple[str, str]:
+def flag_symbols(style: str, flaglean: str = "right") -> tuple[str, str]:
+    lean = "left" if (flaglean or "right").strip().lower() == "left" else "right"
+    slash_flag = "/" if lean == "left" else "\\"
     symbols = {
-        "italian": ("I", "/"),
-        "thin": ("|", "/"),
+        "italian": ("I", slash_flag),
+        "thin": ("|", slash_flag),
         "board": ("|", "="),
         "englishgrid": ("|", "-"),
         "continental": ("Γ", "F"),
         "capirola": ("I", "-"),
     }
-    return symbols.get(style, ("|", "\\"))
+    return symbols.get(style, ("|", slash_flag))
 
 
 def bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:

@@ -1,3 +1,5 @@
+import pytest
+
 from oud.core.model import Bar, Piece
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
@@ -137,3 +139,32 @@ def test_jk_fullscreen_alternating_bass_rows_keeps_cursor_visible_and_scrolls() 
         handle_normal(state, ord("K"))
         ensure_cursor_visible(state, state.screen_width, state.screen_height)
         assert 0 <= state.cursor_string < state.piece.strings
+
+
+@pytest.mark.parametrize("justify", ["compact", "smart", "stretch", "edge"])
+@pytest.mark.parametrize("beatsnap", ["off", "soft"])
+def test_jk_mixed_spacing_modes_with_hidden_bass_rows_keep_cursor_visible(
+    justify: str,
+    beatsnap: str,
+) -> None:
+    base = piece_with_unused_then_used_bass_rows()
+    piece = Piece(title="T", bars=base.bars * 8, strings=7, style="french")
+    state = regression_state(piece, width=96, bar_width=10, justify=justify)
+    state.settings["layout"] = "auto"
+    state.settings["justify"] = justify
+    state.settings["beatsnap"] = beatsnap
+    state.settings["scrollmode"] = "smooth"
+    state.settings["tuning"] = "g2c3f3a3d4g4d2"
+    state.screen_height = 24
+    state.cursor_bar = 1
+    state.cursor_string = 6  # visible only in every second system
+    state.cursor_col = 0
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+
+    # Move down then up across alternating systems; cursor must remain visible/clamped.
+    for key in (ord("J"), ord("J"), ord("K"), ord("K")):
+        handle_normal(state, key)
+        ensure_cursor_visible(state, state.screen_width, state.screen_height)
+        assert 0 <= state.cursor_bar < len(state.piece.bars), (justify, beatsnap)
+        assert 0 <= state.cursor_string < state.piece.strings, (justify, beatsnap)
+        assert state.bar_offset >= 0, (justify, beatsnap)
