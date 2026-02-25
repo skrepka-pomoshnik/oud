@@ -49,14 +49,15 @@ P2 (Notation + formats)
   - [x] Add broader collision tests for gliss/slur lines against fret glyphs and parenthesized noteheads (including system-break cases).
 - [ ] MusicXML notation parity: fermata/fingering/pluck + richer barline/repeat/time symbols.
 - [ ] FT3 -> LilyPond/PDF export parity track: preserve imported FT3 semantics in `.ly`/PDF output.
-  - [ ] Export imported FT3 fingerings/ornaments (when present) to LilyPond tablature annotations.
-  - [ ] Export FT3 repeat/barline markers with correct LilyPond barline/repeat constructs across real corpus cases.
-  - [ ] Export FT3 meter changes (`C/O/fractions`) with configurable style mapping parity.
-  - [ ] Add real-file FT3 -> `.ly` smoke matrix (parse + export) and `:pdf` command integration checks.
+  - [x] Export imported FT3 fingerings/ornaments (when present) to LilyPond tablature annotations.
+  - [x] Export FT3 repeat/barline markers with correct LilyPond barline/repeat constructs across real corpus cases.
+  - [x] Export FT3 meter changes (`C/O/fractions`) with configurable style mapping parity.
+  - [x] Add real-file FT3 -> `.ly` smoke matrix (parse + export) and `:pdf` command integration checks.
+  - [x] Improve FT3 extras export in `tabnotation=full` with cleaner LilyPond-native attachments (less clutter than generic tiny markups).
 - [ ] Add Spanish tab support (Italian-like with inverted string order).
 - [ ] LilyPond tab parity audit matrix: map supported/unsupported TabStaff features and track parity status per feature.
-  - [ ] Keep `DOCS` parity table current as features land (status + linked tests).
-  - [ ] Add “acceptance examples” column (synthetic case names) for faster regression triage.
+  - [x] Keep `DOCS` parity table current as features land (status + linked tests).
+  - [x] Add “acceptance examples” column (synthetic case names) for faster regression triage.
 
 P3 (Maintainability + advanced parity)
 - [ ] Split `command_ops.py` into small domain modules with thin router.

@@ -588,6 +588,35 @@ def test_cmd_midi_lilypond_pdf_play_source(
     cmd.cmd_tool(state, "gridflags", str(tmp_path / "cfg.toml"))
     cmd.cmd_tool(state, "comments", str(tmp_path / "cfg.toml"))
     cmd.cmd_tool(state, "reflow", str(tmp_path / "cfg.toml"))
+
+
+def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    src = Path("lutemusic/czarna_krowa.ft3")
+    if not src.exists():
+        pytest.skip("local FT3 corpus file not available")
+    state = _state()
+    state.path = str(src)
+    called: dict[str, str] = {}
+
+    def _export_lilypond(path: str, *_args: object, **_kwargs: object) -> str:
+        called["ly"] = path
+        return f"Wrote {path}"
+
+    def _print_pdf(path: str) -> str:
+        called["pdf"] = path
+        return f"Printed {Path(path).with_suffix('.pdf')}"
+
+    monkeypatch.setattr(cmd_ops, "export_lilypond", _export_lilypond)
+    monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
+    monkeypatch.setattr(cmd_ops, "save_settings", lambda *_args, **_kwargs: None)
+
+    cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
+    assert called["ly"].endswith("czarna_krowa.ly")
+    assert called["pdf"].endswith("czarna_krowa.ly")
+    assert state.message.endswith("czarna_krowa.pdf")
     cmd.cmd_tool(state, "unknown", str(tmp_path / "cfg.toml"))
     assert state.message == "Tool: reflow|gridflags|flagstyle|comments"
     cmd.cmd_barline(state, "thin")

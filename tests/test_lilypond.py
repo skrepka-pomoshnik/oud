@@ -45,6 +45,8 @@ def test_export_lilypond_tabnotation_full_emits_tab_full_notation(tmp_path) -> N
     )
     text = path.read_text(encoding="utf-8")
     assert "\\tabFullNotation" in text
+    assert r"\set fingeringOrientations = #'(left)" in text
+    assert r"\set strokeFingerOrientations = #'(right)" in text
 
 
 def test_export_lilypond_extends_6_course_tuning_for_8_course_piece_in_low_to_high_order(
@@ -176,7 +178,7 @@ def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -
                 notes=[
                     Note(
                         1,
-                        0,
+                        1,
                         0,
                         left_fingering="4",
                         right_fingering="thumb",
@@ -216,7 +218,86 @@ def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -
     )
     text = path.read_text(encoding="utf-8")
     assert "\\tiny" in text
-    assert '"4 #"' in text or '"# 4"' in text
+    assert '"#"' in text
+    assert '"t"' in text
+    assert "-4" in text
+
+
+def test_export_lilypond_uses_native_fingering_attachments_for_numeric_ft3_fingerings(
+    tmp_path,
+) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[Note(1, 2, 0, left_fingering="4", right_fingering="2")],
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "native_finger.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "showfingerings": "on",
+            "showornaments": "off",
+            "ft3fingering": "both",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "-4" in text
+    assert r"\rightHandFinger #2" in text
+    assert "\\tiny" not in text
+
+
+def test_export_lilypond_ft3_extras_collects_multiple_notes_and_suppresses_open_lh_digits(
+    tmp_path,
+) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[
+                    Note(1, 0, 0, left_fingering="1", right_fingering="thumb", left_ornament="#"),
+                    Note(2, 2, 0, left_fingering="4", right_fingering="2", left_ornament="dot-left"),
+                    Note(3, 3, 0, left_fingering="4", right_fingering="2", left_ornament="dot-left"),
+                ],
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "extras_multi.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "showfingerings": "on",
+            "showornaments": "on",
+            "ft3fingering": "both",
+            "ft3ornaments": "left",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    # Open-string LH "1" is suppressed; chord-level export aggregates/dedups remaining cues.
+    assert '"1"' not in text
+    assert '-4\\rightHandFinger #2' in text or '-4 \\rightHandFinger #2' in text
+    assert '"# ."' in text or '". #"' in text
+    # Thumb stays as fallback markup; numeric RH fingering is exported natively.
     assert '"t"' in text
 
 
@@ -400,6 +481,46 @@ def test_export_lilypond_respects_timesigstyle_display_intent(tmp_path) -> None:
     assert "\\defaultTimeSignature" in text
 
 
+def test_export_lilypond_ft3_meter_mapping_and_midpiece_changes_synthetic(tmp_path) -> None:
+    piece = Piece(
+        title="Meters",
+        strings=6,
+        bars=[
+            Bar(time_sig="O", chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+            Bar(time_sig="C|", chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])]),
+            Bar(time_sig="6/8", chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)])]),
+        ],
+    )
+    path = tmp_path / "meters.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "timesigstyle": "symbol"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\defaultTimeSignature" in text
+    assert "\\time 3/4" in text
+    assert "\\time 2/2" in text
+    assert "\\time 6/8" in text
+    # no duplicate \time for bar 2 with inherited meter
+    assert text.count("\\time 3/4") == 1
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2", "timesigstyle": "fraction"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\numericTimeSignature" in text
+
+
 def test_export_lilypond_emits_midpiece_time_changes_for_real_ft3_if_available(tmp_path) -> None:
     src = Path("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
     if not src.exists():
@@ -471,3 +592,38 @@ def test_export_lilypond_real_ft3_repeat_barline_matrix_if_available(
     text = path.read_text(encoding="utf-8")
     for token in expected_tokens:
         assert token in text
+
+
+@pytest.mark.parametrize(
+    "src_name",
+    [
+        "wu_sol_ich_mich_hin_keren.ft3",
+        "czarna_krowa.ft3",
+        "can_she_excuse.ft3",
+        "05_a_fancy.ft3",
+        "23a_frogg_galliard_2.ft3",
+    ],
+)
+def test_export_lilypond_real_ft3_smoke_matrix_if_available(tmp_path, src_name: str) -> None:
+    src = Path("lutemusic") / src_name
+    if not src.exists():
+        pytest.skip("local FT3 corpus file not available")
+    piece = load_ft3(str(src))
+    path = tmp_path / f"{src.stem}.ly"
+    msg = export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations=build_durations(piece),
+        bar_width=12,
+        settings={
+            "tuning": "g2c3f3a3d4g4",
+            "style": "french",
+            "key": piece.key or "C",
+        },
+    )
+    assert msg.startswith("Wrote ")
+    text = path.read_text(encoding="utf-8")
+    assert "\\new TabStaff" in text
+    assert "stringTunings" in text
+    assert "\\bar " in text

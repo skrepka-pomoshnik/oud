@@ -299,17 +299,74 @@ def _first_note_attr(notes, attr: str) -> str | None:
     return None
 
 
-def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C901, PLR0912
-    if settings.get("tabnotation", "minimal") != "full":
+def _dedup_keep_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        if value and value not in seen:
+            seen.add(value)
+            out.append(value)
+    return out
+
+
+def _ft3_show_fingerings(settings: dict[str, str]) -> bool:
+    return (
+        settings.get("showfingerings", settings.get("showft3extras", "on")) == "on"
+        and settings.get("ft3fingering", "both") != "off"
+    )
+
+
+def _ft3_show_ornaments(settings: dict[str, str]) -> bool:
+    return (
+        settings.get("showornaments", settings.get("showft3extras", "on")) == "on"
+        and settings.get("ft3ornaments", "both") != "off"
+    )
+
+
+def _ft3_full_mode(settings: dict[str, str]) -> bool:
+    return settings.get("tabnotation", "minimal") == "full"
+
+
+def _note_left_fingering_text_for_export(note) -> str | None:
+    value = getattr(note, "left_fingering", None)
+    if not value:
+        return None
+    # Same sanity rule as TUI: LH 1-4 on open strings is usually not useful,
+    # and often reflects editorial/barre semantics we do not engrave yet.
+    if getattr(note, "fret", None) == 0 and value in {"1", "2", "3", "4"}:
+        return None
+    return _ft3_fingering_text(value)
+
+
+def _note_native_lh_fingering_suffix(note, settings: dict[str, str]) -> str:
+    if not (_ft3_full_mode(settings) and _ft3_show_fingerings(settings)):
         return ""
-    show_fingerings = settings.get(
-        "showfingerings",
-        settings.get("showft3extras", "on"),
-    ) == "on"
-    show_ornaments = settings.get(
-        "showornaments",
-        settings.get("showft3extras", "on"),
-    ) == "on"
+    mode = settings.get("ft3fingering", "both")
+    if mode not in {"left", "both"}:
+        return ""
+    value = _note_left_fingering_text_for_export(note)
+    if value and value.isdigit():
+        return f"-{value}"
+    return ""
+
+
+def _note_native_rh_fingering_suffix(note, settings: dict[str, str]) -> str:
+    if not (_ft3_full_mode(settings) and _ft3_show_fingerings(settings)):
+        return ""
+    mode = settings.get("ft3fingering", "both")
+    if mode not in {"right", "both"}:
+        return ""
+    value = _ft3_fingering_text(getattr(note, "right_fingering", None))
+    if value and value.isdigit():
+        return f"\\rightHandFinger #{value}"
+    return ""
+
+
+def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C901, PLR0912
+    if not _ft3_full_mode(settings):
+        return ""
+    show_fingerings = _ft3_show_fingerings(settings)
+    show_ornaments = _ft3_show_ornaments(settings)
     if not (show_fingerings or show_ornaments):
         return ""
 
@@ -320,22 +377,31 @@ def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C
 
     if show_fingerings and finger_mode != "off":
         if finger_mode in {"left", "both"}:
-            left_f = _ft3_fingering_text(_first_note_attr(chord.notes, "left_fingering"))
-            if left_f:
-                above.append(left_f)
+            for note in chord.notes:
+                left_f = _note_left_fingering_text_for_export(note)
+                # Numeric LH fingerings are exported natively on note/chord pitches.
+                if left_f and not left_f.isdigit():
+                    above.append(left_f)
         if finger_mode in {"right", "both"}:
-            right_f = _ft3_fingering_text(_first_note_attr(chord.notes, "right_fingering"))
-            if right_f:
-                below.append(right_f)
+            for note in chord.notes:
+                right_f = _ft3_fingering_text(getattr(note, "right_fingering", None))
+                # Numeric RH fingerings are exported natively via \rightHandFinger.
+                if right_f and not right_f.isdigit():
+                    below.append(right_f)
     if show_ornaments and orn_mode != "off":
         if orn_mode in {"left", "both"}:
-            left_o = _ft3_ornament_text(_first_note_attr(chord.notes, "left_ornament"))
-            if left_o:
-                above.append(left_o)
+            for note in chord.notes:
+                left_o = _ft3_ornament_text(getattr(note, "left_ornament", None))
+                if left_o:
+                    above.append(left_o)
         if orn_mode in {"right", "both"}:
-            right_o = _ft3_ornament_text(_first_note_attr(chord.notes, "right_ornament"))
-            if right_o:
-                below.append(right_o)
+            for note in chord.notes:
+                right_o = _ft3_ornament_text(getattr(note, "right_ornament", None))
+                if right_o:
+                    below.append(right_o)
+
+    above = _dedup_keep_order(above)
+    below = _dedup_keep_order(below)
 
     parts: list[str] = []
     if above:
@@ -443,7 +509,12 @@ def export_lilypond(  # noqa: PLR0912, C901
                     s_idx = note.string - 1
                     if 0 <= s_idx < len(tuning_lookup):
                         pitch = tuning_lookup[s_idx] + note.fret
-                        pitches.append(_midi_to_lilypond(pitch))
+                        base = _midi_to_lilypond(pitch)
+                        native = (
+                            _note_native_lh_fingering_suffix(note, settings)
+                            + _note_native_rh_fingering_suffix(note, settings)
+                        )
+                        pitches.append(base + native)
                 suffix = ""
                 if col in tie_starts:
                     suffix += "~"
@@ -521,6 +592,8 @@ def export_lilypond(  # noqa: PLR0912, C901
     tab_body_prefix: list[str] = []
     if settings.get("tabnotation", "minimal") == "full":
         tab_body_prefix.append(r"  \tabFullNotation")
+        tab_body_prefix.append(r"  \set fingeringOrientations = #'(left)")
+        tab_body_prefix.append(r"  \set strokeFingerOrientations = #'(right)")
     notehead_override = _ly_notehead_style_override(settings)
     if notehead_override:
         tab_body_prefix.append(notehead_override)
