@@ -9,6 +9,11 @@ class Note:
     fret: int
     raw_pos: int
     duration: int | None = None
+    right_fingering: str | None = None
+    left_fingering: str | None = None
+    right_ornament: str | None = None
+    left_ornament: str | None = None
+    ft3_extras: int | None = None
 
 
 @dataclass
@@ -17,6 +22,8 @@ class Bar:
     barline: str | None = None
     repeat: str | None = None
     time_sig: str | None = None
+    dynamic: str | None = None
+    fermata: bool = False
     chords: list[Chord] = field(default_factory=list)
 
 
@@ -34,6 +41,7 @@ class Piece:
     subtitle: str | None = None
     author: str | None = None
     composer: str | None = None
+    arranger: str | None = None
     footnote: str | None = None
     footnote_source: str | None = None
     footnote_editor: str | None = None
@@ -51,6 +59,7 @@ class Piece:
     volume: str | None = None
     page: str | None = None
     section_annotations: dict[str, str] = field(default_factory=dict)
+    import_warnings: list[str] = field(default_factory=list)
     tuning: str | None = None
     style: str | None = None
     bars: list[Bar] = field(default_factory=list)

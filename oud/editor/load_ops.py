@@ -103,3 +103,5 @@ def cmd_open(
     if not state.durations and build_durations_fn is not None:
         state.durations = build_durations_fn(state.piece)
     state.message = f"Opened {path}"
+    if state.piece.import_warnings:
+        state.message = f"{state.message} ({state.piece.import_warnings[0]})"

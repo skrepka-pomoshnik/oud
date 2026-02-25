@@ -60,4 +60,6 @@ def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C
         state.settings["tuning"] = piece.tuning
     if not state.durations:
         state.durations = build_durations(piece)
+    if piece.import_warnings:
+        state.message = piece.import_warnings[0]
     return state

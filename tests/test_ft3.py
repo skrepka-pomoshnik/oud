@@ -1,6 +1,6 @@
 import gzip
 
-from oud.core.ft3 import load_ft3, note_type_to_denominator
+from oud.core.ft3 import load_ft3, note_type_to_denominator, parse_bar
 
 
 def test_load_minimal_ft3(tmp_path) -> None:
@@ -20,6 +20,56 @@ def test_note_type_to_denominator() -> None:
     assert note_type_to_denominator(3) == 2
     assert note_type_to_denominator(4) == 4
     assert note_type_to_denominator(5) == 8
+
+
+def test_parse_bar_decodes_ft3_header_repeat_and_barline_markers() -> None:
+    bar = parse_bar(bytes([0x80, 0x01]) + bytes(30))
+    assert bar.barline == "||"
+    assert bar.repeat is None
+
+    bar = parse_bar(bytes([0x00, 0x10]) + bytes(30))
+    assert bar.repeat == ".:"
+
+    bar = parse_bar(bytes([0x90, 0x01]) + bytes(30))
+    assert bar.barline == "||"
+    assert bar.repeat == ":."
+
+    bar = parse_bar(bytes([0x90, 0x12]) + bytes(30))
+    assert bar.barline == "||"
+    assert bar.repeat == ":|:"
+
+
+def test_parse_bar_decodes_right_repeat_from_byte1_bit2_marker() -> None:
+    bar = parse_bar(bytes([0x80, 0x03]) + bytes(30))
+    assert bar.barline == "||"
+    assert bar.repeat == ":."
+
+
+def _ft3_bar_with_one_note(*, extras: int = 0) -> bytes:
+    header = bytes(32)
+    # chord header at 32: quarter (0 + 2), no dotted/grid
+    chord = bytes([0x02, 0x00, 0x00, 0x00])
+    # note at 36: string byte=2 -> internal string 1, fret byte='a' -> 0
+    note = bytes([0x02, 0x61, extras & 0xFF, (extras >> 8) & 0xFF, 0x00])
+    return header + chord + note
+
+
+def test_parse_bar_decodes_ft3_note_extras_fingerings_and_ornaments() -> None:
+    # right thumb + left finger2 + right ornament hash
+    bar = parse_bar(_ft3_bar_with_one_note(extras=0x0002 | 0x0040 | 0x0600))
+    note = bar.notes[0]
+    assert note.right_fingering == "thumb"
+    assert note.left_fingering == "2"
+    assert note.right_ornament == "#"
+    assert note.left_ornament is None
+    assert note.ft3_extras == 0x0642
+
+
+def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
+    bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
+    note = bar.notes[0]
+    assert note.left_ornament == "brackets"
+    assert note.right_ornament is None
 
 
 def test_load_ft3_strips_rtf_title(tmp_path) -> None:
@@ -54,6 +104,33 @@ def test_frog_galliard_bar8_includes_bass() -> None:
     piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
     bar = piece.bars[7]
     assert any(note.string >= 7 for note in bar.notes)
+
+
+def test_load_ft3_decodes_repeat_pair_from_bar_headers() -> None:
+    piece = load_ft3("lutemusic/wu_sol_ich_mich_hin_keren.ft3")
+    assert piece.bars[1].repeat == ".:"
+    assert piece.bars[4].repeat == ":."
+    assert piece.bars[4].barline == "||"
+
+
+def test_load_ft3_decodes_internal_double_barlines() -> None:
+    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    assert piece.bars[15].barline == "||"
+    assert piece.bars[31].barline == "||"
+
+
+def test_can_she_excuse_ft3_does_not_inflate_string_count_from_invalid_bass_byte() -> None:
+    piece = load_ft3("lutemusic/can_she_excuse.ft3")
+    assert piece.strings == 8
+    assert max((note.string for bar in piece.bars for note in bar.notes), default=0) == 8
+
+
+def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
+    piece = load_ft3("lutemusic/can_she_excuse.ft3")
+    assert len(piece.bars) == 40
+    assert all(bar.chords for bar in piece.bars)
+    assert piece.import_warnings
+    assert "lyric/melody text records" in piece.import_warnings[0]
 
 
 def test_pavan_01_8c_infers_eight_courses() -> None:
@@ -102,6 +179,12 @@ def test_load_ft3_extracts_section_metadata_from_real_file() -> None:
     assert piece.composer == "John Dowland"
 
 
+def test_load_ft3_extracts_arranger_from_real_file() -> None:
+    piece = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    assert piece.composer == "Dietrich Buxtehude"
+    assert piece.arranger == "Sarge Gerbode"
+
+
 def test_load_ft3_parses_footnote_parts_from_annotation(tmp_path) -> None:
     payload = (
         b"CPiece{\\rtf1\\ansi Demo}\r\n~"
@@ -131,3 +214,16 @@ def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
         assert "\\rtf" not in title
         assert "{" not in title
         assert "}" not in title
+
+
+def test_ich_bin_blume_ft3_fills_missing_time_signatures_by_section() -> None:
+    piece = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    # Early section is triple meter (sum=1.5) and should not render against default common time.
+    assert piece.bars[0].time_sig == "O"
+    assert piece.bars[40].time_sig == "O"
+    # Explicit FT3 meter changes must remain and unlabeled bars between them inherit matching section meter.
+    assert piece.bars[88].time_sig == "C|"
+    assert piece.bars[100].time_sig == "C|"
+    assert piece.bars[128].time_sig == "6/8"
+    assert piece.bars[140].time_sig == "6/8"
+    assert piece.bars[159].time_sig == "C|"

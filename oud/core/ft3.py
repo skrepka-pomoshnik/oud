@@ -162,6 +162,7 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
     piece_value = _annotation_lookup(annotations, "piece")
     subtitle_value = _annotation_lookup(annotations, "subtitle")
     composer_value = _annotation_lookup(annotations, "composer")
+    arranger_value = _annotation_lookup(annotations, "arranger")
     author_value = _annotation_lookup(annotations, "author")
     footnote_value = _annotation_lookup(annotations, "footnote")
 
@@ -171,6 +172,8 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
         piece.subtitle = subtitle_value
     if composer_value:
         piece.composer = composer_value
+    if arranger_value:
+        piece.arranger = arranger_value
     if author_value:
         piece.author = author_value
     if footnote_value:
@@ -198,9 +201,55 @@ def at_next_note(s: int, f: int) -> bool:
     return on_string and (on_fret or on_diapason)
 
 
+def _ft3_right_fingering(extras: int) -> str | None:
+    # Bit masks are adapted from the luteconv FT3 parser (thanks to that reverse-engineering work).
+    if extras & 0x0002:
+        return "thumb"
+    if extras & 0x0004:
+        return "1"
+    if extras & 0x0008:
+        return "2"
+    return None
+
+
+def _ft3_left_fingering(extras: int) -> str | None:
+    if extras & 0x0020:
+        return "1"
+    if extras & 0x0040:
+        return "2"
+    if extras & 0x0080:
+        return "3"
+    if extras & 0x0100:
+        return "4"
+    return None
+
+
+def _ft3_left_ornament(extras: int) -> str | None:
+    ornament = extras & 0xFE00
+    if ornament == 0x0400:
+        return "#"
+    if ornament == 0x0800:
+        return "+"
+    if ornament == 0x4A00:
+        return "dot-left"
+    if ornament == 0x0C00:
+        return "x"
+    if extras == 0x3400:
+        return "brackets"
+    return None
+
+
+def _ft3_right_ornament(extras: int) -> str | None:
+    ornament = extras & 0xFE00
+    if ornament == 0x0600:
+        return "#"
+    return None
+
+
 def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
     bar = Bar()
     bar.time_sig = parse_time_signature(bar_data)
+    _parse_bar_markers(bar_data, bar)
     ptr = 32
 
     while ptr + 9 <= len(bar_data):
@@ -231,17 +280,33 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
             elif bar_data[ptr] == 8:
                 flag = bar_data[ptr + 4]
                 if flag == 0x00:
-                    string = 7
-                    fret = bar_data[ptr + 1] - 0x61
+                    fret_byte = bar_data[ptr + 1]
+                    if 0x61 <= fret_byte <= 0x7A:
+                        string = 7
+                        fret = fret_byte - 0x61
                 elif flag & 0x20:
-                    string = bar_data[ptr + 1] - 0x30 + 7
-                    fret = 0
+                    course_byte = bar_data[ptr + 1]
+                    if 0x30 <= course_byte <= 0x39:
+                        string = course_byte - 0x30 + 7
+                        fret = 0
                 elif flag & 0x48 == 0x48:
-                    string = 8
-                    fret = bar_data[ptr + 1] - 0x61
+                    fret_byte = bar_data[ptr + 1]
+                    if 0x61 <= fret_byte <= 0x7A:
+                        string = 8
+                        fret = fret_byte - 0x61
 
             if string is not None and fret is not None:
-                note = Note(string=string, fret=fret, raw_pos=ptr)
+                extras = (bar_data[ptr + 3] << 8) | bar_data[ptr + 2]
+                note = Note(
+                    string=string,
+                    fret=fret,
+                    raw_pos=ptr,
+                    right_fingering=_ft3_right_fingering(extras),
+                    left_fingering=_ft3_left_fingering(extras),
+                    right_ornament=_ft3_right_ornament(extras),
+                    left_ornament=_ft3_left_ornament(extras),
+                    ft3_extras=extras if extras else None,
+                )
                 bar.notes.append(note)
                 chord.notes.append(note)
 
@@ -253,7 +318,48 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
     return bar
 
 
-def load_ft3(path: str) -> Piece:
+def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
+    if len(bar_data) < 2:
+        return
+    b0 = bar_data[0]
+    b1 = bar_data[1]
+
+    # Corpus-based FT3 header hints (conservative):
+    # - byte1 bit 0x10 marks left repeat dots
+    # - byte0 upper-nibble bit 0x10 marks right repeat dots
+    # - byte0 bit 0x80 and/or byte1 bit 0x01 mark an explicit closing/double barline
+    # - byte1 bit 0x02 appears on a few bars alongside explicit closers and likely
+    #   indicates right repeat dots; decode it as such only for structural repeat marks.
+    left_repeat = bool(b1 & 0x10)
+    right_repeat = bool((b0 & 0x10) or (b1 & 0x02))
+
+    if left_repeat and right_repeat:
+        bar.repeat = ":|:"
+    elif left_repeat:
+        bar.repeat = ".:"
+    elif right_repeat:
+        bar.repeat = ":."
+
+    if (b0 & 0x80) or (b1 & 0x01):
+        bar.barline = "||"
+
+
+def _is_ft3_text_record(chunk: bytes) -> bool:
+    tail = chunk[32:] if len(chunk) > 32 else chunk
+    if not tail:
+        return False
+    newline_count = tail.count(b"\r") + tail.count(b"\n")
+    if newline_count < 2:
+        return False
+    letter_count = sum(
+        1
+        for b in tail
+        if (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A)
+    )
+    return letter_count >= 6
+
+
+def load_ft3(path: str) -> Piece:  # noqa: C901
     data = read_ft3(path)
 
     blocks, metadata_blob = _extract_cpiece_blocks(data)
@@ -269,8 +375,22 @@ def load_ft3(path: str) -> Piece:
         title = Path(path).stem.replace("_", " ")
     author = None
 
-    bars = [parse_bar(chunk) for chunk in re.split(b"\x03\x80", data)]
+    raw_chunks = re.split(b"\x03\x80", data)
+    filtered_text_records = 0
+    bar_chunks = raw_chunks
+    body_start = data.find(b"CBar")
+    if body_start >= 0:
+        body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
+        text_record_count = sum(1 for chunk in body_chunks if _is_ft3_text_record(chunk))
+        # Some FT3 files interleave lyric/melody text records in the body stream.
+        # Only switch to body-based parsing/filtering when this pattern is clearly present,
+        # otherwise keep legacy whole-file splitting to preserve current import parity.
+        if text_record_count >= 2:
+            filtered_text_records = text_record_count
+            bar_chunks = [chunk for chunk in body_chunks if not _is_ft3_text_record(chunk)]
+    bars = [parse_bar(chunk) for chunk in bar_chunks]
     _apply_legacy_duration_fix(bars)
+    _fill_missing_time_signatures(bars)
     max_string = 0
     for bar in bars:
         for note in bar.notes:
@@ -285,6 +405,10 @@ def load_ft3(path: str) -> Piece:
         bars=bars,
         strings=strings,
     )
+    if filtered_text_records:
+        piece.import_warnings.append(
+            "FT3 lyric/melody text records are present and currently ignored.",
+        )
     annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
     source, editor, comment = _parse_footnote_parts(piece.footnote)
@@ -359,6 +483,74 @@ def _apply_legacy_duration_fix(bars: list[Bar]) -> None:
     # Another legacy encoding pattern stores 4/4 bars at half-length (2.0).
     if _needs_common_time_halfbar_fix(bars):
         _shift_note_types_one_step_longer(bars, time_sig="C")
+
+
+def _sum_matches_meter(sum_quarter_beats: float, meter: str) -> bool:
+    target = {
+        "O": 1.5,
+        "3/4": 1.5,
+        "6/8": 1.5,
+        "C|": 2.0,
+        "C": 4.0,
+        "4/4": 4.0,
+        "2/2": 2.0,
+    }.get(meter)
+    if target is None:
+        return False
+    return abs(sum_quarter_beats - target) <= 0.15
+
+
+def _infer_meter_from_sum(sum_quarter_beats: float) -> str | None:
+    if abs(sum_quarter_beats - 1.5) <= 0.15:
+        return "O"
+    if abs(sum_quarter_beats - 2.0) <= 0.15:
+        return "C|"
+    if abs(sum_quarter_beats - 4.0) <= 0.2:
+        return "C"
+    return None
+
+
+def _fill_missing_time_signatures(bars: list[Bar]) -> None:  # noqa: C901
+    if not bars:
+        return
+    explicit = [idx for idx, bar in enumerate(bars) if bar.time_sig]
+    if not explicit:
+        for bar in bars:
+            if bar.time_sig is None and bar.chords:
+                guessed = _infer_meter_from_sum(_bar_sum_quarter_beats(bar))
+                if guessed:
+                    bar.time_sig = guessed
+        return
+
+    def _fill_range(
+        start: int,
+        end: int,
+        *,
+        prev_meter: str | None,
+        next_meter: str | None,
+    ) -> None:
+        for idx in range(start, end):
+            bar = bars[idx]
+            if bar.time_sig is not None or not bar.chords:
+                continue
+            total = _bar_sum_quarter_beats(bar)
+            if prev_meter and _sum_matches_meter(total, prev_meter):
+                bar.time_sig = prev_meter
+                continue
+            if next_meter and _sum_matches_meter(total, next_meter):
+                bar.time_sig = next_meter
+                continue
+            guessed = _infer_meter_from_sum(total)
+            if guessed:
+                bar.time_sig = guessed
+
+    first = explicit[0]
+    _fill_range(0, first, prev_meter=None, next_meter=bars[first].time_sig)
+    for pos, idx in enumerate(explicit[:-1]):
+        nxt = explicit[pos + 1]
+        _fill_range(idx + 1, nxt, prev_meter=bars[idx].time_sig, next_meter=bars[nxt].time_sig)
+    last = explicit[-1]
+    _fill_range(last + 1, len(bars), prev_meter=bars[last].time_sig, next_meter=None)
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:

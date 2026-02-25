@@ -68,3 +68,20 @@ def test_cmd_open_basic_paths(tmp_path: Path) -> None:
     folder.mkdir()
     cmd_open(state, str(folder), no_path_msg="No path", build_durations_fn=None)
     assert state.message == ""
+
+
+def test_cmd_open_appends_import_warning_to_message(tmp_path: Path) -> None:
+    state = _state()
+    target = tmp_path / "warn.ft3"
+    target.write_bytes(b"")
+    warned_piece = Piece(title="W", bars=[Bar()], strings=6)
+    warned_piece.import_warnings.append("FT3 lyric/melody text records are present and currently ignored.")
+    cmd_open(
+        state,
+        str(target),
+        no_path_msg="No path",
+        load_ft3_fn=lambda _p: warned_piece,
+        build_durations_fn=None,
+    )
+    assert "Opened" in state.message
+    assert "lyric/melody text records" in state.message

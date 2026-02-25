@@ -19,3 +19,8 @@ def test_init_state_missing_path_defaults_to_8_bars(tmp_path: Path) -> None:
 def test_init_state_preserves_inferred_ft3_extra_courses() -> None:
     state = init_state("lutemusic/pavan_01_8C.ft3", config_path="config.toml")
     assert state.piece.strings >= 8
+
+
+def test_init_state_shows_import_warning_for_ft3_text_records() -> None:
+    state = init_state("lutemusic/can_she_excuse.ft3", config_path="config.toml")
+    assert "lyric/melody text records" in state.message

@@ -56,6 +56,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Subtitle:", piece.subtitle),
         line("Author:", piece.author),
         line("Composer:", piece.composer),
+        line("Arranger:", piece.arranger),
         line("Footnote:", piece.footnote),
         line("Bars:", str(len(piece.bars))),
         line("Strings:", str(piece.strings)),
@@ -67,7 +68,14 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Flagstyle:", settings.get("flagstyle")),
         line("Grid:", settings.get("grid")),
         line("ShowDur:", settings.get("showdur")),
-        line("ShowExtras:", settings.get("showextras")),
+        line(
+            "ShowSpans:",
+            "on"
+            if settings.get("showspans", "off") == "on" or settings.get("showextras", "off") == "on"
+            else "off",
+        ),
+        line("ShowFingerings:", settings.get("showfingerings", settings.get("showft3extras"))),
+        line("ShowOrnaments:", settings.get("showornaments", settings.get("showft3extras"))),
         line("ShowTactus:", settings.get("showtactus")),
         line("Measures:", settings.get("measures")),
         line("MeasuresStep:", settings.get("measuresstep")),
