@@ -100,17 +100,27 @@ def test_jk_clamp_to_visible_string_bounds() -> None:
 
 def test_gi_opens_info_mode() -> None:
     state = _state()
+    state.mode = "insert"
+    state.insert_prefix = "/"
+    state.replace_once = True
     handle_normal(state, ord("g"))
     assert state.pending_key == "g"
     handle_normal(state, ord("i"))
     assert state.mode == "info"
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
 
 
 def test_gh_opens_help_mode() -> None:
     state = _state()
+    state.mode = "insert"
+    state.insert_prefix = ","
+    state.replace_once = True
     handle_normal(state, ord("g"))
     handle_normal(state, ord("h"))
     assert state.mode == "help"
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
 
 
 def test_gr_reports_when_no_file_or_unsaved() -> None:
@@ -125,3 +135,23 @@ def test_gr_reports_when_no_file_or_unsaved() -> None:
     handle_normal(state, ord("g"))
     handle_normal(state, ord("r"))
     assert "Unsaved changes" in state.message
+
+
+def test_counted_yy_and_p_pastes_multiple_bars() -> None:
+    state = _state()
+    state.overrides[(0, 0, 0)] = "a"
+    state.overrides[(1, 0, 1)] = "b"
+    state.overrides[(2, 0, 2)] = "c"
+
+    handle_normal(state, ord("3"))
+    handle_normal(state, ord("y"))
+    handle_normal(state, ord("y"))
+    assert state.message == "Bars yanked: 3"
+    assert state.yanked_bars is not None
+    assert len(state.yanked_bars) == 3
+
+    handle_normal(state, ord("p"))
+    assert len(state.piece.bars) == 11
+    assert state.overrides[(1, 0, 0)] == "a"
+    assert state.overrides[(2, 0, 1)] == "b"
+    assert state.overrides[(3, 0, 2)] == "c"

@@ -8,6 +8,7 @@ from oud.editor.edit_ops import record_action
 from oud.editor.edit_range import BarRange, ChordRange, chord_range_at_col_count
 from oud.editor.layout import bars_per_line, system_range
 from oud.editor.messages import NO_BARS
+from oud.editor.motions import apply_motion_target, target_home_bar
 from oud.editor.ops import chord_index_at_col, insert_chord
 from oud.editor.state import EditorState, UndoAction, YankedBar
 
@@ -97,10 +98,62 @@ def _cmd_chord_delete(state: EditorState, bar: Bar, count: int) -> None:
         state.message = f"Chords deleted: {chord_range.count}"
 
 
-def yank_bar(state: EditorState, index: int) -> None:
+def _cmd_chord_yank(state: EditorState, bar: Bar, count: int) -> None:
+    chord_range = chord_range_at_col_count(
+        bar,
+        state.bar_width,
+        state.cursor_col,
+        count=count,
+        bar_index=state.cursor_bar,
+    )
+    if chord_range.is_empty:
+        state.message = "No chord at cursor"
+        return
+    state.yanked_chords = copy.deepcopy(
+        [bar.chords[idx] for idx in chord_range.indices()],
+    )
+    if chord_range.count == 1:
+        state.message = "Chord yanked"
+    else:
+        state.message = f"Chords yanked: {chord_range.count}"
+
+
+def _cmd_chord_paste(state: EditorState, bar: Bar, count: int) -> None:
+    if not state.yanked_chords:
+        state.message = "No yanked chords"
+        return
+    prev = copy.deepcopy(bar.chords)
+    before_count = len(bar.chords)
+    prev_idx = chord_index_at_col(bar, state.bar_width, state.cursor_col)
+    insert_idx = 0 if prev_idx is None else max(0, min(prev_idx, len(bar.chords)))
+    payload: list = []
+    for _ in range(max(1, count)):
+        payload.extend(copy.deepcopy(state.yanked_chords))
+    for offset, chord in enumerate(payload):
+        bar.chords.insert(insert_idx + offset, chord)
+    inserted_range = ChordRange.from_start_count(
+        state.cursor_bar,
+        insert_idx,
+        len(bar.chords) - before_count,
+    ).clamp(len(bar.chords))
+    record_action(
+        state,
+        UndoAction(
+            kind="chords",
+            data={"bar": state.cursor_bar, "prev": prev, "new": bar.chords},
+        ),
+    )
+    state.modified = True
+    if inserted_range.count == 1:
+        state.message = "Chord pasted"
+    else:
+        state.message = f"Chords pasted: {inserted_range.count}"
+
+
+def _capture_yanked_bar(state: EditorState, index: int) -> YankedBar | None:
     bar_range = BarRange.single(index).clamp(len(state.piece.bars))
     if bar_range.is_empty:
-        return
+        return None
     index = bar_range.start
     bar_copy = copy.deepcopy(state.piece.bars[index])
     overrides = {
@@ -115,7 +168,7 @@ def yank_bar(state: EditorState, index: int) -> None:
     slurs = [(0, start, end) for (b, start, end) in state.slurs if b == index]
     ties = [(0, start, end) for (b, start, end) in state.ties if b == index]
     holds = [(0, start, end) for (b, start, end) in state.holds if b == index]
-    state.yanked_bar = YankedBar(
+    return YankedBar(
         bar=bar_copy,
         overrides=overrides,
         durations=durations,
@@ -128,30 +181,51 @@ def yank_bar(state: EditorState, index: int) -> None:
     )
 
 
-def paste_bar(state: EditorState, index: int) -> None:
-    if state.yanked_bar is None:
-        state.message = "No yanked bar"
+def yank_bar(state: EditorState, index: int, *, count: int = 1) -> None:
+    bar_range = BarRange.from_start_count(index, count).clamp(len(state.piece.bars))
+    if bar_range.is_empty:
         return
+    captured = [
+        item
+        for item in (_capture_yanked_bar(state, idx) for idx in bar_range.indices())
+        if item is not None
+    ]
+    if not captured:
+        return
+    state.yanked_bar = copy.deepcopy(captured[0])
+    state.yanked_bars = copy.deepcopy(captured)
+
+
+def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> None:
     insert_bar(state, index)
-    bar_copy = copy.deepcopy(state.yanked_bar.bar)
+    bar_copy = copy.deepcopy(yanked.bar)
     state.piece.bars[index] = bar_copy
-    for (b, s, c), value in state.yanked_bar.overrides.items():
+    for (b, s, c), value in yanked.overrides.items():
         state.overrides[(index + b, s, c)] = value
-    for (b, s, c), value in state.yanked_bar.durations.items():
+    for (b, s, c), value in yanked.durations.items():
         state.durations[(index + b, s, c)] = value
-    for (b, c), value in state.yanked_bar.annotations.items():
+    for (b, c), value in yanked.annotations.items():
         state.annotations[(index + b, c)] = value
-    for (b, c), value in state.yanked_bar.ornaments.items():
+    for (b, c), value in yanked.ornaments.items():
         state.ornaments[(index + b, c)] = value
-    for (b, c) in state.yanked_bar.dotted:
+    for (b, c) in yanked.dotted:
         state.dotted.add((index + b, c))
-    for b, start, end in state.yanked_bar.slurs:
+    for b, start, end in yanked.slurs:
         state.slurs.append((index + b, start, end))
-    for b, start, end in state.yanked_bar.ties:
+    for b, start, end in yanked.ties:
         state.ties.append((index + b, start, end))
-    for b, start, end in state.yanked_bar.holds:
+    for b, start, end in yanked.holds:
         state.holds.append((index + b, start, end))
     state.modified = True
+
+
+def paste_bar(state: EditorState, index: int) -> None:
+    if state.yanked_bar is None and not state.yanked_bars:
+        state.message = "No yanked bar"
+        return
+    payload = state.yanked_bars or ([state.yanked_bar] if state.yanked_bar is not None else [])
+    for offset, yanked in enumerate(payload):
+        _paste_one_yanked_bar(state, index + offset, yanked)
 
 
 def cmd_bar(state: EditorState, args: str) -> None:
@@ -167,8 +241,7 @@ def cmd_bar(state: EditorState, args: str) -> None:
                 data={"index": state.cursor_bar + 1, "prev": prev_breaks, "new": new_breaks},
             ),
         )
-        state.cursor_bar = min(state.cursor_bar + 1, len(state.piece.bars) - 1)
-        state.cursor_col = 0
+        apply_motion_target(state, target_home_bar(state, state.cursor_bar + 1))
         state.message = "Bar added"
         return
     if action in ("before", "insert"):
@@ -182,7 +255,7 @@ def cmd_bar(state: EditorState, args: str) -> None:
                 data={"index": state.cursor_bar, "prev": prev_breaks, "new": new_breaks},
             ),
         )
-        state.cursor_col = 0
+        apply_motion_target(state, target_home_bar(state, state.cursor_bar))
         state.message = "Bar inserted"
         return
     if action in ("del", "delete", "remove"):
@@ -218,8 +291,7 @@ def cmd_bar(state: EditorState, args: str) -> None:
                     },
                 ),
             )
-        state.cursor_bar = min(state.cursor_bar, len(state.piece.bars) - 1)
-        state.cursor_col = 0
+        apply_motion_target(state, target_home_bar(state, state.cursor_bar))
         state.message = "Bar deleted"
         return
     state.message = "Bar action: add/after/before/insert/del"
@@ -302,8 +374,7 @@ def cmd_stave(state: EditorState, args: str) -> None:
                 },
             ),
         )
-        state.cursor_bar = max(0, min(bar_range.start, len(state.piece.bars) - 1))
-        state.cursor_col = 0
+        apply_motion_target(state, target_home_bar(state, bar_range.start))
         state.message = "Stave deleted"
         return
     state.message = "Stave action: break/join/new/del"
@@ -325,4 +396,10 @@ def cmd_chord(state: EditorState, args: str) -> None:
     if action in ("del", "delete", "remove"):
         _cmd_chord_delete(state, bar, count)
         return
-    state.message = "Chord action: add/del [count]"
+    if action in ("yank", "copy"):
+        _cmd_chord_yank(state, bar, count)
+        return
+    if action in ("paste", "put"):
+        _cmd_chord_paste(state, bar, count)
+        return
+    state.message = "Chord action: add/del/yank/paste [count]"

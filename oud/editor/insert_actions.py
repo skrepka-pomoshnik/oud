@@ -209,13 +209,11 @@ def _handle_insert_rest(state: EditorState) -> bool:
     apply_override(state, cursor_key(state), "r")
     if not column_has_duration(state, state.cursor_bar, state.cursor_col):
         apply_duration(state, cursor_key(state), state.current_duration)
-    if state.replace_once:
-        state.replace_once = False
-        state.mode = "normal"
-    else:
-        steps = 2 if state.settings.get("grid") == "on" else 1
-        for _ in range(steps):
-            move_right(state)
+    if finish_replace_once(state):
+        return True
+    steps = 2 if state.settings.get("grid") == "on" else 1
+    for _ in range(steps):
+        move_right(state)
     return True
 
 

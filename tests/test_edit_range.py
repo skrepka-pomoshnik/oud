@@ -20,6 +20,12 @@ def test_bar_range_from_bounds_normalizes_reversed() -> None:
     assert r.count == 5
 
 
+def test_bar_range_from_start_count() -> None:
+    r = BarRange.from_start_count(2, 3)
+    assert (r.start, r.end) == (2, 5)
+    assert r.count == 3
+
+
 def test_bar_range_clamp_to_piece_bounds() -> None:
     r = BarRange.from_bounds(-5, 99).clamp(4)
     assert (r.start, r.end) == (0, 4)

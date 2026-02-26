@@ -295,6 +295,15 @@ def test_insert_rest_sets_override_and_duration() -> None:
     assert state.durations[(0, 0, 0)] == state.current_duration
 
 
+def test_insert_rest_finishes_replace_once_mode() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.replace_once = True
+    actions.handle_insert(state, ord("r"))
+    assert state.mode == "normal"
+    assert state.replace_once is False
+
+
 def test_insert_rest_snaps_to_chord_slot_when_cursor_in_gap() -> None:
     state = _state()
     state.piece.bars[0].chords = [

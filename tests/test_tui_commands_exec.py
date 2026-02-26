@@ -614,13 +614,28 @@ def test_cmd_bar_and_chord() -> None:
     assert len(state.piece.bars[state.cursor_bar].chords) == 3
     assert state.message == "Chords added: 3"
     state.cursor_col = 0
+    cmd.cmd_chord(state, "yank 2")
+    assert state.yanked_chords is not None
+    assert len(state.yanked_chords) == 2
+    assert state.message == "Chords yanked: 2"
+    state.cursor_col = state.bar_width - 1
+    cmd.cmd_chord(state, "paste")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 5
+    assert state.message == "Chords pasted: 2"
+    state.cursor_col = 0
     cmd.cmd_chord(state, "delete 2")
-    assert len(state.piece.bars[state.cursor_bar].chords) == 1
+    assert len(state.piece.bars[state.cursor_bar].chords) == 3
     assert state.message == "Chords deleted: 2"
     cmd.cmd_chord(state, "delete")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 2
+    state.cursor_col = 0
+    cmd.cmd_chord(state, "delete 2")
     assert state.piece.bars[state.cursor_bar].chords == []
+    state.yanked_chords = None
+    cmd.cmd_chord(state, "paste")
+    assert state.message == "No yanked chords"
     cmd.cmd_chord(state, "other")
-    assert state.message == "Chord action: add/del [count]"
+    assert state.message == "Chord action: add/del/yank/paste [count]"
 
 
 def test_cmd_stave_variants() -> None:

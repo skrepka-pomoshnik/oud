@@ -60,15 +60,13 @@ Testing backlog
 Reference-derived backlog (source-indexed, pending)
 
 VITABS (`refs/VITABS`)
-- [ ] Finish normal-mode motion/action split beyond core cursor moves (`h/j/k/l`, note-wise, visual-row jumps, `w/b/gg/G/$`, `f/F/t/T`, word search `* #`, `%`, mark jumps are extracted); migrate remaining command-style motions and edit-triggered cursor moves to pure targets.
-- [ ] Expand first-class range primitives (bar/chord) into multi-chord edit ranges and route remaining delete/change/yank/range commands through them (single-bar counted `:chord del/insert N` path is in place).
-- [ ] Add `:for <from> <to> <command ...>` style command-range executor (simple, unix-style batch editing).
+- [ ] Finish normal-mode motion/action split beyond core cursor moves (`h/j/k/l`, note-wise, visual-row jumps, `w/b/gg/G/$`, `f/F/t/T`, word search `* #`, `%`, mark jumps are extracted, and wrappers now share motion-target apply); several edit-triggered cursor moves (bar/rhythm advances) also use pure targets; migrate remaining edit-triggered cursor moves.
+- [ ] Expand first-class range primitives (bar/chord) into multi-chord edit ranges and route remaining delete/change/yank/range commands through them (counted `:chord del/insert/yank/paste N` and counted bar yank/paste via `Nyy`/`p` are in place).
 - [ ] Add explicit replace-mode semantics (free h/l edit on existing chord cells without implicit insertion), distinct from insert mode.
 
 tuitar (`refs/tuitar`)
 
 LuteScribe (`refs/LuteScribe`)
-- [ ] Finish enforcing "commit pending edit before move" beyond transient insert prefixes (replace-one-shot and command/search/help/info/plugin/load transitions are routed through shared insert-session boundaries; remaining transitions and edge paths to audit).
 - [ ] Add compound undo grouping API and use it for reflow, transforms, and multi-step commands.
 - [ ] Add partial undo snapshots (system/stave-scoped restore) to avoid full-score restore for local edits.
 - [ ] Refine reflow by stave-wrap/system-wrap with whole-bar break candidates and preferred barline split points.

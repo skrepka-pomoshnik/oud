@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from oud.core.model import Bar
 from oud.editor.motions import (
-    CursorMotionTarget,
+    apply_motion_target,
     target_bar_end,
     target_bar_next,
     target_bar_prev,
@@ -18,16 +17,6 @@ from oud.editor.motions import (
     target_move_right_visual,
 )
 from oud.editor.state import EditorState
-
-
-def apply_motion_target(state: EditorState, target: CursorMotionTarget) -> None:
-    if target.append_bar:
-        state.piece.bars.append(Bar())
-        state.modified = True
-    state.cursor_bar = target.bar
-    state.cursor_col = target.col
-    if target.cursor_string is not None:
-        state.cursor_string = target.cursor_string
 
 
 def move_left(state: EditorState) -> None:

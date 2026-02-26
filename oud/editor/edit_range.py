@@ -23,6 +23,11 @@ class BarRange:
             start, end = end, start
         return cls(start, end)
 
+    @classmethod
+    def from_start_count(cls, start: int, count: int) -> BarRange:
+        width = max(0, count)
+        return cls(start, start + width)
+
     def clamp(self, total_bars: int) -> BarRange:
         if total_bars <= 0:
             return BarRange(0, 0)

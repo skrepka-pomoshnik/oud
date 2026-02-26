@@ -29,6 +29,16 @@ class CursorMotionTarget:
     cursor_string: int | None = None
 
 
+def apply_motion_target(state: EditorState, target: CursorMotionTarget) -> None:
+    if target.append_bar:
+        state.piece.bars.append(Bar())
+        state.modified = True
+    state.cursor_bar = target.bar
+    state.cursor_col = target.col
+    if target.cursor_string is not None:
+        state.cursor_string = target.cursor_string
+
+
 def _bar_has_grid_data(state: EditorState, bar_index: int) -> bool:
     return any(b == bar_index for (b, _s, _c) in state.overrides) or any(
         b == bar_index for (b, _s, _c) in state.durations
@@ -201,6 +211,19 @@ def target_jump_last_bar(state: EditorState) -> CursorMotionTarget:
         return CursorMotionTarget(0, 0)
     target_bar = max(0, len(state.piece.bars) - 1)
     return CursorMotionTarget(target_bar, _bar_start_col(state, target_bar))
+
+
+def target_home_bar(state: EditorState, bar_index: int) -> CursorMotionTarget:
+    if not state.piece.bars:
+        return CursorMotionTarget(0, 0)
+    target_bar = max(0, min(bar_index, len(state.piece.bars) - 1))
+    return CursorMotionTarget(target_bar, 0)
+
+
+def target_advance_next_bar_home(state: EditorState) -> CursorMotionTarget:
+    if state.cursor_bar >= len(state.piece.bars) - 1:
+        return CursorMotionTarget(state.cursor_bar + 1, 0, append_bar=True)
+    return CursorMotionTarget(min(state.cursor_bar + 1, len(state.piece.bars) - 1), 0)
 
 
 def target_jump_row_visual(state: EditorState, delta: int) -> CursorMotionTarget:  # noqa: C901, PLR0912

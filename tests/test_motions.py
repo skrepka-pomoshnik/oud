@@ -1,9 +1,11 @@
 from oud.core.model import Bar, Piece
 from oud.editor.motions import (
+    target_advance_next_bar_home,
     target_bar_end,
     target_bar_next,
     target_bar_prev,
     target_bar_start,
+    target_home_bar,
     target_jump_first_bar,
     target_jump_last_bar,
     target_jump_row_visual,
@@ -71,6 +73,21 @@ def test_target_move_right_requests_append_at_end() -> None:
     state.cursor_bar = 1
     state.cursor_col = 3
     target = target_move_right(state)
+    assert (target.bar, target.col, target.append_bar) == (2, 0, True)
+
+
+def test_target_home_bar_clamps_and_homes_column() -> None:
+    state = _state()
+    state.cursor_col = 3
+    target = target_home_bar(state, 99)
+    assert (target.bar, target.col, target.append_bar) == (1, 0, False)
+
+
+def test_target_advance_next_bar_home_requests_append_at_end() -> None:
+    state = _state()
+    state.cursor_bar = 1
+    state.cursor_col = 3
+    target = target_advance_next_bar_home(state)
     assert (target.bar, target.col, target.append_bar) == (2, 0, True)
 
 

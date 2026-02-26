@@ -49,6 +49,19 @@ def test_yank_and_paste_bar() -> None:
     assert state.overrides[(1, 0, 0)] == "a"
 
 
+def test_yank_and_paste_multiple_bars() -> None:
+    state = _state(bars=3)
+    state.overrides[(0, 0, 0)] = "a"
+    state.overrides[(1, 0, 1)] = "b"
+    yank_bar(state, 0, count=2)
+    assert state.yanked_bars is not None
+    assert len(state.yanked_bars) == 2
+    paste_bar(state, 2)
+    assert len(state.piece.bars) == 5
+    assert state.overrides[(2, 0, 0)] == "a"
+    assert state.overrides[(3, 0, 1)] == "b"
+
+
 def test_cmd_bar_and_stave() -> None:
     state = _state()
     cmd_bar(state, "add")
@@ -74,13 +87,28 @@ def test_cmd_chord() -> None:
     assert len(state.piece.bars[state.cursor_bar].chords) == 3
     assert state.message == "Chords added: 3"
     state.cursor_col = 0
+    cmd_chord(state, "yank 2")
+    assert state.yanked_chords is not None
+    assert len(state.yanked_chords) == 2
+    assert state.message == "Chords yanked: 2"
+    state.cursor_col = state.bar_width - 1
+    cmd_chord(state, "paste")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 5
+    assert state.message == "Chords pasted: 2"
+    state.cursor_col = 0
     cmd_chord(state, "delete 2")
-    assert len(state.piece.bars[state.cursor_bar].chords) == 1
+    assert len(state.piece.bars[state.cursor_bar].chords) == 3
     assert state.message == "Chords deleted: 2"
     cmd_chord(state, "delete")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 2
+    state.cursor_col = 0
+    cmd_chord(state, "delete 2")
     assert state.piece.bars[state.cursor_bar].chords == []
+    state.yanked_chords = None
+    cmd_chord(state, "paste")
+    assert state.message == "No yanked chords"
     cmd_chord(state, "other")
-    assert state.message == "Chord action: add/del [count]"
+    assert state.message == "Chord action: add/del/yank/paste [count]"
 
 
 def test_show_help_uses_less(monkeypatch) -> None:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from oud.editor.bar_ops import delete_bar
 from oud.editor.controller_utils import consume_count, string_index
 from oud.editor.edit_ops import clear_cell
 from oud.editor.find_ops import perform_find, repeat_find
@@ -18,6 +17,7 @@ from oud.editor.keymap import (
 )
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
+from oud.editor.motions import CursorMotionTarget, apply_motion_target, target_home_bar
 from oud.editor.navigation import (
     bar_end,
     bar_next,
@@ -117,12 +117,12 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             state.pending_key = ""
             return True
         if state.pending_key == "g" and key in pending_keys.gh:
-            state.mode = "help"
+            set_mode(state, "help")
             state.help_offset = 0
             state.pending_key = ""
             return True
         if state.pending_key == "g" and key in pending_keys.gi:
-            state.mode = "info"
+            set_mode(state, "info")
             state.info_offset = 0
             state.pending_key = ""
             return True
@@ -148,20 +148,18 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             state.pending_key = ""
             return True
         if state.pending_key == "d" and key in pending_keys.dd:
-            from oud.editor.command_ops import yank_bar  # noqa: PLC0415
+            from oud.editor.command_ops import cmd_bar, yank_bar  # noqa: PLC0415
 
             yank_bar(state, state.cursor_bar)
-            delete_bar(state, state.cursor_bar)
-            state.cursor_bar = min(state.cursor_bar, len(state.piece.bars) - 1)
-            state.cursor_col = 0
-            state.message = "Bar deleted"
+            cmd_bar(state, "del")
             state.pending_key = ""
             return True
         if state.pending_key == "y" and key in pending_keys.yy:
             from oud.editor.command_ops import yank_bar  # noqa: PLC0415
 
-            yank_bar(state, state.cursor_bar)
-            state.message = "Bar yanked"
+            count = consume_count(state)
+            yank_bar(state, state.cursor_bar, count=count)
+            state.message = "Bar yanked" if count == 1 else f"Bars yanked: {count}"
             state.pending_key = ""
             return True
         state.pending_key = ""
@@ -170,7 +168,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     if key in count_keys.digits:
         digit = chr(key)
         if key == count_keys.zero and not state.count_prefix:
-            state.cursor_col = 0
+            apply_motion_target(state, target_home_bar(state, state.cursor_bar))
             return True
         state.count_prefix += digit
         return True
@@ -250,7 +248,10 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     def _handle_row_first() -> None:
         from oud.editor.command_ops import row_first_note_col  # noqa: PLC0415
 
-        state.cursor_col = row_first_note_col(state)
+        apply_motion_target(
+            state,
+            CursorMotionTarget(state.cursor_bar, row_first_note_col(state)),
+        )
 
     def _handle_paste() -> None:
         from oud.editor.command_ops import paste_bar  # noqa: PLC0415

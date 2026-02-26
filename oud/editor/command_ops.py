@@ -105,8 +105,8 @@ def show_help(state: EditorState) -> None:
         temp_path.unlink(missing_ok=True)
 
 
-def yank_bar(state: EditorState, index: int) -> None:
-    _yank_bar(state, index)
+def yank_bar(state: EditorState, index: int, *, count: int = 1) -> None:
+    _yank_bar(state, index, count=count)
 
 
 def paste_bar(state: EditorState, index: int) -> None:

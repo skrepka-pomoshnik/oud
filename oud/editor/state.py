@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypedDict
 
-from oud.core.model import Bar, Piece
+from oud.core.model import Bar, Chord, Piece
 from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.controller_utils import clamp_cursor
 from oud.editor.keycodes import DEFAULT_KEYCODES, KeyCodes
@@ -75,6 +75,8 @@ class EditorState:
         self.pending_mark = ""
         self.pending_quit = False
         self.yanked_bar: YankedBar | None = None
+        self.yanked_bars: list[YankedBar] | None = None
+        self.yanked_chords: list[Chord] | None = None
         self.stave_breaks: set[int] = set()
         self.config_path = config_path
         self.keycodes = keycodes or DEFAULT_KEYCODES

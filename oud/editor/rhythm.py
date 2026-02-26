@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.core.model import Bar
 from oud.core.render_utils import chord_positions, note_type_to_denom
+from oud.editor.motions import apply_motion_target, target_advance_next_bar_home
 from oud.editor.state import EditorState
 
 
@@ -150,11 +150,7 @@ def bar_duration_sum_by_col(state: EditorState, bar_index: int) -> float:  # noq
 
 
 def advance_to_next_bar(state: EditorState) -> None:
-    if state.cursor_bar >= len(state.piece.bars) - 1:
-        state.piece.bars.append(Bar())
-        state.modified = True
-    state.cursor_bar = min(state.cursor_bar + 1, len(state.piece.bars) - 1)
-    state.cursor_col = 0
+    apply_motion_target(state, target_advance_next_bar_home(state))
 
 
 def advance_if_bar_full(state: EditorState) -> None:

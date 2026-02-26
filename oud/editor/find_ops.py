@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from oud.core.render_utils import bar_cells, bar_cells_from_chords
 from oud.editor.controller_utils import string_index
+from oud.editor.motions import CursorMotionTarget, apply_motion_target
 from oud.editor.state import EditorState
 
 
@@ -100,26 +101,51 @@ def target_repeat_find(
     return (find_mode, target, col)
 
 
-def perform_find(state: EditorState, find_mode: str, target: str, count: int = 1) -> bool:
+def target_find_motion(
+    state: EditorState,
+    find_mode: str,
+    target: str,
+    count: int = 1,
+) -> CursorMotionTarget | None:
     col = target_find_col(state, find_mode, target, count=count)
     if col is None:
+        return None
+    return CursorMotionTarget(state.cursor_bar, col)
+
+
+def target_repeat_find_motion(
+    state: EditorState,
+    *,
+    reverse: bool,
+    count: int = 1,
+) -> tuple[str, str, CursorMotionTarget] | None:
+    target = target_repeat_find(state, reverse=reverse, count=count)
+    if target is None:
+        return None
+    find_mode, target_char, col = target
+    return (find_mode, target_char, CursorMotionTarget(state.cursor_bar, col))
+
+
+def perform_find(state: EditorState, find_mode: str, target: str, count: int = 1) -> bool:
+    motion = target_find_motion(state, find_mode, target, count=count)
+    if motion is None:
         state.message = f"Not found: {target}"
         return False
-    state.cursor_col = col
+    apply_motion_target(state, motion)
     state.last_find = (find_mode, target)
     return True
 
 
 def repeat_find(state: EditorState, *, reverse: bool, count: int = 1) -> bool:
-    target = target_repeat_find(state, reverse=reverse, count=count)
-    if target is None:
+    motion = target_repeat_find_motion(state, reverse=reverse, count=count)
+    if motion is None:
         if state.last_find is None:
             state.message = "No previous find"
         else:
             _mode, ch = state.last_find
             state.message = f"Not found: {ch}"
         return False
-    find_mode, target_char, col = target
-    state.cursor_col = col
+    find_mode, target_char, cursor_target = motion
+    apply_motion_target(state, cursor_target)
     state.last_find = (find_mode, target_char)
     return True
