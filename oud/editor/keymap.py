@@ -18,6 +18,8 @@ class KeyProfile:
     bar_prev: tuple[int, ...]
     page_up: tuple[int, ...]
     page_down: tuple[int, ...]
+    scroll_up: tuple[int, ...]
+    scroll_down: tuple[int, ...]
     col_start: tuple[int, ...]
     col_end: tuple[int, ...]
 
@@ -35,8 +37,10 @@ def _profile(state) -> KeyProfile:
             bar_delete_extra=(keycodes.dc,),
             bar_next=(ord("."),),
             bar_prev=(ord(","),),
-            page_up=(keycodes.ppage,),
-            page_down=(keycodes.npage,),
+            page_up=(),
+            page_down=(),
+            scroll_up=(keycodes.ppage,),
+            scroll_down=(keycodes.npage,),
             col_start=(keycodes.home,),
             col_end=(keycodes.end,),
         )
@@ -52,6 +56,8 @@ def _profile(state) -> KeyProfile:
         bar_prev=(ord("b"),),
         page_up=(ord("K"), ord("{")),
         page_down=(ord("J"), ord("}")),
+        scroll_up=(keycodes.ppage, 21),   # PgUp, Ctrl-U
+        scroll_down=(keycodes.npage, 4),  # PgDn, Ctrl-D
         col_start=(),
         col_end=(ord("e"), ord("$")),
     )
@@ -135,6 +141,8 @@ class NormalActionBindings:
     bar_prev: tuple[int, ...]
     page_up: tuple[int, ...]
     page_down: tuple[int, ...]
+    scroll_up: tuple[int, ...]
+    scroll_down: tuple[int, ...]
     col_start: tuple[int, ...]
     col_end: tuple[int, ...]
     jump_bottom: tuple[int, ...]
@@ -336,6 +344,8 @@ def normal_action_bindings(state) -> NormalActionBindings:
     bar_prev = profile.bar_prev
     page_up = profile.page_up
     page_down = profile.page_down
+    scroll_up = profile.scroll_up
+    scroll_down = profile.scroll_down
     col_start = profile.col_start
     col_end = profile.col_end
     return NormalActionBindings(
@@ -345,8 +355,10 @@ def normal_action_bindings(state) -> NormalActionBindings:
         pending=_remap_tuple(state, "remap_pending", (ord("g"), ord("d"), ord("y"))),
         bar_next=bar_next,
         bar_prev=bar_prev,
-        page_up=page_up,
-        page_down=page_down,
+        page_up=_remap_tuple(state, "remap_page_up", page_up),
+        page_down=_remap_tuple(state, "remap_page_down", page_down),
+        scroll_up=_remap_tuple(state, "remap_scroll_up", scroll_up),
+        scroll_down=_remap_tuple(state, "remap_scroll_down", scroll_down),
         col_start=col_start,
         col_end=col_end,
         jump_bottom=_remap_tuple(state, "remap_jump_bottom", (ord("G"),)),

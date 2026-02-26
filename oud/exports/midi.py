@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from oud.core.duet_score import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.playback_timeline import PlaybackCursor, build_timeline_from_events
 from oud.core.time_utils import parse_time_signature_value
@@ -250,6 +251,121 @@ def _bar_chord_events(
     return events
 
 
+def _duet_pair_bar_indices(piece: Piece, start_bar: int) -> list[tuple[int | None, int | None]]:
+    start_pair = max(0, start_bar // 2)
+    total_pairs = duet_logical_bar_count(piece)
+    pairs: list[tuple[int | None, int | None]] = []
+    for pair_idx in range(start_pair, total_pairs):
+        first = duet_raw_bar_index(0, pair_idx, piece=piece)
+        second = duet_raw_bar_index(1, pair_idx, piece=piece)
+        pairs.append(
+            (
+                first if first < len(piece.bars) else None,
+                second if second < len(piece.bars) else None,
+            ),
+        )
+    return pairs
+
+
+def _duet_timeline_events(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    dotted: set[tuple[int, int]] | None,
+) -> list[tuple[int, int, int, int]]:
+    timeline_events: list[tuple[int, int, int, int]] = []
+    current_time = 0
+    for first_idx, second_idx in _duet_pair_bar_indices(piece, start_bar):
+        pair_base_time = current_time
+        pair_max_end = 0
+        for b_idx in (first_idx, second_idx):
+            if b_idx is None:
+                continue
+            bar = piece.bars[b_idx]
+            chord_events = _bar_chord_events(
+                bar,
+                b_idx,
+                piece.strings,
+                overrides,
+                durations,
+                bar_width,
+                style,
+                default_duration,
+                dotted=dotted,
+            )
+            if not chord_events:
+                continue
+            max_end = 0
+            for event_idx, (start, duration, col, notes) in enumerate(chord_events):
+                if not notes:
+                    continue
+                marker_col = event_idx if bar.chords else col
+                timeline_events.append((b_idx, pair_base_time + start, duration, marker_col))
+                max_end = max(max_end, start + duration)
+            pair_max_end = max(pair_max_end, max_end)
+        current_time += pair_max_end
+    return timeline_events
+
+
+def _duet_note_events(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    dotted: set[tuple[int, int]] | None,
+    settings: dict[str, str],
+    gate: float,
+    pitches: list[int],
+) -> list[tuple[int, bytes]]:
+    events: list[tuple[int, bytes]] = []
+    current_time = 0
+    for first_idx, second_idx in _duet_pair_bar_indices(piece, start_bar):
+        pair_base_time = current_time
+        pair_max_end = 0
+        for b_idx in (first_idx, second_idx):
+            if b_idx is None:
+                continue
+            bar = piece.bars[b_idx]
+            beats, unit = _meter_for_bar(bar, settings)
+            chord_events = _bar_chord_events(
+                bar,
+                b_idx,
+                piece.strings,
+                overrides,
+                durations,
+                bar_width,
+                style,
+                default_duration,
+                dotted=dotted,
+            )
+            if not chord_events:
+                continue
+            max_end = 0
+            for start, duration, _col, notes in chord_events:
+                velocity = _accent_velocity(start, beats, unit)
+                note_len = max(1, int(duration * gate))
+                for note in notes:
+                    s_idx = note.string - 1
+                    if s_idx < 0 or s_idx >= len(pitches):
+                        continue
+                    pitch = pitches[s_idx] + note.fret
+                    events.append((pair_base_time + start, _note_on(0, pitch, velocity)))
+                    events.append((pair_base_time + start + note_len, _note_off(0, pitch, 64)))
+                max_end = max(max_end, start + duration)
+            pair_max_end = max(pair_max_end, max_end)
+        current_time += pair_max_end
+    return events
+
+
 def build_playback_timeline(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
@@ -266,6 +382,18 @@ def build_playback_timeline(
     default_duration = 4
     timeline_events: list[tuple[int, int, int, int]] = []
     sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
+    if is_duet_score_piece(piece):
+        timeline_events = _duet_timeline_events(
+            piece,
+            overrides=overrides,
+            durations=durations,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
+            start_bar=start_bar,
+            dotted=dotted,
+        )
+        return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
     current_time = 0
     for b_idx, bar in enumerate(piece.bars):
         if b_idx < start_bar:
@@ -399,8 +527,30 @@ def export_midi(
     events.append((0, _meta_tempo(bpm)))
     events.append((0, _program_change(0, program)))
 
-    current_time = 0
     default_duration = 4
+    if is_duet_score_piece(piece):
+        events.extend(
+            _duet_note_events(
+                piece,
+                overrides=overrides,
+                durations=durations,
+                bar_width=bar_width,
+                style=style,
+                default_duration=default_duration,
+                start_bar=start_bar,
+                dotted=dotted,
+                settings=settings,
+                gate=gate,
+                pitches=pitches,
+            ),
+        )
+        track = _write_track(events)
+        header = b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big")
+        header += TICKS_PER_QUARTER.to_bytes(2, "big")
+        data = header + track
+        Path(path).write_bytes(data)
+        return f"Wrote {path}"
+    current_time = 0
     for b_idx, bar in enumerate(piece.bars):
         if b_idx < start_bar:
             continue

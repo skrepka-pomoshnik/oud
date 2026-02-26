@@ -25,9 +25,13 @@ def _state() -> EditorState:
 
 def test_cmd_info_and_plugins(monkeypatch) -> None:
     state = _state()
+    state.insert_prefix = "/"
+    state.replace_once = True
     cmd_info(state)
     assert state.mode == "info"
     assert state.info_offset == 0
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
 
     called: dict[str, bool] = {"ok": False}
 
@@ -66,6 +70,8 @@ def test_cmd_open_basic_paths(tmp_path: Path) -> None:
 
     folder = tmp_path / "dir"
     folder.mkdir()
+    state.insert_prefix = ",1"
+    state.replace_once = True
     cmd_open(state, str(folder), no_path_msg="No path", build_durations_fn=None)
     assert state.message == ""
 
@@ -76,6 +82,8 @@ def test_cmd_open_appends_import_warning_to_message(tmp_path: Path) -> None:
     target.write_bytes(b"")
     warned_piece = Piece(title="W", bars=[Bar()], strings=6)
     warned_piece.import_warnings.append("FT3 lyric/melody text records are present and currently ignored.")
+    state.insert_prefix = "/"
+    state.replace_once = True
     cmd_open(
         state,
         str(target),
@@ -85,3 +93,5 @@ def test_cmd_open_appends_import_warning_to_message(tmp_path: Path) -> None:
     )
     assert "Opened" in state.message
     assert "lyric/melody text records" in state.message
+    assert state.insert_prefix == ""
+    assert state.replace_once is False

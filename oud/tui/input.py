@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from oud.editor.insert_session import set_mode
 from oud.editor.keymap import command_bindings, search_bindings
 from oud.editor.prompt_state import (
     command_history_commit,
@@ -162,14 +163,14 @@ def handle_command(state: EditorState, key: int, apply_command) -> bool:
     state.cmdline = result.text
     state.command_history_index = result.history_index
     if result.cancel:
-        state.mode = "normal"
+        set_mode(state, "normal")
         state.cmdline = ""
         command_history_reset_nav(state)
         return True
     if result.submit:
         cmd = state.cmdline
         state.cmdline = ""
-        state.mode = "normal"
+        set_mode(state, "normal")
         command_history_commit(state, cmd)
         apply_command(state, cmd)
         return True
@@ -201,7 +202,7 @@ def handle_search(state: EditorState, key: int) -> bool:
     state.searchline = result.text
     state.search_history_index = result.history_index
     if result.cancel:
-        state.mode = "normal"
+        set_mode(state, "normal")
         state.searchline = ""
         search_history_reset_nav(state)
         return True
@@ -209,7 +210,7 @@ def handle_search(state: EditorState, key: int) -> bool:
         search_text = state.searchline
         target = parse_search(search_text)
         state.searchline = ""
-        state.mode = "normal"
+        set_mode(state, "normal")
         search_history_commit(state, search_text)
         if target is None:
             state.message = "Invalid bar"

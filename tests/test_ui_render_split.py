@@ -4,6 +4,13 @@ import re
 
 import pytest
 
+from oud.core.duet_score import (
+    duet_bar_mapping,
+    duet_raw_bar_index,
+    duet_staff_labels,
+    duet_storage_mode,
+    split_duet_piece_staff,
+)
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.ui.adapter import Screen
 from oud.ui.framebuffer import FrameBuffer
@@ -218,10 +225,146 @@ def test_render_shows_time_signature_at_left_of_score_once() -> None:
     ]
     assert any(text.strip() == "O" for (_y, _x, text) in time_calls)
     assert any(x >= 3 for (_y, x, text) in time_calls if text.strip() == "O")
-    # Inlined time signature is drawn as a small multi-row block (>=3 rows).
-    inline_rows = [(y, text) for (y, _x, text) in time_calls if text.strip() in {"O", "|", "/", "4"}]
-    assert len(inline_rows) >= 3
-    assert sum(1 for (_y, _x, text) in time_calls if text.strip().startswith("O")) == 1
+
+
+def test_render_duet_score_view_both_shows_two_staff_labels_and_brace() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Duet",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="Discant lute:6-course, Tenor lute:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("Discant lute" in text for text in texts)
+    assert any("Tenor lute" in text for text in texts)
+    assert any("{" in text for text in texts)
+
+
+def test_render_duet_score_view_frame_preserves_title_and_label_text() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=28, w=100)
+    kwargs["piece"] = Piece(
+        title="Duet Title",
+        composer="Anon",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, 3, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    lines = _render_lines(kwargs)
+    assert "Duet Title" in lines[0]
+    assert any("Lute 1" in line for line in lines[:12])
+    assert any("Lute 2" in line for line in lines[:18])
+    assert not any("Lu{e 2" in line for line in lines[:18])
+
+
+def test_render_duet_score_view_single_staff_hides_other_staff() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Duet",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "1"
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("Lute 1 only" in text for text in texts)
+    assert not any("Lute 2 only" in text for text in texts)
+
+
+def test_render_duet_score_view_mirrors_playback_marker_on_both_staves() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=28, w=100)
+    kwargs["piece"] = Piece(
+        title="Duet",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    kwargs["playback_bar"] = 1
+    kwargs["playback_col"] = 0
+    lines = _render_lines(kwargs)
+    marker_rows = [idx for idx, line in enumerate(lines) if "^" in line]
+    assert len(marker_rows) >= 2
+
+
+def test_duet_staff_labels_and_time_fill_are_derived_from_ensemble_and_pair() -> None:
+    piece = Piece(
+        title="Duet",
+        bars=[
+            # Sequential halves duet-score storage: top staff bars first, then bottom.
+            Bar(time_sig=None, chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(time_sig="C|", chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])]),
+            Bar(time_sig="O", chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+            Bar(time_sig=None, chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="Prime lute:6-course, Bass lute:6-course",
+        part="score",
+    )
+    assert duet_staff_labels(piece) == ("Prime lute", "Bass lute")
+    top = split_duet_piece_staff(piece, 0)
+    bottom = split_duet_piece_staff(piece, 1)
+    assert top.bars[0].time_sig == "O"      # filled from paired staff
+    assert bottom.bars[1].time_sig == "C|"   # filled from paired staff
+
+
+def test_duet_mapping_uses_odd_raw_bars_for_top_staff() -> None:
+    # Legacy interleaved mapping remains available for synthetic fixtures.
+    assert duet_bar_mapping(0) == (1, 0)
+    assert duet_bar_mapping(1) == (0, 0)
+    assert duet_bar_mapping(2) == (1, 1)
+    assert duet_bar_mapping(3) == (0, 1)
+    assert duet_raw_bar_index(0, 0) == 1
+    assert duet_raw_bar_index(1, 0) == 0
+
+
+def test_duet_score_piece_defaults_to_sequential_halves_mapping() -> None:
+    piece = Piece(
+        title="Duet",
+        bars=[Bar(), Bar(), Bar(), Bar()],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    assert duet_storage_mode(piece) == "halves"
+    assert duet_bar_mapping(0, piece=piece) == (0, 0)
+    assert duet_bar_mapping(1, piece=piece) == (0, 1)
+    assert duet_bar_mapping(2, piece=piece) == (1, 0)
+    assert duet_bar_mapping(3, piece=piece) == (1, 1)
+    assert duet_raw_bar_index(0, 1, piece=piece) == 1
+    assert duet_raw_bar_index(1, 1, piece=piece) == 3
 
 
 def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None:
@@ -434,14 +577,51 @@ def test_render_new_sheet_first_note_flag_does_not_overlap_time_cue_lane() -> No
     assert lines[flag_row_y][cue_x] == " "
 
 
+def test_render_override_first_note_flag_does_not_overlap_time_cue_lane() -> None:
+    kwargs = _args("insert")
+    kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O")], strings=6)
+    kwargs["overrides"] = {(0, 0, 0): "a"}
+    kwargs["durations"] = {(0, 0, 0): 4}
+    render_piece(**kwargs)
+
+    screen = kwargs["stdscr"]
+    width = screen.w
+    height = screen.h
+    canvas = [[" " for _ in range(width)] for _ in range(height)]
+    for y, x, text, _a in screen.calls:
+        if not (0 <= y < height):
+            continue
+        for idx, ch in enumerate(text):
+            tx = x + idx
+            if 0 <= tx < width:
+                canvas[y][tx] = ch
+    lines = ["".join(row) for row in canvas]
+
+    cue_cells = [
+        (y, x)
+        for y, row in enumerate(lines)
+        for x, ch in enumerate(row)
+        if ch == "O"
+    ]
+    assert cue_cells
+    cue_y, cue_x = cue_cells[0]
+    flag_row_y = next(
+        y
+        for y in range(max(0, cue_y - 4), cue_y)
+        if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
+    )
+    assert lines[flag_row_y][cue_x] == " "
+
+
 def test_render_repeat_glyphs_visible_on_synthetic_piece() -> None:
     kwargs = _args("normal")
     kwargs["stdscr"] = _Screen(h=39, w=121)
     kwargs["piece"] = repeat_and_meter_change_piece()
     render_piece(**kwargs)
     texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
-    assert any(".:" in text for text in texts)
-    assert any(":." in text for text in texts)
+    assert sum(1 for text in texts if text == ":") >= 4
+    assert not any(".:" in text for text in texts)
+    assert not any(":." in text for text in texts)
 
 
 def test_render_repeat_words_visible_on_synthetic_piece() -> None:
@@ -452,6 +632,21 @@ def test_render_repeat_words_visible_on_synthetic_piece() -> None:
     render_piece(**kwargs)
     texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
     assert any("DC al Fine" in text for text in texts)
+
+
+def test_render_shows_duet_score_hint_from_metadata() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Spanish Measures",
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])],
+        strings=6,
+        piece_type="lute duet",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("Lute 1 / Lute 2" in text for text in texts)
 
 
 def test_imported_fingering_renders_right_subscript_in_french() -> None:
@@ -614,7 +809,78 @@ def test_imported_dot_left_ornament_renders_inline_as_unicode_dot(
     kwargs["settings"]["showornaments"] = "on"
     lines = _render_lines(kwargs)
     text = "\n".join(lines)
-    assert f"{base}˙" in text
+    assert f"{base}\u0307" in text
+
+
+@pytest.mark.parametrize(
+    ("style", "italian_orient", "base"),
+    [
+        ("french", None, "b"),
+        ("italian", "reverse", "1"),
+    ],
+)
+def test_imported_right_hand_dot_fingering_renders_as_combining_mark_on_note(
+    style: str,
+    italian_orient: str | None,
+    base: str,
+) -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="RHDot",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0, right_fingering="dot1")]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["style"] = style
+    if italian_orient is not None:
+        kwargs["settings"]["italianorient"] = italian_orient
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    text = "\n".join(_render_lines(kwargs))
+    assert f"{base}\u0307" in text
+
+
+@pytest.mark.parametrize(
+    ("style", "italian_orient", "fingering"),
+    [
+        ("french", None, "₂\u0308"),
+        ("italian", "reverse", "²\u0308"),
+    ],
+)
+def test_imported_right_hand_dots_attach_to_fingering_when_left_fingering_present(
+    style: str,
+    italian_orient: str | None,
+    fingering: str,
+) -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="RHDot+LH",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(3, 1, 0, left_fingering="2", right_fingering="dot2")],
+                    ),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["style"] = style
+    if italian_orient is not None:
+        kwargs["settings"]["italianorient"] = italian_orient
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    text = "\n".join(_render_lines(kwargs))
+    assert fingering in text
 
 
 def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(monkeypatch) -> None:

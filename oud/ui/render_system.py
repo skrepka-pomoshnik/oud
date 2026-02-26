@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import unicodedata
+
 from oud.core.render_utils import (
     smart_group_map,
     soft_beat_snap_map,
@@ -65,6 +67,16 @@ def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
         if ch != " ":
             out[idx] = ch
     return out
+
+
+def _repeat_dot_display_rows(display_strings: int) -> set[int]:
+    if display_strings <= 0:
+        return set()
+    if display_strings == 1:
+        return {0}
+    hi = min(display_strings - 1, display_strings // 2)
+    lo = max(0, hi - 1)
+    return {lo, hi}
 
 
 def _overlay_sparse_mark_chars(
@@ -167,9 +179,20 @@ def _inline_fingering_glyph(ch: str, *, style: str = "french") -> str:
         "t": "ₜ",
         "T": "ₜ",
     }
-    if style == "italian":
-        return supers.get(ch, ch)
-    return subs.get(ch, ch)
+    out: list[str] = []
+    for part in ch:
+        if unicodedata.combining(part):
+            out.append(part)
+            continue
+        if style == "italian":
+            out.append(supers.get(part, part))
+        else:
+            out.append(subs.get(part, part))
+    return "".join(out)
+
+
+def _combining_only_mark(text: str) -> bool:
+    return bool(text) and all(unicodedata.combining(ch) for ch in text)
 
 
 def _overlay_inline_local_marks(
@@ -193,20 +216,26 @@ def _overlay_inline_local_marks(
 
         # Ornament/grace marker sits immediately to the right of the note (a#).
         if orn != " ":
-            right = col + 1
-            if right < width and cells[target_row][right] == "-":
-                cells[target_row][right] = orn
+            if _combining_only_mark(orn):
+                cells[target_row][col] = cells[target_row][col] + orn
+            else:
+                right = col + 1
+                if right < width and cells[target_row][right] == "-":
+                    cells[target_row][right] = orn
 
         # Fingering/annotation marker uses compact unicode and must stay adjacent.
         # If there is no adjacent free slot, drop it instead of drifting.
         if ann != " ":
             mark = _inline_fingering_glyph(ann, style=style)
-            right = col + 1
-            if right < width and cells[target_row][right] == "-":
-                cells[target_row][right] = mark
+            if _combining_only_mark(mark):
+                cells[target_row][col] = cells[target_row][col] + mark
+            else:
+                right = col + 1
+                if right < width and cells[target_row][right] == "-":
+                    cells[target_row][right] = mark
 
 
-def _overlay_inline_local_marks_on_display_row(  # noqa: C901
+def _overlay_inline_local_marks_on_display_row(  # noqa: C901, PLR0912
     *,
     display_row_cells: list[str],
     source_row_cells: list[str],
@@ -239,9 +268,12 @@ def _overlay_inline_local_marks_on_display_row(  # noqa: C901
         ):
             orn = " "
         if orn != " ":
-            right = disp_col + 1
-            if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
-                display_row_cells[right] = orn
+            if _combining_only_mark(orn):
+                display_row_cells[disp_col] = display_row_cells[disp_col] + orn
+            else:
+                right = disp_col + 1
+                if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
+                    display_row_cells[right] = orn
         ann = ann_cells[col]
         if (
             ann != " "
@@ -252,9 +284,12 @@ def _overlay_inline_local_marks_on_display_row(  # noqa: C901
             ann = " "
         if ann != " ":
             mark = _inline_fingering_glyph(ann, style=style)
-            right = disp_col + 1
-            if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
-                display_row_cells[right] = mark
+            if _combining_only_mark(mark):
+                display_row_cells[disp_col] = display_row_cells[disp_col] + mark
+            else:
+                right = disp_col + 1
+                if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
+                    display_row_cells[right] = mark
 
 
 def _merge_span_rows_with_cue_priority(  # noqa: C901
@@ -890,6 +925,9 @@ def render_systems(  # noqa: C901, PLR0912
             repeat = bar.repeat or ""
             repeat_glyph = repeat if repeat in {".:", ":.", "."} else ""
             repeat_cue = repeat if not repeat_glyph else ""
+            repeat_rows = _repeat_dot_display_rows(system_display_strings)
+            repeat_left = repeat in {".:", ":|:", "."}
+            repeat_right = repeat in {":.", ":|:", "."}
             sign_cues: list[str] = []
             if bar.fermata:
                 sign_cues.append("^")
@@ -1052,7 +1090,6 @@ def render_systems(  # noqa: C901, PLR0912
             draw_pad = pad + cue_pad_extra
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
-                safe_addstr(stdscr, meta_row, bar_x - 2, repeat_glyph)
                 if abs_bar == 0 and not wrote_time_sig:
                     safe_addstr(stdscr, meta_row, 0, " ")
                 meta_x = bar_x
@@ -1630,10 +1667,13 @@ def render_systems(  # noqa: C901, PLR0912
                     spacing_mode="auto" if scale_bar else spacing_mode,
                     display_width=display_width,
                     bar_width=bar_width,
-                    barpad=pad,
+                    barpad=draw_pad if scale_bar else pad,
                     flagstyle=flagstyle,
                     flaglean=flaglean,
                 )
+                if draw_pad and not scale_bar:
+                    flag_cells = pad_row(flag_cells, display_width, draw_pad)
+                    stem_cells = pad_row(stem_cells, display_width, draw_pad)
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
                 if (
                     playback_bar is not None
@@ -1711,6 +1751,8 @@ def render_systems(  # noqa: C901, PLR0912
                     )
                 row_text = "".join(row_cells)
                 safe_addstr(stdscr, y, bar_x - 1, "|")
+                if repeat_left and display_idx in repeat_rows:
+                    safe_addstr(stdscr, y, bar_x - 1, ":")
                 safe_addstr(stdscr, y, bar_x, row_text)
                 if show_time_sig_here and _sig_label:
                     ts_rows = time_sig_inline_rows(
@@ -1742,6 +1784,8 @@ def render_systems(  # noqa: C901, PLR0912
                             row_text = "".join(row_cells)
                             safe_addstr(stdscr, y, bar_x, row_text)
                 safe_addstr(stdscr, y, barline_x, barline)
+                if repeat_right and display_idx in repeat_rows:
+                    safe_addstr(stdscr, y, barline_x, ":")
 
                 if (
                     abs_bar == cursor_bar

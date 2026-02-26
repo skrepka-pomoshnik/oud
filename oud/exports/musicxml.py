@@ -281,7 +281,7 @@ def _add_note(  # noqa: C901
         if left_f:
             SubElement(technical, "fingering").text = str(left_f)
         right_f = getattr(note_model, "right_fingering", None)
-        if right_f:
+        if right_f and right_f not in {"dot1", "dot2", "dot3"}:
             pluck = "p" if right_f == "thumb" else str(right_f)
             SubElement(technical, "pluck").text = pluck
 

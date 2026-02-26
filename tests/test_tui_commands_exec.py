@@ -10,6 +10,7 @@ from oud.core.tab_parser import TabData
 from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor import command_ops as cmd_ops
 from oud.editor.file_ops import render_ascii_snapshot
+from oud.editor.ops import french_to_fret
 from oud.editor.state import EditorState
 from oud.tui import commands as cmd
 
@@ -130,6 +131,59 @@ def test_cmd_transpose_retune_and_courseshift_with_undo(tmp_path: Path) -> None:
     assert any(n.string == 2 for n in shifted)
     assert "Course shift down" in state.message
 
+
+def test_cmd_courseshift_works_on_grid_overrides_and_keeps_pitch(tmp_path: Path) -> None:
+    state = _state(bars=1)
+    state.cursor_bar = 0
+    state.cursor_col = 0
+    state.cursor_string = 0
+    state.overrides[(0, 0, 0)] = "c"  # fret 2 on cursor string
+    state.durations[(0, 0, 0)] = 4
+    source_tuning = parse_tuning_pitches(state.settings["tuning"])
+    src_pitch = source_tuning[0] + 2
+
+    cmd.apply_command(state, "courseshift down", str(tmp_path / "cfg.toml"))
+
+    moved = [(k, v) for (k, v) in state.overrides.items() if k[0] == 0 and k[2] == 0]
+    assert len(moved) == 1
+    (bar, s_idx, col), glyph = moved[0]
+    assert (bar, col) == (0, 0)
+    assert s_idx == 1
+    fret = french_to_fret(glyph)
+    assert fret is not None
+    dst_pitch = source_tuning[s_idx] + fret
+    assert dst_pitch == src_pitch
+    assert "Course shift down" in state.message
+
+
+def test_cmd_transpose_and_retune_preserve_grid_override_pitch_rules(tmp_path: Path) -> None:
+    state = _state(bars=1)
+    state.overrides[(0, 0, 0)] = "b"  # fret 1
+    state.durations[(0, 0, 0)] = 4
+    state.cursor_bar = 0
+    state.cursor_col = 0
+    state.cursor_string = 0
+    src_tuning = parse_tuning_pitches(state.settings["tuning"])
+    src_pitch = src_tuning[0] + 1
+
+    cmd.apply_command(state, "transpose 2", str(tmp_path / "cfg.toml"))
+    trans_key, trans_glyph = next(iter(state.overrides.items()))
+    trans_fret = french_to_fret(trans_glyph)
+    assert trans_fret is not None
+    trans_tuning = parse_tuning_pitches(state.settings["tuning"])
+    trans_pitch = trans_tuning[trans_key[1]] + trans_fret
+    assert trans_pitch == src_pitch + 2
+    assert "Transposed +2" in state.message
+
+    cmd.apply_command(state, "retune e2a2d3g3b3e4", str(tmp_path / "cfg.toml"))
+    ret_key, ret_glyph = next(iter(state.overrides.items()))
+    ret_fret = french_to_fret(ret_glyph)
+    assert ret_fret is not None
+    ret_tuning = parse_tuning_pitches(state.settings["tuning"])
+    ret_pitch = ret_tuning[ret_key[1]] + ret_fret
+    assert ret_pitch == trans_pitch
+    assert "Retuned:" in state.message
+
 def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
 
@@ -205,6 +259,17 @@ def test_cmd_set_layout_stretch_alias(monkeypatch: pytest.MonkeyPatch, tmp_path:
     cmd.cmd_set(state, "layout=stretch", str(tmp_path / "cfg.toml"))
     assert state.settings["layout"] == "auto"
     assert state.settings["justify"] == "edge"
+
+
+def test_cmd_set_movementmode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _state()
+
+    def _save(_path: str, _settings: dict[str, str]) -> None:
+        return None
+
+    monkeypatch.setattr(cmd_ops, "save_settings", _save)
+    cmd.cmd_set(state, "movementmode=note", str(tmp_path / "cfg.toml"))
+    assert state.settings["movementmode"] == "note"
 
 
 def test_cmd_set_tabnotation_full_preset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -545,12 +610,17 @@ def test_cmd_bar_and_chord() -> None:
     assert len(state.piece.bars) == 3
     cmd.cmd_bar(state, "del")
     assert len(state.piece.bars) == 2
-    cmd.cmd_chord(state, "insert")
-    assert state.piece.bars[state.cursor_bar].chords
+    cmd.cmd_chord(state, "insert 3")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 3
+    assert state.message == "Chords added: 3"
+    state.cursor_col = 0
+    cmd.cmd_chord(state, "delete 2")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 1
+    assert state.message == "Chords deleted: 2"
     cmd.cmd_chord(state, "delete")
     assert state.piece.bars[state.cursor_bar].chords == []
     cmd.cmd_chord(state, "other")
-    assert state.message == "Chord action: add/del"
+    assert state.message == "Chord action: add/del [count]"
 
 
 def test_cmd_stave_variants() -> None:

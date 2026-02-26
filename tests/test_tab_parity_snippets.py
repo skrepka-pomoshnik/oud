@@ -369,10 +369,11 @@ def test_tab_snippet_repeats_and_double_barline_render_without_breaking_staff() 
         state.settings[key] = "off"
     lines = _render_state_lines(state, height=18)
     head = lines[:8]
-    assert any(".:" in line for line in head)
-    assert any(":." in line for line in head)
+    assert not any(".:" in line for line in head)
+    assert not any(":." in line for line in head)
     staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
     assert staff_rows
+    assert any(":" in row for row in staff_rows)
     # Double barline at the system edge is allowed, but staff rows must still draw a closing barline.
     assert all(row.rstrip().endswith("|") for row in staff_rows)
     assert any(row.rstrip().endswith("||") for row in staff_rows)
@@ -406,7 +407,8 @@ def test_tab_snippet_repeat_and_barline_variant_matrix_renders() -> None:
         assert staff_rows, (repeat, barline)
         assert any(row.rstrip().endswith("|") for row in staff_rows), (repeat, barline)
         if repeat in {".:", ":.", "."}:
-            assert any(repeat in line for line in lines[:6]), (repeat, barline)
+            assert not any(repeat in line for line in lines[:6]), (repeat, barline)
+            assert any(":" in line for line in lines[2:12]), (repeat, barline)
         else:
             assert any("DC al Fine" in line for line in lines[:8]), (repeat, barline)
 

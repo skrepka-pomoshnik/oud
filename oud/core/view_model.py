@@ -766,6 +766,12 @@ def _ft3_fingering_glyph(value: str | None) -> str | None:
         return None
     if value == "thumb":
         return "t"
+    if value == "dot1":
+        return "\u0307"
+    if value == "dot2":
+        return "\u0308"
+    if value == "dot3":
+        return "\u20DB"
     return value[0]
 
 
@@ -775,11 +781,24 @@ def _ft3_display_fingering_for_note(note: Note, *, fingering_mode: str) -> str |
     # Keep RH markers / thumb, but suppress LH digit clutter until barre semantics exist.
     if note.fret == 0 and left_value in {"1", "2", "3", "4"}:
         left_value = None
-    picked = _pick_side_value(
-        left=left_value,
-        right=note.right_fingering,
-        mode=fingering_mode,
-    )
+    right_value = note.right_fingering
+    if fingering_mode == "off":
+        return None
+    left_enabled = fingering_mode in {"left", "both"}
+    right_enabled = fingering_mode in {"right", "both"}
+    left_glyph = _ft3_fingering_glyph(left_value) if left_enabled else None
+    right_glyph = _ft3_fingering_glyph(right_value) if right_enabled else None
+    if (
+        right_enabled
+        and right_value in {"dot1", "dot2", "dot3"}
+        and right_glyph is not None
+    ):
+        if left_glyph:
+            # RH dotted-finger cue attaches to the fingering mark itself (e.g. 2̈).
+            return left_glyph + right_glyph
+        # RH dotted-finger cue with no LH digit attaches directly to the note glyph.
+        return right_glyph
+    picked = _pick_side_value(left=left_value, right=right_value, mode=fingering_mode)
     return _ft3_fingering_glyph(picked)
 
 
@@ -787,7 +806,7 @@ def _ft3_ornament_glyph(value: str | None) -> str | None:
     if not value:
         return None
     mapping = {
-        "dot-left": "˙",
+        "dot-left": "\u0307",
         "brackets": "[",
     }
     return mapping.get(value, value[0])

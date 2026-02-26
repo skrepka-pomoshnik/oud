@@ -8,6 +8,7 @@ from pathlib import Path
 
 from oud.core.plugin_model import RemoteTab
 from oud.editor.command_ops import cmd_open
+from oud.editor.insert_session import set_mode
 from oud.editor.keymap import plugin_bindings
 from oud.editor.list_menu import (
     MenuNavBindings,
@@ -271,11 +272,11 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
     action = _plugin_action(state, key)
     if action == "exit":
         if not _pop_stack(state):
-            state.mode = "normal"
+            set_mode(state, "normal")
         return True
     if action == "back":
         if not _pop_stack(state):
-            state.mode = "normal"
+            set_mode(state, "normal")
         return True
 
     nav_bindings = MenuNavBindings(

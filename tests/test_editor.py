@@ -5,6 +5,8 @@ from oud.editor import actions, edit_ops, ops, undo_ops
 from oud.editor import command_ops as cmd_ops
 from oud.editor.controller import handle_key as dispatch_key
 from oud.editor.state import EditorState
+from oud.ui.framebuffer import FrameBuffer
+from oud.ui.render import render_piece
 
 
 def _state() -> EditorState:
@@ -34,6 +36,56 @@ def _state() -> EditorState:
         "midipatch": "0",
     }
     return EditorState(piece, settings)
+
+
+def _render_lines(state: EditorState, *, width: int = 80, height: int = 24) -> list[str]:
+    fb = FrameBuffer(height, width)
+    render_piece(
+        fb,
+        state.piece,
+        state.bar_offset,
+        state.cursor_bar,
+        state.cursor_string,
+        state.cursor_col,
+        state.bar_width,
+        state.overrides,
+        state.durations,
+        state.ornaments,
+        state.annotations,
+        state.highlights,
+        state.dotted,
+        state.slurs,
+        state.ties,
+        state.holds,
+        state.mode,
+        state.cmdline,
+        "",
+        "",
+        state.searchline,
+        state.settings,
+        None,
+        state.stave_breaks,
+        state.plugin_title,
+        [],
+        state.plugin_index,
+        state.plugin_offset,
+        state.help_offset,
+        state.playback_bar,
+        state.playback_col,
+        getattr(state, "glisses", []),
+    )
+    return fb.snapshot().lines
+
+
+def _press(state: EditorState, key: int) -> bool:
+    return dispatch_key(
+        state,
+        key,
+        handle_insert=actions.handle_insert,
+        handle_normal=actions.handle_normal,
+        handle_command=lambda _state, _key: True,
+        handle_search=lambda _state, _key: True,
+    )
 
 
 def test_undo_override_removes_cell() -> None:
@@ -766,6 +818,30 @@ def test_insert_mode_notes_insert_and_arrows_move() -> None:
     assert state.cursor_string == 0
 
 
+def test_insert_mode_arrow_movement_clears_bass_slash_prefix() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.piece.strings = 8
+    actions.handle_insert(state, ord("/"))
+    assert state.insert_prefix == "/"
+    actions.handle_insert(state, state.keycodes.right)
+    assert state.insert_prefix == ""
+    actions.handle_insert(state, ord("a"))
+    assert (0, 0, 1) in state.overrides
+    assert (0, 6, 1) not in state.overrides
+
+
+def test_insert_mode_arrow_movement_clears_italian_multifret_prefix() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.settings["style"] = "italian"
+    state.settings["italianmultifret"] = "on"
+    actions.handle_insert(state, ord(","))
+    assert state.insert_prefix == ","
+    actions.handle_insert(state, state.keycodes.left)
+    assert state.insert_prefix == ""
+
+
 def test_insert_mode_backspace_clears_note() -> None:
     state = _state()
     state.mode = "insert"
@@ -905,3 +981,88 @@ def test_insert_bass_slash_shorthand() -> None:
     actions.handle_insert(state, ord("/"))
     actions.handle_insert(state, ord("a"))
     assert state.overrides[(0, 6, 0)] == "a"
+
+
+def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> None:
+    state = _state()
+    state.screen_width = 28
+    state.screen_height = 20
+    state.settings.update(
+        {
+            "layout": "auto",
+            "justify": "smart",
+            "beatsnap": "soft",
+            "showtuning": "off",
+            "showdur": "off",
+            "showspans": "off",
+            "showfingerings": "off",
+            "showornaments": "off",
+            "linelen": "0",
+            "barsperline": "0",
+            "maxbars": "0",
+            "barpad": "1",
+            "flagredundant": "on",
+        },
+    )
+    if not hasattr(state, "glisses"):
+        state.glisses = []
+    _press(state, ord("i"))
+    first_flag_x: int | None = None
+    for _ in range(4):
+        _press(state, ord("a"))
+        lines = _render_lines(state, width=state.screen_width, height=state.screen_height)
+        top_g_idx = next(i for i, line in enumerate(lines) if "g|" in line)
+        top_g_row = lines[top_g_idx]
+        note_x = top_g_row.find("a")
+        assert note_x >= 0
+        flag_row = ""
+        for line in reversed(lines[:top_g_idx]):
+            if any(f"{label}|" in line for label in ("g", "d", "a", "f", "c")):
+                continue
+            if any(ch in line for ch in ("|", "\\", "=")):
+                flag_row = line
+                break
+        assert flag_row
+        glyph_positions = [i for i, ch in enumerate(flag_row) if ch in ("|", "\\", "=")]
+        assert glyph_positions
+        flag_x = glyph_positions[0]
+        if first_flag_x is None:
+            first_flag_x = flag_x
+        assert flag_x == first_flag_x
+        assert flag_x == note_x
+        time_rows = [line for line in lines if "|-C" in line or " C" in line]
+        if time_rows:
+            time_x = time_rows[0].find("C")
+            if time_x >= 0:
+                assert flag_row[time_x] == " "
+
+
+def test_keypress_insert_aaaa_then_l_moves_one_cell_per_press_on_grid_bar() -> None:
+    state = _state()
+    state.screen_width = 18
+    state.screen_height = 20
+    state.settings.update(
+        {
+            "layout": "auto",
+            "justify": "smart",
+            "beatsnap": "soft",
+            "showtuning": "off",
+            "showdur": "off",
+            "showspans": "off",
+            "showfingerings": "off",
+            "showornaments": "off",
+            "linelen": "0",
+            "barsperline": "0",
+            "maxbars": "0",
+            "barpad": "1",
+            "flagredundant": "on",
+        },
+    )
+    for key in ("i", "a", "a", "a", "a"):
+        _press(state, ord(key))
+    _press(state, 27)
+    cols: list[int] = []
+    for _ in range(10):
+        _press(state, ord("l"))
+        cols.append(state.cursor_col)
+    assert cols == [5, 6, 7, 8, 9, 10, 11, 0, 1, 2]

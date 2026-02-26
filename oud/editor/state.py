@@ -9,6 +9,7 @@ from oud.core.model import Bar, Piece
 from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.controller_utils import clamp_cursor
 from oud.editor.keycodes import DEFAULT_KEYCODES, KeyCodes
+from oud.editor.transient_message import DEFAULT_MESSAGE_TTL_TICKS
 
 if TYPE_CHECKING:
     from oud.core.plugin_model import RemoteTab
@@ -36,6 +37,8 @@ class EditorState:
         self.current_duration = 4
         self.cmdline = ""
         self.searchline = ""
+        self._message = ""
+        self.message_ttl_ticks = 0
         self.message = ""
         self.path: str | None = None
         self.modified = False
@@ -81,11 +84,21 @@ class EditorState:
         self.dirty_rows: set[int] = set()
         self.last_frame: Frame | None = None
         self.last_frame_size: tuple[int, int] | None = None
+        self.viewport_scroll_hold_ticks = 0
         # Temporary bridge marker for preset-based partial conversion (guitar/lute).
         self.partial_preset_convert_applied: str | None = None
 
     def clamp(self) -> None:
         clamp_cursor(self)
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @message.setter
+    def message(self, value: str) -> None:
+        self._message = value
+        self.message_ttl_ticks = DEFAULT_MESSAGE_TTL_TICKS if value else 0
 
     @property
     def command_history(self) -> list[str]:

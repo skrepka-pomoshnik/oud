@@ -70,12 +70,17 @@ def test_cmd_bar_and_stave() -> None:
 
 def test_cmd_chord() -> None:
     state = _state()
-    cmd_chord(state, "insert")
-    assert state.piece.bars[state.cursor_bar].chords
+    cmd_chord(state, "insert 3")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 3
+    assert state.message == "Chords added: 3"
+    state.cursor_col = 0
+    cmd_chord(state, "delete 2")
+    assert len(state.piece.bars[state.cursor_bar].chords) == 1
+    assert state.message == "Chords deleted: 2"
     cmd_chord(state, "delete")
     assert state.piece.bars[state.cursor_bar].chords == []
     cmd_chord(state, "other")
-    assert state.message == "Chord action: add/del"
+    assert state.message == "Chord action: add/del [count]"
 
 
 def test_show_help_uses_less(monkeypatch) -> None:

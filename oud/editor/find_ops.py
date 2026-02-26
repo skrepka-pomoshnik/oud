@@ -71,10 +71,37 @@ def _find_target_col(
     return min(len(row) - 1, index + 1) if find_mode == "T" else index
 
 
-def perform_find(state: EditorState, find_mode: str, target: str, count: int = 1) -> bool:
+def target_find_col(
+    state: EditorState,
+    find_mode: str,
+    target: str,
+    count: int = 1,
+) -> int | None:
     row_index = string_index(state, state.cursor_string)
     row = _row_chars(state, state.cursor_bar, row_index)
-    col = _find_target_col(row, state.cursor_col, target, find_mode, count)
+    return _find_target_col(row, state.cursor_col, target, find_mode, count)
+
+
+def target_repeat_find(
+    state: EditorState,
+    *,
+    reverse: bool,
+    count: int = 1,
+) -> tuple[str, str, int] | None:
+    if state.last_find is None:
+        return None
+    find_mode, target = state.last_find
+    if reverse:
+        mode_map = {"f": "F", "F": "f", "t": "T", "T": "t"}
+        find_mode = mode_map[find_mode]
+    col = target_find_col(state, find_mode, target, count=count)
+    if col is None:
+        return None
+    return (find_mode, target, col)
+
+
+def perform_find(state: EditorState, find_mode: str, target: str, count: int = 1) -> bool:
+    col = target_find_col(state, find_mode, target, count=count)
     if col is None:
         state.message = f"Not found: {target}"
         return False
@@ -84,11 +111,15 @@ def perform_find(state: EditorState, find_mode: str, target: str, count: int = 1
 
 
 def repeat_find(state: EditorState, *, reverse: bool, count: int = 1) -> bool:
-    if state.last_find is None:
-        state.message = "No previous find"
+    target = target_repeat_find(state, reverse=reverse, count=count)
+    if target is None:
+        if state.last_find is None:
+            state.message = "No previous find"
+        else:
+            _mode, ch = state.last_find
+            state.message = f"Not found: {ch}"
         return False
-    find_mode, target = state.last_find
-    if reverse:
-        mode_map = {"f": "F", "F": "f", "t": "T", "T": "t"}
-        find_mode = mode_map[find_mode]
-    return perform_find(state, find_mode, target, count=count)
+    find_mode, target_char, col = target
+    state.cursor_col = col
+    state.last_find = (find_mode, target_char)
+    return True

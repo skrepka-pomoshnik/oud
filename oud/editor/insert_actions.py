@@ -11,6 +11,11 @@ from oud.core.render_utils import (
 )
 from oud.editor.controller_utils import cursor_key, string_index
 from oud.editor.edit_ops import apply_duration, apply_override, clear_cell_note, record_action
+from oud.editor.insert_session import (
+    clear_insert_transient,
+    exit_insert_mode,
+    finish_replace_once,
+)
 from oud.editor.keymap import insert_bindings, italian_duration_digits
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import stop_midi
@@ -37,6 +42,12 @@ def _column_has_event(state: EditorState, bar_index: int, col: int) -> bool:
         if key in state.overrides or key in state.durations:
             return True
     return False
+
+
+def _commit_pending_insert_edit(state: EditorState) -> None:
+    """Cancel transient insert prefixes before movement/command transitions."""
+    if state.insert_prefix:
+        clear_insert_transient(state)
 
 
 def _snap_to_previous_time_slot_if_needed(state: EditorState) -> None:
@@ -360,16 +371,14 @@ def _handle_insert_bass_slash(  # noqa: C901, PLR0911, PLR0912
                 apply_override(state, (bar, target, col), ch)
             if not column_has_duration(state, bar, col):
                 apply_duration(state, (bar, target, col), state.current_duration)
-            state.insert_prefix = ""
-            if state.replace_once:
-                state.replace_once = False
-                state.mode = "normal"
-            else:
-                steps = 2 if state.settings.get("grid") == "on" else 1
-                for _ in range(steps):
-                    move_right(state)
+            clear_insert_transient(state)
+            if finish_replace_once(state):
+                return True
+            steps = 2 if state.settings.get("grid") == "on" else 1
+            for _ in range(steps):
+                move_right(state)
             return True
-        state.insert_prefix = ""
+        clear_insert_transient(state)
         return False
     if key == ord("/"):
         state.insert_prefix = "/"
@@ -396,28 +405,27 @@ def _handle_insert_italian_multifret(state: EditorState, key: int, style: str) -
         return False
     state.insert_prefix = state.insert_prefix or ","
     if style != "italian" or state.settings.get("italianmultifret", "on") != "on":
-        state.insert_prefix = ""
+        clear_insert_transient(state)
         return False
     if key < 0 or key > 255:
-        state.insert_prefix = ""
+        clear_insert_transient(state)
         return False
     ch = chr(key)
     if not ch.isdigit():
-        state.insert_prefix = ""
+        clear_insert_transient(state)
         return False
     state.insert_prefix += ch
     digits = state.insert_prefix[1:]
     if len(digits) >= 2:
         fret = int(digits)
         if _handle_insert_fret_value(state, fret):
-            if state.replace_once:
-                state.replace_once = False
-                state.mode = "normal"
-            else:
-                steps = 2 if state.settings.get("grid") == "on" else 1
-                for _ in range(steps):
-                    move_right(state)
-        state.insert_prefix = ""
+            if finish_replace_once(state):
+                clear_insert_transient(state)
+                return True
+            steps = 2 if state.settings.get("grid") == "on" else 1
+            for _ in range(steps):
+                move_right(state)
+        clear_insert_transient(state)
     return True
 
 
@@ -429,13 +437,11 @@ def _handle_insert_char(state: EditorState, key: int, style: str) -> bool:
         valid = is_french_fret(ch) if style == "french" else is_italian_fret(ch)
         if valid:
             _handle_insert_note(state, ch, style)
-            if state.replace_once:
-                state.replace_once = False
-                state.mode = "normal"
-            else:
-                steps = 2 if state.settings.get("grid") == "on" else 1
-                for _ in range(steps):
-                    move_right(state)
+            if finish_replace_once(state):
+                return True
+            steps = 2 if state.settings.get("grid") == "on" else 1
+            for _ in range(steps):
+                move_right(state)
         else:
             state.message = "Invalid fret for current style"
         return True
@@ -446,9 +452,7 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
     bindings = insert_bindings(state)
     keycodes = state.keycodes
     if key == 27:
-        state.mode = "normal"
-        state.replace_once = False
-        state.insert_prefix = ""
+        exit_insert_mode(state)
         return True
 
     def dispatch_actions(actions: list[tuple[tuple[int, ...], Callable[[], bool]]]) -> bool:
@@ -458,6 +462,7 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         return False
 
     def _handle_clear() -> bool:
+        _commit_pending_insert_edit(state)
         if 0 <= state.cursor_bar < len(state.piece.bars):
             _flatten_chords_to_grid(state, state.cursor_bar)
         clear_cell_note(
@@ -469,6 +474,7 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         return True
 
     def _handle_backspace() -> bool:
+        _commit_pending_insert_edit(state)
         if 0 <= state.cursor_bar < len(state.piece.bars):
             _flatten_chords_to_grid(state, state.cursor_bar)
         clear_cell_note(
@@ -481,6 +487,7 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         return True
 
     def _handle_delete() -> bool:
+        _commit_pending_insert_edit(state)
         if 0 <= state.cursor_bar < len(state.piece.bars):
             _flatten_chords_to_grid(state, state.cursor_bar)
         clear_cell_note(
@@ -493,17 +500,19 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         return True
 
     def _handle_barline() -> bool:
+        _commit_pending_insert_edit(state)
         from oud.editor.command_ops import set_barline  # noqa: PLC0415
 
         set_barline(state, "thin")
         return True
 
     def _handle_escape() -> bool:
-        state.mode = "normal"
-        state.replace_once = False
+        _commit_pending_insert_edit(state)
+        exit_insert_mode(state)
         return True
 
     def _handle_quit() -> bool:
+        _commit_pending_insert_edit(state)
         if state.modified and not state.pending_quit:
             state.pending_quit = True
             state.message = UNSAVED_QUIT
@@ -512,18 +521,22 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         return False
 
     def _handle_left() -> bool:
+        _commit_pending_insert_edit(state)
         move_left(state)
         return True
 
     def _handle_right() -> bool:
+        _commit_pending_insert_edit(state)
         move_right(state)
         return True
 
     def _handle_up() -> bool:
+        _commit_pending_insert_edit(state)
         state.cursor_string -= 1
         return True
 
     def _handle_down() -> bool:
+        _commit_pending_insert_edit(state)
         state.cursor_string += 1
         return True
 
@@ -531,7 +544,7 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         try:
             state.insert_prefix = chr(key)
         except ValueError:
-            state.insert_prefix = ""
+            clear_insert_transient(state)
         return True
 
     if dispatch_actions(

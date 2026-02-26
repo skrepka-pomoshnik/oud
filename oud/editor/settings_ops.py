@@ -91,6 +91,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"vim", "vim+arrows", "casual", "casual+arrows"},
         "Keys must be vim/vim+arrows/casual/casual+arrows",
     ),
+    "movementmode": (
+        {"visual", "note"},
+        "Movementmode must be visual/note",
+    ),
     "layout": (
         {"packed", "spread", "auto", "stretch"},
         "Layout must be packed/spread/auto/stretch",
@@ -118,6 +122,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "fretlabelmode": (
         {"auto", "numeric", "letters"},
         "Fretlabelmode must be auto/numeric/letters",
+    ),
+    "duetscoreview": (
+        {"auto", "both", "1", "2"},
+        "Duetscoreview must be auto/both/1/2",
     ),
     "tiecuestyle": (
         {"bracket", "paren", "hide"},

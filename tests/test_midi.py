@@ -182,6 +182,43 @@ def test_build_playback_timeline_uses_chord_index_for_marker_col() -> None:
     assert [cursor.col for cursor in timeline] == [0, 1, 2, 3]
 
 
+def test_build_playback_timeline_duet_score_pairs_play_simultaneously() -> None:
+    piece = Piece(
+        title="Duet",
+        bars=[
+            # Sequential halves duet-score storage: top staff then bottom staff.
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert len(timeline) >= 4
+    # First logical pair (raw bars 0 and 2 in sequential-halves storage) must start together.
+    first_pair = [c for c in timeline if c.bar in (0, 2)]
+    assert len(first_pair) == 2
+    assert first_pair[0].start == first_pair[1].start == 0.0
+    # Second logical pair starts later, and raw bars 1 and 3 align to each other.
+    second_pair = [c for c in timeline if c.bar in (1, 3)]
+    assert len(second_pair) == 2
+    assert second_pair[0].start == second_pair[1].start
+    assert second_pair[0].start > 0.0
+
+
 def test_midi_chord_positions_match_render_positions() -> None:
     bar = Bar(
         chords=[

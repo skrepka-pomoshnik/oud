@@ -1,12 +1,9 @@
 from pathlib import Path
 
-import oud.editor.navigation as nav
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.init import init_state
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.editor.navigation import (
-    _bar_content_width_for_cursor,
-    _cursor_display_map_for_bar,
     jump_row_visual,
     move_left,
     move_left_note,
@@ -16,6 +13,10 @@ from oud.editor.navigation import (
 )
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
+from oud.editor.visual_cursor_map import (
+    bar_content_width_for_cursor,
+    cursor_display_map_for_bar,
+)
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 
@@ -135,8 +136,8 @@ def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
     state.settings["barpad"] = "1"
     state.screen_width = 90
     state.cursor_bar = 3
-    content = _bar_content_width_for_cursor(state, 3)
-    mapping = _cursor_display_map_for_bar(state, 3, content)
+    content = bar_content_width_for_cursor(state, 3)
+    mapping = cursor_display_map_for_bar(state, 3, content)
     dup = next((idx for idx in range(len(mapping) - 1) if mapping[idx] == mapping[idx + 1]), None)
     if dup is None:
         return
@@ -156,8 +157,8 @@ def test_visual_move_right_stops_on_note_inside_duplicate_render_column(
     state.bar_width = 6
     state.overrides[(0, 0, 1)] = "a"
 
-    monkeypatch.setattr(nav, "_bar_content_width_for_cursor", lambda _s, _b: 4)
-    monkeypatch.setattr(nav, "_cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4])
+    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr("oud.editor.motions.cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4])
 
     move_right_visual(state)
 
@@ -197,14 +198,14 @@ def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode() -> None:
     state.screen_width = 120
     state.cursor_bar = 1
     state.cursor_col = 5
-    prev_content = _bar_content_width_for_cursor(state, state.cursor_bar)
-    prev_map = _cursor_display_map_for_bar(state, state.cursor_bar, prev_content)
+    prev_content = bar_content_width_for_cursor(state, state.cursor_bar)
+    prev_map = cursor_display_map_for_bar(state, state.cursor_bar, prev_content)
     anchor = prev_map[state.cursor_col]
 
     jump_row_visual(state, 1)
 
-    target_content = _bar_content_width_for_cursor(state, state.cursor_bar)
-    target_map = _cursor_display_map_for_bar(state, state.cursor_bar, target_content)
+    target_content = bar_content_width_for_cursor(state, state.cursor_bar)
+    target_map = cursor_display_map_for_bar(state, state.cursor_bar, target_content)
     current = target_map[state.cursor_col]
     best = min(abs(value - anchor) for value in target_map)
     assert abs(current - anchor) == best
@@ -217,15 +218,15 @@ def test_jump_row_visual_auto_uses_cursor_visual_x_for_target_bar_selection_synt
     state.cursor_bar = 1
     state.cursor_col = 10
     prev_bar = state.cursor_bar
-    prev_content = _bar_content_width_for_cursor(state, prev_bar)
-    prev_map = _cursor_display_map_for_bar(state, prev_bar, prev_content)
+    prev_content = bar_content_width_for_cursor(state, prev_bar)
+    prev_map = cursor_display_map_for_bar(state, prev_bar, prev_content)
     prev_anchor = prev_map[state.cursor_col]
 
     jump_row_visual(state, 1)
 
     assert state.cursor_bar != prev_bar
-    target_content = _bar_content_width_for_cursor(state, state.cursor_bar)
-    target_map = _cursor_display_map_for_bar(state, state.cursor_bar, target_content)
+    target_content = bar_content_width_for_cursor(state, state.cursor_bar)
+    target_map = cursor_display_map_for_bar(state, state.cursor_bar, target_content)
     current = target_map[state.cursor_col]
     best = min(abs(value - prev_anchor) for value in target_map)
     assert abs(current - prev_anchor) == best
@@ -273,8 +274,8 @@ def test_cursor_display_map_for_bar_is_monotonic_with_beatsnap_off_and_soft() ->
         state = regression_state(multi_bar_spacing_piece(), width=64, bar_width=12, justify="smart")
         state.settings["layout"] = "auto"
         state.settings["beatsnap"] = mode
-        content = _bar_content_width_for_cursor(state, 1)
-        mapping = _cursor_display_map_for_bar(state, 1, content)
+        content = bar_content_width_for_cursor(state, 1)
+        mapping = cursor_display_map_for_bar(state, 1, content)
         checks.append((mode, mapping))
 
     for _mode, mapping in checks:

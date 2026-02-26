@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from oud.editor.edit_ops import record_action
+from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState, UndoAction
 
 SaveFn = Callable[[str, dict[str, str]], None]
 
 
 def cmd_info(state: EditorState) -> None:
-    state.mode = "info"
+    set_mode(state, "info")
     state.info_offset = 0
 
 

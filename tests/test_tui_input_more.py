@@ -107,6 +107,10 @@ def test_complete_set_value_uses_legit_options_only() -> None:
     assert text in {"set flaglean=left", "set flaglean=l"}
     assert msg is None or msg.startswith("Options:")
 
+    text, msg = complete_command_text(state, "set movementmode=n")
+    assert text in {"set movementmode=note", "set movementmode=n"}
+    assert msg is None or msg.startswith("Options:")
+
     text, msg = complete_command_text(state, "set minimumfret=")
     assert text == "set minimumfret="
     assert msg is not None and "0" in msg and "7" in msg
@@ -151,11 +155,17 @@ def test_handle_command_paths() -> None:
     state.mode = "command"
     handle_command(state, 27, _apply)
     assert state.mode == "normal"
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
     state.mode = "command"
     state.cmdline = "w"
+    state.insert_prefix = "/"
+    state.replace_once = True
     handle_command(state, 10, _apply)
     assert calls == ["w"]
     assert state.command_history == ["w"]
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
     state.mode = "command"
     state.cmdline = "wa"
     handle_command(state, 127, _apply)
@@ -177,16 +187,24 @@ def test_parse_search_and_handle_search() -> None:
     assert parse_search("3") == 2
     state.mode = "search"
     state.searchline = "2"
+    state.insert_prefix = ",1"
+    state.replace_once = True
     handle_search(state, 10)
     assert state.cursor_bar == 1
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
     state.mode = "search"
     state.searchline = "bad"
     handle_search(state, 10)
     assert state.message == "Invalid bar"
     state.mode = "search"
     state.searchline = "12"
+    state.insert_prefix = "/"
+    state.replace_once = True
     handle_search(state, 27)
     assert state.mode == "normal"
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
     state.mode = "search"
     state.searchline = "12"
     handle_search(state, 127)

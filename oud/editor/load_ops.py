@@ -6,6 +6,7 @@ from oud.core.ft3 import load_ft3
 from oud.core.model import Piece
 from oud.core.musicxml_import import load_musicxml, load_mxl
 from oud.core.tab_parser import load_tab, load_tab_data
+from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState
 
 LoadResult = tuple[
@@ -99,7 +100,7 @@ def cmd_open(
     state.cursor_string = 0
     state.cursor_col = 0
     state.bar_offset = 0
-    state.mode = "normal"
+    set_mode(state, "normal")
     if not state.durations and build_durations_fn is not None:
         state.durations = build_durations_fn(state.piece)
     state.message = f"Opened {path}"

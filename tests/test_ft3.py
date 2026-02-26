@@ -65,6 +65,15 @@ def test_parse_bar_decodes_ft3_note_extras_fingerings_and_ornaments() -> None:
     assert note.ft3_extras == 0x0642
 
 
+def test_parse_bar_decodes_ft3_right_hand_dot_fingering_variants() -> None:
+    one = parse_bar(_ft3_bar_with_one_note(extras=0x0004)).notes[0]
+    two = parse_bar(_ft3_bar_with_one_note(extras=0x0008)).notes[0]
+    three = parse_bar(_ft3_bar_with_one_note(extras=0x0010)).notes[0]
+    assert one.right_fingering == "dot1"
+    assert two.right_fingering == "dot2"
+    assert three.right_fingering == "dot3"
+
+
 def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
     note = bar.notes[0]

@@ -168,3 +168,36 @@ def test_jk_mixed_spacing_modes_with_hidden_bass_rows_keep_cursor_visible(
         assert 0 <= state.cursor_bar < len(state.piece.bars), (justify, beatsnap)
         assert 0 <= state.cursor_string < state.piece.strings, (justify, beatsnap)
         assert state.bar_offset >= 0, (justify, beatsnap)
+
+
+def test_scroll_keys_move_viewport_without_mutating_cursor_bar() -> None:
+    state = _state(bars=80)
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.cursor_col = 0
+    # PgDn is now a scroll-only action in normal mode.
+    handle_normal(state, state.keycodes.npage)
+    assert state.cursor_bar == 0
+    assert state.bar_offset > 0
+    moved_offset = state.bar_offset
+    # Viewport hold should prevent immediate snap-back to cursor on next ensure call.
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == moved_offset
+    # The following ensure pass can re-sync if needed.
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset <= moved_offset
+
+
+def test_ctrl_u_ctrl_d_scroll_viewport_without_cursor_jump() -> None:
+    state = _state(bars=80)
+    state.bar_offset = 10
+    state.cursor_bar = 12
+    state.cursor_col = 0
+    # Ctrl-D scrolls down, Ctrl-U scrolls up in the vim profile.
+    handle_normal(state, 4)
+    down_offset = state.bar_offset
+    assert down_offset > 10
+    assert state.cursor_bar == 12
+    handle_normal(state, 21)
+    assert state.bar_offset < down_offset
+    assert state.cursor_bar == 12

@@ -16,10 +16,14 @@ def _state() -> EditorState:
 
 def test_enter_plugin_mode_sets_root_items() -> None:
     state = _state()
+    state.insert_prefix = "/"
+    state.replace_once = True
     enter_plugin_mode(state)
     assert state.mode == "plugin"
     assert state.plugin_items
     assert state.plugin_index == 0
+    assert state.insert_prefix == ""
+    assert state.replace_once is False
 
 
 def test_handle_plugin_key_selects_index_item(monkeypatch) -> None:

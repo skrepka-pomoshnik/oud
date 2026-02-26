@@ -3,7 +3,13 @@ import string
 
 import pytest
 
-from oud.core.tab_parser import load_tab, load_tab_data
+from oud.core.tab_parser import (
+    load_tab,
+    load_tab_data,
+    parse_tab_text_data,
+    reparse_tab_text_auto_delta,
+    reparse_tab_text_delta,
+)
 
 
 def _piece_signature(piece) -> tuple:
@@ -282,3 +288,186 @@ def test_load_tab_y_prefix_normalization_preserves_semantics(tmp_path) -> None:
         encoding="utf-8",
     )
     assert _piece_signature(load_tab(str(prefixed))) == _piece_signature(load_tab(str(normalized)))
+
+
+def test_parse_tab_text_data_matches_file_loader_signature(tmp_path) -> None:
+    content = "\n".join(
+        [
+            "{Inline/Composer}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "1 b",
+            "e",
+        ],
+    ) + "\n"
+    path = tmp_path / "inline.tab"
+    path.write_text(content, encoding="utf-8")
+    parsed_inline = parse_tab_text_data(content)
+    parsed_file = load_tab_data(str(path))
+    assert parsed_inline is not None
+    assert parsed_file is not None
+    assert _piece_signature(parsed_inline.piece) == _piece_signature(parsed_file.piece)
+
+
+def test_parse_tab_text_data_reports_stable_bar_line_spans() -> None:
+    content = "\n".join(
+        [
+            "{Span}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "1 b",
+            "e",
+            "{Second}",
+            "b",
+            "Sc|",
+            "0c",
+            "e",
+        ],
+    )
+    parsed = parse_tab_text_data(content)
+    assert parsed is not None
+    assert len(parsed.piece.bars) == 2
+    # First bar spans the two chord rows; second includes explicit in-bar timesig row and chord row.
+    assert parsed.bar_line_spans == [(3, 4), (8, 9)]
+
+
+def test_reparse_tab_text_delta_reports_affected_bar_ranges_for_body_change() -> None:
+    base = "\n".join(
+        [
+            "{Span}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "1 b",
+            "e",
+            "b",
+            "0c",
+            "e",
+        ],
+    )
+    prev = parse_tab_text_data(base)
+    assert prev is not None
+    changed = base.replace("1 b", "1 c")
+    delta = reparse_tab_text_delta(
+        prev,
+        changed,
+        changed_line_start=4,
+        changed_line_end=4,
+    )
+    assert delta.data is not None
+    assert delta.old_bar_range == (0, 1)
+    assert delta.new_bar_range == (0, 1)
+    assert delta.full_reparse is False
+    assert delta.reason is None
+    assert delta.data.piece.bars[0].chords[1].notes[0].fret == 2
+
+
+def test_reparse_tab_text_delta_falls_back_on_structural_line_change() -> None:
+    base = "\n".join(
+        [
+            "{Span}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "1 b",
+            "e",
+            "b",
+            "0c",
+            "e",
+        ],
+    )
+    prev = parse_tab_text_data(base)
+    assert prev is not None
+    changed = base.replace("1 b", "b")
+    delta = reparse_tab_text_delta(
+        prev,
+        changed,
+        changed_line_start=4,
+        changed_line_end=4,
+    )
+    assert delta.data is not None
+    assert delta.full_reparse is True
+    assert delta.reason == "structural_change"
+
+
+def test_reparse_tab_text_delta_marks_header_change_as_full_reparse_reason() -> None:
+    base = "\n".join(
+        [
+            "{Title}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "e",
+        ],
+    )
+    prev = parse_tab_text_data(base)
+    assert prev is not None
+    changed = base.replace("{Title}", "{NewTitle}")
+    delta = reparse_tab_text_delta(
+        prev,
+        changed,
+        changed_line_start=0,
+        changed_line_end=0,
+    )
+    assert delta.data is not None
+    assert delta.full_reparse is True
+    assert delta.reason == "header_or_metadata_change"
+
+
+def test_reparse_tab_text_auto_delta_detects_inserted_body_line_and_reports_bar_ranges() -> None:
+    base = "\n".join(
+        [
+            "{AutoDelta}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "1 b",
+            "e",
+            "b",
+            "0c",
+            "e",
+        ],
+    )
+    prev = parse_tab_text_data(base)
+    assert prev is not None
+    changed = "\n".join(
+        [
+            "{AutoDelta}",
+            "#time: Sc",
+            "b",
+            "0a",
+            "1 b",
+            "x  c",
+            "e",
+            "b",
+            "0c",
+            "e",
+        ],
+    )
+    delta = reparse_tab_text_auto_delta(prev, changed)
+    assert delta.data is not None
+    assert delta.old_bar_range in {(0, 0), (0, 1)}
+    assert delta.new_bar_range == (0, 1)
+    assert delta.full_reparse is True
+    assert delta.reason == "line_count_changed"
+
+
+def test_reparse_tab_text_auto_delta_returns_no_change_delta_for_identical_text() -> None:
+    base = "\n".join(
+        [
+            "{NoChange}",
+            "b",
+            "0a",
+            "e",
+        ],
+    )
+    prev = parse_tab_text_data(base)
+    assert prev is not None
+    delta = reparse_tab_text_auto_delta(prev, base)
+    assert delta.data is not None
+    assert delta.full_reparse is False
+    assert delta.reason == "no_change"
+    assert delta.old_bar_range == (0, 0)
+    assert delta.new_bar_range == (0, 0)

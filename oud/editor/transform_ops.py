@@ -380,31 +380,182 @@ def _assign_shifted_chord(
     return True
 
 
+def _find_cursor_grid_entries_for_shift(
+    state: EditorState,
+) -> tuple[list[tuple[tuple[int, int, int], int, str]], int | None]:
+    if not state.piece.bars:
+        state.message = "No bars"
+        return [], None
+    if state.cursor_bar < 0 or state.cursor_bar >= len(state.piece.bars):
+        state.message = "No bars"
+        return [], None
+    bar = state.cursor_bar
+    col = state.cursor_col
+    style = state.settings.get("style", "french")
+    entries: list[tuple[tuple[int, int, int], int, str]] = []
+    for key, value in sorted(state.overrides.items()):
+        b, _s_idx, c = key
+        if b != bar or c != col:
+            continue
+        fret = _parse_override_fret(value, style)
+        if fret is None:
+            continue
+        entries.append((key, fret, value))
+    if not entries:
+        state.message = "No note at cursor"
+        return [], None
+    actual_string_idx = string_index(state, state.cursor_string)
+    note_idx = next(
+        (i for i, (key, _fret, _value) in enumerate(entries) if key[1] == actual_string_idx),
+        None,
+    )
+    if note_idx is None:
+        state.message = "No note on cursor string"
+        return entries, None
+    return entries, note_idx
+
+
+def _grid_column_pitches(
+    entries: list[tuple[tuple[int, int, int], int, str]],
+    *,
+    source_tuning: list[int],
+) -> list[int] | None:
+    pitches: list[int] = []
+    for (key, fret, _value) in entries:
+        _bar, s_idx, _col = key
+        if s_idx < 0 or s_idx >= len(source_tuning):
+            return None
+        pitches.append(source_tuning[s_idx] + fret)
+    return pitches
+
+
+def _grid_shift_has_nonfret_collision(
+    state: EditorState,
+    *,
+    entries: list[tuple[tuple[int, int, int], int, str]],
+    assigned_notes,
+    style: str,
+) -> bool:
+    source_keys = {key for (key, _fret, _value) in entries}
+    dest_keys = {
+        (entries[i][0][0], assigned.string - 1, entries[i][0][2])
+        for i, assigned in enumerate(assigned_notes)
+    }
+    for dest_key in dest_keys:
+        existing = state.overrides.get(dest_key)
+        if existing is None or dest_key in source_keys:
+            continue
+        if _parse_override_fret(existing, style) is None:
+            return True
+    return False
+
+
+def _apply_grid_shift_assignments(
+    state: EditorState,
+    *,
+    entries: list[tuple[tuple[int, int, int], int, str]],
+    assigned_notes,
+    style: str,
+) -> bool:
+    new_overrides = dict(state.overrides)
+    for key, _fret, _value in entries:
+        new_overrides.pop(key, None)
+    for entry, assigned in zip(entries, assigned_notes, strict=False):
+        src_key, _src_fret, _src_value = entry
+        out = _format_override_fret(assigned.fret, style)
+        if out is None:
+            return False
+        bar_idx, _s_idx, col = src_key
+        new_overrides[(bar_idx, assigned.string - 1, col)] = out
+    state.overrides = new_overrides
+    return True
+
+
+def _assign_shifted_grid_column(
+    state: EditorState,
+    *,
+    entries: list[tuple[tuple[int, int, int], int, str]],
+    forced_note_index: int,
+    forced_target_string: int,
+) -> bool:
+    source_tuning = _editor_tuning_pitches(
+        state.settings.get("tuning", ""),
+        strings=state.piece.strings,
+    )
+    if not source_tuning:
+        state.message = "Invalid tuning"
+        return False
+    policy = _policy_from_settings(state)
+    pitches = _grid_column_pitches(entries, source_tuning=source_tuning)
+    if pitches is None:
+        state.message = "Course shift failed"
+        return False
+    result = assign_chord_pitches(
+        pitches,
+        source_tuning[: state.piece.strings],
+        policy=policy,
+        forced_strings={forced_note_index: forced_target_string},
+    )
+    if not result.ok or len(result.notes) != len(entries):
+        state.message = "Course shift impossible"
+        return False
+    style = state.settings.get("style", "french")
+    if _grid_shift_has_nonfret_collision(
+        state,
+        entries=entries,
+        assigned_notes=result.notes,
+        style=style,
+    ):
+        state.message = "Course shift collision"
+        return False
+    if not _apply_grid_shift_assignments(
+        state,
+        entries=entries,
+        assigned_notes=result.notes,
+        style=style,
+    ):
+        state.message = "Course shift failed"
+        return False
+    return True
+
+
 def cmd_courseshift(state: EditorState, value: str) -> None:
     direction = value.strip().lower() or "down"
     if direction not in {"up", "down"}:
         state.message = "Courseshift must be up/down"
         return
-    _bar, chord = _find_cursor_chord_for_shift(state)
-    if chord is None:
-        return
-    actual_string_idx = string_index(state, state.cursor_string)
-    note_idx = next(
-        (i for i, n in enumerate(chord.notes) if (n.string - 1) == actual_string_idx),
-        None,
-    )
-    if note_idx is None:
-        state.message = "No note on cursor string"
-        return
     before = _snapshot_score_transform(state)
-    target_string = chord.notes[note_idx].string + (1 if direction == "down" else -1)
-    if not _assign_shifted_chord(
-        state,
-        chord,
-        forced_note_index=note_idx,
-        forced_target_string=target_string,
-    ):
-        return
+    _bar, chord = _find_cursor_chord_for_shift(state)
+    if chord is not None:
+        actual_string_idx = string_index(state, state.cursor_string)
+        note_idx = next(
+            (i for i, n in enumerate(chord.notes) if (n.string - 1) == actual_string_idx),
+            None,
+        )
+        if note_idx is None:
+            state.message = "No note on cursor string"
+            return
+        target_string = chord.notes[note_idx].string + (1 if direction == "down" else -1)
+        if not _assign_shifted_chord(
+            state,
+            chord,
+            forced_note_index=note_idx,
+            forced_target_string=target_string,
+        ):
+            return
+    else:
+        entries, note_idx = _find_cursor_grid_entries_for_shift(state)
+        if note_idx is None:
+            return
+        src_key, _fret, _value = entries[note_idx]
+        target_string = (src_key[1] + 1) + (1 if direction == "down" else -1)
+        if not _assign_shifted_grid_column(
+            state,
+            entries=entries,
+            forced_note_index=note_idx,
+            forced_target_string=target_string,
+        ):
+            return
     state.modified = True
     _record_score_transform(state, before=before, label=f"courseshift {direction}")
     state.message = f"Course shift {direction}"

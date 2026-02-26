@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+from oud.core.model import Bar, Piece
+from oud.editor.state import EditorState
+from oud.editor.transient_message import (
+    DEFAULT_MESSAGE_TTL_TICKS,
+    decay_transient_message,
+)
+
+
+def _state() -> EditorState:
+    return EditorState(
+        Piece(title="T", bars=[Bar()], strings=6),
+        settings={"style": "french"},
+    )
+
+
+def test_message_assignment_sets_default_ttl() -> None:
+    state = _state()
+    state.message = "Saved"
+    assert state.message == "Saved"
+    assert state.message_ttl_ticks == DEFAULT_MESSAGE_TTL_TICKS
+    state.message = ""
+    assert state.message_ttl_ticks == 0
+
+
+def test_decay_transient_message_expires_only_after_ttl() -> None:
+    state = _state()
+    state.mode = "normal"
+    state.message = "Saved"
+    state.message_ttl_ticks = 2
+    decay_transient_message(state)
+    assert state.message == "Saved"
+    assert state.message_ttl_ticks == 1
+    decay_transient_message(state)
+    assert state.message == ""
+    assert state.message_ttl_ticks == 0
+
+
+def test_decay_transient_message_skips_command_and_search_modes() -> None:
+    for mode in ("command", "search", "help", "plugin"):
+        state = _state()
+        state.mode = mode
+        state.message = "Saved"
+        state.message_ttl_ticks = 1
+        decay_transient_message(state)
+        assert state.message == "Saved"
+        assert state.message_ttl_ticks == 1
+
+
+def test_decay_transient_message_clears_stale_zero_ttl_message() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.message = "Saved"
+    state.message_ttl_ticks = 0
+    decay_transient_message(state)
+    assert state.message == ""
+    assert state.message_ttl_ticks == 0

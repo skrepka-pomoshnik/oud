@@ -206,9 +206,11 @@ def _ft3_right_fingering(extras: int) -> str | None:
     if extras & 0x0002:
         return "thumb"
     if extras & 0x0004:
-        return "1"
+        return "dot1"
     if extras & 0x0008:
-        return "2"
+        return "dot2"
+    if extras & 0x0010:
+        return "dot3"
     return None
 
 

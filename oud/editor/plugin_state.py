@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from oud.core.plugin_model import RemoteTab
+from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState
 
 
 def plugin_enter_root(state: EditorState, items: list[RemoteTab]) -> None:
-    state.mode = "plugin"
+    set_mode(state, "plugin")
     state.plugins.title = "Plugins"
     state.plugins.items = list(items)
     state.plugins.index = 0

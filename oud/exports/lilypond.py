@@ -368,6 +368,12 @@ def _ft3_fingering_text(value: str | None) -> str | None:
         return None
     if value == "thumb":
         return "t"
+    if value == "dot1":
+        return "."
+    if value == "dot2":
+        return ".."
+    if value == "dot3":
+        return "..."
     return value[:1]
 
 

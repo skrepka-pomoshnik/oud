@@ -5,6 +5,7 @@ import curses
 from oud.editor.init import init_state
 from oud.editor.playback import update_playback_animation
 from oud.editor.status import status_line
+from oud.editor.transient_message import decay_transient_message
 from oud.editor.view_state import view_commit_frame, view_merge_dirty, view_resize
 from oud.exports.export_tab import export_ascii
 from oud.tui.controller import handle_key as handle_key_impl
@@ -46,6 +47,7 @@ def run_loop(
     screen = CursesScreen(stdscr)
     running = True
     while running:
+        decay_transient_message(state)
         height, width = stdscr.getmaxyx()
         state.screen_height = height
         state.screen_width = width
@@ -112,8 +114,6 @@ def run_loop(
 
         key = stdscr.getch()
         if key != -1:
-            if state.mode in ("normal", "insert") and state.message:
-                state.message = ""
             running = handle_key_impl(
                 state,
                 key,

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import bars_per_line, dynamic_system_starts, system_index, system_start_index
-from oud.editor.navigation import _system_display_indices_for_bar
 from oud.editor.state import EditorState
+from oud.editor.visual_cursor_map import (
+    system_display_indices_for_bar as _system_display_indices_for_bar,
+)
 from oud.ui.layout_map import block_height as _block_height
 from oud.ui.render import _bass_strings_used
 
@@ -39,13 +41,13 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     return max(1, available // block_h)
 
 
-def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:  # noqa: C901
+def _viewport_row_mapping(state: EditorState, width: int, height: int):
     per_line = bars_per_line(state, width)
     rows = rows_per_screen(state, height)
     if state.settings.get("layout", "packed") == "auto":
         starts = dynamic_system_starts(state, width)
 
-        def _row_for_bar(bar_index: int) -> int:
+        def row_for_bar(bar_index: int) -> int:
             row = 0
             for idx, start in enumerate(starts):
                 next_start = starts[idx + 1] if idx + 1 < len(starts) else len(state.piece.bars)
@@ -54,20 +56,34 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None: 
                     break
             return row
 
-        def _start_for_row(row_index: int) -> int:
+        def start_for_row(row_index: int) -> int:
             if row_index <= 0:
                 return starts[0] if starts else 0
             if row_index >= len(starts):
                 return starts[-1] if starts else 0
             return starts[row_index]
-
-        cursor_row = _row_for_bar(state.cursor_bar)
-        first_row = _row_for_bar(state.bar_offset)
     else:
-        cursor_row = system_index(state, state.cursor_bar, per_line)
-        first_row = system_index(state, state.bar_offset, per_line)
-        def _start_for_row(row_index: int) -> int:
-            return system_start_index(state, row_index, per_line)
+        row_for_bar = lambda bar_index: system_index(state, bar_index, per_line)  # noqa: E731
+        start_for_row = lambda row_index: system_start_index(state, row_index, per_line)  # noqa: E731
+    return rows, row_for_bar, start_for_row
+
+
+def scroll_viewport_page(state: EditorState, width: int, height: int, delta_pages: int) -> None:
+    rows, row_for_bar, start_for_row = _viewport_row_mapping(state, width, height)
+    current_row = row_for_bar(state.bar_offset)
+    target_row = max(0, current_row + delta_pages * max(1, rows))
+    state.bar_offset = start_for_row(target_row)
+    state.viewport_scroll_hold_ticks = 1
+
+
+def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
+    hold = int(getattr(state, "viewport_scroll_hold_ticks", 0))
+    if hold > 0:
+        state.viewport_scroll_hold_ticks = hold - 1
+        return
+    rows, _row_for_bar, _start_for_row = _viewport_row_mapping(state, width, height)
+    cursor_row = _row_for_bar(state.cursor_bar)
+    first_row = _row_for_bar(state.bar_offset)
     scroll_mode = state.settings.get("scrollmode", "smooth")
 
     def _page_start_row(row: int) -> int:

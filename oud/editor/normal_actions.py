@@ -6,6 +6,7 @@ from oud.editor.bar_ops import delete_bar
 from oud.editor.controller_utils import consume_count, string_index
 from oud.editor.edit_ops import clear_cell
 from oud.editor.find_ops import perform_find, repeat_find
+from oud.editor.insert_session import enter_insert_mode, set_mode
 from oud.editor.keymap import (
     NormalActionBindings,
     count_bindings,
@@ -18,9 +19,17 @@ from oud.editor.keymap import (
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
 from oud.editor.navigation import (
+    bar_end,
+    bar_next,
+    bar_prev,
+    bar_start,
+    jump_first_bar,
+    jump_last_bar,
     jump_row_visual,
+    move_left_note,
     move_left_visual,
     move_right,
+    move_right_note,
     move_right_visual,
 )
 from oud.editor.search_ops import (
@@ -31,6 +40,7 @@ from oud.editor.search_ops import (
     set_mark,
 )
 from oud.editor.state import EditorState
+from oud.tui.viewport import scroll_viewport_page
 
 
 def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0912, C901
@@ -78,8 +88,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         if not state.pending_key:
             return False
         if state.pending_key == "g" and key in pending_keys.gg:
-            state.cursor_bar = 0
-            state.cursor_col = 0
+            jump_first_bar(state)
             state.pending_key = ""
             return True
         if state.pending_key == "g" and key in pending_keys.gj:
@@ -175,7 +184,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         stop_midi(state)
         return False
     if key in bindings.command:
-        state.mode = "command"
+        set_mode(state, "command")
         state.cmdline = ""
         return True
 
@@ -185,7 +194,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
 
             show_help(state)
         else:
-            state.mode = "help"
+            set_mode(state, "help")
             state.help_offset = 0
 
     def _handle_print() -> None:
@@ -200,19 +209,18 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             start_midi(state)
 
     def _handle_search() -> None:
-        state.mode = "search"
+        set_mode(state, "search")
         state.searchline = ""
 
     def _handle_insert() -> None:
-        state.mode = "insert"
+        enter_insert_mode(state)
 
     def _handle_info() -> None:
-        state.mode = "info"
+        set_mode(state, "info")
         state.info_offset = 0
 
     def _handle_replace() -> None:
-        state.mode = "insert"
-        state.replace_once = True
+        enter_insert_mode(state, replace_once=True)
 
     def _handle_bar_after() -> None:
         from oud.editor.command_ops import cmd_bar  # noqa: PLC0415
@@ -337,13 +345,20 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
 ) -> bool:
     count = consume_count(state)
     keys = movement_keys(state, include_arrows=True)
+    move_mode = state.settings.get("movementmode", "visual")
     if key in keys.left:
         for _ in range(count):
-            move_left_visual(state)
+            if move_mode == "note":
+                move_left_note(state)
+            else:
+                move_left_visual(state)
         return True
     if key in keys.right:
         for _ in range(count):
-            move_right_visual(state)
+            if move_mode == "note":
+                move_right_note(state)
+            else:
+                move_right_visual(state)
         return True
     if key in keys.up:
         state.cursor_string -= count
@@ -352,6 +367,14 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
     if key in keys.down:
         state.cursor_string += count
         state.clamp()
+        return True
+    if key in action_keys.scroll_up:
+        for _ in range(count):
+            scroll_viewport_page(state, state.screen_width, state.screen_height, -1)
+        return True
+    if key in action_keys.scroll_down:
+        for _ in range(count):
+            scroll_viewport_page(state, state.screen_width, state.screen_height, 1)
         return True
     if key in action_keys.page_up:
         for _ in range(count):
@@ -362,21 +385,18 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
             jump_row_visual(state, 1)
         return True
     if key in action_keys.bar_next:
-        state.cursor_bar = min(len(state.piece.bars) - 1, state.cursor_bar + count)
-        state.cursor_col = 0
+        bar_next(state, count)
         return True
     if key in action_keys.bar_prev:
-        state.cursor_bar = max(0, state.cursor_bar - count)
-        state.cursor_col = 0
+        bar_prev(state, count)
         return True
     if key in action_keys.col_start:
-        state.cursor_col = 0
+        bar_start(state)
         return True
     if key in action_keys.col_end:
-        state.cursor_col = state.bar_width - 1
+        bar_end(state)
         return True
     if key in action_keys.jump_bottom:
-        state.cursor_bar = max(0, len(state.piece.bars) - 1)
-        state.cursor_col = 0
+        jump_last_bar(state)
         return True
     return False

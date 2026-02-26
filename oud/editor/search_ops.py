@@ -94,57 +94,103 @@ def _search_word(state: EditorState, term: str, direction: int) -> bool:
     return False
 
 
-def search_word_under_cursor(state: EditorState, direction: int) -> bool:
+def target_search_word_under_cursor(
+    state: EditorState,
+    direction: int,
+) -> tuple[str, int, tuple[int, int, int]] | None:
     actual_string = string_index(state, state.cursor_string)
     term = _cell_char(state, state.cursor_bar, actual_string, state.cursor_col)
     if not _is_searchable(term):
-        state.message = "No word under cursor"
-        return False
-    if not _search_word(state, term, direction):
-        state.message = f"Not found: {term}"
-        return False
-    state.last_word_search = (term, direction)
-    return True
+        return None
+    total = _linear_total(state)
+    start = _to_linear(state, state.cursor_bar, actual_string, state.cursor_col)
+    for step in range(1, total):
+        idx = (start + (direction * step)) % total
+        bar, s_actual, col = _from_linear(state, idx)
+        if _cell_char(state, bar, s_actual, col) == term:
+            return (term, direction, (bar, s_actual, col))
+    return None
 
 
-def repeat_word_search(state: EditorState, reverse: bool) -> bool:
+def target_repeat_word_search(
+    state: EditorState,
+    *,
+    reverse: bool,
+) -> tuple[str, int, tuple[int, int, int]] | None:
     if state.last_word_search is None:
-        state.message = "No previous search"
-        return False
+        return None
     term, direction = state.last_word_search
     if reverse:
         direction *= -1
-    if not _search_word(state, term, direction):
-        state.message = f"Not found: {term}"
-        return False
-    state.last_word_search = (term, direction)
-    return True
+    total = _linear_total(state)
+    actual_string = string_index(state, state.cursor_string)
+    start = _to_linear(state, state.cursor_bar, actual_string, state.cursor_col)
+    for step in range(1, total):
+        idx = (start + (direction * step)) % total
+        bar, s_actual, col = _from_linear(state, idx)
+        if _cell_char(state, bar, s_actual, col) == term:
+            return (term, direction, (bar, s_actual, col))
+    return None
 
 
-def jump_match(state: EditorState) -> bool:  # noqa: C901
+def target_jump_match(state: EditorState) -> tuple[int, int] | None:  # noqa: C901
     for spans in (state.slurs, state.ties, state.holds):
         for bar, start, end in spans:
             if bar != state.cursor_bar:
                 continue
             if state.cursor_col == start:
-                state.cursor_col = end
-                return True
+                return (bar, end)
             if state.cursor_col == end:
-                state.cursor_col = start
-                return True
+                return (bar, start)
     current = state.piece.bars[state.cursor_bar]
     if current.repeat == ".:":
         for idx in range(state.cursor_bar + 1, len(state.piece.bars)):
             if state.piece.bars[idx].repeat == ":.":
-                state.cursor_bar = idx
-                state.cursor_col = 0
-                return True
+                return (idx, 0)
     elif current.repeat == ":.":
         for idx in range(state.cursor_bar - 1, -1, -1):
             if state.piece.bars[idx].repeat == ".:":
-                state.cursor_bar = idx
-                state.cursor_col = 0
-                return True
+                return (idx, 0)
+    return None
+
+
+def target_jump_mark(state: EditorState, name: str) -> tuple[int, int, int] | None:
+    return state.marks.get(name.lower())
+
+
+def search_word_under_cursor(state: EditorState, direction: int) -> bool:
+    target = target_search_word_under_cursor(state, direction)
+    if target is None:
+        actual_string = string_index(state, state.cursor_string)
+        term = _cell_char(state, state.cursor_bar, actual_string, state.cursor_col)
+        state.message = "No word under cursor" if not _is_searchable(term) else f"Not found: {term}"
+        return False
+    term, direction, (bar, s_actual, col) = target
+    _jump_to(state, bar, s_actual, col)
+    state.last_word_search = (term, direction)
+    return True
+
+
+def repeat_word_search(state: EditorState, reverse: bool) -> bool:
+    target = target_repeat_word_search(state, reverse=reverse)
+    if target is None:
+        if state.last_word_search is None:
+            state.message = "No previous search"
+            return False
+        term, _direction = state.last_word_search
+        state.message = f"Not found: {term}"
+        return False
+    term, direction, (bar, s_actual, col) = target
+    _jump_to(state, bar, s_actual, col)
+    state.last_word_search = (term, direction)
+    return True
+
+
+def jump_match(state: EditorState) -> bool:
+    target = target_jump_match(state)
+    if target is not None:
+        state.cursor_bar, state.cursor_col = target
+        return True
     state.message = "No match"
     return False
 
@@ -164,9 +210,10 @@ def set_mark(state: EditorState, name: str) -> bool:
 
 def jump_mark(state: EditorState, name: str) -> bool:
     mark = name.lower()
-    if mark not in state.marks:
+    target = target_jump_mark(state, mark)
+    if target is None:
         state.message = f"Mark not found: {mark}"
         return False
-    bar, string_actual, col = state.marks[mark]
+    bar, string_actual, col = target
     _jump_to(state, bar, string_actual, col)
     return True
