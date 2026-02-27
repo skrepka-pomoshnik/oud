@@ -1,6 +1,7 @@
 from oud.core.model import Bar, Piece
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
+from oud.editor.undo_ops import undo
 
 
 def _state() -> EditorState:
@@ -155,3 +156,35 @@ def test_counted_yy_and_p_pastes_multiple_bars() -> None:
     assert state.overrides[(1, 0, 0)] == "a"
     assert state.overrides[(2, 0, 1)] == "b"
     assert state.overrides[(3, 0, 2)] == "c"
+
+
+def test_counted_x_is_single_grouped_undo() -> None:
+    state = _state()
+    state.overrides[(0, 0, 0)] = "a"
+    state.overrides[(0, 0, 1)] = "b"
+    state.overrides[(0, 0, 2)] = "c"
+    state.durations[(0, 0, 0)] = 4
+    state.durations[(0, 0, 1)] = 4
+    state.durations[(0, 0, 2)] = 4
+    handle_normal(state, ord("3"))
+    handle_normal(state, ord("x"))
+    assert (0, 0, 0) not in state.overrides
+    assert (0, 0, 1) not in state.overrides
+    assert (0, 0, 2) not in state.overrides
+    assert len(state.undo_stack) == 1
+    assert state.undo_stack[-1].kind == "group"
+    undo(state, config_path=state.config_path)
+    assert state.overrides[(0, 0, 0)] == "a"
+    assert state.overrides[(0, 0, 1)] == "b"
+    assert state.overrides[(0, 0, 2)] == "c"
+
+
+def test_read_only_blocks_insert_and_delete() -> None:
+    state = _state()
+    state.read_only = True
+    state.overrides[(0, 0, 0)] = "a"
+    handle_normal(state, ord("i"))
+    assert state.mode == "normal"
+    assert "Read-only" in state.message
+    handle_normal(state, ord("x"))
+    assert state.overrides[(0, 0, 0)] == "a"

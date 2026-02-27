@@ -30,10 +30,19 @@ from oud.editor.command_ops import (
     cmd_chord as _cmd_chord,
 )
 from oud.editor.command_ops import (
+    cmd_col as _cmd_col,
+)
+from oud.editor.command_ops import (
+    cmd_cursor as _cmd_cursor,
+)
+from oud.editor.command_ops import (
     cmd_info as _cmd_info,
 )
 from oud.editor.command_ops import (
     cmd_open as _cmd_open,
+)
+from oud.editor.command_ops import (
+    cmd_pause as _cmd_pause,
 )
 from oud.editor.command_ops import (
     cmd_plugins as _cmd_plugins,
@@ -64,8 +73,57 @@ from oud.editor.commands import (
     cmd_subtitle,
     cmd_title,
 )
-from oud.editor.messages import UNSAVED_QUIT_CMD
+from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT_CMD
 from oud.editor.state import EditorState
+
+READ_ONLY_BLOCKED_COMMANDS = frozenset(
+    {
+        "w",
+        "wa",
+        "wascii",
+        "write",
+        "set",
+        "convert",
+        "midi",
+        "lilypond",
+        "musicxml",
+        "pdf",
+        "print",
+        "time",
+        "title",
+        "author",
+        "composer",
+        "subtitle",
+        "footnote",
+        "header",
+        "undo",
+        "redo",
+        "orn",
+        "annot",
+        "highlight",
+        "bar",
+        "chord",
+        "stave",
+        "slur",
+        "tie",
+        "hold",
+        "barline",
+        "repeat",
+        "dynamic",
+        "fermata",
+        "arpeggio",
+        "separee",
+        "tuplet",
+        "transpose",
+        "retune",
+        "courseshift",
+        "tool",
+    },
+)
+
+
+def _readonly_block_message(state: EditorState) -> None:
+    state.message = f"{READ_ONLY_VIEWER}: command disabled"
 
 
 def _tuning_preset(value: str) -> str | None:
@@ -122,6 +180,14 @@ def cmd_bar(state: EditorState, args: str) -> None:
 
 def cmd_stave(state: EditorState, args: str) -> None:
     _cmd_stave(state, args)
+
+
+def cmd_col(state: EditorState, args: str) -> None:
+    _cmd_col(state, args)
+
+
+def cmd_cursor(state: EditorState, args: str) -> None:
+    _cmd_cursor(state, args)
 
 
 def cmd_slur(state: EditorState, args: str) -> None:
@@ -202,6 +268,10 @@ def cmd_time(state: EditorState, args: str) -> None:
 
 def cmd_verify(state: EditorState, _args: str) -> None:
     _cmd_verify(state)
+
+
+def cmd_pause(state: EditorState, _args: str) -> None:
+    _cmd_pause(state)
 
 
 def cmd_undo(state: EditorState, _args: str, config_path: str) -> None:
@@ -286,6 +356,12 @@ def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:
         raise SystemExit(0)
     cmd, *rest = cmdline.split(maxsplit=1)
     args = rest[0] if rest else ""
+    if state.read_only and cmd in ("wq", "x"):
+        _readonly_block_message(state)
+        return
+    if state.read_only and cmd in READ_ONLY_BLOCKED_COMMANDS:
+        _readonly_block_message(state)
+        return
     handler = _command_map().get(cmd)
     if handler is None:
         if cmd in ("wq", "x"):
@@ -332,6 +408,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("ascii", _no_config(cmd_ascii)),
         CommandSpec("midi", _with_config(cmd_midi), takes_path=True),
         CommandSpec("play", _with_config(cmd_play)),
+        CommandSpec("pause", _no_config(cmd_pause)),
         CommandSpec("lilypond", _with_config(cmd_lilypond), takes_path=True),
         CommandSpec("musicxml", _with_config(cmd_musicxml), takes_path=True),
         CommandSpec("pdf", _with_config(cmd_pdf), takes_path=True),
@@ -356,6 +433,8 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("info", _no_config(cmd_info)),
         CommandSpec("plugins", _no_config(cmd_plugins)),
         CommandSpec("bar", _no_config(cmd_bar)),
+        CommandSpec("cursor", _no_config(cmd_cursor)),
+        CommandSpec("col", _no_config(cmd_col)),
         CommandSpec("chord", _no_config(cmd_chord)),
         CommandSpec("stave", _no_config(cmd_stave)),
         CommandSpec("slur", _no_config(cmd_slur)),

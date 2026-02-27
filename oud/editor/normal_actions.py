@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from oud.editor.controller_utils import consume_count, string_index
-from oud.editor.edit_ops import clear_cell
+from oud.editor.edit_ops import clear_cell, undo_group
 from oud.editor.find_ops import perform_find, repeat_find
-from oud.editor.insert_session import enter_insert_mode, set_mode
+from oud.editor.insert_session import enter_insert_mode, enter_replace_mode, set_mode
 from oud.editor.keymap import (
     NormalActionBindings,
     count_bindings,
@@ -15,7 +15,7 @@ from oud.editor.keymap import (
     normal_bindings,
     pending_bindings,
 )
-from oud.editor.messages import UNSAVED_QUIT
+from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
 from oud.editor.motions import CursorMotionTarget, apply_motion_target, target_home_bar
 from oud.editor.navigation import (
@@ -66,6 +66,9 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
                 return True
         return False
 
+    def block_read_only() -> None:
+        state.message = READ_ONLY_VIEWER
+
     if state.pending_mark:
         if 32 <= key <= 126:
             name = chr(key)
@@ -92,6 +95,10 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             state.pending_key = ""
             return True
         if state.pending_key == "g" and key in pending_keys.gj:
+            if state.read_only:
+                block_read_only()
+                state.pending_key = ""
+                return True
             from oud.core.tuning_utils import parse_bass_strings, tuning_count  # noqa: PLC0415
 
             tuning = state.settings.get("tuning", "")
@@ -148,6 +155,10 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             state.pending_key = ""
             return True
         if state.pending_key == "d" and key in pending_keys.dd:
+            if state.read_only:
+                block_read_only()
+                state.pending_key = ""
+                return True
             from oud.editor.command_ops import cmd_bar, yank_bar  # noqa: PLC0415
 
             yank_bar(state, state.cursor_bar)
@@ -211,6 +222,9 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         state.searchline = ""
 
     def _handle_insert() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         enter_insert_mode(state)
 
     def _handle_info() -> None:
@@ -218,29 +232,53 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         state.info_offset = 0
 
     def _handle_replace() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         enter_insert_mode(state, replace_once=True)
 
+    def _handle_replace_mode() -> None:
+        if state.read_only:
+            block_read_only()
+            return
+        enter_replace_mode(state)
+
     def _handle_bar_after() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         from oud.editor.command_ops import cmd_bar  # noqa: PLC0415
 
         cmd_bar(state, "after")
 
     def _handle_bar_before() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         from oud.editor.command_ops import cmd_bar  # noqa: PLC0415
 
         cmd_bar(state, "before")
 
     def _handle_bar_delete() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         from oud.editor.command_ops import cmd_bar  # noqa: PLC0415
 
         cmd_bar(state, "del")
 
     def _handle_undo() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         from oud.editor.undo_ops import undo  # noqa: PLC0415
 
         undo(state, config_path=state.config_path)
 
     def _handle_redo() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         from oud.editor.undo_ops import redo  # noqa: PLC0415
 
         redo(state, config_path=state.config_path)
@@ -254,6 +292,9 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         )
 
     def _handle_paste() -> None:
+        if state.read_only:
+            block_read_only()
+            return
         from oud.editor.command_ops import paste_bar  # noqa: PLC0415
 
         paste_bar(state, state.cursor_bar + 1)
@@ -267,6 +308,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             (bindings.insert, _handle_insert),
             (bindings.info, _handle_info),
             (bindings.replace, _handle_replace),
+            ((ord("R"),), _handle_replace_mode),
             (bindings.bar_after, _handle_bar_after),
             (bindings.bar_before, _handle_bar_before),
             (bindings.bar_delete, _handle_bar_delete),
@@ -278,16 +320,20 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     ):
         return True
     if key in action_keys.delete_cell:
+        if state.read_only:
+            block_read_only()
+            return True
         count = consume_count(state)
-        for _ in range(count):
-            clear_cell(
-                state,
-                state.cursor_bar,
-                string_index(state, state.cursor_string),
-                state.cursor_col,
-            )
-            if count > 1:
-                move_right(state)
+        with undo_group(state, label="delete-cell-count"):
+            for _ in range(count):
+                clear_cell(
+                    state,
+                    state.cursor_bar,
+                    string_index(state, state.cursor_string),
+                    state.cursor_col,
+                )
+                if count > 1:
+                    move_right(state)
         state.pending_key = ""
         return True
     if key in action_keys.pending:

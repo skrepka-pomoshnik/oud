@@ -3,7 +3,7 @@ from oud.editor.command_ops import convert_overrides
 from oud.editor.edit_ops import apply_duration
 from oud.editor.state import EditorState
 from oud.editor.verify_ops import bar_duration_sum
-from oud.tui.commands import _parse_time_sig_value, _tuning_preset
+from oud.tui.commands import _parse_time_sig_value, _tuning_preset, apply_command
 
 
 def _state() -> EditorState:
@@ -64,3 +64,17 @@ def test_convert_overrides_updates_message() -> None:
     assert state.overrides[(0, 0, 0)] == "0"
     assert state.overrides[(0, 0, 1)] == "z"
     assert "Converted" in state.message
+
+
+def test_apply_command_blocks_mutation_in_read_only_mode() -> None:
+    state = _state()
+    state.read_only = True
+    apply_command(state, "w out.tab", "config.toml")
+    assert "Read-only" in state.message
+
+
+def test_apply_command_allows_non_mutating_info_in_read_only_mode() -> None:
+    state = _state()
+    state.read_only = True
+    apply_command(state, "info", "config.toml")
+    assert state.mode == "info"

@@ -44,6 +44,7 @@ class EditorState:
         self.modified = False
         self.undo_stack: list[UndoAction] = []
         self.redo_stack: list[UndoAction] = []
+        self.undo_group_stack: list[UndoGroupFrame] = []
         self.history = PromptHistoryState()
         self.settings = settings
         self.replace_once = False
@@ -74,6 +75,7 @@ class EditorState:
         self.marks: dict[str, tuple[int, int, int]] = {}
         self.pending_mark = ""
         self.pending_quit = False
+        self.read_only = False
         self.yanked_bar: YankedBar | None = None
         self.yanked_bars: list[YankedBar] | None = None
         self.yanked_chords: list[Chord] | None = None
@@ -266,6 +268,12 @@ class UndoAction:
     data: dict[str, object]
 
 
+@dataclass
+class UndoGroupFrame:
+    label: str | None = None
+    actions: list[UndoAction] = field(default_factory=list)
+
+
 class BarSnapshot(TypedDict):
     bar: Bar
     overrides: dict[tuple[int, int, int], str]
@@ -307,3 +315,4 @@ class PluginViewState:
     query: str = ""
     query_active: bool = False
     pending: str = ""
+    confirm: str = ""

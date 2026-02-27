@@ -4,11 +4,17 @@ from oud.core.ft3 import build_durations
 from oud.core.model import Bar
 from oud.core.tuning_utils import tuning_count
 from oud.editor.load_ops import load_piece_data
+from oud.editor.messages import READ_ONLY_VIEWER
 from oud.editor.state import EditorState
 from oud.settings import DEFAULT_SETTINGS, load_settings
 
 
-def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C901, PLR0912
+def init_state(  # noqa: C901, PLR0912
+    path: str | None,
+    *,
+    config_path: str,
+    read_only: bool = False,
+) -> EditorState:
     settings = load_settings(config_path)
     piece, overrides, durations, dotted, bar_width = load_piece_data(path)
     if not piece.bars:
@@ -20,6 +26,7 @@ def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C
         piece.bars = [Bar() for _ in range(initial_bars)]
 
     state = EditorState(piece, settings, config_path=config_path)
+    state.read_only = read_only
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
@@ -62,4 +69,6 @@ def init_state(path: str | None, *, config_path: str) -> EditorState:  # noqa: C
         state.durations = build_durations(piece)
     if piece.import_warnings:
         state.message = piece.import_warnings[0]
+    elif read_only:
+        state.message = READ_ONLY_VIEWER
     return state

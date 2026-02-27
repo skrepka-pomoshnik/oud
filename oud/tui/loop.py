@@ -26,12 +26,13 @@ def run_loop(
     handle_insert,
     handle_normal,
     apply_command,
+    read_only: bool = False,
 ) -> int:
     curses.curs_set(0)
     stdscr.keypad(True)
     stdscr.timeout(50)
 
-    state = init_state(path, config_path=config_path)
+    state = init_state(path, config_path=config_path, read_only=read_only)
     state.keycodes = keycodes_from_curses()
     def suspend_tui() -> None:
         curses.def_prog_mode()

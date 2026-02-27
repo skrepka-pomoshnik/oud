@@ -31,7 +31,7 @@ ERR_BARS_ORDER = "bar range start must be <= end"
 ERR_BARS_PAST_END = "bar range starts past end of piece"
 
 
-def _main(stdscr, path: str | None, config_path: str) -> int:
+def _main(stdscr, path: str | None, config_path: str, read_only: bool = False) -> int:
     return run_loop(
         stdscr,
         path,
@@ -39,6 +39,7 @@ def _main(stdscr, path: str | None, config_path: str) -> int:
         handle_insert=handle_insert,
         handle_normal=handle_normal,
         apply_command=apply_command,
+        read_only=read_only,
     )
 
 
@@ -253,10 +254,22 @@ def _build_parser() -> argparse.ArgumentParser:
         default=CONFIG_PATH,
         help="Path to config TOML",
     )
+    parser.add_argument(
+        "--readonly",
+        dest="readonly_global",
+        action="store_true",
+        help="Open TUI in read-only viewer mode",
+    )
     sub = parser.add_subparsers(dest="command", metavar="command")
 
     p_tui = sub.add_parser("tui", help="Open interactive editor")
     p_tui.add_argument("path", nargs="?", help="Optional file to open in TUI")
+    p_tui.add_argument(
+        "--readonly",
+        dest="readonly_tui",
+        action="store_true",
+        help="Open in read-only viewer mode",
+    )
 
     p_ascii = sub.add_parser("ascii", help="Render tablature as ASCII")
     p_ascii.add_argument("path", help="Input .ft3/.tab path")
@@ -321,7 +334,11 @@ def main(argv: list[str] | None = None) -> int:
     args = _normalize_args(raw_args)
     parsed = _build_parser().parse_args(args)
     if parsed.command == "tui":
-        return curses.wrapper(_main, parsed.path, parsed.config)
+        read_only = bool(
+            getattr(parsed, "readonly_global", False)
+            or getattr(parsed, "readonly_tui", False),
+        )
+        return curses.wrapper(_main, parsed.path, parsed.config, read_only)
     if parsed.command == "ascii":
         try:
             bars = parsed.bars

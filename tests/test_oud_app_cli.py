@@ -11,39 +11,63 @@ from oud.core.model import Bar, Piece
 
 
 def test_main_defaults_to_tui(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[object, str | None, str]] = []
+    calls: list[tuple[object, str | None, str, bool]] = []
 
-    def fake_wrapper(func, path, config):
-        calls.append((func, path, config))
+    def fake_wrapper(func, path, config, read_only):
+        calls.append((func, path, config, read_only))
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
     assert oud_app.main([]) == 0
-    assert calls == [(oud_app._main, None, oud_app.CONFIG_PATH)]
+    assert calls == [(oud_app._main, None, oud_app.CONFIG_PATH, False)]
 
 
 def test_main_with_path_opens_tui(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[object, str | None, str]] = []
+    calls: list[tuple[object, str | None, str, bool]] = []
 
-    def fake_wrapper(func, path, config):
-        calls.append((func, path, config))
+    def fake_wrapper(func, path, config, read_only):
+        calls.append((func, path, config, read_only))
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
     assert oud_app.main(["examples/example.ft3"]) == 0
-    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH)]
+    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH, False)]
 
 
 def test_main_with_config_then_path_opens_tui(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[object, str | None, str]] = []
+    calls: list[tuple[object, str | None, str, bool]] = []
 
-    def fake_wrapper(func, path, config):
-        calls.append((func, path, config))
+    def fake_wrapper(func, path, config, read_only):
+        calls.append((func, path, config, read_only))
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
     assert oud_app.main(["--config", "cfg.toml", "examples/example.ft3"]) == 0
-    assert calls == [(oud_app._main, "examples/example.ft3", "cfg.toml")]
+    assert calls == [(oud_app._main, "examples/example.ft3", "cfg.toml", False)]
+
+
+def test_main_with_readonly_flag_opens_tui_in_viewer_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, str | None, str, bool]] = []
+
+    def fake_wrapper(func, path, config, read_only):
+        calls.append((func, path, config, read_only))
+        return 0
+
+    monkeypatch.setattr(curses, "wrapper", fake_wrapper)
+    assert oud_app.main(["--readonly", "examples/example.ft3"]) == 0
+    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH, True)]
+
+
+def test_main_tui_subcommand_accepts_readonly_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, str | None, str, bool]] = []
+
+    def fake_wrapper(func, path, config, read_only):
+        calls.append((func, path, config, read_only))
+        return 0
+
+    monkeypatch.setattr(curses, "wrapper", fake_wrapper)
+    assert oud_app.main(["tui", "--readonly", "examples/example.ft3"]) == 0
+    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH, True)]
 
 
 def test_main_dispatches_convert(monkeypatch: pytest.MonkeyPatch) -> None:
