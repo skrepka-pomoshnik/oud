@@ -267,7 +267,7 @@ def cmd_time(state: EditorState, args: str) -> None:
 
 
 def cmd_verify(state: EditorState, _args: str) -> None:
-    _cmd_verify(state)
+    _cmd_verify(state, _args)
 
 
 def cmd_pause(state: EditorState, _args: str) -> None:

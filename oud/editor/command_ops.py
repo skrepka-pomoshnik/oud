@@ -109,8 +109,8 @@ def yank_bar(state: EditorState, index: int, *, count: int = 1) -> None:
     _yank_bar(state, index, count=count)
 
 
-def paste_bar(state: EditorState, index: int) -> None:
-    _paste_bar(state, index)
+def paste_bar(state: EditorState, index: int, *, count: int = 1) -> None:
+    _paste_bar(state, index, count=count)
 
 
 def cmd_bar(state: EditorState, args: str) -> None:
@@ -119,6 +119,32 @@ def cmd_bar(state: EditorState, args: str) -> None:
 
 def cmd_stave(state: EditorState, args: str) -> None:
     _cmd_stave(state, args)
+
+
+def cmd_col(state: EditorState, args: str) -> None:
+    token = args.strip()
+    if not token.isdigit():
+        state.message = "Usage: col <1-based-column>"
+        return
+    state.cursor_col = max(0, int(token) - 1)
+    state.clamp()
+    state.message = f"Col {state.cursor_col + 1}"
+
+
+def cmd_cursor(state: EditorState, args: str) -> None:
+    tokens = [part for part in args.replace(",", " ").split() if part]
+    if not tokens or len(tokens) > 3 or any(not part.isdigit() for part in tokens):
+        state.message = "Usage: cursor <bar> [string] [col]"
+        return
+    state.cursor_bar = max(0, int(tokens[0]) - 1)
+    if len(tokens) >= 2:
+        state.cursor_string = max(0, int(tokens[1]) - 1)
+    if len(tokens) >= 3:
+        state.cursor_col = max(0, int(tokens[2]) - 1)
+    state.clamp()
+    state.message = (
+        f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{state.cursor_col + 1}"
+    )
 
 
 def cmd_open(state: EditorState, args: str) -> None:
@@ -197,6 +223,12 @@ def cmd_play(state: EditorState, args: str, config_path: str) -> None:
         start_midi_fn=start_midi,
         save_fn=save_settings,
     )
+
+
+def cmd_pause(state: EditorState) -> None:
+    from oud.editor.midi_control import pause_midi  # noqa: PLC0415
+
+    pause_midi(state)
 
 
 def apply_set_command(state: EditorState, args: str, config_path: str) -> None:
@@ -285,10 +317,19 @@ def cmd_courseshift(state: EditorState, value: str) -> None:
     _cmd_courseshift(state, value)
 
 
-def cmd_verify(state: EditorState) -> None:
-    from oud.editor.verify_ops import verify_bar  # noqa: PLC0415
+def cmd_verify(state: EditorState, args: str = "") -> None:
+    mode = args.strip().lower()
+    if mode in ("", "bar"):
+        from oud.editor.verify_ops import verify_bar  # noqa: PLC0415
 
-    state.message = verify_bar(state, state.cursor_bar)
+        state.message = verify_bar(state, state.cursor_bar)
+        return
+    if mode in ("render", "view", "ui"):
+        from oud.editor.verify_ops import verify_render_bar  # noqa: PLC0415
+
+        state.message = verify_render_bar(state, state.cursor_bar)
+        return
+    state.message = "Verify modes: bar|render"
 
 
 def cmd_write(state: EditorState, path: str) -> None:

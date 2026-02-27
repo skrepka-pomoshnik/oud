@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from oud.core.render_utils import note_type_to_denom
+from itertools import pairwise
+
+from oud.core.render_utils import bar_cells_from_chords, chord_positions, note_type_to_denom
 from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 from oud.core.time_utils import parse_time_signature_value
 from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor.rule_pipeline import BarRule, RuleContext, RuleIssue, run_rules
 from oud.editor.state import EditorState
+from oud.editor.visual_cursor_map import bar_content_width_for_cursor, cursor_display_map_for_bar
 
 
 def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) -> float:  # noqa: C901
@@ -159,4 +162,80 @@ def verify_bar(state: EditorState, bar_index: int) -> str:
     issues = verify_bar_issues(state, bar_index)
     if not issues:
         return "Measure ok"
+    return issues[0].message
+
+
+def verify_render_bar_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:
+    issues: list[RuleIssue] = []
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return [RuleIssue(code="render.out_of_range", message="Bar out of range")]
+    bar = state.piece.bars[bar_index]
+    positions = chord_positions(bar, state.bar_width, default_duration=4)
+    if bar.chords and not positions:
+        issues.append(
+            RuleIssue(code="render.no_positions", message="No render positions for bar chords"),
+        )
+        return issues
+
+    if positions:
+        style = state.settings.get("style", "french")
+        french_c = state.settings.get("frenchc", "normal")
+        label_mode = state.settings.get("fretlabelmode", "auto")
+        cells = bar_cells_from_chords(
+            bar,
+            state.piece.strings,
+            state.bar_width,
+            4,
+            style,
+            french_c_shape=french_c,
+            label_mode=label_mode,
+        )
+        visible_cols = {
+            col
+            for col in range(state.bar_width)
+            if any(cells[s_idx][col] not in ("-", " ") for s_idx in range(state.piece.strings))
+        }
+        for col, _denom, _dot in positions:
+            if col not in visible_cols:
+                issues.append(
+                    RuleIssue(
+                        code="render.orphan_flag",
+                        message=f"Flag without note under it at col {col + 1}",
+                    ),
+                )
+                return issues
+
+    content_width = max(1, bar_content_width_for_cursor(state, bar_index))
+    mapping = cursor_display_map_for_bar(state, bar_index, content_width)
+    if len(mapping) != state.bar_width:
+        issues.append(
+            RuleIssue(
+                code="render.map_width",
+                message="Render cursor map width mismatch",
+            ),
+        )
+        return issues
+    if any(left > right for left, right in pairwise(mapping)):
+        issues.append(
+            RuleIssue(
+                code="render.map_non_monotonic",
+                message="Render map is non-monotonic",
+            ),
+        )
+        return issues
+    if mapping and state.bar_width > 1 and len(set(mapping)) <= 1:
+        issues.append(
+            RuleIssue(
+                code="render.map_collapsed",
+                message="Render map collapsed to one column",
+                level="warning",
+            ),
+        )
+    return issues
+
+
+def verify_render_bar(state: EditorState, bar_index: int) -> str:
+    issues = verify_render_bar_issues(state, bar_index)
+    if not issues:
+        return "Render ok"
     return issues[0].message

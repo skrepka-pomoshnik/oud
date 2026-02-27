@@ -184,6 +184,24 @@ def test_cmd_transpose_and_retune_preserve_grid_override_pitch_rules(tmp_path: P
     assert ret_pitch == trans_pitch
     assert "Retuned:" in state.message
 
+
+def test_cmd_pause_cursor_and_col_commands(tmp_path: Path) -> None:
+    state = _state(bars=3)
+    cmd.apply_command(state, "pause", str(tmp_path / "cfg.toml"))
+    assert state.message == "MIDI not playing"
+
+    cmd.apply_command(state, "cursor 2 3 5", str(tmp_path / "cfg.toml"))
+    assert state.cursor_bar == 1
+    assert state.cursor_string == 2
+    assert state.cursor_col == 4
+
+    cmd.apply_command(state, "col 2", str(tmp_path / "cfg.toml"))
+    assert state.cursor_col == 1
+
+    cmd.apply_command(state, "cursor nope", str(tmp_path / "cfg.toml"))
+    assert state.message.startswith("Usage: cursor")
+
+
 def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
 
@@ -610,6 +628,17 @@ def test_cmd_bar_and_chord() -> None:
     assert len(state.piece.bars) == 3
     cmd.cmd_bar(state, "del")
     assert len(state.piece.bars) == 2
+    state = _state(bars=4)
+    state.overrides[(0, 0, 0)] = "a"
+    state.overrides[(1, 0, 1)] = "b"
+    cmd.cmd_bar(state, "yank 2")
+    assert state.message == "Bars yanked: 2"
+    cmd.cmd_bar(state, "paste 2")
+    assert len(state.piece.bars) == 8
+    assert state.message == "Bars pasted: 4"
+    cmd.cmd_bar(state, "del 3")
+    assert len(state.piece.bars) == 5
+    assert state.message == "Bars deleted: 3"
     cmd.cmd_chord(state, "insert 3")
     assert len(state.piece.bars[state.cursor_bar].chords) == 3
     assert state.message == "Chords added: 3"
@@ -636,6 +665,8 @@ def test_cmd_bar_and_chord() -> None:
     assert state.message == "No yanked chords"
     cmd.cmd_chord(state, "other")
     assert state.message == "Chord action: add/del/yank/paste [count]"
+    cmd.cmd_bar(state, "other")
+    assert state.message == "Bar action: add/after/before/insert/del/yank/paste [count]"
 
 
 def test_cmd_stave_variants() -> None:
@@ -670,6 +701,10 @@ def test_cmd_time_and_verify() -> None:
     state.piece.bars[0].chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]
     cmd.cmd_verify(state, "")
     assert state.message.startswith("Underfull")
+    cmd.cmd_verify(state, "render")
+    assert state.message in ("Render ok", "Render map collapsed to one column")
+    cmd.cmd_verify(state, "other")
+    assert state.message == "Verify modes: bar|render"
 
 
 def test_cmd_midi_lilypond_pdf_play_source(
@@ -893,6 +928,8 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_info",
         "cmd_plugins",
         "cmd_bar",
+        "cmd_cursor",
+        "cmd_col",
         "cmd_chord",
         "cmd_stave",
         "cmd_slur",
@@ -910,6 +947,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_courseshift",
         "cmd_time",
         "cmd_verify",
+        "cmd_pause",
     }
     patched_3arg = {
         "cmd_set",
@@ -967,6 +1005,8 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "info": "",
         "plugins": "",
         "bar": "add",
+        "cursor": "1 1 1",
+        "col": "1",
         "chord": "insert",
         "stave": "break",
         "slur": "0 0 0",
