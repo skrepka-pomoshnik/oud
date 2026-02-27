@@ -1163,6 +1163,41 @@ def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
     assert lyric_inner.find("Was") < lyric_inner.find("I") < lyric_inner.find("so")
 
 
+def test_compact_justify_packs_more_bars_per_system_than_stretch() -> None:
+    def _dense_bar(seed: int) -> Bar:
+        return Bar(
+            chords=[
+                Chord(note_type=8, dotted=(seed % 2 == 0), grid=None, notes=[Note(1, (seed + 1) % 12, 0)]),
+                Chord(note_type=16, dotted=False, grid=None, notes=[Note(2, (seed + 3) % 12, 0)]),
+                Chord(note_type=8, dotted=False, grid=None, notes=[Note(3, (seed + 5) % 12, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, (seed + 7) % 12, 0)]),
+            ],
+        )
+
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=24, w=100)
+    kwargs["bar_width"] = 16
+    kwargs["piece"] = Piece(
+        title="Pack",
+        bars=[_dense_bar(i) for i in range(8)],
+        strings=6,
+        style="french",
+    )
+    kwargs["settings"]["layout"] = "auto"
+
+    kwargs["settings"]["justify"] = "stretch"
+    stretch_lines = _render_lines(kwargs)
+    stretch_g = next(line for line in stretch_lines if line.startswith(" g|"))
+    stretch_bars = stretch_g.count("|")
+
+    kwargs["settings"]["justify"] = "compact"
+    compact_lines = _render_lines(kwargs)
+    compact_g = next(line for line in compact_lines if line.startswith(" g|"))
+    compact_bars = compact_g.count("|")
+
+    assert compact_bars >= stretch_bars
+
+
 def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
     kwargs = _args("normal")
     kwargs["piece"] = Piece(

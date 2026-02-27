@@ -838,6 +838,9 @@ def render_systems(  # noqa: C901, PLR0912
                     prev_time_value=prev_time,
                     sig_label=sig_label,
                 )
+                compact_fill = spacing_fill == "compact"
+                auto_event_gap = 1 if compact_fill else 2
+                auto_flag_gap = 0 if compact_fill else (2 if spacing_fill == "smart" else 1)
                 min_widths.append(
                     _required_auto_display_width_for_bar(
                         piece.bars[abs_bar],
@@ -850,8 +853,8 @@ def render_systems(  # noqa: C901, PLR0912
                         show_dur=show_dur and rows_proto["dur"] is not None,
                         hide_redundant=hide_redundant,
                         barpad=barpad,
-                        flag_gap=2 if spacing_fill == "smart" else 1,
-                        event_gap=2,
+                        flag_gap=auto_flag_gap,
+                        event_gap=auto_event_gap,
                         cue_pad_total=time_cue_reserved_width(
                             show_time_cue=show_cue,
                             scale_bar=True,
@@ -1240,8 +1243,15 @@ def render_systems(  # noqa: C901, PLR0912
                                 label_mode=fretlabelmode,
                             ),
                         )
+                    if spacing_fill == "compact":
+                        event_min_gap = max(1, event_min_gap - 1)
                     unit_anchor_min_gap = max(1, event_min_gap - 1)
-                    flag_min_gap = 1 if spacing_fill == "smart" else 0
+                    if spacing_fill == "smart":
+                        flag_min_gap = 1
+                    elif spacing_fill == "compact":
+                        flag_min_gap = 0
+                    else:
+                        flag_min_gap = 0
                     beatsnap_mode = settings.get("beatsnap", "off")
                     if beatsnap_mode == "soft" and beats > 1:
                         src_to_dest = soft_beat_snap_map(
