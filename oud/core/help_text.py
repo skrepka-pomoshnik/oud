@@ -15,6 +15,7 @@ HELP_LINES = [
     "Info I / gi                              Flags f (cycle style)",
     "Search * / # / n / N                     Marks   m{a}  'a  `a",
     "Match %                                  Play    M",
+    "Visual v / V                              Yank rows y",
     "Add  gj (bass string)",
     "Plugins gp or :plugins   Reload gr",
     "Flags f (cycle style)                   Letters F (c)",

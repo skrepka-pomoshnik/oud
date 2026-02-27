@@ -188,3 +188,48 @@ def test_read_only_blocks_insert_and_delete() -> None:
     assert "Read-only" in state.message
     handle_normal(state, ord("x"))
     assert state.overrides[(0, 0, 0)] == "a"
+
+
+def test_visual_mode_yanks_selected_rows_slice_with_v() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 1
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 1, 2)] = "b"
+
+    handle_normal(state, ord("v"))
+    assert state.mode == "visual"
+    handle_normal(state, ord("j"))
+    handle_normal(state, ord("l"))
+    handle_normal(state, ord("y"))
+
+    assert state.mode == "normal"
+    assert state.yanked_rows is not None
+    assert len(state.yanked_rows) == 2
+    snippets = [snippet for (_bar, _row, snippet) in state.yanked_rows]
+    assert any("a" in snippet for snippet in snippets)
+    assert any("b" in snippet for snippet in snippets)
+
+
+def test_visual_line_mode_yanks_full_row_block_with_V() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 1
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 1, 2)] = "b"
+    state.overrides[(0, 2, 3)] = "c"
+
+    handle_normal(state, ord("V"))
+    assert state.mode == "visual_line"
+    handle_normal(state, ord("j"))
+    handle_normal(state, ord("j"))
+    handle_normal(state, ord("y"))
+
+    assert state.mode == "normal"
+    assert state.yanked_rows is not None
+    assert len(state.yanked_rows) == 3
+    assert all(len(snippet) == state.bar_width for (_bar, _row, snippet) in state.yanked_rows)

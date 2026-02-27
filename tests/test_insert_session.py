@@ -1,5 +1,5 @@
 from oud.core.model import Bar, Piece
-from oud.editor.insert_session import enter_insert_mode, set_mode
+from oud.editor.insert_session import enter_insert_mode, enter_replace_mode, set_mode
 from oud.editor.state import EditorState
 
 
@@ -18,6 +18,15 @@ def test_set_mode_clears_insert_session_when_leaving_insert_context() -> None:
     assert state.replace_once is False
 
 
+def test_set_mode_clears_visual_anchor_when_leaving_visual_context() -> None:
+    state = _state()
+    state.mode = "visual"
+    state.visual_anchor = (0, 1, 2)
+    set_mode(state, "normal")
+    assert state.mode == "normal"
+    assert state.visual_anchor is None
+
+
 def test_enter_insert_mode_resets_prefix_and_sets_replace_flag() -> None:
     state = _state()
     state.insert_prefix = ",1"
@@ -32,3 +41,13 @@ def test_enter_insert_mode_resets_prefix_and_sets_replace_flag() -> None:
     assert state.mode == "insert"
     assert state.insert_prefix == ""
     assert state.replace_once is True
+
+
+def test_enter_replace_mode_resets_prefix_and_sets_replace_context() -> None:
+    state = _state()
+    state.insert_prefix = "/"
+    state.replace_once = True
+    enter_replace_mode(state)
+    assert state.mode == "replace"
+    assert state.insert_prefix == ""
+    assert state.replace_once is False

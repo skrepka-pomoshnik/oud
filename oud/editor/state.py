@@ -76,6 +76,8 @@ class EditorState:
         self.pending_mark = ""
         self.pending_quit = False
         self.read_only = False
+        self.visual_anchor: tuple[int, int, int] | None = None
+        self.yanked_rows: list[tuple[int, int, str]] | None = None
         self.yanked_bar: YankedBar | None = None
         self.yanked_bars: list[YankedBar] | None = None
         self.yanked_chords: list[Chord] | None = None

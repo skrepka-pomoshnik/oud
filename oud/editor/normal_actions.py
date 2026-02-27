@@ -40,10 +40,13 @@ from oud.editor.search_ops import (
     set_mark,
 )
 from oud.editor.state import EditorState
+from oud.editor.visual_ops import clear_visual_mode, enter_visual_mode, yank_visual_rows
 from oud.tui.viewport import scroll_viewport_page
 
 
 def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0912, C901
+    if state.mode in {"visual", "visual_line"}:
+        return _handle_visual_mode(state, key)
     bindings = normal_bindings(state)
     action_keys = normal_action_bindings(state)
     count_keys = count_bindings()
@@ -195,6 +198,18 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     if key in bindings.command:
         set_mode(state, "command")
         state.cmdline = ""
+        return True
+    if key == ord("v"):
+        state.count_prefix = ""
+        state.pending_key = ""
+        state.visual_anchor = (state.cursor_bar, state.cursor_string, state.cursor_col)
+        enter_visual_mode(state, linewise=False)
+        return True
+    if key == ord("V"):
+        state.count_prefix = ""
+        state.pending_key = ""
+        state.visual_anchor = (state.cursor_bar, state.cursor_string, state.cursor_col)
+        enter_visual_mode(state, linewise=True)
         return True
 
     def _handle_help() -> None:
@@ -379,6 +394,33 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     if key in action_keys.find_repeat_reverse:
         count = consume_count(state)
         repeat_find(state, reverse=True, count=count)
+        return True
+    if _handle_normal_movement(state, key, action_keys):
+        return True
+    return True
+
+
+def _handle_visual_mode(state: EditorState, key: int) -> bool:
+    bindings = normal_bindings(state)
+    action_keys = normal_action_bindings(state)
+    keycodes = state.keycodes
+    if key in (27, keycodes.exit):
+        clear_visual_mode(state)
+        state.message = ""
+        return True
+    if key in bindings.command:
+        state.visual_anchor = None
+        set_mode(state, "command")
+        state.cmdline = ""
+        return True
+    if key == ord("v"):
+        enter_visual_mode(state, linewise=False)
+        return True
+    if key == ord("V"):
+        enter_visual_mode(state, linewise=True)
+        return True
+    if key in (ord("y"), ord("Y")):
+        yank_visual_rows(state)
         return True
     if _handle_normal_movement(state, key, action_keys):
         return True
