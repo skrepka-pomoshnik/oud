@@ -400,7 +400,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     return True
 
 
-def _handle_visual_mode(state: EditorState, key: int) -> bool:
+def _handle_visual_mode(state: EditorState, key: int) -> bool:  # noqa: PLR0911
     bindings = normal_bindings(state)
     action_keys = normal_action_bindings(state)
     keycodes = state.keycodes

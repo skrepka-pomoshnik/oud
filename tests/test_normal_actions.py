@@ -213,7 +213,7 @@ def test_visual_mode_yanks_selected_rows_slice_with_v() -> None:
     assert any("b" in snippet for snippet in snippets)
 
 
-def test_visual_line_mode_yanks_full_row_block_with_V() -> None:
+def test_visual_line_mode_yanks_full_row_block_with_v() -> None:
     state = _state()
     state.bar_width = 8
     state.cursor_bar = 0

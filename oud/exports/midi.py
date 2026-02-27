@@ -407,7 +407,11 @@ def _duet_note_events(
             for start, duration, col, notes in chord_events:
                 velocity = _accent_velocity(start, beats, unit)
                 note_len = max(1, int(duration * gate))
-                bar_ornament = ornaments.get((b_idx, col)) if (show_ornaments and ornaments) else None
+                bar_ornament = (
+                    ornaments.get((b_idx, col))
+                    if (show_ornaments and ornaments)
+                    else None
+                )
                 for note in notes:
                     s_idx = note.string - 1
                     if s_idx < 0 or s_idx >= len(pitches):
@@ -567,7 +571,7 @@ def _write_track(events: list[tuple[int, bytes]]) -> bytes:
     return header + data
 
 
-def export_midi(
+def export_midi(  # noqa: C901
     path: str,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
