@@ -53,6 +53,19 @@ def test_safe_addstr_boundaries_and_errors() -> None:
     safe_addstr(s3, 1, 2, "xx")
 
 
+def test_safe_addstr_clips_by_display_columns_with_combining_marks() -> None:
+    s = _Screen(h=4, w=3)
+    safe_addstr(s, 0, 0, "a\u0323bcd")
+    assert s.calls[-1][2] == "a\u0323bc"
+
+
+def test_safe_addstr_negative_x_drops_display_columns_not_codepoints() -> None:
+    s = _Screen(h=4, w=6)
+    safe_addstr(s, 0, -1, "a\u0323bcd")
+    assert s.calls[-1][1] == 0
+    assert s.calls[-1][2] == "bcd"
+
+
 def test_clean_pad_and_flag_symbols() -> None:
     assert clean_text("a\x00b") == "a b"
     assert pad_row(list("ab"), 6, 1) == [" ", "a", "b", " ", " ", " "]
@@ -64,12 +77,16 @@ def test_clean_pad_and_flag_symbols() -> None:
 def test_info_help_plugin_and_info_render() -> None:
     piece = Piece(
         title="T",
-        bars=[Bar()],
+        bars=[Bar(melody_grid="3 3 8", lyrics=["Can", "Was she"])],
         strings=6,
         composer="C",
         arranger="A",
         subtitle="S",
         footnote="F",
+        footnote_source="Src",
+        footnote_editor="Ed",
+        footnote_comment="Fc",
+        comment="Commentary",
     )
     lines = info_lines(
         piece,
@@ -80,6 +97,12 @@ def test_info_help_plugin_and_info_render() -> None:
     assert any(line.startswith("Terminal:") for line in lines)
     assert any(line.startswith("Version:") for line in lines)
     assert any(line.startswith("Arranger:") and line.endswith("A") for line in lines)
+    assert any(line.startswith("FootSrc:") and line.endswith("Src") for line in lines)
+    assert any(line.startswith("FootEd:") and line.endswith("Ed") for line in lines)
+    assert any(line.startswith("FootCmt:") and line.endswith("Fc") for line in lines)
+    assert any(line.startswith("Comment:") and line.endswith("Commentary") for line in lines)
+    assert any(line.startswith("LyricBars:") and line.endswith("1") for line in lines)
+    assert any(line.startswith("MelodyBars:") and line.endswith("1") for line in lines)
     s = _Screen(h=6, w=30)
     render_help(s, "help", 1, 0)
     render_plugin(s, "plugin", 1, "Plugins", ["a", "b"], 1, 0, "msg")

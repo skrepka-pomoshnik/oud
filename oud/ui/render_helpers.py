@@ -1,9 +1,40 @@
 from __future__ import annotations
 
+import unicodedata
+
 from oud import __version__
 from oud.core.help_text import help_lines
 from oud.core.model import Piece
 from oud.ui.adapter import CursesError, Screen
+
+
+def _split_display_clusters(text: str) -> list[str]:
+    clusters: list[str] = []
+    for ch in text:
+        if unicodedata.combining(ch):
+            if clusters:
+                clusters[-1] += ch
+            continue
+        clusters.append(ch)
+    return clusters
+
+
+def _clip_display_width(text: str, max_cols: int) -> str:
+    if max_cols <= 0 or not text:
+        return ""
+    clusters = _split_display_clusters(text)
+    if len(clusters) <= max_cols:
+        return text
+    return "".join(clusters[:max_cols])
+
+
+def _drop_display_cols_left(text: str, skip_cols: int) -> str:
+    if skip_cols <= 0 or not text:
+        return text
+    clusters = _split_display_clusters(text)
+    if skip_cols >= len(clusters):
+        return ""
+    return "".join(clusters[skip_cols:])
 
 
 def safe_addstr(stdscr: Screen, y: int, x: int, text: str, attr: int = 0) -> None:
@@ -13,12 +44,13 @@ def safe_addstr(stdscr: Screen, y: int, x: int, text: str, attr: int = 0) -> Non
     if y < 0 or y >= height or x >= width:
         return
     if x < 0:
-        text = text[-x:]
+        text = _drop_display_cols_left(text, -x)
         x = 0
     if x >= width:
         return
+    clipped = _clip_display_width(text, max(0, width - x))
     try:
-        stdscr.addstr(y, x, text[: max(0, width - x)], attr)
+        stdscr.addstr(y, x, clipped, attr)
     except CursesError:
         return
     except ValueError:
@@ -58,6 +90,12 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Composer:", piece.composer),
         line("Arranger:", piece.arranger),
         line("Footnote:", piece.footnote),
+        line("FootSrc:", piece.footnote_source),
+        line("FootEd:", piece.footnote_editor),
+        line("FootCmt:", piece.footnote_comment),
+        line("Comment:", piece.comment),
+        line("LyricBars:", str(sum(1 for bar in piece.bars if bar.lyrics))),
+        line("MelodyBars:", str(sum(1 for bar in piece.bars if bar.melody_grid))),
         line("Bars:", str(len(piece.bars))),
         line("Strings:", str(piece.strings)),
         line("Style:", settings.get("style")),
@@ -76,6 +114,8 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         ),
         line("ShowFingerings:", settings.get("showfingerings", settings.get("showft3extras"))),
         line("ShowOrnaments:", settings.get("showornaments", settings.get("showft3extras"))),
+        line("ShowMelody:", settings.get("showmelody")),
+        line("ShowLyrics:", settings.get("showlyrics")),
         line("ShowTactus:", settings.get("showtactus")),
         line("Measures:", settings.get("measures")),
         line("MeasuresStep:", settings.get("measuresstep")),
