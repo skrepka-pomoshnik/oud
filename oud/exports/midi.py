@@ -31,6 +31,57 @@ def _note_type_to_denom(note_type: int) -> int | None:
     return mapping.get(note_type)
 
 
+def _show_ornaments(settings: dict[str, str]) -> bool:
+    if settings.get("showornaments", settings.get("showft3extras", "on")) != "on":
+        return False
+    return settings.get("ft3ornaments", "both") != "off"
+
+
+def _picked_note_ornament(note: Note, *, ornament_mode: str) -> str | None:
+    left = note.left_ornament
+    right = note.right_ornament
+    if ornament_mode == "left":
+        return left
+    if ornament_mode == "right":
+        return right
+    return left or right
+
+
+def _ornament_pitch_delta(symbol: str | None) -> int:
+    if not symbol:
+        return 0
+    if symbol == "x":
+        return -1
+    if symbol == "+":
+        return 2
+    if symbol in {"#", "dot-left", "brackets"}:
+        return 1
+    return 1
+
+
+def _append_note_messages(
+    events: list[tuple[int, bytes]],
+    *,
+    start_tick: int,
+    note_len: int,
+    pitch: int,
+    velocity: int,
+    ornament_symbol: str | None,
+) -> None:
+    grace_len = 0
+    if ornament_symbol and note_len >= 3:
+        delta = _ornament_pitch_delta(ornament_symbol)
+        grace_pitch = max(0, min(127, pitch + delta))
+        if grace_pitch != pitch:
+            grace_len = max(1, min(note_len // 3, TICKS_PER_QUARTER // 16))
+            events.append((start_tick, _note_on(0, grace_pitch, min(127, velocity + 6))))
+            events.append((start_tick + grace_len, _note_off(0, grace_pitch, 64)))
+    main_start = start_tick + grace_len
+    main_len = max(1, note_len - grace_len)
+    events.append((main_start, _note_on(0, pitch, velocity)))
+    events.append((main_start + main_len, _note_off(0, pitch, 64)))
+
+
 def _duration_ticks(denom: int, dotted: bool) -> int:
     base = TICKS_PER_QUARTER * 4
     ticks = max(1, base // max(1, denom))
@@ -325,9 +376,12 @@ def _duet_note_events(
     settings: dict[str, str],
     gate: float,
     pitches: list[int],
+    ornaments: dict[tuple[int, int], str] | None = None,
 ) -> list[tuple[int, bytes]]:
     events: list[tuple[int, bytes]] = []
     current_time = 0
+    show_ornaments = _show_ornaments(settings)
+    ornament_mode = settings.get("ft3ornaments", "both")
     for first_idx, second_idx in _duet_pair_bar_indices(piece, start_bar):
         pair_base_time = current_time
         pair_max_end = 0
@@ -350,16 +404,29 @@ def _duet_note_events(
             if not chord_events:
                 continue
             max_end = 0
-            for start, duration, _col, notes in chord_events:
+            for start, duration, col, notes in chord_events:
                 velocity = _accent_velocity(start, beats, unit)
                 note_len = max(1, int(duration * gate))
+                bar_ornament = ornaments.get((b_idx, col)) if (show_ornaments and ornaments) else None
                 for note in notes:
                     s_idx = note.string - 1
                     if s_idx < 0 or s_idx >= len(pitches):
                         continue
                     pitch = pitches[s_idx] + note.fret
-                    events.append((pair_base_time + start, _note_on(0, pitch, velocity)))
-                    events.append((pair_base_time + start + note_len, _note_off(0, pitch, 64)))
+                    ornament_symbol = None
+                    if show_ornaments:
+                        ornament_symbol = _picked_note_ornament(
+                            note,
+                            ornament_mode=ornament_mode,
+                        ) or bar_ornament
+                    _append_note_messages(
+                        events,
+                        start_tick=pair_base_time + start,
+                        note_len=note_len,
+                        pitch=pitch,
+                        velocity=velocity,
+                        ornament_symbol=ornament_symbol,
+                    )
                 max_end = max(max_end, start + duration)
             pair_max_end = max(pair_max_end, max_end)
         current_time += pair_max_end
@@ -510,6 +577,7 @@ def export_midi(
     bpm: int = 90,
     start_bar: int = 0,
     dotted: set[tuple[int, int]] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
 ) -> str:
     settings = settings or {}
     tuning = _resolved_tuning_for_piece(piece, settings)
@@ -523,6 +591,8 @@ def export_midi(
     if gate_text.isdigit():
         gate_percent = max(10, min(100, int(gate_text)))
     gate = gate_percent / 100.0
+    show_ornaments = _show_ornaments(settings)
+    ornament_mode = settings.get("ft3ornaments", "both")
     events: list[tuple[int, bytes]] = []
     events.append((0, _meta_tempo(bpm)))
     events.append((0, _program_change(0, program)))
@@ -542,6 +612,7 @@ def export_midi(
                 settings=settings,
                 gate=gate,
                 pitches=pitches,
+                ornaments=ornaments,
             ),
         )
         track = _write_track(events)
@@ -569,16 +640,29 @@ def export_midi(
         if not chord_events:
             continue
         max_end = 0
-        for start, duration, _col, notes in chord_events:
+        for start, duration, col, notes in chord_events:
             velocity = _accent_velocity(start, beats, unit)
             note_len = max(1, int(duration * gate))
+            bar_ornament = ornaments.get((b_idx, col)) if (show_ornaments and ornaments) else None
             for note in notes:
                 s_idx = note.string - 1
                 if s_idx < 0 or s_idx >= len(pitches):
                     continue
                 pitch = pitches[s_idx] + note.fret
-                events.append((current_time + start, _note_on(0, pitch, velocity)))
-                events.append((current_time + start + note_len, _note_off(0, pitch, 64)))
+                ornament_symbol = None
+                if show_ornaments:
+                    ornament_symbol = _picked_note_ornament(
+                        note,
+                        ornament_mode=ornament_mode,
+                    ) or bar_ornament
+                _append_note_messages(
+                    events,
+                    start_tick=current_time + start,
+                    note_len=note_len,
+                    pitch=pitch,
+                    velocity=velocity,
+                    ornament_symbol=ornament_symbol,
+                )
             max_end = max(max_end, start + duration)
         current_time += max_end
 

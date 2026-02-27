@@ -21,6 +21,12 @@ from oud.exports.midi import (
 )
 
 
+def _track_data(path) -> bytes:
+    data = path.read_bytes()
+    track_len = int.from_bytes(data[18:22], "big")
+    return data[22 : 22 + track_len]
+
+
 def test_vlq_encoding() -> None:
     assert _vlq(0) == b"\x00"
     assert _vlq(127) == b"\x7f"
@@ -61,6 +67,59 @@ def test_export_midi_start_bar_and_tempo(tmp_path) -> None:
     assert "Wrote" in msg
     data = path.read_bytes()
     assert b"\xff\x51\x03\x07\xa1\x20" in data
+
+
+def test_export_midi_plays_note_ornament_when_enabled(tmp_path) -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0, left_ornament="#")])],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "orn_enabled.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showornaments": "on", "ft3ornaments": "both"},
+    )
+    track = _track_data(path)
+    assert track.count(bytes([0x90])) == 2
+
+
+def test_export_midi_skips_note_ornament_when_disabled(tmp_path) -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0, left_ornament="#")])],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "orn_disabled.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showornaments": "off", "ft3ornaments": "both"},
+    )
+    track = _track_data(path)
+    assert track.count(bytes([0x90])) == 1
+
+
+def test_export_midi_plays_bar_ornament_when_enabled(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "bar_orn_enabled.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showornaments": "on"},
+        ornaments={(0, 0): "#"},
+    )
+    track = _track_data(path)
+    assert track.count(bytes([0x90])) == 2
 
 
 def test_parse_tuning_low_to_high() -> None:

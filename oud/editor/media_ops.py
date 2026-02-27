@@ -37,6 +37,7 @@ def cmd_midi(
         state.bar_width,
         settings=state.settings,
         dotted=state.dotted,
+        ornaments=state.ornaments,
     )
     save_fn(config_path, state.settings)
 

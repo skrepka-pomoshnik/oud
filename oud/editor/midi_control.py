@@ -56,6 +56,7 @@ def start_midi(
         bpm=bpm,
         start_bar=start_bar,
         dotted=state.dotted,
+        ornaments=state.ornaments,
     )
     timeline = build_playback_timeline(
         state.piece,
@@ -72,3 +73,21 @@ def start_midi(
     state.message, state.midi_proc = play_midi(path, soundfont=soundfont)
     if state.midi_proc is not None:
         start_playback_clock(state, time.monotonic())
+
+
+def pause_midi(state: EditorState) -> None:
+    proc = state.midi_proc
+    if proc is None or proc.poll() is not None:
+        state.midi_proc = None
+        state.message = "MIDI not playing"
+        return
+    if state.playback.bar is not None:
+        state.cursor_bar = max(0, state.playback.bar)
+    if state.playback.col is not None:
+        state.cursor_col = max(0, state.playback.col)
+    state.clamp()
+    state.midi_proc = None
+    reset_playback_animation(state)
+    if proc.poll() is None:
+        proc.terminate()
+    state.message = "MIDI paused"
