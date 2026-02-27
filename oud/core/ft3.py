@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from statistics import median
 
+from oud.core.ft3_text import FT3TextRecord, is_ft3_text_record, parse_ft3_text_record
 from oud.core.model import Bar, Chord, Note, Piece
 
 
@@ -260,6 +261,11 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
             continue
 
         note_type = bar_data[ptr] + 2
+        if note_type_to_denominator(note_type) is None:
+            # Ignore false-positive chord headers found while scanning body bytes.
+            # Valid FT3 rhythmic note types map to known denominators.
+            ptr += 1
+            continue
         dotted = bool(bar_data[ptr + 1] & 0x10)
         grid = None
         if bar_data[ptr + 1] & 0x02:
@@ -346,22 +352,7 @@ def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
         bar.barline = "||"
 
 
-def _is_ft3_text_record(chunk: bytes) -> bool:
-    tail = chunk[32:] if len(chunk) > 32 else chunk
-    if not tail:
-        return False
-    newline_count = tail.count(b"\r") + tail.count(b"\n")
-    if newline_count < 2:
-        return False
-    letter_count = sum(
-        1
-        for b in tail
-        if (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A)
-    )
-    return letter_count >= 6
-
-
-def load_ft3(path: str) -> Piece:  # noqa: C901
+def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     data = read_ft3(path)
 
     blocks, metadata_blob = _extract_cpiece_blocks(data)
@@ -379,17 +370,25 @@ def load_ft3(path: str) -> Piece:  # noqa: C901
 
     raw_chunks = re.split(b"\x03\x80", data)
     filtered_text_records = 0
+    parsed_text_records: list[FT3TextRecord] = []
     bar_chunks = raw_chunks
     body_start = data.find(b"CBar")
     if body_start >= 0:
         body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
-        text_record_count = sum(1 for chunk in body_chunks if _is_ft3_text_record(chunk))
+        # Always parse bars from the CBar body stream so CPiece/metadata bytes
+        # cannot pollute bar 1 (common in duet-score files).
+        bar_chunks = body_chunks
+        text_record_count = sum(1 for chunk in body_chunks if is_ft3_text_record(chunk))
         # Some FT3 files interleave lyric/melody text records in the body stream.
-        # Only switch to body-based parsing/filtering when this pattern is clearly present,
-        # otherwise keep legacy whole-file splitting to preserve current import parity.
+        # Enable filtering/parsing only when this pattern is clearly present.
         if text_record_count >= 2:
             filtered_text_records = text_record_count
-            bar_chunks = [chunk for chunk in body_chunks if not _is_ft3_text_record(chunk)]
+            bar_chunks = []
+            for chunk in body_chunks:
+                if is_ft3_text_record(chunk):
+                    parsed_text_records.append(parse_ft3_text_record(chunk))
+                    continue
+                bar_chunks.append(chunk)
     bars = [parse_bar(chunk) for chunk in bar_chunks]
     _apply_legacy_duration_fix(bars)
     _fill_missing_time_signatures(bars)
@@ -407,9 +406,19 @@ def load_ft3(path: str) -> Piece:  # noqa: C901
         bars=bars,
         strings=strings,
     )
+    if parsed_text_records:
+        for bar, record in zip(piece.bars, parsed_text_records, strict=False):
+            if record.melody_grid:
+                bar.melody_grid = record.melody_grid
+            if record.melody_events:
+                bar.melody_events = list(record.melody_events)
+            if record.lyrics:
+                bar.lyrics = list(record.lyrics)
+            if record.lyric_event_rows:
+                bar.lyric_event_rows = [list(row) for row in record.lyric_event_rows]
     if filtered_text_records:
         piece.import_warnings.append(
-            "FT3 lyric/melody text records are present and currently ignored.",
+            "FT3 lyric/melody text records are present (basic parsing/rendering only).",
         )
     annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
@@ -536,6 +545,16 @@ def _fill_missing_time_signatures(bars: list[Bar]) -> None:  # noqa: C901
             if bar.time_sig is not None or not bar.chords:
                 continue
             total = _bar_sum_quarter_beats(bar)
+            if prev_meter is None and next_meter:
+                # Before the first explicit meter: keep strong sum-based guesses
+                # (e.g. O for 3/4-like bars), otherwise fall back to next_meter
+                # so short lead-ins still show the score meter cue.
+                guessed = _infer_meter_from_sum(total)
+                if guessed:
+                    bar.time_sig = guessed
+                    continue
+                bar.time_sig = next_meter
+                continue
             if prev_meter and _sum_matches_meter(total, prev_meter):
                 bar.time_sig = prev_meter
                 continue

@@ -775,6 +775,7 @@ def render_systems(  # noqa: C901, PLR0912
     if glisses is None:
         glisses = []
     total_bars = len(piece.bars)
+    duet_width_lock = settings.get("duetwidthlock", "off") == "on"
     current_bar_start = bar_offset
     for sys_idx in range(systems):
         row_start = header_row + 1 + sys_idx * block_h
@@ -1114,7 +1115,7 @@ def render_systems(  # noqa: C901, PLR0912
                         _required_duration_content_width(preview_flags, min_gap=smart_gap),
                     )
                 min_display = min_content + barpad * 2
-                if min_display > display_width and spacing_mode != "auto":
+                if min_display > display_width and spacing_mode != "auto" and not duet_width_lock:
                     display_width = min_display
                     scale_bar = True
             pad = barpad if scale_bar else 0
@@ -1550,28 +1551,6 @@ def render_systems(  # noqa: C901, PLR0912
                         keep=sparse_cues,
                     )
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
-                if (
-                    playback_bar is not None
-                    and playback_col is not None
-                    and abs_bar == playback_bar
-                    and _playback_in_range(bar, playback_col, bar_width)
-                ):
-                    content_width = max(1, display_width - pad * 2)
-                    pcol = _playback_scaled_col_for_chords(
-                        playback_col=playback_col,
-                        bar_width=bar_width,
-                        grid_width=grid_width,
-                        content_width=content_width,
-                        positions=positions,
-                        src_to_dest=src_to_dest,
-                    )
-                    safe_addstr(
-                        stdscr,
-                        row_start + (rows["flag"] or 0),
-                        bar_x + draw_pad + pcol,
-                        flag_cells[draw_pad + pcol],
-                        A_BOLD,
-                    )
                 if rows.get("flag2") is not None:
                     safe_addstr(
                         stdscr,
@@ -1732,21 +1711,6 @@ def render_systems(  # noqa: C901, PLR0912
                     flag_cells = pad_row(flag_cells, display_width, draw_pad)
                     stem_cells = pad_row(stem_cells, display_width, draw_pad)
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
-                if (
-                    playback_bar is not None
-                    and playback_col is not None
-                    and abs_bar == playback_bar
-                    and _playback_in_range(bar, playback_col, bar_width)
-                ):
-                    content_width = max(1, display_width - draw_pad * 2)
-                    pcol = _scale_col(playback_col, bar_width, content_width)
-                    safe_addstr(
-                        stdscr,
-                        row_start + (rows["flag"] or 0),
-                        bar_x + draw_pad + pcol,
-                        flag_cells[draw_pad + pcol],
-                        A_BOLD,
-                    )
                 if rows.get("flag2") is not None:
                     safe_addstr(
                         stdscr,
@@ -1863,32 +1827,6 @@ def render_systems(  # noqa: C901, PLR0912
                         cell_x,
                         row_text[draw_pad + scaled_cursor_col],
                         A_REVERSE,
-                    )
-                if (
-                    playback_bar is not None
-                    and playback_col is not None
-                    and abs_bar == playback_bar
-                    and _playback_in_range(bar, playback_col, bar_width)
-                ):
-                    content_width = max(1, display_width - draw_pad * 2)
-                    if bar.chords:
-                        scaled_play_col = _playback_scaled_col_for_chords(
-                            playback_col=playback_col,
-                            bar_width=bar_width,
-                            grid_width=grid_width,
-                            content_width=content_width,
-                            positions=positions,
-                            src_to_dest=src_to_dest,
-                        )
-                    else:
-                        scaled_play_col = _scale_col(playback_col, bar_width, content_width)
-                    play_x = bar_x + draw_pad + scaled_play_col
-                    safe_addstr(
-                        stdscr,
-                        y,
-                        play_x,
-                        row_text[draw_pad + scaled_play_col],
-                        A_BOLD,
                     )
                 for col in range(bar_width):
                     if (abs_bar, actual, col) in highlights:

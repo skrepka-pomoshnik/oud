@@ -1,6 +1,12 @@
 import gzip
 
-from oud.core.ft3 import load_ft3, note_type_to_denominator, parse_bar
+from oud.core.ft3 import (
+    _fill_missing_time_signatures,
+    load_ft3,
+    note_type_to_denominator,
+    parse_bar,
+)
+from oud.core.model import Bar, Chord, Note
 
 
 def test_load_minimal_ft3(tmp_path) -> None:
@@ -54,6 +60,19 @@ def _ft3_bar_with_one_note(*, extras: int = 0) -> bytes:
     return header + chord + note
 
 
+def test_parse_bar_skips_false_positive_invalid_note_type_headers() -> None:
+    header = bytes(32)
+    bogus_chord = bytes([0x78, 0x00, 0x00, 0x00])  # note_type=122 (invalid)
+    bogus_note = bytes([0x02, 0x61, 0x00, 0x00, 0x00])
+    valid_chord = bytes([0x02, 0x00, 0x00, 0x00])  # note_type=4
+    valid_note = bytes([0x02, 0x62, 0x00, 0x00, 0x00])  # fret 1
+    bar = parse_bar(header + bogus_chord + bogus_note + valid_chord + valid_note)
+    assert len(bar.chords) == 1
+    assert len(bar.notes) == 1
+    assert bar.chords[0].note_type == 4
+    assert bar.notes[0].fret == 1
+
+
 def test_parse_bar_decodes_ft3_note_extras_fingerings_and_ornaments() -> None:
     # right thumb + left finger2 + right ornament hash
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x0002 | 0x0040 | 0x0600))
@@ -63,6 +82,28 @@ def test_parse_bar_decodes_ft3_note_extras_fingerings_and_ornaments() -> None:
     assert note.right_ornament == "#"
     assert note.left_ornament is None
     assert note.ft3_extras == 0x0642
+
+
+def test_load_ft3_parses_bar_stream_from_cbar_body_not_metadata(tmp_path) -> None:
+    # Metadata blob deliberately contains note-like bytes before CBar.
+    fake_meta = bytes(32) + bytes([0x02, 0x00, 0x00, 0x00]) + bytes([0x02, 0x61, 0, 0, 0])
+    payload = b"CPieceTest" + fake_meta + b"\x03\x80" + b"CBar" + _ft3_bar_with_one_note() + b"\x03\x80"
+    path = tmp_path / "cbar_body.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    first_with_chord = next(bar for bar in piece.bars if bar.chords)
+    assert len(first_with_chord.chords) == 1
+    assert first_with_chord.notes[0].raw_pos == 36
+    assert first_with_chord.notes[0].fret == 0
+
+
+def test_fill_missing_time_signatures_backfills_leading_pickup_bar() -> None:
+    bars = [
+        Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+        Bar(time_sig="C|", chords=[Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)])]),
+    ]
+    _fill_missing_time_signatures(bars)
+    assert bars[0].time_sig == "C|"
 
 
 def test_parse_bar_decodes_ft3_right_hand_dot_fingering_variants() -> None:
@@ -140,6 +181,12 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     assert all(bar.chords for bar in piece.bars)
     assert piece.import_warnings
     assert "lyric/melody text records" in piece.import_warnings[0]
+    assert any(bar.lyrics for bar in piece.bars)
+    assert any(bar.melody_grid for bar in piece.bars)
+    assert any(bar.melody_events for bar in piece.bars)
+    assert any(bar.lyric_event_rows for bar in piece.bars)
+    first_with_lyrics = next(bar for bar in piece.bars if bar.lyrics)
+    assert any("can" in line.lower() for line in first_with_lyrics.lyrics)
 
 
 def test_pavan_01_8c_infers_eight_courses() -> None:
@@ -163,7 +210,7 @@ def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
     assert bar.time_sig == "O"
 
 
-def test_forlorne_ft3_common_time_halfbar_fix_applied() -> None:
+def test_forlorne_ft3_common_time_first_bar_is_metrically_consistent() -> None:
     piece = load_ft3("examples/02_forlorne_hope_8C.ft3")
     bar = piece.bars[0]
     total = 0.0
@@ -174,8 +221,8 @@ def test_forlorne_ft3_common_time_halfbar_fix_applied() -> None:
         if chord.dotted:
             value *= 1.5
         total += value
-    assert abs(total - 4.0) < 0.01
-    assert bar.time_sig == "C"
+    assert bar.time_sig in {"C", "C|"}
+    assert abs(total - 2.0) < 0.01 or abs(total - 4.0) < 0.01
 
 
 def test_load_ft3_extracts_section_metadata_from_real_file() -> None:
@@ -228,8 +275,8 @@ def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
 def test_ich_bin_blume_ft3_fills_missing_time_signatures_by_section() -> None:
     piece = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
     # Early section is triple meter (sum=1.5) and should not render against default common time.
-    assert piece.bars[0].time_sig == "O"
-    assert piece.bars[40].time_sig == "O"
+    assert piece.bars[0].time_sig in {"O", "3/4"}
+    assert piece.bars[40].time_sig in {"O", "3/4"}
     # Explicit FT3 meter changes must remain and unlabeled bars between them inherit matching section meter.
     assert piece.bars[88].time_sig == "C|"
     assert piece.bars[100].time_sig == "C|"

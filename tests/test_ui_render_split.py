@@ -317,6 +317,86 @@ def test_render_duet_score_view_mirrors_playback_marker_on_both_staves() -> None
     assert len(marker_rows) >= 2
 
 
+def test_playback_marker_does_not_mutate_staff_cells_with_combining_marks() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=20, w=90)
+    kwargs["piece"] = Piece(
+        title="Playback Stable",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[
+                            Note(
+                                1,
+                                0,
+                                0,
+                                right_fingering="dot1",
+                                right_ornament="#",
+                                left_fingering="4",
+                            ),
+                        ],
+                    ),
+                ],
+                time_sig="C|",
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    kwargs["settings"]["showextras"] = "on"
+    kwargs["settings"]["showft3extras"] = "on"
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "on"
+    baseline = _render_lines(kwargs)
+    kwargs["playback_bar"] = 0
+    kwargs["playback_col"] = 0
+    with_playback = _render_lines(kwargs)
+    normalized_playback = [line.replace("^", " ") for line in with_playback]
+    assert normalized_playback == baseline
+
+
+def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
+    def _dense_bar() -> Bar:
+        return Bar(
+            chords=[
+                Chord(note_type=8, dotted=(idx % 2 == 0), grid=None, notes=[Note(1, 1, 0)])
+                for idx in range(6)
+            ],
+        )
+
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=36, w=120)
+    kwargs["piece"] = Piece(
+        title="Duet Align",
+        bars=[
+            _dense_bar(),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 3, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    kwargs["settings"]["layout"] = "auto"
+    kwargs["settings"]["justify"] = "edge"
+    lines = _render_lines(kwargs)
+
+    top_label = next(i for i, line in enumerate(lines) if "Lute 1" in line)
+    bottom_label = next(i for i, line in enumerate(lines) if "Lute 2" in line)
+    top_g = next(i for i in range(top_label + 1, len(lines)) if lines[i].startswith(" g|"))
+    bottom_g = next(i for i in range(bottom_label + 1, len(lines)) if lines[i].startswith(" g|"))
+    top_barlines = [col for col, ch in enumerate(lines[top_g]) if ch == "|"]
+    bottom_barlines = [col for col, ch in enumerate(lines[bottom_g]) if ch == "|"]
+    assert top_barlines == bottom_barlines
+
+
 def test_duet_staff_labels_and_time_fill_are_derived_from_ensemble_and_pair() -> None:
     piece = Piece(
         title="Duet",
@@ -402,6 +482,18 @@ def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
     ]
     assert numeric_calls
     assert not symbol_calls
+
+
+def test_render_cut_time_signature_cue_is_visible_in_first_bar() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(title="Cut", bars=[Bar(time_sig="C|"), Bar()], strings=6)
+    render_piece(**kwargs)
+    calls = [
+        (y, x, text)
+        for (y, x, text, _a) in kwargs["stdscr"].calls
+        if y >= 2 and x >= 3 and text.strip() in {"C|", "2"}
+    ]
+    assert calls
 
 
 @pytest.mark.parametrize("justify", ["compact", "smart", "stretch"])
