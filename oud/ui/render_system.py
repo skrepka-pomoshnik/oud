@@ -60,6 +60,7 @@ from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
 from oud.ui.render_text_lanes import lyric_event_cells as _lane_lyric_event_cells
 from oud.ui.render_text_lanes import melody_event_cells as _lane_melody_event_cells
 from oud.ui.render_text_lanes import text_bar_cells as _lane_text_bar_cells
+from oud.ui.render_text_lanes import tokenized_onset_cells as _lane_tokenized_onset_cells
 from oud.ui.render_text_lanes import visible_lyric_rows
 
 
@@ -1875,6 +1876,13 @@ def render_systems(  # noqa: C901, PLR0912
                         width=display_width,
                         left_pad=draw_pad,
                     )
+                elif text_onset_cols:
+                    melody_cells = _lane_tokenized_onset_cells(
+                        getattr(bar, "melody_grid", None),
+                        onset_cols=text_onset_cols,
+                        width=display_width,
+                        left_pad=draw_pad,
+                    )
                 else:
                     melody_cells = _text_bar_cells(getattr(bar, "melody_grid", None), display_width)
                 safe_addstr(stdscr, row_start + (rows["melody"] or 0), bar_x - 1, "|")
@@ -1905,7 +1913,15 @@ def render_systems(  # noqa: C901, PLR0912
                             if lyric_idx < len(lyric_lines)
                             else None
                         )
-                        lyric_cells = _text_bar_cells(lyric_text, display_width)
+                        if text_onset_cols:
+                            lyric_cells = _lane_tokenized_onset_cells(
+                                lyric_text,
+                                onset_cols=text_onset_cols,
+                                width=display_width,
+                                left_pad=draw_pad,
+                            )
+                        else:
+                            lyric_cells = _text_bar_cells(lyric_text, display_width)
                     safe_addstr(stdscr, row_start + lyric_row, bar_x - 1, "|")
                     safe_addstr(stdscr, row_start + lyric_row, bar_x, "".join(lyric_cells))
                     safe_addstr(

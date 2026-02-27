@@ -1126,9 +1126,41 @@ def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
     assert "\nm " in text
     assert "\ny " in text
     assert "Can" in text
-    assert "Was she" in text
+    assert "Was" in text and "she" in text
     for token in ("3", "8", "a", "4", "H"):
         assert token in text
+
+
+def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
+    kwargs = _args("normal")
+    kwargs["bar_width"] = 24
+    kwargs["piece"] = Piece(
+        title="RawAligned",
+        bars=[
+            Bar(
+                melody_grid="Can she excuse",
+                lyrics=["Was I so base"],
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 3, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    lines = _render_lines(kwargs)
+    melody_line = next(line for line in lines if line.startswith("m "))
+    lyric_line = next(line for line in lines if line.startswith("y "))
+    first_barline = melody_line.index("|")
+    second_barline = melody_line.index("|", first_barline + 1)
+    melody_inner = melody_line[first_barline + 1 : second_barline]
+    lyric_inner = lyric_line[first_barline + 1 : second_barline]
+    # Tokens should be spread across onset positions, not collapsed as a plain text blob.
+    assert melody_inner.find("Can") < melody_inner.find("she") < melody_inner.find("excuse")
+    assert lyric_inner.find("Was") < lyric_inner.find("I") < lyric_inner.find("so")
 
 
 def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
@@ -1234,3 +1266,44 @@ def test_ft3_structured_text_events_render_onset_aligned_over_raw_text_fallback(
     assert "ex" in text and "cuse" in text and "me" in text
     assert "-" in text
     assert "3" in text and "8" in text and "a" in text
+
+
+def test_ft3_structured_text_events_keep_later_onsets_stable_after_long_first_token() -> None:
+    kwargs = _args("normal")
+    kwargs["bar_width"] = 24
+    kwargs["piece"] = Piece(
+        title="StructuredDense",
+        bars=[
+            Bar(
+                melody_events=[
+                    MelodyEvent("abcdefghi", 0),
+                    MelodyEvent("Z", 1),
+                ],
+                lyric_event_rows=[
+                    [
+                        LyricEvent("longsyll", 0, syllabic="begin"),
+                        LyricEvent("me", 1, syllabic="end"),
+                    ],
+                ],
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    lines = _render_lines(kwargs)
+    melody_line = next(line for line in lines if line.startswith("m "))
+    lyric_line = next(line for line in lines if line.startswith("y "))
+    first_barline = melody_line.index("|")
+    second_barline = melody_line.index("|", first_barline + 1)
+    melody_inner = melody_line[first_barline + 1 : second_barline]
+    lyric_inner = lyric_line[first_barline + 1 : second_barline]
+    # "Z" and "me" must appear at/after the second onset, not drifted to the far right.
+    assert melody_inner.find("Z") > 0
+    assert lyric_inner.find("me") > 0
+    assert melody_inner.find("Z") < len(melody_inner) - 3
+    assert lyric_inner.find("me") < len(lyric_inner) - 3
