@@ -175,6 +175,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     # Keep paired staves aligned by forcing a shared packed plan in duet score view.
     duet_settings = dict(settings)
     duet_settings["layout"] = "packed"
+    duet_settings["duetwidthlock"] = "on"
     spacing_mode = "packed"
     spacing_fill = settings.get("justify", "stretch")
     bars_per_line_limit = max(1, usable_width // max(1, (bar_width + bar_gap)))
@@ -191,9 +192,10 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
 
     if selected_staff is not None:
         payload = _split_payload(selected_staff)
-        _safe_addstr(stdscr, header_row + 1, 0, " " * max(0, width - 1))
+        label_row = header_row + 2
+        _safe_addstr(stdscr, label_row, 0, " " * max(0, width - 1))
         single_label = f"{staff_labels[selected_staff]} only"[: max(0, width - 1)]
-        _safe_addstr(stdscr, header_row + 1, max(0, left_margin + 1), single_label)
+        _safe_addstr(stdscr, label_row, max(0, left_margin + 1), single_label)
         total_strings = payload["piece"].strings
         content_block_h = _block_height(
             include_meta,
@@ -389,8 +391,8 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
         bottom_row_start = bottom_header + 1
         label_x = max(0, left_margin + 1)
         label_w = max(0, width - label_x - 1)
-        _safe_addstr(stdscr, top_header, label_x, staff_labels[0][:label_w])
-        _safe_addstr(stdscr, bottom_header, label_x, staff_labels[1][:label_w])
+        _safe_addstr(stdscr, top_header + 1, label_x, staff_labels[0][:label_w])
+        _safe_addstr(stdscr, bottom_header + 1, label_x, staff_labels[1][:label_w])
         _duet_brace(
             stdscr,
             x=max(0, left_margin - 1),

@@ -397,6 +397,85 @@ def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
     assert top_barlines == bottom_barlines
 
 
+def test_render_duet_top_staff_rows_share_same_barline_columns() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=36, w=120)
+    kwargs["piece"] = Piece(
+        title="Duet L1",
+        bars=[
+            Bar(chords=[Chord(note_type=8, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=16, dotted=True, grid=None, notes=[Note(2, 11, 0)])]),
+            Bar(chords=[Chord(note_type=8, dotted=False, grid=None, notes=[Note(3, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, 3, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    lines = _render_lines(kwargs)
+    top_label = next(i for i, line in enumerate(lines) if "Lute 1" in line)
+    top_g = next(i for i in range(top_label + 1, len(lines)) if lines[i].startswith(" g|"))
+    top_staff_rows = lines[top_g : top_g + 6]
+    row_barlines = [[col for col, ch in enumerate(row) if ch == "|"] for row in top_staff_rows]
+    assert row_barlines
+    assert all(cols == row_barlines[0] for cols in row_barlines[1:])
+
+
+def test_render_duet_top_staff_rows_have_equal_symbol_count() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=36, w=120)
+    kwargs["piece"] = Piece(
+        title="Duet Width",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=8,
+                        dotted=False,
+                        grid=None,
+                        notes=[
+                            Note(1, 0, 0, left_fingering="2", right_fingering="dot1"),
+                            Note(2, 2, 0),
+                        ],
+                    ),
+                    Chord(
+                        note_type=8,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(3, 3, 0)],
+                    ),
+                ],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "on"
+    lines = _render_lines(kwargs)
+    top_label = next(i for i, line in enumerate(lines) if "Lute 1" in line)
+    top_g = next(i for i in range(top_label + 1, len(lines)) if lines[i].startswith(" g|"))
+    top_staff_rows = lines[top_g : top_g + 6]
+
+    def _symbol_span_len(row: str) -> int:
+        left = row.find("|")
+        right = row.rfind("|")
+        segment = row if left < 0 or right <= left else row[left : right + 1]
+        return len(segment)
+
+    counts = [_symbol_span_len(row) for row in top_staff_rows]
+    assert counts
+    assert len(set(counts)) == 1
+
+
 def test_duet_staff_labels_and_time_fill_are_derived_from_ensemble_and_pair() -> None:
     piece = Piece(
         title="Duet",
