@@ -1,5 +1,11 @@
+import unicodedata
+
 from oud.ui.adapter import CursesError, Screen
 from oud.ui.framebuffer import Frame, draw_frame_rows
+
+
+def _display_cols(text: str) -> int:
+    return sum(1 for ch in text if not unicodedata.combining(ch))
 
 
 class _StrictScreen(Screen):
@@ -15,7 +21,7 @@ class _StrictScreen(Screen):
         _ = attr
         assert 0 <= y < self._height
         assert 0 <= x < self._width
-        assert x + len(text) <= self._width
+        assert x + _display_cols(text) <= self._width
         self.calls.append((y, x, text))
 
     def erase(self) -> None:
@@ -40,7 +46,7 @@ def test_draw_frame_rows_clamps_to_width() -> None:
 class _CursesLikeScreen(_StrictScreen):
     def addstr(self, y: int, x: int, text: str, attr: int = 0) -> None:
         _ = attr
-        if y == self._height - 1 and x + len(text) >= self._width:
+        if y == self._height - 1 and x + _display_cols(text) >= self._width:
             raise CursesError("ERR")
         super().addstr(y, x, text, attr)
 
@@ -52,3 +58,16 @@ def test_draw_frame_rows_ignores_curses_errors() -> None:
         attrs=[(0,) * 6, (0,) * 6],
     )
     draw_frame_rows(screen, frame, {0, 1})
+
+
+def test_draw_frame_rows_combining_mark_rows_preserve_width() -> None:
+    screen = _StrictScreen(height=1, width=6)
+    frame = Frame(
+        lines=["a\u0323bcdef"],
+        attrs=[(0,) * 6],
+    )
+    draw_frame_rows(screen, frame, {0})
+    assert screen.calls
+    # One display row worth of text should be drawn without truncation/shear.
+    drawn = "".join(text for (_y, _x, text) in screen.calls)
+    assert "f" in drawn

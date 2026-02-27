@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 
 from oud.ui.adapter import CursesError, Screen
@@ -29,11 +30,12 @@ class FrameBuffer(Screen):
         if y < 0 or y >= self._height or x >= self._width:
             return
         if x < 0:
-            text = text[-x:]
+            text = _drop_display_cols_left(text, -x)
             x = 0
-        max_len = max(0, self._width - x)
-        for idx, ch in enumerate(text[:max_len]):
-            self._chars[y][x + idx] = ch
+        max_cols = max(0, self._width - x)
+        clusters = _split_display_clusters(text)[:max_cols]
+        for idx, cluster in enumerate(clusters):
+            self._chars[y][x + idx] = cluster
             self._attrs[y][x + idx] = attr
 
     def erase(self) -> None:
@@ -67,13 +69,49 @@ def frame_diff_rows(prev: Frame | None, curr: Frame) -> set[int]:
     return rows
 
 
+def _split_display_clusters(text: str) -> list[str]:
+    clusters: list[str] = []
+    for ch in text:
+        if unicodedata.combining(ch):
+            if clusters:
+                clusters[-1] += ch
+            continue
+        clusters.append(ch)
+    return clusters
+
+
+def _drop_display_cols_left(text: str, cols: int) -> str:
+    if cols <= 0 or not text:
+        return text
+    clusters = _split_display_clusters(text)
+    if cols >= len(clusters):
+        return ""
+    return "".join(clusters[cols:])
+
+
+def _clip_display_cols(text: str, cols: int) -> str:
+    if cols <= 0 or not text:
+        return ""
+    clusters = _split_display_clusters(text)
+    if len(clusters) <= cols:
+        return text
+    return "".join(clusters[:cols])
+
+
 def iter_attr_runs(text: str, attrs: tuple[int, ...]) -> list[tuple[str, int]]:
-    if not text:
+    if not text and not attrs:
+        return []
+    clusters = _split_display_clusters(text)
+    if len(clusters) < len(attrs):
+        clusters.extend([" "] * (len(attrs) - len(clusters)))
+    elif len(clusters) > len(attrs):
+        clusters = clusters[: len(attrs)]
+    if not clusters:
         return []
     runs: list[tuple[str, int]] = []
     current_attr = attrs[0] if attrs else 0
-    current_text = [text[0]]
-    for ch, attr in zip(text[1:], attrs[1:], strict=False):
+    current_text = [clusters[0]]
+    for ch, attr in zip(clusters[1:], attrs[1:], strict=False):
         if attr == current_attr:
             current_text.append(ch)
             continue
@@ -93,24 +131,27 @@ def draw_frame_rows(screen: Screen, frame: Frame, rows: set[int]) -> None:  # no
         attrs = frame.attrs[row]
         if width <= 0:
             continue
-        if len(text) > width:
-            text = text[:width]
+        if len(attrs) > width:
             attrs = attrs[:width]
+        elif len(attrs) < width:
+            attrs = attrs + (0,) * (width - len(attrs))
         x = 0
         for chunk_text, attr in iter_attr_runs(text, attrs):
             if x >= width:
                 break
             if not chunk_text:
                 continue
-            if x + len(chunk_text) > width:
-                clipped = chunk_text[: max(0, width - x)]
+            chunk_cols = len(_split_display_clusters(chunk_text))
+            if x + chunk_cols > width:
+                clipped = _clip_display_cols(chunk_text, max(0, width - x))
                 if not clipped:
                     break
                 chunk_out = clipped
+                chunk_cols = len(_split_display_clusters(chunk_out))
             else:
                 chunk_out = chunk_text
             try:
                 screen.addstr(row, x, chunk_out, attr)
             except CursesError:
                 break
-            x += len(chunk_out)
+            x += chunk_cols
