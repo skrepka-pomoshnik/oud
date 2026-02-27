@@ -44,6 +44,8 @@ _BOOL_KEYS = {
     "showdur",
     "showspans",
     "showtuplets",
+    "showmelody",
+    "showlyrics",
     "showfingerings",
     "showornaments",
     "showextras",
@@ -146,6 +148,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "glisscuestyle": (
         {"slash", "paren", "angle", "hide"},
         "Glisscuestyle must be slash/paren/angle/hide",
+    ),
+    "vocalpos": (
+        {"top", "bottom"},
+        "Vocalpos must be top/bottom",
     ),
     "ft3fingering": (
         {"off", "left", "right", "both"},

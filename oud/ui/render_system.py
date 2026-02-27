@@ -57,6 +57,10 @@ from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
+from oud.ui.render_text_lanes import lyric_event_cells as _lane_lyric_event_cells
+from oud.ui.render_text_lanes import melody_event_cells as _lane_melody_event_cells
+from oud.ui.render_text_lanes import text_bar_cells as _lane_text_bar_cells
+from oud.ui.render_text_lanes import visible_lyric_rows
 
 
 def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
@@ -77,6 +81,31 @@ def _repeat_dot_display_rows(display_strings: int) -> set[int]:
     hi = min(display_strings - 1, display_strings // 2)
     lo = max(0, hi - 1)
     return {lo, hi}
+
+
+def _text_bar_cells(text: str | None, width: int) -> list[str]:
+    return _lane_text_bar_cells(text, width)
+
+
+def _event_display_onset_cols(
+    *,
+    positions: list[tuple[int, int, bool]] | None,
+    grid_map: list[int] | None,
+    draw_pad: int,
+) -> list[int]:
+    if not positions or not grid_map:
+        return []
+    cols: list[int] = []
+    seen: set[int] = set()
+    for raw_col, _denom, _dot in positions:
+        if not (0 <= raw_col < len(grid_map)):
+            continue
+        disp_col = draw_pad + grid_map[raw_col]
+        if disp_col in seen:
+            continue
+        seen.add(disp_col)
+        cols.append(disp_col)
+    return cols
 
 
 def _overlay_sparse_mark_chars(
@@ -738,6 +767,10 @@ def render_systems(  # noqa: C901, PLR0912
     tuning_labels: list[str],
     basslabels: str,
     chord_wrap_limit: int,
+    show_melody: bool = False,
+    show_lyrics: bool = False,
+    lyric_rows_count: int = 0,
+    vocal_pos: str = "bottom",
 ) -> None:
     if glisses is None:
         glisses = []
@@ -753,6 +786,10 @@ def render_systems(  # noqa: C901, PLR0912
             show_tuplets,
             show_tactus,
             double_stems,
+            show_melody=show_melody,
+            show_lyrics=show_lyrics,
+            lyric_rows_count=lyric_rows_count,
+            vocal_pos=vocal_pos,
         )
         # Clear the system block to avoid stale characters after reflow/resizes.
         for clear_row in range(row_start, row_start + block_h):
@@ -859,6 +896,10 @@ def render_systems(  # noqa: C901, PLR0912
             show_tuplets,
             show_tactus,
             double_stems,
+            show_melody=show_melody,
+            show_lyrics=show_lyrics,
+            lyric_rows_count=lyric_rows_count,
+            vocal_pos=vocal_pos,
         )
         for display_idx in range(system_display_strings):
             label = "  "
@@ -866,6 +907,16 @@ def render_systems(  # noqa: C901, PLR0912
                 actual = system_visual_indices[display_idx]
                 label = _string_label(actual, total_strings, tuning_labels, basslabels)
             safe_addstr(stdscr, row_start + (rows["staff"] or 0) + display_idx, 0, label)
+        if rows.get("melody") is not None:
+            safe_addstr(stdscr, row_start + (rows["melody"] or 0), 0, "m ")
+        lyric_base = rows.get("lyric")
+        lyric_row_offsets = (
+            tuple((lyric_base or 0) + idx for idx in range(max(0, lyric_rows_count)))
+            if lyric_base is not None and lyric_rows_count > 0
+            else ()
+        )
+        for lyric_idx, lyric_row in enumerate(lyric_row_offsets):
+            safe_addstr(stdscr, row_start + lyric_row, 0, "y " if lyric_idx == 0 else "  ")
 
         bar_x = left_margin
         if spacing_mode == "auto" and bar_widths:
@@ -1088,6 +1139,7 @@ def render_systems(  # noqa: C901, PLR0912
                     time_cue_side_pad(show_time_cue=True, scale_bar=True),
                 )
             draw_pad = pad + cue_pad_extra
+            text_onset_cols: list[int] = []
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
                 if abs_bar == 0 and not wrote_time_sig:
@@ -1312,6 +1364,11 @@ def render_systems(  # noqa: C901, PLR0912
                     grid_width=grid_width,
                     content_width=content_width,
                     src_to_dest=src_to_dest,
+                )
+                text_onset_cols = _event_display_onset_cols(
+                    positions=positions,
+                    grid_map=grid_map,
+                    draw_pad=draw_pad,
                 )
                 # Generic row scaling can drop sparse cue endpoints. Re-overlay them using
                 # the same chord/display map so parenthesize/tie/slur cue punctuation survives.
@@ -1871,6 +1928,54 @@ def render_systems(  # noqa: C901, PLR0912
                 marker_y = row_start + (rows["staff"] or 0) + system_display_strings
                 marker_x = bar_x + draw_pad + scaled_play_col
                 safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
+
+            if rows.get("melody") is not None:
+                if getattr(bar, "melody_events", None) and text_onset_cols:
+                    melody_cells = _lane_melody_event_cells(
+                        bar.melody_events,
+                        onset_cols=text_onset_cols,
+                        width=display_width,
+                        left_pad=draw_pad,
+                    )
+                else:
+                    melody_cells = _text_bar_cells(getattr(bar, "melody_grid", None), display_width)
+                safe_addstr(stdscr, row_start + (rows["melody"] or 0), bar_x - 1, "|")
+                safe_addstr(stdscr, row_start + (rows["melody"] or 0), bar_x, "".join(melody_cells))
+                safe_addstr(
+                    stdscr,
+                    row_start + (rows["melody"] or 0),
+                    min(max(0, width - 2), bar_x + display_width),
+                    barline,
+                )
+            if lyric_row_offsets:
+                for lyric_idx, lyric_row in enumerate(lyric_row_offsets):
+                    lyric_event_rows = getattr(bar, "lyric_event_rows", None) or []
+                    if lyric_idx < len(lyric_event_rows) and text_onset_cols:
+                        lyric_cells = _lane_lyric_event_cells(
+                            lyric_event_rows[lyric_idx],
+                            onset_cols=text_onset_cols,
+                            width=display_width,
+                            left_pad=draw_pad,
+                        )
+                    else:
+                        lyric_lines = visible_lyric_rows(
+                            getattr(bar, "lyrics", None),
+                            max_rows=len(lyric_row_offsets),
+                        )
+                        lyric_text = (
+                            lyric_lines[lyric_idx]
+                            if lyric_idx < len(lyric_lines)
+                            else None
+                        )
+                        lyric_cells = _text_bar_cells(lyric_text, display_width)
+                    safe_addstr(stdscr, row_start + lyric_row, bar_x - 1, "|")
+                    safe_addstr(stdscr, row_start + lyric_row, bar_x, "".join(lyric_cells))
+                    safe_addstr(
+                        stdscr,
+                        row_start + lyric_row,
+                        min(max(0, width - 2), bar_x + display_width),
+                        barline,
+                    )
 
             if spacing_mode == "auto":
                 next_gap = gaps_after[local_idx] if local_idx < len(gaps_after) else 0

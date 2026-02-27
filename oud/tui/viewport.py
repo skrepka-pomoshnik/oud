@@ -20,6 +20,34 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     show_tactus = state.settings.get("showtactus", "off") == "on"
     show_tuplets = state.settings.get("showtuplets", "off") == "on"
     double_stems = state.settings.get("flagstems", "single") == "double"
+    show_melody = state.settings.get("showmelody", "on") == "on" and any(
+        (bar.melody_grid or "").strip()
+        or any((event.text or "").strip() for event in bar.melody_events)
+        for bar in state.piece.bars
+    )
+    show_lyrics = state.settings.get("showlyrics", "on") == "on" and any(
+        any(line.strip() for line in bar.lyrics)
+        or any(
+            any((event.text or "").strip() for event in row)
+            for row in bar.lyric_event_rows
+        )
+        for bar in state.piece.bars
+    )
+    lyric_rows_count = 0
+    if show_lyrics:
+        for bar in state.piece.bars:
+            rows = 0
+            if bar.lyric_event_rows:
+                rows = sum(
+                    1
+                    for row in bar.lyric_event_rows
+                    if any((event.text or "").strip() for event in row)
+                )
+            if rows == 0:
+                rows = len([line for line in bar.lyrics if line.strip()])
+            lyric_rows_count = max(lyric_rows_count, min(2, rows))
+            if lyric_rows_count >= 2:
+                break
     used_bass = _bass_strings_used(state.piece, state.overrides)
     total_strings = state.piece.strings
     base_strings = min(6, total_strings)
@@ -36,6 +64,10 @@ def rows_per_screen(state: EditorState, height: int) -> int:
         show_tuplets,
         show_tactus,
         double_stems,
+        show_melody=show_melody,
+        show_lyrics=show_lyrics,
+        lyric_rows_count=lyric_rows_count,
+        vocal_pos=state.settings.get("vocalpos", "bottom"),
     )
     available = max(0, height - 2 - 1)
     return max(1, available // block_h)

@@ -77,3 +77,40 @@ def test_block_height_with_tuplets_reserves_one_row() -> None:
         double_stems=False,
     )
     assert with_tuplets == without_tuplets + 1
+
+
+def test_layout_block_rows_vocal_top_places_melody_before_flags() -> None:
+    rows = layout_block_rows(
+        strings=6,
+        include_meta=True,
+        show_dur=True,
+        show_extras=False,
+        show_tuplets=False,
+        show_tactus=False,
+        double_stems=False,
+        show_melody=True,
+        show_lyrics=True,
+        lyric_rows_count=1,
+        vocal_pos="top",
+    )
+    assert rows["melody"] is not None and rows["flag"] is not None
+    assert rows["melody"] < rows["flag"]
+    assert rows["lyric"] is not None and rows["lyric"] < rows["flag"]
+
+
+def test_layout_block_rows_vocal_bottom_places_melody_after_staff() -> None:
+    rows = layout_block_rows(
+        strings=6,
+        include_meta=True,
+        show_dur=True,
+        show_extras=False,
+        show_tuplets=False,
+        show_tactus=False,
+        double_stems=False,
+        show_melody=True,
+        show_lyrics=True,
+        lyric_rows_count=1,
+        vocal_pos="bottom",
+    )
+    assert rows["melody"] is not None and rows["staff"] is not None
+    assert rows["melody"] > rows["staff"] + 5

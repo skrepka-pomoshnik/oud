@@ -142,7 +142,9 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     tuning_labels: list[str],
     basslabels: str,
     chord_wrap_limit: int,
+    lyric_rows_count: int = 0,
 ) -> bool:
+    _ = lyric_rows_count
     if not is_duet_score_piece(piece):
         return False
     mode = duet_view_mode(settings)
@@ -201,6 +203,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             show_tuplets,
             show_tactus,
             double_stems,
+            lyric_rows_count=0,
         )
         # Reserve one extra row per system for the playback marker (`^`) so it
         # does not collide with the next system/label in duet view.
@@ -268,6 +271,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             tuning_labels=tuning_labels,
             basslabels=basslabels,
             chord_wrap_limit=chord_wrap_limit,
+            lyric_rows_count=0,
         )
         return True
 
@@ -284,6 +288,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
         show_tuplets,
         show_tactus,
         double_stems,
+        lyric_rows_count=0,
     )
     # Reserve one playback-marker row per staff block in duet mode.
     block_h = content_block_h + 1
@@ -378,6 +383,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 tuning_labels=tuning_labels,
                 basslabels=basslabels,
                 chord_wrap_limit=chord_wrap_limit,
+                lyric_rows_count=0,
             )
         top_row_start = top_header + 1
         bottom_row_start = bottom_header + 1
@@ -451,6 +457,44 @@ def _piece_has_imported_ft3_extras(piece: Piece) -> bool:
             ):
                 return True
     return False
+
+
+def _piece_has_lyrics(piece: Piece) -> bool:
+    for bar in piece.bars:
+        if any(line.strip() for line in bar.lyrics):
+            return True
+        for row in bar.lyric_event_rows:
+            if any((event.text or "").strip() for event in row):
+                return True
+    return False
+
+
+def _piece_has_melody_grid(piece: Piece) -> bool:
+    for bar in piece.bars:
+        if (bar.melody_grid or "").strip():
+            return True
+        if any((event.text or "").strip() for event in bar.melody_events):
+            return True
+    return False
+
+
+def _piece_lyric_row_count(piece: Piece, *, max_rows: int = 2) -> int:
+    count = 0
+    for bar in piece.bars:
+        rows = 0
+        if bar.lyric_event_rows:
+            rows = sum(
+                1
+                for row in bar.lyric_event_rows
+                if any((event.text or "").strip() for event in row)
+            )
+        if rows == 0:
+            rows = len([line for line in bar.lyrics if line.strip()])
+        if rows > 0:
+            count = max(count, min(max_rows, rows))
+            if count >= max_rows:
+                return max_rows
+    return count
 
 
 def _render_ascii_preview(
@@ -589,6 +633,10 @@ def render_piece(  # noqa: C901, PLR0912
     show_extras = settings.get("showspans", "off") == "on"
     show_tuplets = settings.get("showtuplets", "off") == "on"
     show_tactus = settings.get("showtactus", "off") == "on"
+    vocal_pos = settings.get("vocalpos", "bottom")
+    show_melody_text = settings.get("showmelody", "on") == "on" and _piece_has_melody_grid(piece)
+    show_lyric_text = settings.get("showlyrics", "on") == "on" and _piece_has_lyrics(piece)
+    lyric_rows_count = _piece_lyric_row_count(piece, max_rows=2) if show_lyric_text else 0
     hide_redundant = settings.get("flagredundant", "on") == "on"
     double_stems = settings.get("flagstems", "single") == "double"
     reverse_strings = rows_reversed(
@@ -623,6 +671,10 @@ def render_piece(  # noqa: C901, PLR0912
         show_tuplets,
         show_tactus,
         double_stems,
+        show_melody=show_melody_text,
+        show_lyrics=show_lyric_text,
+        lyric_rows_count=lyric_rows_count,
+        vocal_pos=vocal_pos,
     )
     available = max(0, height - 2 - (header_row + 1))
     systems = max(1, available // block_h)
@@ -694,8 +746,9 @@ def render_piece(  # noqa: C901, PLR0912
         default_duration=default_duration,
         tuning_labels=tuning_labels,
         basslabels=basslabels,
-        chord_wrap_limit=chord_wrap_limit,
-    )
+            chord_wrap_limit=chord_wrap_limit,
+            lyric_rows_count=0,
+        )
     if not rendered_duet:
         render_systems(
             stdscr,
@@ -734,6 +787,10 @@ def render_piece(  # noqa: C901, PLR0912
             show_tactus=show_tactus,
             hide_redundant=hide_redundant,
             double_stems=double_stems,
+            show_melody=show_melody_text,
+            show_lyrics=show_lyric_text,
+            lyric_rows_count=lyric_rows_count,
+            vocal_pos=vocal_pos,
             reverse_strings=reverse_strings,
             max_chords=max_chords,
             spacing_mode=spacing_mode,

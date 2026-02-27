@@ -11,7 +11,7 @@ from oud.core.duet_score import (
     duet_storage_mode,
     split_duet_piece_staff,
 )
-from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.ui.adapter import Screen
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import _apply_overrides, render_piece
@@ -819,6 +819,39 @@ def test_imported_dot_left_ornament_renders_inline_as_unicode_dot(
         ("italian", "reverse", "1"),
     ],
 )
+def test_imported_left_hand_plus_ornament_renders_inline(
+    style: str,
+    italian_orient: str | None,
+    base: str,
+) -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Plus",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0, left_ornament="+")]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["style"] = style
+    if italian_orient is not None:
+        kwargs["settings"]["italianorient"] = italian_orient
+    kwargs["settings"]["showfingerings"] = "off"
+    kwargs["settings"]["showornaments"] = "on"
+    text = "\n".join(_render_lines(kwargs))
+    assert f"{base}+" in text
+
+
+@pytest.mark.parametrize(
+    ("style", "italian_orient", "base"),
+    [
+        ("french", None, "b"),
+        ("italian", "reverse", "1"),
+    ],
+)
 def test_imported_right_hand_dot_fingering_renders_as_combining_mark_on_note(
     style: str,
     italian_orient: str | None,
@@ -842,14 +875,14 @@ def test_imported_right_hand_dot_fingering_renders_as_combining_mark_on_note(
     kwargs["settings"]["showfingerings"] = "on"
     kwargs["settings"]["showornaments"] = "off"
     text = "\n".join(_render_lines(kwargs))
-    assert f"{base}\u0307" in text
+    assert f"{base}\u0323" in text
 
 
 @pytest.mark.parametrize(
     ("style", "italian_orient", "fingering"),
     [
-        ("french", None, "₂\u0308"),
-        ("italian", "reverse", "²\u0308"),
+        ("french", None, "₂\u0324"),
+        ("italian", "reverse", "²\u0324"),
     ],
 )
 def test_imported_right_hand_dots_attach_to_fingering_when_left_fingering_present(
@@ -895,3 +928,138 @@ def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(m
     kwargs["settings"]["showspans"] = "off"
     render_piece(**kwargs)
     assert captured["show_extras"] is False
+
+
+def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Texted",
+        bars=[
+            Bar(
+                melody_grid=" 3   3  8 a",
+                lyrics=["Can", "Was she"],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+            Bar(
+                melody_grid=" 4   3  H 8",
+                lyrics=["cuse"],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    lines = _render_lines(kwargs)
+    text = "\n".join(lines)
+    assert "\nm " in text
+    assert "\ny " in text
+    assert "Can" in text
+    assert "Was she" in text
+    for token in ("3", "8", "a", "4", "H"):
+        assert token in text
+
+
+def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="TextedOff",
+        bars=[
+            Bar(
+                melody_grid=" 3   3  8 a",
+                lyrics=["Can"],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "off"
+    kwargs["settings"]["showlyrics"] = "off"
+    text = "\n".join(_render_lines(kwargs))
+    assert "\nm " not in text
+    assert "\ny " not in text
+    assert "Can" not in text
+
+
+def test_vocalpos_top_places_melody_rows_above_tab_staff() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="TopVocal",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("3", 0)],
+                lyric_event_rows=[[LyricEvent("Can", 0)]],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    kwargs["settings"]["vocalpos"] = "top"
+    lines = _render_lines(kwargs)
+    melody_idx = next(i for i, line in enumerate(lines) if line.startswith("m "))
+    staff_idx = next(i for i, line in enumerate(lines) if line.startswith(" g|"))
+    assert melody_idx < staff_idx
+
+
+def test_vocalpos_bottom_places_melody_rows_below_tab_staff() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="BottomVocal",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("3", 0)],
+                lyric_event_rows=[[LyricEvent("Can", 0)]],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    kwargs["settings"]["vocalpos"] = "bottom"
+    lines = _render_lines(kwargs)
+    melody_idx = next(i for i, line in enumerate(lines) if line.startswith("m "))
+    staff_idx = next(i for i, line in enumerate(lines) if line.startswith(" g|"))
+    assert melody_idx > staff_idx
+
+
+def test_ft3_structured_text_events_render_onset_aligned_over_raw_text_fallback() -> None:
+    kwargs = _args("normal")
+    kwargs["bar_width"] = 20
+    kwargs["piece"] = Piece(
+        title="StructuredText",
+        bars=[
+            Bar(
+                melody_grid="raw melody should not win",
+                lyrics=["raw lyric should not win"],
+                melody_events=[
+                    MelodyEvent("3", 0),
+                    MelodyEvent("8", 1),
+                    MelodyEvent("a", 2),
+                ],
+                lyric_event_rows=[
+                    [
+                        LyricEvent("ex", 0, syllabic="begin"),
+                        LyricEvent("cuse", 1, syllabic="end"),
+                        LyricEvent("me", 2, syllabic="single"),
+                    ],
+                ],
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 3, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    text = "\n".join(_render_lines(kwargs))
+    assert "raw lyric should not win" not in text
+    assert "raw melody should not win" not in text
+    assert "ex" in text and "cuse" in text and "me" in text
+    assert "-" in text
+    assert "3" in text and "8" in text and "a" in text

@@ -1,6 +1,46 @@
 from __future__ import annotations
 
 
+def _resolved_lyric_rows(show_lyrics: bool, lyric_rows_count: int) -> int:
+    return lyric_rows_count if lyric_rows_count > 0 else (1 if show_lyrics else 0)
+
+
+def _alloc_top_vocal_rows(
+    offset: int,
+    *,
+    show_melody: bool,
+    lyric_rows: int,
+) -> tuple[int, int | None, tuple[int, ...]]:
+    melody = None
+    lyric = ()
+    next_offset = offset
+    if show_melody:
+        melody = next_offset
+        next_offset += 1
+    if lyric_rows > 0:
+        lyric = tuple(next_offset + idx for idx in range(lyric_rows))
+        next_offset += lyric_rows
+    return next_offset, melody, lyric
+
+
+def _alloc_bottom_vocal_rows(
+    *,
+    staff: int,
+    strings: int,
+    show_melody: bool,
+    lyric_rows: int,
+) -> tuple[int | None, tuple[int, ...]]:
+    melody = None
+    lyric = ()
+    text_base = staff + strings + 1  # one row under staff for playback marker ^
+    if show_melody:
+        melody = text_base
+    if lyric_rows > 0:
+        lyric_start = text_base + (1 if show_melody else 0)
+        lyric = tuple(lyric_start + idx for idx in range(lyric_rows))
+    return melody, lyric
+
+
 def layout_rows(height: int, strings: int) -> dict[str, int | None]:
     if height <= 0:
         return {"header": None, "flag": None, "dur": None, "staff": None, "status": None}
@@ -35,6 +75,10 @@ def layout_block_rows(
     show_tuplets: bool,
     show_tactus: bool,
     double_stems: bool,
+    show_melody: bool = False,
+    show_lyrics: bool = False,
+    lyric_rows_count: int = 0,
+    vocal_pos: str = "bottom",
 ) -> dict[str, int | None]:
     _ = strings
     offset = 0
@@ -56,11 +100,28 @@ def layout_block_rows(
         if show_tuplets:
             tuplet = offset
         offset += 1
+    actual_lyric_rows = _resolved_lyric_rows(show_lyrics, lyric_rows_count)
+    melody = None
+    lyric_rows: tuple[int, ...] = ()
+    if vocal_pos == "top":
+        offset, melody, lyric_rows = _alloc_top_vocal_rows(
+            offset,
+            show_melody=show_melody,
+            lyric_rows=actual_lyric_rows,
+        )
     flag = offset
     flag2 = offset + 1 if double_stems else None
     offset += 2 if double_stems else 1
     dur = offset if show_dur else None
     staff = offset + (1 if show_dur else 0)
+    if vocal_pos != "top":
+        melody, lyric_rows = _alloc_bottom_vocal_rows(
+            staff=staff,
+            strings=strings,
+            show_melody=show_melody,
+            lyric_rows=actual_lyric_rows,
+        )
+    lyric = lyric_rows[0] if lyric_rows else None
     return {
         "meta": meta,
         "ann": ann,
@@ -75,6 +136,8 @@ def layout_block_rows(
         "flag2": flag2,
         "dur": dur,
         "staff": staff,
+        "melody": melody,
+        "lyric": lyric,
     }
 
 
@@ -86,7 +149,12 @@ def block_height(
     show_tuplets: bool,
     show_tactus: bool,
     double_stems: bool,
+    show_melody: bool = False,
+    show_lyrics: bool = False,
+    lyric_rows_count: int = 0,
+    vocal_pos: str = "bottom",
 ) -> int:
+    _ = vocal_pos
     height = strings + 1
     if include_meta:
         height += 1
@@ -99,4 +167,8 @@ def block_height(
         height += 1
     if show_extras or show_tuplets:
         height += 1
+    if show_melody:
+        height += 1
+    actual_lyric_rows = _resolved_lyric_rows(show_lyrics, lyric_rows_count)
+    height += max(0, actual_lyric_rows)
     return height
