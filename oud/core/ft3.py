@@ -352,6 +352,27 @@ def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
         bar.barline = "||"
 
 
+def _ft3_text_import_warning(records: list[FT3TextRecord]) -> str | None:
+    if not records:
+        return None
+    ascii_fallback = any(record.parse_mode == "ascii" for record in records)
+    has_lyrics = any(record.lyric_event_rows or record.lyrics for record in records)
+    has_melody = any(record.melody_events or record.melody_grid for record in records)
+    if ascii_fallback:
+        return "FT3 vocal text imported via raw fallback; lyric alignment may be approximate."
+    if has_lyrics and not has_melody:
+        return (
+            "FT3 lyrics parsed from structured text records; "
+            "melody lane is inferred from tablature."
+        )
+    if has_lyrics or has_melody:
+        return (
+            "FT3 vocal text parsed from structured records; "
+            "some vocal details may still be omitted."
+        )
+    return None
+
+
 def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     data = read_ft3(path)
 
@@ -417,9 +438,9 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
             if record.lyric_event_rows:
                 bar.lyric_event_rows = [list(row) for row in record.lyric_event_rows]
     if filtered_text_records:
-        piece.import_warnings.append(
-            "FT3 lyric/melody text records are present (basic parsing/rendering only).",
-        )
+        warning = _ft3_text_import_warning(parsed_text_records)
+        if warning:
+            piece.import_warnings.append(warning)
     annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
     source, editor, comment = _parse_footnote_parts(piece.footnote)

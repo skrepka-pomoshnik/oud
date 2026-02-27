@@ -50,7 +50,14 @@ def _grid_lyric_events(text: str | None) -> list[LyricEvent]:
         return []
     out: list[LyricEvent] = []
     for onset_idx, match in enumerate(re.finditer(r"\S+", text)):
-        out.append(LyricEvent(text=match.group(0), onset_index=onset_idx, src_pos=match.start()))
+        out.append(
+            LyricEvent(
+                text=match.group(0),
+                onset_index=onset_idx,
+                verse=0,
+                src_pos=match.start(),
+            ),
+        )
     return out
 
 
@@ -123,6 +130,7 @@ def _primary_lyric_events(event_rows: list[list[LyricEvent]]) -> list[LyricEvent
             LyricEvent(
                 text=best.text,
                 onset_index=best.onset_index,
+                verse=best.verse,
                 syllabic=best.syllabic,
                 src_pos=best.src_pos,
                 extender=best.extender,
@@ -155,6 +163,11 @@ def _lyric_row_score(row: list[LyricEvent]) -> int:
     return sum(sum(ch.isalpha() for ch in (ev.text or "")) for ev in row)
 
 
+def _lyric_row_verse(row: list[LyricEvent]) -> int:
+    verses = [ev.verse for ev in row]
+    return min(verses) if verses else 0
+
+
 def lyric_rows_for_bar(
     bar: Bar,
     *,
@@ -163,29 +176,11 @@ def lyric_rows_for_bar(
     left_pad: int,
     lyric_rows_count: int,
 ) -> list[list[str]]:
-    event_rows: list[list[LyricEvent]] = []
-    for row in getattr(bar, "lyric_event_rows", None) or []:
-        filtered = [ev for ev in row if (ev.text or "").strip() or ev.extender]
-        if filtered:
-            event_rows.append(filtered)
-    if not event_rows:
-        for text in getattr(bar, "lyrics", None) or []:
-            events = _grid_lyric_events(text)
-            if events:
-                event_rows.append(events)
-    event_rows = _dedup_lyric_rows(event_rows)
-    primary = _primary_lyric_events(event_rows)
-    ordered_rows: list[list[LyricEvent]] = []
-    if primary:
-        ordered_rows.append(primary)
-    primary_key = _lyric_row_key(primary) if primary else ()
-    remaining = [
-        row
-        for row in event_rows
-        if _lyric_row_key(row) and _lyric_row_key(row) != primary_key
-    ]
-    remaining.sort(key=_lyric_row_score, reverse=True)
-    ordered_rows.extend(remaining)
+    event_rows = _dedup_lyric_rows(_bar_lyric_rows(bar))
+    ordered_rows = sorted(
+        event_rows,
+        key=lambda row: (_lyric_row_verse(row), -_lyric_row_score(row), _lyric_row_key(row)),
+    )
     target_rows = max(lyric_rows_count, len(ordered_rows))
     out: list[list[str]] = []
     for idx in range(target_rows):

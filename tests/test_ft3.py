@@ -180,7 +180,7 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     assert len(piece.bars) == 40
     assert all(bar.chords for bar in piece.bars)
     assert piece.import_warnings
-    assert "lyric/melody text records" in piece.import_warnings[0]
+    assert "structured text records" in piece.import_warnings[0]
     assert any(bar.lyrics for bar in piece.bars)
     assert any(
         bar.melody_grid or bar.melody_events or bar.lyrics or bar.lyric_event_rows
@@ -189,6 +189,27 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     assert any(bar.lyric_event_rows for bar in piece.bars)
     first_with_lyrics = next(bar for bar in piece.bars if bar.lyrics)
     assert any("can" in line.lower() for line in first_with_lyrics.lyrics)
+
+
+def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> None:
+    text_record = (
+        bytes(32)
+        + b"\x01\x00\x03\x00\x08Can\r\nWas\x06she\r\nI\x07ex-\r\nso\r\n"
+    )
+    payload = (
+        b"CPieceTest\x03\x80CBar"
+        + text_record
+        + b"\x03\x80"
+        + text_record
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+    )
+    path = tmp_path / "structured_text.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.import_warnings
+    assert "structured text records" in piece.import_warnings[0]
 
 
 def test_pavan_01_8c_infers_eight_courses() -> None:

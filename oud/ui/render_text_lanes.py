@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import re
 
-from oud.core.model import LyricEvent, MelodyEvent
+from oud.core.model import Chord, LyricEvent, MelodyEvent
+
+_MELODY_STAFF_ROWS = 5
+_CENTER_STAFF_ROW = _MELODY_STAFF_ROWS // 2
+_DIATONIC_BASE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11, "h": 11}
 
 
 def visible_lyric_rows(lines: list[str] | None, max_rows: int = 2) -> list[str]:
@@ -227,6 +231,107 @@ def melody_event_cells(
     return cells
 
 
+def _token_pitch_value(token: str) -> int | None:
+    raw = token.strip().lower()
+    if not raw:
+        return None
+    letter = next((ch for ch in raw if ch in _DIATONIC_BASE), None)
+    if letter is None:
+        return None
+    pitch = 60 + _DIATONIC_BASE[letter]
+    pitch += raw.count("#")
+    if "b" in raw and letter != "b":
+        pitch -= 1
+    pitch += 12 * raw.count("'")
+    pitch -= 12 * raw.count(",")
+    return pitch
+
+
+def _chord_top_pitch(chord: Chord, tuning_pitches: list[int] | None) -> int | None:
+    if not chord.notes or not tuning_pitches:
+        return None
+    pitches: list[int] = []
+    for note in chord.notes:
+        idx = note.string - 1
+        if 0 <= idx < len(tuning_pitches):
+            pitches.append(tuning_pitches[idx] + note.fret)
+    return max(pitches) if pitches else None
+
+
+def _pitch_to_staff_row(pitch: int, lo: int, hi: int) -> int:
+    if hi <= lo:
+        return _CENTER_STAFF_ROW
+    span = hi - lo
+    normalized = (pitch - lo) / span
+    row = (_MELODY_STAFF_ROWS - 1) - round(normalized * (_MELODY_STAFF_ROWS - 1))
+    return max(0, min(_MELODY_STAFF_ROWS - 1, row))
+
+
+def _event_pitch_map(events: list[MelodyEvent] | None) -> dict[int, int]:
+    mapping: dict[int, int] = {}
+    for ev in events or []:
+        if ev.onset_index in mapping:
+            continue
+        pitch = _token_pitch_value(ev.text)
+        if pitch is not None:
+            mapping[ev.onset_index] = pitch
+    return mapping
+
+
+def _merge_chord_pitch_map(
+    onset_pitch: dict[int, int],
+    bar_chords: list[Chord] | None,
+    tuning_pitches: list[int] | None,
+) -> None:
+    if not bar_chords:
+        return
+    for onset_idx, chord in enumerate(bar_chords):
+        pitch = _chord_top_pitch(chord, tuning_pitches)
+        if pitch is not None:
+            onset_pitch[onset_idx] = pitch
+
+
+def _fill_unpitched_event_rows(
+    onset_pitch: dict[int, int],
+    events: list[MelodyEvent] | None,
+) -> None:
+    for ev in events or []:
+        if ev.onset_index in onset_pitch:
+            continue
+        if ev.text.strip():
+            onset_pitch[ev.onset_index] = 64
+
+
+def melody_staff_rows(
+    events: list[MelodyEvent] | None,
+    *,
+    onset_cols: list[int],
+    width: int,
+    left_pad: int = 0,
+    bar_chords: list[Chord] | None = None,
+    tuning_pitches: list[int] | None = None,
+) -> list[list[str]]:
+    rows = [["-"] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
+    if width <= 0 or not onset_cols:
+        return rows
+    onset_pitch = _event_pitch_map(events)
+    _merge_chord_pitch_map(onset_pitch, bar_chords, tuning_pitches)
+    _fill_unpitched_event_rows(onset_pitch, events)
+    if not onset_pitch:
+        return rows
+    pitch_values = list(onset_pitch.values())
+    lo = min(pitch_values)
+    hi = max(pitch_values)
+    floor = max(0, left_pad)
+    for onset_idx, pitch in sorted(onset_pitch.items()):
+        if onset_idx < 0 or onset_idx >= len(onset_cols):
+            continue
+        col = max(floor, min(width - 1, onset_cols[onset_idx]))
+        row = _pitch_to_staff_row(pitch, lo, hi)
+        rows[row][col] = "o"
+    return rows
+
+
 def lyric_event_cells(
     events: list[LyricEvent] | None,
     *,
@@ -241,33 +346,29 @@ def lyric_event_cells(
     last_end = floor - 1
     placed_spans: list[tuple[LyricEvent, int, int]] = []
     for ev in events:
-        region = _event_region(
-            onset_cols,
-            ev.onset_index,
-            width=len(cells),
-            floor=floor,
-        )
-        if region is None:
+        target = _event_target_col(onset_cols, ev.onset_index)
+        if target is None:
             continue
-        start, end = region
+        start = max(floor, min(len(cells) - 1, target))
+        if start <= last_end + 1:
+            start = last_end + 2
+        if start >= len(cells):
+            continue
         if ev.extender and not ev.text:
-            anchor = max(start, min(end, start))
-            if cells[anchor] == " ":
-                cells[anchor] = "_"
-            placed_spans.append((ev, anchor, anchor))
+            cells[start] = "_"
+            placed_spans.append((ev, start, start))
+            last_end = start
             continue
-        placed = _place_text_in_region(
-            cells,
-            ev.text,
-            start=start,
-            end=end,
-            after=last_end,
-        )
-        if placed is None:
+        text = ev.text or ""
+        if not text:
             continue
-        start, end = placed
-        last_end = end
+        end = min(len(cells) - 1, start + len(text) - 1)
+        if end < start:
+            continue
+        for idx, ch in enumerate(text[: end - start + 1]):
+            cells[start + idx] = ch
         placed_spans.append((ev, start, end))
+        last_end = end
     _place_lyric_link_cues(cells, placed_spans)
     return cells
 
@@ -282,10 +383,12 @@ def _place_lyric_link_cues(
         _next_ev, next_start, _next_end = placed_spans[idx + 1]
         if next_start <= end + 1:
             continue
-        gap_mid = end + max(1, (next_start - end) // 2)
-        if gap_mid >= len(cells) or cells[gap_mid] != " ":
-            continue
         if ev.syllabic in {"begin", "middle"}:
-            cells[gap_mid] = "-"
+            gap_mid = end + max(1, (next_start - end) // 2)
+            for col in range(max(end + 1, gap_mid - 1), min(next_start, gap_mid + 2)):
+                if 0 <= col < len(cells) and cells[col] == " ":
+                    cells[col] = "-"
         elif ev.extender:
-            cells[gap_mid] = "_"
+            for col in range(end + 1, next_start):
+                if 0 <= col < len(cells) and cells[col] == " ":
+                    cells[col] = "_"

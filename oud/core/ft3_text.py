@@ -12,6 +12,7 @@ class FT3TextRecord:
     lyrics: list[str]
     melody_events: list[MelodyEvent]
     lyric_event_rows: list[list[LyricEvent]]
+    parse_mode: str = "ascii"
 
 
 def _empty_text_record() -> FT3TextRecord:
@@ -20,6 +21,7 @@ def _empty_text_record() -> FT3TextRecord:
         lyrics=[],
         melody_events=[],
         lyric_event_rows=[],
+        parse_mode="ascii",
     )
 
 
@@ -296,21 +298,36 @@ def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
     last_non_lyric = -1
     for idx, tok in enumerate(tokens):
         if _likely_non_lyric_token(tok) or not _keep_lyric_token(tok):
+            if set(tok) <= {"_"}:
+                continue
             last_non_lyric = idx
     start = last_non_lyric + 1
-    out = [tok for tok in tokens[start:] if _keep_lyric_token(tok)]
+    out = [tok for tok in tokens[start:] if _keep_lyric_token(tok) or set(tok) <= {"_"}]
     if out:
         return out
-    return [tok for tok in tokens if _keep_lyric_token(tok)]
+    return [tok for tok in tokens if _keep_lyric_token(tok) or set(tok) <= {"_"}]
 
 
-def _events_from_lyric_tokens(tokens: list[str]) -> list[LyricEvent]:
+def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEvent]:
     events: list[LyricEvent] = []
     onset_idx = 0
     chain_open = False
     for tok in tokens:
         raw = _clean_text_token(tok)
         if not raw:
+            continue
+        if set(raw) <= {"_"}:
+            events.append(
+                LyricEvent(
+                    text="",
+                    onset_index=onset_idx,
+                    verse=verse,
+                    syllabic="single",
+                    src_pos=onset_idx,
+                    extender=True,
+                ),
+            )
+            onset_idx += 1
             continue
         trailing_hyphen = raw.endswith("-")
         text = raw.rstrip("-").strip()
@@ -332,6 +349,7 @@ def _events_from_lyric_tokens(tokens: list[str]) -> list[LyricEvent]:
             LyricEvent(
                 text=text,
                 onset_index=onset_idx,
+                verse=verse,
                 syllabic=syllabic,
                 src_pos=onset_idx,
                 extender=False,
@@ -379,11 +397,11 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
     if not verse_rows:
         return None
     lyric_lines = [" ".join(tokens).strip() for tokens in verse_rows if tokens]
-    lyric_event_rows = [
-        events
-        for tokens in verse_rows
-        if (events := _events_from_lyric_tokens(tokens))
-    ]
+    lyric_event_rows = []
+    for verse, tokens in enumerate(verse_rows):
+        events = _events_from_lyric_tokens(tokens, verse=verse)
+        if events:
+            lyric_event_rows.append(events)
     if not lyric_lines and not lyric_event_rows:
         return None
     return FT3TextRecord(
@@ -391,6 +409,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
         lyrics=lyric_lines,
         melody_events=[],
         lyric_event_rows=lyric_event_rows,
+        parse_mode="structured",
     )
 
 
@@ -421,6 +440,7 @@ def _lyric_events_from_line(line: str) -> list[LyricEvent]:
                 LyricEvent(
                     text="",
                     onset_index=onset_idx,
+                    verse=0,
                     syllabic="single",
                     src_pos=pos,
                     extender=True,
@@ -448,6 +468,7 @@ def _lyric_events_from_line(line: str) -> list[LyricEvent]:
             LyricEvent(
                 text=text,
                 onset_index=onset_idx,
+                verse=0,
                 syllabic=syllabic,
                 src_pos=pos,
                 extender=False,
@@ -495,4 +516,5 @@ def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:
         dedup_lyrics,
         melody_events=melody_events,
         lyric_event_rows=lyric_event_rows,
+        parse_mode="ascii",
     )

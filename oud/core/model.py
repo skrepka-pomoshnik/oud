@@ -16,6 +16,23 @@ class Note:
     ft3_extras: int | None = None
 
 
+@dataclass(frozen=True)
+class MelodyEvent:
+    text: str
+    onset_index: int
+    src_pos: int = 0
+
+
+@dataclass(frozen=True)
+class LyricEvent:
+    text: str
+    onset_index: int
+    verse: int = 0
+    syllabic: str = "single"  # single|begin|middle|end
+    src_pos: int = 0
+    extender: bool = False
+
+
 @dataclass
 class Bar:
     notes: list[Note] = field(default_factory=list)
@@ -25,6 +42,10 @@ class Bar:
     dynamic: str | None = None
     fermata: bool = False
     chords: list[Chord] = field(default_factory=list)
+    melody_grid: str | None = None
+    lyrics: list[str] = field(default_factory=list)
+    melody_events: list[MelodyEvent] = field(default_factory=list)
+    lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
 
 
 @dataclass

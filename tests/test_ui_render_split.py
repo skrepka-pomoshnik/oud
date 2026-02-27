@@ -1308,6 +1308,30 @@ def test_vocal_renderer_displays_all_lyric_rows_without_two_row_cap() -> None:
     assert "Row3" in text
 
 
+def test_vocal_renderer_orders_lyric_rows_by_verse_index() -> None:
+    kwargs = _args("normal")
+    kwargs["bar_width"] = 20
+    kwargs["piece"] = Piece(
+        title="VerseOrder",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("3", 0)],
+                lyric_event_rows=[
+                    [LyricEvent("Verse2", 0, verse=1)],
+                    [LyricEvent("Verse1", 0, verse=0)],
+                    [LyricEvent("Verse3", 0, verse=2)],
+                ],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    text = "\n".join(_render_lines(kwargs))
+    assert text.index("Verse1") < text.index("Verse2") < text.index("Verse3")
+
+
 def test_vocalpos_top_places_melody_rows_above_tab_staff() -> None:
     kwargs = _args("normal")
     kwargs["piece"] = Piece(

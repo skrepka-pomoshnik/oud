@@ -26,6 +26,9 @@ P2 (Notation + formats)
 - [ ] Tablature formatting parity: configurable fret label policies (numeric/letter/custom labels), multi-digit fret collision rules, bass-label policies.
   - [ ] Add custom fret label mapping (user-defined alphabet/symbol set) with validation and export-safe fallback.
 - [ ] Add Spanish tab support (Italian-like with inverted string order).
+- [ ] Vocal/lyric FT3 parity (layered parser + renderer).
+  - [ ] Add dedicated melody-grid lane renderer (token/onset-aware), not only raw text rows.
+  - [ ] Add duet/vocal score integration: melody+lyrics rows per staff with shared system breaks.
 
 P3 (Maintainability + advanced parity)
 - [ ] Split `command_ops.py` into small domain modules with thin router.
@@ -60,14 +63,13 @@ Testing backlog
 Reference-derived backlog (source-indexed, pending)
 
 VITABS (`refs/VITABS`)
-- [ ] Finish normal-mode motion/action split beyond core cursor moves (`h/j/k/l`, note-wise, visual-row jumps, `w/b/gg/G/$`, `f/F/t/T`, word search `* #`, `%`, mark jumps are extracted, and wrappers now share motion-target apply); several edit-triggered cursor moves (bar/rhythm advances) also use pure targets; migrate remaining edit-triggered cursor moves.
-- [ ] Expand first-class range primitives (bar/chord) into multi-chord edit ranges and route remaining delete/change/yank/range commands through them (counted `:chord del/insert/yank/paste N` and counted bar yank/paste via `Nyy`/`p` are in place).
-- [ ] Add explicit replace-mode semantics (free h/l edit on existing chord cells without implicit insertion), distinct from insert mode.
+- [ ] Finish normal-mode motion/action split beyond core cursor moves (`h/j/k/l`, note-wise, visual-row jumps, `w/b/gg/G/$`, `f/F/t/T`, word search `* #`, `%`, mark jumps are extracted, and wrappers now share motion-target apply); several edit-triggered cursor moves (bar/rhythm advances plus insert-mode row-step/snap helpers) also use pure targets; migrate remaining edit-triggered cursor moves.
+- [ ] Expand first-class range primitives (bar/chord) into multi-chord edit ranges and route remaining delete/change/yank/range commands through them (counted `:chord del/insert/yank/paste N`, counted bar yank/paste via `Nyy`/`p`, and counted `:bar del/yank/paste N` are in place).
 
 tuitar (`refs/tuitar`)
 
 LuteScribe (`refs/LuteScribe`)
-- [ ] Add compound undo grouping API and use it for reflow, transforms, and multi-step commands.
+- [ ] Add compound undo grouping API and use it for reflow, transforms, and multi-step commands (API is in place; local multi-step cell clears, counted `x`, and bar paste use transactional undo, but reflow/transform command families still need integration).
 - [ ] Add partial undo snapshots (system/stave-scoped restore) to avoid full-score restore for local edits.
 - [ ] Refine reflow by stave-wrap/system-wrap with whole-bar break candidates and preferred barline split points.
 - [ ] Implement true multiple staves per system (duet score rendering and editing), beyond current `Lute 1 / Lute 2` metadata hint line.

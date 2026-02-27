@@ -54,6 +54,22 @@ def test_lyric_event_cells_renders_dash_between_syllables() -> None:
     assert text.index("ex") < dash_idx < text.index("cuse")
 
 
+def test_lyric_event_cells_renders_extender_across_gap() -> None:
+    cells = lyric_event_cells(
+        [
+            LyricEvent("A", 0, verse=0, syllabic="single"),
+            LyricEvent("", 1, verse=0, extender=True),
+            LyricEvent("men", 2, verse=0, syllabic="single"),
+        ],
+        onset_cols=[2, 8, 14],
+        width=20,
+        left_pad=1,
+    )
+    text = "".join(cells)
+    assert "A" in text and "men" in text
+    assert "___" in text
+
+
 def test_lyric_event_cells_respects_left_pad_for_time_cue_lane() -> None:
     cells = lyric_event_cells(
         [LyricEvent("Can", 0)],
