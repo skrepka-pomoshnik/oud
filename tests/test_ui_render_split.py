@@ -106,6 +106,19 @@ def _render_lines(kwargs: dict) -> list[str]:
     return fb.snapshot().lines
 
 
+def _first_melody_row_idx(lines: list[str]) -> int:
+    return next(i for i, line in enumerate(lines) if line.startswith("  |") and "o" in line)
+
+
+def _first_lyric_row(lines: list[str]) -> str:
+    melody_start = _first_melody_row_idx(lines)
+    return next(
+        line
+        for idx, line in enumerate(lines)
+        if idx > melody_start + 3 and line.startswith("  |") and re.search(r"[A-Za-z]{2,}", line)
+    )
+
+
 def test_apply_overrides_wrapper() -> None:
     cells = [list("----") for _ in range(6)]
     _apply_overrides(cells, {(0, 0, 1): "r", (0, 1, 2): "a"}, 0, 6, 4)
@@ -357,6 +370,33 @@ def test_playback_marker_does_not_mutate_staff_cells_with_combining_marks() -> N
     with_playback = _render_lines(kwargs)
     normalized_playback = [line.replace("^", " ") for line in with_playback]
     assert normalized_playback == baseline
+
+
+def test_playback_highlights_active_note_cell_with_attribute() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=20, w=90)
+    kwargs["piece"] = Piece(
+        title="Playback Highlight",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(1, 0, 0)],
+                    ),
+                ],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    kwargs["cursor_col"] = 10
+    kwargs["playback_bar"] = 0
+    kwargs["playback_col"] = 0
+    render_piece(**kwargs)
+    assert any(text == "a" and attr != 0 for (_y, _x, text, attr) in kwargs["stdscr"].calls)
 
 
 def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
@@ -1123,12 +1163,35 @@ def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
     kwargs["settings"]["showlyrics"] = "on"
     lines = _render_lines(kwargs)
     text = "\n".join(lines)
-    assert "\nm " in text
-    assert "\ny " in text
+    assert any(line.startswith("  |") and "o" in line for line in lines)
+    assert any(line.startswith("  |") and re.search(r"[A-Za-z]", line) for line in lines)
     assert "Can" in text
-    assert "Was" in text and "she" in text
-    for token in ("3", "8", "a", "4", "H"):
-        assert token in text
+    assert "Was" in text
+    assert any("Was s" in line or "Was she" in line for line in lines)
+    assert "o" in text
+
+
+def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="MelodyNotes",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("3", 0), MelodyEvent("8", 1)],
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(6, 0, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    lines = _render_lines(kwargs)
+    melody_start = _first_melody_row_idx(lines)
+    melody_block = lines[melody_start : melody_start + 5]
+    assert len(melody_block) == 5
+    assert any("o" in row for row in melody_block)
 
 
 def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
@@ -1152,14 +1215,14 @@ def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
     kwargs["settings"]["showmelody"] = "on"
     kwargs["settings"]["showlyrics"] = "on"
     lines = _render_lines(kwargs)
-    melody_line = next(line for line in lines if line.startswith("m "))
-    lyric_line = next(line for line in lines if line.startswith("y "))
-    first_barline = melody_line.index("|")
-    second_barline = melody_line.index("|", first_barline + 1)
-    melody_inner = melody_line[first_barline + 1 : second_barline]
+    melody_start = _first_melody_row_idx(lines)
+    melody_block = lines[melody_start : melody_start + 5]
+    lyric_line = _first_lyric_row(lines)
+    first_barline = lyric_line.index("|")
+    second_barline = lyric_line.index("|", first_barline + 1)
     lyric_inner = lyric_line[first_barline + 1 : second_barline]
-    # Tokens should be spread across onset positions, not collapsed as a plain text blob.
-    assert melody_inner.find("Can") < melody_inner.find("she") < melody_inner.find("excuse")
+    assert not any("Can" in row for row in melody_block)
+    assert any("o" in row for row in melody_block)
     assert lyric_inner.find("Was") < lyric_inner.find("I") < lyric_inner.find("so")
 
 
@@ -1213,10 +1276,36 @@ def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
     )
     kwargs["settings"]["showmelody"] = "off"
     kwargs["settings"]["showlyrics"] = "off"
-    text = "\n".join(_render_lines(kwargs))
-    assert "\nm " not in text
-    assert "\ny " not in text
+    lines = _render_lines(kwargs)
+    text = "\n".join(lines)
+    assert not any(line.startswith("  |") and "o" in line for line in lines)
+    assert not any(line.startswith("  |") and "Can" in line for line in lines)
     assert "Can" not in text
+
+
+def test_vocal_renderer_displays_all_lyric_rows_without_two_row_cap() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="ManyLyrics",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("3", 0)],
+                lyric_event_rows=[
+                    [LyricEvent("Row1", 0)],
+                    [LyricEvent("Row2", 0)],
+                    [LyricEvent("Row3", 0)],
+                ],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    text = "\n".join(_render_lines(kwargs))
+    assert "Row1" in text
+    assert "Row2" in text
+    assert "Row3" in text
 
 
 def test_vocalpos_top_places_melody_rows_above_tab_staff() -> None:
@@ -1236,7 +1325,7 @@ def test_vocalpos_top_places_melody_rows_above_tab_staff() -> None:
     kwargs["settings"]["showlyrics"] = "on"
     kwargs["settings"]["vocalpos"] = "top"
     lines = _render_lines(kwargs)
-    melody_idx = next(i for i, line in enumerate(lines) if line.startswith("m "))
+    melody_idx = _first_melody_row_idx(lines)
     staff_idx = next(i for i, line in enumerate(lines) if line.startswith(" g|"))
     assert melody_idx < staff_idx
 
@@ -1258,7 +1347,7 @@ def test_vocalpos_bottom_places_melody_rows_below_tab_staff() -> None:
     kwargs["settings"]["showlyrics"] = "on"
     kwargs["settings"]["vocalpos"] = "bottom"
     lines = _render_lines(kwargs)
-    melody_idx = next(i for i, line in enumerate(lines) if line.startswith("m "))
+    melody_idx = _first_melody_row_idx(lines)
     staff_idx = next(i for i, line in enumerate(lines) if line.startswith(" g|"))
     assert melody_idx > staff_idx
 
@@ -1300,7 +1389,7 @@ def test_ft3_structured_text_events_render_onset_aligned_over_raw_text_fallback(
     assert "raw melody should not win" not in text
     assert "ex" in text and "cuse" in text and "me" in text
     assert "-" in text
-    assert "3" in text and "8" in text and "a" in text
+    assert "o" in text
 
 
 def test_ft3_structured_text_events_keep_later_onsets_stable_after_long_first_token() -> None:
@@ -1331,14 +1420,10 @@ def test_ft3_structured_text_events_keep_later_onsets_stable_after_long_first_to
     kwargs["settings"]["showmelody"] = "on"
     kwargs["settings"]["showlyrics"] = "on"
     lines = _render_lines(kwargs)
-    melody_line = next(line for line in lines if line.startswith("m "))
-    lyric_line = next(line for line in lines if line.startswith("y "))
-    first_barline = melody_line.index("|")
-    second_barline = melody_line.index("|", first_barline + 1)
-    melody_inner = melody_line[first_barline + 1 : second_barline]
+    lyric_line = _first_lyric_row(lines)
+    first_barline = lyric_line.index("|")
+    second_barline = lyric_line.index("|", first_barline + 1)
     lyric_inner = lyric_line[first_barline + 1 : second_barline]
-    # "Z" and "me" must appear at/after the second onset, not drifted to the far right.
-    assert melody_inner.find("Z") > 0
+    # "me" must appear at/after the second onset, not drifted to the far right.
     assert lyric_inner.find("me") > 0
-    assert melody_inner.find("Z") < len(melody_inner) - 3
     assert lyric_inner.find("me") < len(lyric_inner) - 3

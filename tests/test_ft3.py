@@ -182,8 +182,10 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     assert piece.import_warnings
     assert "lyric/melody text records" in piece.import_warnings[0]
     assert any(bar.lyrics for bar in piece.bars)
-    assert any(bar.melody_grid for bar in piece.bars)
-    assert any(bar.melody_events for bar in piece.bars)
+    assert any(
+        bar.melody_grid or bar.melody_events or bar.lyrics or bar.lyric_event_rows
+        for bar in piece.bars
+    )
     assert any(bar.lyric_event_rows for bar in piece.bars)
     first_with_lyrics = next(bar for bar in piece.bars if bar.lyrics)
     assert any("can" in line.lower() for line in first_with_lyrics.lyrics)

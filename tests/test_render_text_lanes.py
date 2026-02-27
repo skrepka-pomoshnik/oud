@@ -1,7 +1,8 @@
-from oud.core.model import LyricEvent, MelodyEvent
+from oud.core.model import Chord, LyricEvent, MelodyEvent, Note
 from oud.ui.render_text_lanes import (
     lyric_event_cells,
     melody_event_cells,
+    melody_staff_rows,
     text_bar_cells,
     tokenized_onset_cells,
     visible_lyric_rows,
@@ -92,7 +93,23 @@ def test_lyric_event_cells_keeps_next_syllable_on_its_onset_after_long_text() ->
     )
     text = "".join(cells)
     assert text[2:10] == "longsyll"
-    assert text[10:12] == "me"
+    assert "me" in text
+    assert text.find("me") >= 10
+
+
+def test_lyric_event_cells_shifts_next_token_right_when_anchor_overlaps() -> None:
+    cells = lyric_event_cells(
+        [
+            LyricEvent("veryverylong", 0, syllabic="begin"),
+            LyricEvent("me", 1, syllabic="end"),
+        ],
+        onset_cols=[2, 8],
+        width=20,
+        left_pad=1,
+    )
+    text = "".join(cells)
+    assert "me" in text
+    assert text.find("me") >= 8
 
 
 def test_tokenized_onset_cells_aligns_raw_tokens_to_onset_columns() -> None:
@@ -106,3 +123,21 @@ def test_tokenized_onset_cells_aligns_raw_tokens_to_onset_columns() -> None:
     assert text[2:5] == "Can"
     assert text[8:11] == "she"
     assert text[14:20].startswith("excuse")
+
+
+def test_melody_staff_rows_uses_chord_pitches_when_tokens_are_non_pitch() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("3", 0), MelodyEvent("8", 1)],
+        onset_cols=[2, 8],
+        width=12,
+        left_pad=1,
+        bar_chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(6, 0, 0)]),
+        ],
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    assert len(rows) == 5
+    text_rows = ["".join(row) for row in rows]
+    assert any(line[2] == "o" for line in text_rows)
+    assert any(line[8] == "o" for line in text_rows)

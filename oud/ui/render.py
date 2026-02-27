@@ -44,6 +44,7 @@ from oud.ui.render_status import (
     resolve_duration_text,
 )
 from oud.ui.render_system import render_systems
+from oud.ui.render_vocal import melody_row_count
 
 
 def _duet_score_hint(piece: Piece) -> str | None:
@@ -477,10 +478,15 @@ def _piece_has_melody_grid(piece: Piece) -> bool:
             return True
         if any((event.text or "").strip() for event in bar.melody_events):
             return True
+        if any(line.strip() for line in bar.lyrics):
+            return True
+        for row in bar.lyric_event_rows:
+            if any((event.text or "").strip() for event in row):
+                return True
     return False
 
 
-def _piece_lyric_row_count(piece: Piece, *, max_rows: int = 2) -> int:
+def _piece_lyric_row_count(piece: Piece, *, max_rows: int = 99) -> int:
     count = 0
     for bar in piece.bars:
         rows = 0
@@ -637,8 +643,9 @@ def render_piece(  # noqa: C901, PLR0912
     show_tactus = settings.get("showtactus", "off") == "on"
     vocal_pos = settings.get("vocalpos", "bottom")
     show_melody_text = settings.get("showmelody", "on") == "on" and _piece_has_melody_grid(piece)
+    melody_rows_count = melody_row_count() if show_melody_text else 0
     show_lyric_text = settings.get("showlyrics", "on") == "on" and _piece_has_lyrics(piece)
-    lyric_rows_count = _piece_lyric_row_count(piece, max_rows=2) if show_lyric_text else 0
+    lyric_rows_count = _piece_lyric_row_count(piece, max_rows=99) if show_lyric_text else 0
     hide_redundant = settings.get("flagredundant", "on") == "on"
     double_stems = settings.get("flagstems", "single") == "double"
     reverse_strings = rows_reversed(
@@ -674,6 +681,7 @@ def render_piece(  # noqa: C901, PLR0912
         show_tactus,
         double_stems,
         show_melody=show_melody_text,
+        melody_rows_count=melody_rows_count,
         show_lyrics=show_lyric_text,
         lyric_rows_count=lyric_rows_count,
         vocal_pos=vocal_pos,
@@ -790,6 +798,7 @@ def render_piece(  # noqa: C901, PLR0912
             hide_redundant=hide_redundant,
             double_stems=double_stems,
             show_melody=show_melody_text,
+            melody_rows_count=melody_rows_count,
             show_lyrics=show_lyric_text,
             lyric_rows_count=lyric_rows_count,
             vocal_pos=vocal_pos,
