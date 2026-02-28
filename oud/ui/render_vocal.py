@@ -40,6 +40,7 @@ def melody_rows_for_bar(
         onset_cols=onset_cols,
         width=width,
         left_pad=left_pad,
+        bar=bar,
         bar_chords=getattr(bar, "chords", None),
         tuning_pitches=tuning_pitches,
     )

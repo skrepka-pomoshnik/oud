@@ -73,6 +73,7 @@ _INT_KEYS = {
     "bargap",
     "staffthick",
     "midipatch",
+    "midivocalpatch",
     "midigate",
     "tempo",
     "newbars",

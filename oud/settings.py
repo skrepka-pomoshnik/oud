@@ -62,6 +62,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "fretlabelmode": "auto",
     "duetscoreview": "auto",
     "midipatch": "24",
+    "midivocalpatch": "53",
     "midigate": "85",
     "tempo": "90",
     "soundfont": "",

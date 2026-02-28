@@ -11,9 +11,11 @@ from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.playback_timeline import PlaybackCursor, build_timeline_from_events
 from oud.core.time_utils import parse_time_signature_value
 from oud.core.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
+from oud.core.vocal_line import infer_vocal_events
 
 TICKS_PER_QUARTER = 480
 BASE_NOTE_VELOCITY = 80
+DEFAULT_VOCAL_PATCH = 53
 
 
 def _note_type_to_denom(note_type: int) -> int | None:
@@ -62,6 +64,7 @@ def _ornament_pitch_delta(symbol: str | None) -> int:
 def _append_note_messages(
     events: list[tuple[int, bytes]],
     *,
+    channel: int,
     start_tick: int,
     note_len: int,
     pitch: int,
@@ -74,12 +77,12 @@ def _append_note_messages(
         grace_pitch = max(0, min(127, pitch + delta))
         if grace_pitch != pitch:
             grace_len = max(1, min(note_len // 3, TICKS_PER_QUARTER // 16))
-            events.append((start_tick, _note_on(0, grace_pitch, min(127, velocity + 6))))
-            events.append((start_tick + grace_len, _note_off(0, grace_pitch, 64)))
+            events.append((start_tick, _note_on(channel, grace_pitch, min(127, velocity + 6))))
+            events.append((start_tick + grace_len, _note_off(channel, grace_pitch, 64)))
     main_start = start_tick + grace_len
     main_len = max(1, note_len - grace_len)
-    events.append((main_start, _note_on(0, pitch, velocity)))
-    events.append((main_start + main_len, _note_off(0, pitch, 64)))
+    events.append((main_start, _note_on(channel, pitch, velocity)))
+    events.append((main_start + main_len, _note_off(channel, pitch, 64)))
 
 
 def _duration_ticks(denom: int, dotted: bool) -> int:
@@ -425,6 +428,7 @@ def _duet_note_events(
                         ) or bar_ornament
                     _append_note_messages(
                         events,
+                        channel=0,
                         start_tick=pair_base_time + start,
                         note_len=note_len,
                         pitch=pitch,
@@ -432,9 +436,50 @@ def _duet_note_events(
                         ornament_symbol=ornament_symbol,
                     )
                 max_end = max(max_end, start + duration)
+            _append_vocal_messages(
+                events,
+                bar=bar,
+                chord_events=chord_events,
+                base_time=pair_base_time,
+                tuning_pitches=pitches,
+                settings=settings,
+            )
             pair_max_end = max(pair_max_end, max_end)
         current_time += pair_max_end
     return events
+
+
+def _append_vocal_messages(
+    events: list[tuple[int, bytes]],
+    *,
+    bar: Bar,
+    chord_events: list[tuple[int, int, int, list[Note]]],
+    base_time: int,
+    tuning_pitches: list[int],
+    settings: dict[str, str],
+) -> None:
+    vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_pitches)
+    if not vocal_events:
+        return
+    gate_text = settings.get("midigate", "85")
+    gate_percent = 85
+    if gate_text.isdigit():
+        gate_percent = max(10, min(100, int(gate_text)))
+    gate = gate_percent / 100.0
+    for event in vocal_events:
+        if not (0 <= event.chord_index < len(chord_events)):
+            continue
+        start, duration, _col, _notes = chord_events[event.chord_index]
+        note_len = max(1, int(duration * gate))
+        _append_note_messages(
+            events,
+            channel=1,
+            start_tick=base_time + start,
+            note_len=note_len,
+            pitch=event.pitch,
+            velocity=min(127, BASE_NOTE_VELOCITY + 4),
+            ornament_symbol=None,
+        )
 
 
 def build_playback_timeline(
@@ -589,6 +634,9 @@ def export_midi(  # noqa: C901
     if len(pitches) < piece.strings:
         pitches.extend(_default_tuning(piece.strings)[len(pitches) :])
     program = int(settings.get("midipatch", "0") or "0")
+    vocal_program = int(
+        settings.get("midivocalpatch", str(DEFAULT_VOCAL_PATCH)) or str(DEFAULT_VOCAL_PATCH),
+    )
     style = settings.get("style") or "french"
     gate_text = settings.get("midigate", "85")
     gate_percent = 85
@@ -600,6 +648,7 @@ def export_midi(  # noqa: C901
     events: list[tuple[int, bytes]] = []
     events.append((0, _meta_tempo(bpm)))
     events.append((0, _program_change(0, program)))
+    events.append((0, _program_change(1, vocal_program)))
 
     default_duration = 4
     if is_duet_score_piece(piece):
@@ -661,6 +710,7 @@ def export_midi(  # noqa: C901
                     ) or bar_ornament
                 _append_note_messages(
                     events,
+                    channel=0,
                     start_tick=current_time + start,
                     note_len=note_len,
                     pitch=pitch,
@@ -668,6 +718,14 @@ def export_midi(  # noqa: C901
                     ornament_symbol=ornament_symbol,
                 )
             max_end = max(max_end, start + duration)
+        _append_vocal_messages(
+            events,
+            bar=bar,
+            chord_events=chord_events,
+            base_time=current_time,
+            tuning_pitches=pitches,
+            settings=settings,
+        )
         current_time += max_end
 
     track = _write_track(events)

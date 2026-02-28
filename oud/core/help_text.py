@@ -28,6 +28,7 @@ HELP_LINES = [
     "Durations: 1 2 4 8 6 3 (french) or Ctrl+1..7 / ;1..7 (italian)",
     "Barline: | sets thin barline",
     "Esc returns to normal",
+    "Vocal layer (notes+lyrics) is view-only; use :vocal clear to remove",
     "",
     "COMMANDS",
     ":w [path]        write .tab       :wa [path]        write ascii (save-as)",
@@ -45,6 +46,7 @@ HELP_LINES = [
     ":pdf              compile pdf (P)",
     ":midicmd [path]  show midi command",
     ":bar add|before|after|del         :barline thin|thick|double|hidden|pale",
+    ":vocal clear      remove imported melody/lyrics layer",
     (
         ":repeat none|start|end|dots|both|dc|ds|fine|coda|tocoda|"
         "dcalfine|dcalcoda|dsalfine|dsalcoda   :orn <char>|clear"
@@ -73,7 +75,8 @@ HELP_LINES = [
     ":set measuresstep=... (used with measures=every)",
     ":set italianorient=normal|reverse italianmultifret=on|off viewinvert=on|off",
     ":set frenchc=normal|alt",
-    ":set midipatch=... midigate=... soundfont=... tempo=...",
+    ":set midipatch=... midivocalpatch=... midigate=... soundfont=... tempo=...",
+    ":set showmelody=on|off showlyrics=on|off vocalpos=top|bottom",
     ":set charstyle=... title=... author=... composer=...",
     ":tool reflow|gridflags|flagstyle|comments",
 ]

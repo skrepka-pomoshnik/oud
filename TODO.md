@@ -27,7 +27,6 @@ P2 (Notation + formats)
   - [ ] Add custom fret label mapping (user-defined alphabet/symbol set) with validation and export-safe fallback.
 - [ ] Add Spanish tab support (Italian-like with inverted string order).
 - [ ] Vocal/lyric FT3 parity (layered parser + renderer).
-  - [ ] Add dedicated melody-grid lane renderer (token/onset-aware), not only raw text rows.
   - [ ] Add duet/vocal score integration: melody+lyrics rows per staff with shared system breaks.
 
 P3 (Maintainability + advanced parity)

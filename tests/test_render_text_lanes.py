@@ -1,4 +1,4 @@
-from oud.core.model import Chord, LyricEvent, MelodyEvent, Note
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
 from oud.ui.render_text_lanes import (
     lyric_event_cells,
     melody_event_cells,
@@ -157,3 +157,28 @@ def test_melody_staff_rows_uses_chord_pitches_when_tokens_are_non_pitch() -> Non
     text_rows = ["".join(row) for row in rows]
     assert any(line[2] == "o" for line in text_rows)
     assert any(line[8] == "o" for line in text_rows)
+
+
+def test_melody_staff_rows_uses_lyric_anchor_count_for_inferred_vocal_notes() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(4, 3, 0)]),
+        ],
+        lyric_event_rows=[[LyricEvent("Can", 0), LyricEvent("she", 1), LyricEvent("ex", 2)]],
+    )
+    rows = melody_staff_rows(
+        [],
+        onset_cols=[2, 8, 14],
+        width=20,
+        left_pad=1,
+        bar=bar,
+        bar_chords=bar.chords,
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert sum(line.count("o") for line in text_rows) == 3
+    assert "|" in text_rows[0]
+    assert "\\" in text_rows[0]

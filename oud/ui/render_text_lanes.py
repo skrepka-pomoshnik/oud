@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import re
 
-from oud.core.model import Chord, LyricEvent, MelodyEvent
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
+from oud.core.vocal_line import chord_top_pitch, infer_vocal_events, token_pitch_value
 
 _MELODY_STAFF_ROWS = 5
 _CENTER_STAFF_ROW = _MELODY_STAFF_ROWS // 2
-_DIATONIC_BASE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11, "h": 11}
 
 
 def visible_lyric_rows(lines: list[str] | None, max_rows: int = 2) -> list[str]:
@@ -231,40 +231,16 @@ def melody_event_cells(
     return cells
 
 
-def _token_pitch_value(token: str) -> int | None:
-    raw = token.strip().lower()
-    if not raw:
-        return None
-    letter = next((ch for ch in raw if ch in _DIATONIC_BASE), None)
-    if letter is None:
-        return None
-    pitch = 60 + _DIATONIC_BASE[letter]
-    pitch += raw.count("#")
-    if "b" in raw and letter != "b":
-        pitch -= 1
-    pitch += 12 * raw.count("'")
-    pitch -= 12 * raw.count(",")
-    return pitch
-
-
-def _chord_top_pitch(chord: Chord, tuning_pitches: list[int] | None) -> int | None:
-    if not chord.notes or not tuning_pitches:
-        return None
-    pitches: list[int] = []
-    for note in chord.notes:
-        idx = note.string - 1
-        if 0 <= idx < len(tuning_pitches):
-            pitches.append(tuning_pitches[idx] + note.fret)
-    return max(pitches) if pitches else None
-
-
 def _pitch_to_staff_row(pitch: int, lo: int, hi: int) -> int:
+    note_row_min = 2
+    note_row_max = _MELODY_STAFF_ROWS - 1
     if hi <= lo:
-        return _CENTER_STAFF_ROW
+        return note_row_min + ((note_row_max - note_row_min) // 2)
     span = hi - lo
     normalized = (pitch - lo) / span
-    row = (_MELODY_STAFF_ROWS - 1) - round(normalized * (_MELODY_STAFF_ROWS - 1))
-    return max(0, min(_MELODY_STAFF_ROWS - 1, row))
+    row_span = note_row_max - note_row_min
+    row = note_row_max - round(normalized * row_span)
+    return max(note_row_min, min(note_row_max, row))
 
 
 def _event_pitch_map(events: list[MelodyEvent] | None) -> dict[int, int]:
@@ -272,7 +248,7 @@ def _event_pitch_map(events: list[MelodyEvent] | None) -> dict[int, int]:
     for ev in events or []:
         if ev.onset_index in mapping:
             continue
-        pitch = _token_pitch_value(ev.text)
+        pitch = token_pitch_value(ev.text)
         if pitch is not None:
             mapping[ev.onset_index] = pitch
     return mapping
@@ -286,7 +262,7 @@ def _merge_chord_pitch_map(
     if not bar_chords:
         return
     for onset_idx, chord in enumerate(bar_chords):
-        pitch = _chord_top_pitch(chord, tuning_pitches)
+        pitch = chord_top_pitch(chord, tuning_pitches)
         if pitch is not None:
             onset_pitch[onset_idx] = pitch
 
@@ -308,28 +284,74 @@ def melody_staff_rows(
     onset_cols: list[int],
     width: int,
     left_pad: int = 0,
+    bar: Bar | None = None,
     bar_chords: list[Chord] | None = None,
     tuning_pitches: list[int] | None = None,
 ) -> list[list[str]]:
-    rows = [["-"] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
+    rows = [[" "] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
+    for staff_row in range(2, _MELODY_STAFF_ROWS):
+        rows[staff_row] = ["-"] * max(0, width)
     if width <= 0 or not onset_cols:
         return rows
-    onset_pitch = _event_pitch_map(events)
-    _merge_chord_pitch_map(onset_pitch, bar_chords, tuning_pitches)
-    _fill_unpitched_event_rows(onset_pitch, events)
-    if not onset_pitch:
+    vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_pitches) if bar is not None else []
+    if not vocal_events:
+        onset_pitch = _event_pitch_map(events)
+        _merge_chord_pitch_map(onset_pitch, bar_chords, tuning_pitches)
+        _fill_unpitched_event_rows(onset_pitch, events)
+        vocal_events = [
+            type(
+                "_FallbackVocalEvent",
+                (),
+                {
+                    "onset_index": onset_idx,
+                    "pitch": pitch,
+                    "note_type": 4,
+                    "dotted": False,
+                },
+            )()
+            for onset_idx, pitch in sorted(onset_pitch.items())
+        ]
+    if not vocal_events:
         return rows
-    pitch_values = list(onset_pitch.values())
+    pitch_values = [event.pitch for event in vocal_events]
     lo = min(pitch_values)
     hi = max(pitch_values)
     floor = max(0, left_pad)
-    for onset_idx, pitch in sorted(onset_pitch.items()):
+    for event in vocal_events:
+        onset_idx = event.onset_index
         if onset_idx < 0 or onset_idx >= len(onset_cols):
             continue
         col = max(floor, min(width - 1, onset_cols[onset_idx]))
-        row = _pitch_to_staff_row(pitch, lo, hi)
+        row = _pitch_to_staff_row(event.pitch, lo, hi)
+        _draw_vocal_stem(rows, row=row, col=col, note_type=event.note_type, dotted=event.dotted)
         rows[row][col] = "o"
     return rows
+
+
+def _draw_vocal_stem(
+    rows: list[list[str]],
+    *,
+    row: int,
+    col: int,
+    note_type: int,
+    dotted: bool,
+) -> None:
+    if not rows or not (0 <= row < len(rows)):
+        return
+    flag_row = 0
+    rows[flag_row][col] = "|"
+    if len(rows) > 1 and row >= 2:
+        rows[1][col] = "|"
+    flags = max(0, note_type - 4)
+    for idx in range(1, flags + 1):
+        tail_col = col + idx
+        if tail_col >= len(rows[flag_row]):
+            break
+        rows[flag_row][tail_col] = "\\"
+    if dotted:
+        dot_col = col + flags + 1
+        if 0 <= dot_col < len(rows[flag_row]):
+            rows[flag_row][dot_col] = "."
 
 
 def lyric_event_cells(

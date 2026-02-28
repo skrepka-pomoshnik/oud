@@ -120,6 +120,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Measures:", settings.get("measures")),
         line("MeasuresStep:", settings.get("measuresstep")),
         line("MidiPatch:", settings.get("midipatch")),
+        line("MidiVocalPatch:", settings.get("midivocalpatch", "53")),
         line("MidiGate:", settings.get("midigate")),
         line("Tempo:", settings.get("tempo")),
         line("Soundfont:", settings.get("soundfont")),

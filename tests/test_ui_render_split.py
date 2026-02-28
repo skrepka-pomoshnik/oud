@@ -115,7 +115,7 @@ def _first_lyric_row(lines: list[str]) -> str:
     return next(
         line
         for idx, line in enumerate(lines)
-        if idx > melody_start + 3 and line.startswith("  |") and re.search(r"[A-Za-z]{2,}", line)
+        if idx > melody_start and line.startswith("  |") and re.search(r"[A-Za-z]{2,}", line)
     )
 
 
