@@ -9,6 +9,7 @@ from oud.editor.command_ops import (
     yank_bar,
 )
 from oud.editor.state import EditorState
+from oud.editor.undo_ops import redo, undo
 
 
 def _state(bars: int = 2) -> EditorState:
@@ -47,6 +48,14 @@ def test_yank_and_paste_bar() -> None:
     paste_bar(state, 1)
     assert len(state.piece.bars) == 3
     assert state.overrides[(1, 0, 0)] == "a"
+    assert state.message == "Bar pasted"
+    assert state.undo_stack[-1].kind == "bars-insert"
+    undo(state, config_path=state.config_path)
+    assert len(state.piece.bars) == 2
+    assert (1, 0, 0) not in state.overrides
+    redo(state, config_path=state.config_path)
+    assert len(state.piece.bars) == 3
+    assert state.overrides[(1, 0, 0)] == "a"
 
 
 def test_yank_and_paste_multiple_bars() -> None:
@@ -60,6 +69,12 @@ def test_yank_and_paste_multiple_bars() -> None:
     assert len(state.piece.bars) == 5
     assert state.overrides[(2, 0, 0)] == "a"
     assert state.overrides[(3, 0, 1)] == "b"
+    assert state.message == "Bars pasted: 2"
+    assert state.undo_stack[-1].kind == "bars-insert"
+    undo(state, config_path=state.config_path)
+    assert len(state.piece.bars) == 3
+    assert (2, 0, 0) not in state.overrides
+    assert (3, 0, 1) not in state.overrides
 
 
 def test_cmd_bar_and_stave() -> None:
@@ -68,6 +83,17 @@ def test_cmd_bar_and_stave() -> None:
     assert state.message == "Bar added"
     cmd_bar(state, "del")
     assert state.message == "Bar deleted"
+    state = _state(bars=4)
+    state.overrides[(0, 0, 0)] = "a"
+    state.overrides[(1, 0, 1)] = "b"
+    cmd_bar(state, "yank 2")
+    assert state.message == "Bars yanked: 2"
+    cmd_bar(state, "paste 2")
+    assert state.message == "Bars pasted: 4"
+    assert len(state.piece.bars) == 8
+    cmd_bar(state, "del 3")
+    assert state.message == "Bars deleted: 3"
+    assert len(state.piece.bars) == 5
     state.cursor_bar = 0
     cmd_stave(state, "break")
     assert state.message == "Stave break added"
@@ -79,6 +105,8 @@ def test_cmd_bar_and_stave() -> None:
     assert state.message == "Stave deleted"
     cmd_stave(state, "other")
     assert state.message == "Stave action: break/join/new/del"
+    cmd_bar(state, "other")
+    assert state.message == "Bar action: add/after/before/insert/del/yank/paste [count]"
 
 
 def test_cmd_chord() -> None:

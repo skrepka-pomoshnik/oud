@@ -9,6 +9,7 @@ def _alloc_top_vocal_rows(
     offset: int,
     *,
     show_melody: bool,
+    melody_rows: int,
     lyric_rows: int,
 ) -> tuple[int, int | None, tuple[int, ...]]:
     melody = None
@@ -16,7 +17,7 @@ def _alloc_top_vocal_rows(
     next_offset = offset
     if show_melody:
         melody = next_offset
-        next_offset += 1
+        next_offset += max(1, melody_rows)
     if lyric_rows > 0:
         lyric = tuple(next_offset + idx for idx in range(lyric_rows))
         next_offset += lyric_rows
@@ -28,6 +29,7 @@ def _alloc_bottom_vocal_rows(
     staff: int,
     strings: int,
     show_melody: bool,
+    melody_rows: int,
     lyric_rows: int,
 ) -> tuple[int | None, tuple[int, ...]]:
     melody = None
@@ -36,7 +38,7 @@ def _alloc_bottom_vocal_rows(
     if show_melody:
         melody = text_base
     if lyric_rows > 0:
-        lyric_start = text_base + (1 if show_melody else 0)
+        lyric_start = text_base + (max(1, melody_rows) if show_melody else 0)
         lyric = tuple(lyric_start + idx for idx in range(lyric_rows))
     return melody, lyric
 
@@ -76,6 +78,7 @@ def layout_block_rows(
     show_tactus: bool,
     double_stems: bool,
     show_melody: bool = False,
+    melody_rows_count: int = 1,
     show_lyrics: bool = False,
     lyric_rows_count: int = 0,
     vocal_pos: str = "bottom",
@@ -101,12 +104,14 @@ def layout_block_rows(
             tuplet = offset
         offset += 1
     actual_lyric_rows = _resolved_lyric_rows(show_lyrics, lyric_rows_count)
+    actual_melody_rows = max(1, melody_rows_count) if show_melody else 0
     melody = None
     lyric_rows: tuple[int, ...] = ()
     if vocal_pos == "top":
         offset, melody, lyric_rows = _alloc_top_vocal_rows(
             offset,
             show_melody=show_melody,
+            melody_rows=actual_melody_rows,
             lyric_rows=actual_lyric_rows,
         )
     flag = offset
@@ -119,6 +124,7 @@ def layout_block_rows(
             staff=staff,
             strings=strings,
             show_melody=show_melody,
+            melody_rows=actual_melody_rows,
             lyric_rows=actual_lyric_rows,
         )
     lyric = lyric_rows[0] if lyric_rows else None
@@ -150,6 +156,7 @@ def block_height(
     show_tactus: bool,
     double_stems: bool,
     show_melody: bool = False,
+    melody_rows_count: int = 1,
     show_lyrics: bool = False,
     lyric_rows_count: int = 0,
     vocal_pos: str = "bottom",
@@ -168,7 +175,7 @@ def block_height(
     if show_extras or show_tuplets:
         height += 1
     if show_melody:
-        height += 1
+        height += max(1, melody_rows_count)
     actual_lyric_rows = _resolved_lyric_rows(show_lyrics, lyric_rows_count)
     height += max(0, actual_lyric_rows)
     return height

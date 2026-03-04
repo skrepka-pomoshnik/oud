@@ -17,6 +17,17 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
 ) -> None:
     kind = action.kind
     data = action.data
+    if kind == "group":
+        actions = cast(list, data.get("actions", []))
+        ordered = actions if redo else list(reversed(actions))
+        for sub in ordered:
+            apply_action(
+                state,
+                cast(UndoAction, sub),
+                redo=redo,
+                config_path=config_path,
+            )
+        return
     if kind == "override":
         key = cast(tuple[int, int, int], data["key"])
         value = cast(str | None, data["new"] if redo else data["prev"])
@@ -57,6 +68,10 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
             target.pop(key, None)
         else:
             target[key] = value
+        return
+    if kind == "annotations-all":
+        value = cast(dict[tuple[int, int], str], data["new"] if redo else data["prev"])
+        state.annotations = dict(value)
         return
     if kind == "highlight":
         key = cast(tuple[int, int, int], data["key"])
@@ -133,6 +148,20 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
             for offset, snapshot in enumerate(snapshots):
                 insert_bar(state, start + offset)
                 restore_bar_snapshot(state, start + offset, snapshot)
+        state.stave_breaks = breaks
+        return
+    if kind == "bars-insert":
+        start = cast(int, data["start"])
+        snapshots = cast(list[BarSnapshot] | None, data["snapshots"] if redo else None)
+        breaks = cast(set[int], data["new"] if redo else data["prev"])
+        if redo and snapshots is not None:
+            for offset, snapshot in enumerate(snapshots):
+                insert_bar(state, start + offset)
+                restore_bar_snapshot(state, start + offset, snapshot)
+        else:
+            count = cast(int, data["count"])
+            for _ in range(count):
+                delete_bar(state, start)
         state.stave_breaks = breaks
         return
     if kind == "bar-clear":

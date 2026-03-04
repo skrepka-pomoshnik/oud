@@ -58,9 +58,10 @@ HELP_LINES = [
     ":transpose <int>  :retune <tuning/preset>  :courseshift up|down",
     (
         ":set style=... strings=... tuning=... tuninglabels=... "
-        "flagstyle=... flagstems=... time=... (or auto)"
+        "flagstyle=... flagstems=... dotplacement=afterflag|afterstem time=... (or auto)"
     ),
     ":set keys=vim|vim+arrows|casual|casual+arrows",
+    ":set contrast=normal|high",
     (
         ":set spacing=... barsperline=... maxbars=... maxchords=... chordwrap=... bargap=... "
         "linelen=... staffthick=... fontstyle=..."

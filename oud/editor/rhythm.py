@@ -65,6 +65,10 @@ def column_has_duration(state: EditorState, bar_index: int, col: int) -> bool:
     )
 
 
+def cell_has_duration(state: EditorState, bar_index: int, string: int, col: int) -> bool:
+    return (bar_index, string, col) in state.durations
+
+
 def _row_has_note(state: EditorState, bar_index: int, string: int, col: int) -> bool:
     if (bar_index, string, col) in state.overrides:
         return True

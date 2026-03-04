@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.core.tab_parser import TabData
 from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor import command_ops as cmd_ops
@@ -707,6 +707,30 @@ def test_cmd_time_and_verify() -> None:
     assert state.message == "Verify modes: bar|render"
 
 
+def test_cmd_vocal_clear_removes_melody_and_lyrics_from_piece() -> None:
+    state = _state()
+    state.piece = Piece(
+        title="Vocal",
+        bars=[
+            Bar(
+                melody_grid="3 8 a",
+                lyrics=["Can she"],
+                melody_events=[MelodyEvent("3", 0)],
+                lyric_event_rows=[[LyricEvent("Can", 0)]],
+            ),
+            Bar(),
+        ],
+        strings=6,
+    )
+    cmd.cmd_vocal(state, "clear")
+    assert state.modified is True
+    assert "Cleared vocal layer in 1 bar" in state.message
+    assert state.piece.bars[0].melody_grid is None
+    assert state.piece.bars[0].melody_events == []
+    assert state.piece.bars[0].lyrics == []
+    assert state.piece.bars[0].lyric_event_rows == []
+
+
 def test_cmd_midi_lilypond_pdf_play_source(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -947,6 +971,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_courseshift",
         "cmd_time",
         "cmd_verify",
+        "cmd_vocal",
         "cmd_pause",
     }
     patched_3arg = {
@@ -1022,6 +1047,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "transpose": "2",
         "retune": "guitar",
         "courseshift": "down",
+        "vocal": "clear",
         "tool": "gridflags",
     }
     specs = cmd._command_specs()

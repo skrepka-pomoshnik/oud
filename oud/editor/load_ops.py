@@ -18,30 +18,41 @@ LoadResult = tuple[
 ]
 
 
+def _invalid_load_result(path: str | None, message: str) -> LoadResult:
+    title = Path(path).stem if path else "Untitled"
+    piece = Piece(title=title, bars=[])
+    piece.import_warnings.append(message)
+    return piece, {}, {}, set(), None
+
+
 def load_piece_data(path: str | None) -> LoadResult:  # noqa: PLR0911
     overrides: dict[tuple[int, int, int], str] = {}
     durations: dict[tuple[int, int, int], int] = {}
     dotted: set[tuple[int, int]] = set()
     bar_width: int | None = None
     if path and not Path(path).exists():
-        title = Path(path).stem if path else "Untitled"
-        piece = Piece(title=title, bars=[])
-        return piece, overrides, durations, dotted, bar_width
+        return _invalid_load_result(path, f"Missing file: {path}")
     if path:
-        if path.lower().endswith(".tab"):
-            parsed = load_tab_data(path)
-            if parsed is not None:
-                overrides = parsed.overrides
-                durations = parsed.durations
-                dotted = parsed.dotted
-                bar_width = parsed.bar_width
-                return parsed.piece, overrides, durations, dotted, bar_width
-            return load_tab(path), overrides, durations, dotted, bar_width
-        if path.lower().endswith(".mxl"):
-            return load_mxl(path), overrides, durations, dotted, bar_width
-        if path.lower().endswith((".musicxml", ".xml")):
-            return load_musicxml(path), overrides, durations, dotted, bar_width
-        return load_ft3(path), overrides, durations, dotted, bar_width
+        path_obj = Path(path)
+        if path_obj.is_dir():
+            return _invalid_load_result(path, f"Ignored directory path: {path}")
+        try:
+            if path.lower().endswith(".tab"):
+                parsed = load_tab_data(path)
+                if parsed is not None:
+                    overrides = parsed.overrides
+                    durations = parsed.durations
+                    dotted = parsed.dotted
+                    bar_width = parsed.bar_width
+                    return parsed.piece, overrides, durations, dotted, bar_width
+                return load_tab(path), overrides, durations, dotted, bar_width
+            if path.lower().endswith(".mxl"):
+                return load_mxl(path), overrides, durations, dotted, bar_width
+            if path.lower().endswith((".musicxml", ".xml")):
+                return load_musicxml(path), overrides, durations, dotted, bar_width
+            return load_ft3(path), overrides, durations, dotted, bar_width
+        except Exception as exc:
+            return _invalid_load_result(path, f"Could not open {path_obj.name}: {exc}")
     return Piece(title="Untitled", bars=[]), overrides, durations, dotted, bar_width
 
 

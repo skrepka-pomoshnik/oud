@@ -82,14 +82,8 @@ luteconv / FT3 reverse-engineering (`refs/luteconv`, `refs/LuteScribe/Source/lut
 - [ ] Add FT3 binary feature matrix docs/tests (which bar/note fields are decoded vs ignored).
 
 MuseScore engraving (`refs/MuseScore/src/engraving`)
-- [ ] Add `StaffType`-like tab style preset model (single policy object) for tab rendering toggles:
-  duration-symbol repeat policy, minim style, stems-through/beside, on-lines/between-lines, upside-down, rests on tab, tab fingering visibility.
 - [ ] Unify pitch<->string/fret transforms around a `StringData`-like service for both input and export (same rules for `convertPitch/getPitch/fret`).
-- [ ] Add explicit tied-fret display policy options (MuseScore `ShowTiedFret` / `ParenthesizeTiedFret` analogue) and keep tie layout conditional on that policy.
-- [ ] Add tab-specific stem geometry policy (through-staff vs beside-staff, minim-style stem shortening/slashing) separated from generic flag rendering.
-- [ ] Add tab-specific dot placement policy (near stems vs near fret glyphs) with regression tests.
 - [ ] Add tab fret-glyph metrics/cache layer (label bbox/offsets by style) so spacing uses measured label width, not ad hoc string length only.
-- [ ] Add tab bass-prefix policy matrix (slashes/numbers/ledger behavior) modeled as style rules, not hardcoded per renderer branch.
 - [ ] Add multi-voice tab collision precedence model (voice noteheads/frets, ties/slurs/gliss, ornaments) before implementing true polyphonic tab voices.
 - [ ] Add MuseScore-style layout-invariant tests (no unlaid items / geometry sanity) for our renderer:
   row widths, cue visibility, right-edge alignment, no dropped sparse symbols after reflow/scale.

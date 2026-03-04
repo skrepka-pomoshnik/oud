@@ -89,6 +89,7 @@ def test_layout_block_rows_vocal_top_places_melody_before_flags() -> None:
         show_tactus=False,
         double_stems=False,
         show_melody=True,
+        melody_rows_count=5,
         show_lyrics=True,
         lyric_rows_count=1,
         vocal_pos="top",
@@ -108,9 +109,38 @@ def test_layout_block_rows_vocal_bottom_places_melody_after_staff() -> None:
         show_tactus=False,
         double_stems=False,
         show_melody=True,
+        melody_rows_count=5,
         show_lyrics=True,
         lyric_rows_count=1,
         vocal_pos="bottom",
     )
     assert rows["melody"] is not None and rows["staff"] is not None
     assert rows["melody"] > rows["staff"] + 5
+
+
+def test_block_height_expands_with_melody_note_staff_rows() -> None:
+    text_height = block_height(
+        include_meta=True,
+        strings=6,
+        show_dur=False,
+        show_extras=False,
+        show_tuplets=False,
+        show_tactus=False,
+        double_stems=False,
+        show_melody=True,
+        melody_rows_count=1,
+        show_lyrics=False,
+    )
+    notes_height = block_height(
+        include_meta=True,
+        strings=6,
+        show_dur=False,
+        show_extras=False,
+        show_tuplets=False,
+        show_tactus=False,
+        double_stems=False,
+        show_melody=True,
+        melody_rows_count=5,
+        show_lyrics=False,
+    )
+    assert notes_height == text_height + 4

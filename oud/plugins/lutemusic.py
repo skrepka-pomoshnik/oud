@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from html.parser import HTMLParser
 from pathlib import Path
+from posixpath import normpath
 from typing import NamedTuple
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
@@ -10,6 +11,7 @@ from urllib.request import Request, urlopen
 from oud.core.plugin_model import RemoteTab
 
 SUPPORTED_EXTS = (".tab", ".ft3", ".ft3.gz")
+FT3_EXTS = (".ft3", ".ft3.gz")
 PLUGIN_TITLE = "Lutemusic"
 
 LUTEMUSIC_URLS = {
@@ -67,6 +69,11 @@ def _fetch_html(url: str) -> str:
 def _is_supported_link(link: str) -> bool:
     lower = link.lower()
     return any(lower.endswith(ext) for ext in SUPPORTED_EXTS)
+
+
+def _is_ft3_link(link: str) -> bool:
+    lower = link.lower()
+    return any(lower.endswith(ext) for ext in FT3_EXTS)
 
 
 def _is_dir_link(link: str) -> bool:
@@ -135,6 +142,22 @@ def _safe_filename(text: str) -> str:
     return "".join(ch if ch in allowed else "_" for ch in text)
 
 
+def _safe_rel_path(text: str) -> Path:
+    parts = [part for part in text.replace("\\", "/").split("/") if part not in ("", ".", "..")]
+    if not parts:
+        return Path("download.ft3")
+    safe_parts = [_safe_filename(part) or "_" for part in parts]
+    return Path(*safe_parts)
+
+
+def _download_url_to(url: str, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    req = Request(url, headers={"User-Agent": "oud"})  # noqa: S310
+    with urlopen(req, timeout=10) as response:  # noqa: S310
+        dest.write_bytes(response.read())
+    return dest
+
+
 def download_tab(item: RemoteTab, dest_dir: Path) -> Path:
     if item.is_dir:
         raise DownloadError
@@ -144,7 +167,36 @@ def download_tab(item: RemoteTab, dest_dir: Path) -> Path:
     if not filename:
         filename = "download.tab"
     dest = dest_dir / filename
-    req = Request(item.url, headers={"User-Agent": "oud"})  # noqa: S310
-    with urlopen(req, timeout=10) as response:  # noqa: S310
-        dest.write_bytes(response.read())
-    return dest
+    return _download_url_to(item.url, dest)
+
+
+def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -> list[Path]:
+    if not item.is_dir:
+        raise DownloadError
+    root_url = item.url if item.url.endswith("/") else f"{item.url}/"
+    root_path = urlparse(root_url).path or "/"
+    downloaded: list[Path] = []
+    seen_dirs: set[str] = set()
+    stack = [root_url]
+    while stack:
+        url = stack.pop()
+        if url in seen_dirs:
+            continue
+        seen_dirs.add(url)
+        for child in fetch_supported_tabs(url, limit=limit):
+            if child.is_dir:
+                child_url = child.url if child.url.endswith("/") else f"{child.url}/"
+                stack.append(child_url)
+                continue
+            if not _is_ft3_link(child.url):
+                continue
+            child_path = urlparse(child.url).path or ""
+            rel = child_path
+            if child_path.startswith(root_path):
+                rel = child_path[len(root_path) :]
+            rel = normpath(rel).lstrip("/")
+            if not rel or rel.startswith(".."):
+                rel = Path(child_path).name
+            local_path = dest_dir / _safe_rel_path(rel)
+            downloaded.append(_download_url_to(child.url, local_path))
+    return downloaded

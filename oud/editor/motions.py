@@ -129,15 +129,79 @@ def target_move_right(state: EditorState) -> CursorMotionTarget:
 
 
 def target_move_left_visual(state: EditorState) -> CursorMotionTarget:
-    # Editing movement should stay one grid cell per keypress.
-    # Note-wise jumps are handled by dedicated note motions.
-    return target_move_left(state)
+    return _target_move_visual(state, -1)
 
 
 def target_move_right_visual(state: EditorState) -> CursorMotionTarget:
-    # Editing movement should stay one grid cell per keypress.
-    # Note-wise jumps are handled by dedicated note motions.
-    return target_move_right(state)
+    return _target_move_visual(state, 1)
+
+
+def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
+    target = CursorMotionTarget(state.cursor_bar, state.cursor_col)
+    if delta not in (-1, 1):
+        return target
+    bar_index = state.cursor_bar
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return target
+    next_col = state.cursor_col + delta
+    if next_col < 0:
+        target = target_move_left(state)
+    elif next_col >= state.bar_width:
+        target = target_move_right(state)
+    else:
+        content_width = bar_content_width_for_cursor(state, bar_index)
+        mapping = cursor_display_map_for_bar(state, bar_index, content_width)
+        if not (0 <= state.cursor_col < len(mapping) and 0 <= next_col < len(mapping)):
+            target = CursorMotionTarget(bar_index, next_col)
+        else:
+            current_display_col = mapping[state.cursor_col]
+            if mapping[next_col] != current_display_col:
+                target = CursorMotionTarget(bar_index, next_col)
+            else:
+                target = _target_move_visual_collapsed(
+                    state,
+                    bar_index=bar_index,
+                    next_col=next_col,
+                    current_display_col=current_display_col,
+                    mapping=mapping,
+                    delta=delta,
+                )
+    return target
+
+
+def _target_wrap_horizontal_visual(state: EditorState, delta: int) -> CursorMotionTarget:
+    if delta < 0:
+        if state.cursor_bar > 0:
+            return CursorMotionTarget(state.cursor_bar - 1, state.bar_width - 1)
+        return CursorMotionTarget(state.cursor_bar, 0)
+    if state.cursor_bar < len(state.piece.bars) - 1:
+        return CursorMotionTarget(state.cursor_bar + 1, 0)
+    return CursorMotionTarget(state.cursor_bar + 1, 0, append_bar=True)
+
+
+def _target_move_visual_collapsed(
+    state: EditorState,
+    *,
+    bar_index: int,
+    next_col: int,
+    current_display_col: int,
+    mapping: list[int],
+    delta: int,
+) -> CursorMotionTarget:
+    actual_string = string_index(state, state.cursor_string)
+    note_cols = set(_row_note_cols(state, bar_index, actual_string)) or set(
+        _note_cols(state, bar_index),
+    )
+    if not note_cols:
+        return CursorMotionTarget(bar_index, next_col)
+    scan = next_col
+    while 0 <= scan < len(mapping) and mapping[scan] == current_display_col:
+        if scan in note_cols:
+            return CursorMotionTarget(bar_index, scan)
+        scan += delta
+    if 0 <= scan < state.bar_width:
+        return CursorMotionTarget(bar_index, scan)
+    return _target_wrap_horizontal_visual(state, delta)
 
 
 def target_move_left_note(state: EditorState) -> CursorMotionTarget:
@@ -218,6 +282,65 @@ def target_home_bar(state: EditorState, bar_index: int) -> CursorMotionTarget:
         return CursorMotionTarget(0, 0)
     target_bar = max(0, min(bar_index, len(state.piece.bars) - 1))
     return CursorMotionTarget(target_bar, 0)
+
+
+def target_step_display_row(state: EditorState, delta: int) -> CursorMotionTarget:
+    return CursorMotionTarget(
+        state.cursor_bar,
+        state.cursor_col,
+        cursor_string=state.cursor_string + delta,
+    )
+
+
+def target_snap_previous_time_slot_if_needed(state: EditorState) -> CursorMotionTarget:
+    bar = state.cursor_bar
+    col = state.cursor_col
+    string = string_index(state, state.cursor_string)
+    if col <= 0:
+        return CursorMotionTarget(bar, col)
+    if any(
+        (bar, s_idx, col) in state.overrides or (bar, s_idx, col) in state.durations
+        for s_idx in range(state.piece.strings)
+    ):
+        return CursorMotionTarget(bar, col)
+    if not any(
+        (bar, s_idx, col - 1) in state.overrides or (bar, s_idx, col - 1) in state.durations
+        for s_idx in range(state.piece.strings)
+    ):
+        return CursorMotionTarget(bar, col)
+    if (bar, string, col - 1) in state.overrides or (bar, string, col - 1) in state.durations:
+        return CursorMotionTarget(bar, col)
+    return CursorMotionTarget(bar, col - 1)
+
+
+def target_snap_to_chord_slot(state: EditorState) -> CursorMotionTarget:
+    bar_index = state.cursor_bar
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return CursorMotionTarget(state.cursor_bar, state.cursor_col)
+    bar = state.piece.bars[bar_index]
+    if not bar.chords:
+        return CursorMotionTarget(state.cursor_bar, state.cursor_col)
+    has_grid = any(b == bar_index for (b, _s, _c) in state.overrides) or any(
+        b == bar_index for (b, _s, _c) in state.durations
+    )
+    if has_grid:
+        return CursorMotionTarget(state.cursor_bar, state.cursor_col)
+    slots = [
+        col
+        for (col, _denom, _dot) in spread_flag_positions(
+            chord_positions(bar, state.bar_width, default_duration=4),
+            state.bar_width,
+            min_gap=1,
+        )
+    ]
+    if not slots or state.cursor_col in slots:
+        return CursorMotionTarget(state.cursor_bar, state.cursor_col)
+    cur = state.cursor_col
+    best = min(
+        slots,
+        key=lambda c: (abs(c - cur), 0 if c <= cur else 1, -c),
+    )
+    return CursorMotionTarget(state.cursor_bar, best)
 
 
 def target_advance_next_bar_home(state: EditorState) -> CursorMotionTarget:

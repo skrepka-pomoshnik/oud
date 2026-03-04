@@ -25,6 +25,8 @@ from oud.core.tab_policy import (
     time_sig_inline_rows,
     visual_row_indices,
 )
+from oud.core.tab_style import resolve_tab_style_policy
+from oud.core.tuning_utils import parse_tuning_pitches
 from oud.core.view_model import (
     _bar_annotations,
     _bar_durations,
@@ -57,11 +59,7 @@ from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
-from oud.ui.render_text_lanes import lyric_event_cells as _lane_lyric_event_cells
-from oud.ui.render_text_lanes import melody_event_cells as _lane_melody_event_cells
-from oud.ui.render_text_lanes import text_bar_cells as _lane_text_bar_cells
-from oud.ui.render_text_lanes import tokenized_onset_cells as _lane_tokenized_onset_cells
-from oud.ui.render_text_lanes import visible_lyric_rows
+from oud.ui.render_vocal import lyric_rows_for_bar, melody_rows_for_bar, vocal_onset_cols_for_bar
 
 
 def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
@@ -82,10 +80,6 @@ def _repeat_dot_display_rows(display_strings: int) -> set[int]:
     hi = min(display_strings - 1, display_strings // 2)
     lo = max(0, hi - 1)
     return {lo, hi}
-
-
-def _text_bar_cells(text: str | None, width: int) -> list[str]:
-    return _lane_text_bar_cells(text, width)
 
 
 def _event_display_onset_cols(
@@ -486,6 +480,77 @@ def _note_event_columns(cells: list[list[str]], total_strings: int, grid_width: 
     return cols
 
 
+def _anchor_flag_positions_to_note_cols(
+    positions: list[tuple[int, int, bool]],
+    note_cols: list[int],
+) -> list[tuple[int, int, bool]]:
+    if not positions or not note_cols:
+        return []
+    ordered_note_cols = sorted(note_cols)
+    anchored: list[tuple[int, int, bool]] = []
+    note_idx = 0
+    last_col = -1
+    for raw_col, denom, dot in sorted(positions, key=lambda item: item[0]):
+        while note_idx < len(ordered_note_cols) and ordered_note_cols[note_idx] <= last_col:
+            note_idx += 1
+        scan_idx = note_idx
+        while scan_idx < len(ordered_note_cols) and ordered_note_cols[scan_idx] < raw_col:
+            scan_idx += 1
+        if scan_idx >= len(ordered_note_cols):
+            scan_idx = note_idx
+        if scan_idx >= len(ordered_note_cols):
+            break
+        col = ordered_note_cols[scan_idx]
+        anchored.append((col, denom, dot))
+        last_col = col
+        note_idx = scan_idx + 1
+    return anchored
+
+
+def _expand_scale_map_from_anchors(
+    all_positions: list[tuple[int, int, bool]],
+    anchor_map: dict[int, int],
+    *,
+    content_width: int,
+) -> dict[int, int]:
+    if not all_positions:
+        return {}
+    raw_cols = sorted({col for col, _denom, _dot in all_positions})
+    if not anchor_map:
+        return {col: _scale_col(col, max(1, raw_cols[-1] + 1), content_width) for col in raw_cols}
+    anchors = sorted(anchor_map)
+    out: dict[int, int] = {}
+    prev_dest = -1
+    width_hint = max(1, raw_cols[-1] + 1)
+    for raw_col in raw_cols:
+        if raw_col in anchor_map:
+            dest = anchor_map[raw_col]
+        else:
+            left = max((col for col in anchors if col < raw_col), default=None)
+            right = min((col for col in anchors if col > raw_col), default=None)
+            if left is not None and right is not None and right > left:
+                left_dest = anchor_map[left]
+                right_dest = anchor_map[right]
+                span_raw = right - left
+                span_dest = right_dest - left_dest
+                if span_dest > 1:
+                    dest = left_dest + round(((raw_col - left) * span_dest) / span_raw)
+                    dest = max(left_dest + 1, min(right_dest - 1, dest))
+                else:
+                    dest = right_dest
+            elif left is not None:
+                dest = anchor_map[left] + (raw_col - left)
+            elif right is not None:
+                dest = anchor_map[right] - (right - raw_col)
+            else:
+                dest = _scale_col(raw_col, width_hint, content_width)
+        dest = max(0, min(content_width - 1, dest))
+        dest = max(dest, prev_dest)
+        out[raw_col] = dest
+        prev_dest = dest
+    return out
+
+
 def _scale_chord_row(
     row_cells: list[str],
     *,
@@ -769,13 +834,17 @@ def render_systems(  # noqa: C901, PLR0912
     basslabels: str,
     chord_wrap_limit: int,
     show_melody: bool = False,
+    melody_rows_count: int = 1,
     show_lyrics: bool = False,
     lyric_rows_count: int = 0,
     vocal_pos: str = "bottom",
 ) -> None:
     if glisses is None:
         glisses = []
+    style_policy = resolve_tab_style_policy(settings)
     total_bars = len(piece.bars)
+    melody_rows_count = max(1, melody_rows_count) if show_melody else 0
+    tuning_pitches = parse_tuning_pitches(settings.get("tuning", ""))
     duet_width_lock = settings.get("duetwidthlock", "off") == "on"
     current_bar_start = bar_offset
     for sys_idx in range(systems):
@@ -789,6 +858,7 @@ def render_systems(  # noqa: C901, PLR0912
             show_tactus,
             double_stems,
             show_melody=show_melody,
+            melody_rows_count=melody_rows_count,
             show_lyrics=show_lyrics,
             lyric_rows_count=lyric_rows_count,
             vocal_pos=vocal_pos,
@@ -902,6 +972,7 @@ def render_systems(  # noqa: C901, PLR0912
             show_tactus,
             double_stems,
             show_melody=show_melody,
+            melody_rows_count=melody_rows_count,
             show_lyrics=show_lyrics,
             lyric_rows_count=lyric_rows_count,
             vocal_pos=vocal_pos,
@@ -913,15 +984,21 @@ def render_systems(  # noqa: C901, PLR0912
                 label = _string_label(actual, total_strings, tuning_labels, basslabels)
             safe_addstr(stdscr, row_start + (rows["staff"] or 0) + display_idx, 0, label)
         if rows.get("melody") is not None:
-            safe_addstr(stdscr, row_start + (rows["melody"] or 0), 0, "m ")
+            for melody_row_idx in range(melody_rows_count):
+                safe_addstr(
+                    stdscr,
+                    row_start + (rows["melody"] or 0) + melody_row_idx,
+                    0,
+                    "  ",
+                )
         lyric_base = rows.get("lyric")
         lyric_row_offsets = (
             tuple((lyric_base or 0) + idx for idx in range(max(0, lyric_rows_count)))
             if lyric_base is not None and lyric_rows_count > 0
             else ()
         )
-        for lyric_idx, lyric_row in enumerate(lyric_row_offsets):
-            safe_addstr(stdscr, row_start + lyric_row, 0, "y " if lyric_idx == 0 else "  ")
+        for lyric_row in lyric_row_offsets:
+            safe_addstr(stdscr, row_start + lyric_row, 0, "  ")
 
         bar_x = left_margin
         if spacing_mode == "auto" and bar_widths:
@@ -993,14 +1070,8 @@ def render_systems(  # noqa: C901, PLR0912
             imported_orn = [" " for _ in range(grid_width)]
             imported_ann_targets = [-1 for _ in range(grid_width)]
             imported_orn_targets = [-1 for _ in range(grid_width)]
-            show_fingerings = settings.get(
-                "showfingerings",
-                settings.get("showft3extras", "on"),
-            ) == "on"
-            show_ornaments = settings.get(
-                "showornaments",
-                settings.get("showft3extras", "on"),
-            ) == "on"
+            show_fingerings = style_policy.showfingerings
+            show_ornaments = style_policy.showornaments
             if show_fingerings:
                 imported_ann = _bar_imported_ft3_annotations(
                     bar,
@@ -1041,22 +1112,22 @@ def render_systems(  # noqa: C901, PLR0912
                 imported_orn,
                 local_orn,
             )
-            slur_chars = slur_span_chars(settings.get("slurcuestyle", "paren"))
+            slur_chars = slur_span_chars(style_policy.slurcuestyle)
             if slur_chars is None:
                 slur_cells = [" " for _ in range(grid_width)]
             else:
                 slur_cells = _bar_span_row(slurs, abs_bar, grid_width, *slur_chars)
-            tie_chars = tie_span_chars(settings.get("tiecuestyle", "bracket"))
+            tie_chars = tie_span_chars(style_policy.tiecuestyle)
             if tie_chars is None:
                 tie_cells = [" " for _ in range(grid_width)]
             else:
                 tie_cells = _bar_span_row(ties, abs_bar, grid_width, *tie_chars)
-            hold_chars = hold_span_chars(settings.get("holdcuestyle", "angle"))
+            hold_chars = hold_span_chars(style_policy.holdcuestyle)
             if hold_chars is None:
                 hold_cells = [" " for _ in range(grid_width)]
             else:
                 hold_cells = _bar_span_row(holds, abs_bar, grid_width, *hold_chars)
-            gliss_chars = gliss_span_chars(settings.get("glisscuestyle", "hide"))
+            gliss_chars = gliss_span_chars(style_policy.glisscuestyle)
             if gliss_chars is None:
                 gliss_cells = [" " for _ in range(grid_width)]
             else:
@@ -1074,12 +1145,12 @@ def render_systems(  # noqa: C901, PLR0912
             hidden_tie_cols = tie_notehead_hidden_cols(
                 ties,
                 bar_index=abs_bar,
-                mode=settings.get("tienoteheads", "show"),
+                mode=style_policy.tienoteheads,
             )
             paren_tie_cols = tie_notehead_parenthesize_cols(
                 ties,
                 bar_index=abs_bar,
-                mode=settings.get("tienoteheads", "show"),
+                mode=style_policy.tienoteheads,
             )
             if hidden_tie_cols:
                 for hide_col in hidden_tie_cols:
@@ -1228,8 +1299,8 @@ def render_systems(  # noqa: C901, PLR0912
                     default_duration=default_duration,
                 )
                 ordered_flags = sorted(flag_positions, key=lambda item: item[0])
-                flagstyle = settings.get("flagstyle", "standard")
-                flaglean = settings.get("flaglean", "right")
+                flagstyle = style_policy.flagstyle
+                flaglean = style_policy.flaglean
                 dur_source_positions: list[tuple[int, int]] = []
                 if scale_bar:
                     content_width = max(1, display_width - draw_pad * 2)
@@ -1253,75 +1324,151 @@ def render_systems(  # noqa: C901, PLR0912
                     else:
                         flag_min_gap = 0
                     beatsnap_mode = settings.get("beatsnap", "off")
-                    if beatsnap_mode == "soft" and beats > 1:
-                        src_to_dest = soft_beat_snap_map(
-                            positions,
-                            grid_width=grid_width,
-                            content_width=content_width,
-                            beats=beats,
-                            min_gap=unit_anchor_min_gap,
-                        )
-                        src_to_dest = trim_right_slack_for_onsets(
-                            src_to_dest,
-                            all_positions=positions,
-                            visible_positions=ordered_flags,
-                            content_width=content_width,
-                            min_gap=unit_anchor_min_gap,
-                        )
-                    elif spacing_fill == "smart":
-                        src_to_dest = smart_group_map(
-                            positions,
-                            ordered_flags,
-                            content_width,
-                            min_gap=event_min_gap,
-                        )
-                    else:
-                        _, src_to_dest = _build_chord_scale_map(
-                            positions,
-                            grid_width,
-                            content_width,
-                            min_gap=event_min_gap,
-                        )
-                    if content_width > 1 and src_to_dest:
-                        # Reserve one trailing cell for the right-side dash, but preserve
-                        # event spacing while doing so (simple clamping can re-glue notes).
-                        anchor_width = max(1, content_width - 1)
-                        seeded_event_positions = [
-                            (
-                                _scale_col(
-                                    src_to_dest.get(
-                                        col,
-                                        _scale_col(col, grid_width, content_width),
+                    has_grid_groups = any(chord.grid for chord in bar.chords)
+                    if has_grid_groups:
+                        if beatsnap_mode == "soft" and beats > 1:
+                            anchor_src_to_dest = soft_beat_snap_map(
+                                ordered_flags,
+                                grid_width=grid_width,
+                                content_width=content_width,
+                                beats=beats,
+                                min_gap=max(1, flag_min_gap),
+                            )
+                            anchor_src_to_dest = trim_right_slack_for_onsets(
+                                anchor_src_to_dest,
+                                all_positions=ordered_flags,
+                                visible_positions=ordered_flags,
+                                content_width=content_width,
+                                min_gap=max(1, flag_min_gap),
+                            )
+                        elif spacing_fill == "smart":
+                            anchor_src_to_dest = smart_group_map(
+                                ordered_flags,
+                                ordered_flags,
+                                content_width,
+                                min_gap=max(1, flag_min_gap),
+                            )
+                        else:
+                            _, anchor_src_to_dest = _build_chord_scale_map(
+                                ordered_flags,
+                                grid_width,
+                                content_width,
+                                min_gap=max(1, flag_min_gap),
+                            )
+                        if content_width > 1 and anchor_src_to_dest:
+                            anchor_width = max(1, content_width - 1)
+                            seeded_flag_positions = [
+                                (
+                                    _scale_col(
+                                        anchor_src_to_dest.get(
+                                            col,
+                                            _scale_col(col, grid_width, content_width),
+                                        ),
+                                        content_width,
+                                        anchor_width,
                                     ),
-                                    content_width,
-                                    anchor_width,
+                                    denom,
+                                    dot,
+                                )
+                                for (col, denom, dot) in ordered_flags
+                            ]
+                            spread_flag_positions_scaled = spread_flag_positions(
+                                seeded_flag_positions,
+                                anchor_width,
+                                min_gap=max(1, flag_min_gap),
+                            )
+                            anchor_src_to_dest = {
+                                raw_col: scaled_col
+                                for (raw_col, _d1, _dot1), (scaled_col, _d2, _dot2) in zip(
+                                    ordered_flags,
+                                    spread_flag_positions_scaled,
+                                    strict=False,
+                                )
+                            }
+                        src_to_dest = _expand_scale_map_from_anchors(
+                            positions,
+                            anchor_src_to_dest,
+                            content_width=content_width,
+                        )
+                        final_flag_positions = [
+                            (
+                                anchor_src_to_dest.get(
+                                    col,
+                                    _scale_col(col, grid_width, content_width),
                                 ),
-                                2,  # unit anchor spacing only; do not reserve flag tails here
-                                False,
+                                denom,
+                                dot,
                             )
-                            for (col, denom, dot) in positions
+                            for (col, denom, dot) in ordered_flags
                         ]
-                        spread_event_positions = spread_flag_positions(
-                            seeded_event_positions,
-                            anchor_width,
-                            min_gap=unit_anchor_min_gap,
-                        )
-                        src_to_dest = {
-                            raw_col: scaled_col
-                            for (raw_col, _d1, _dot1), (scaled_col, _d2, _dot2) in zip(
+                    else:
+                        if beatsnap_mode == "soft" and beats > 1:
+                            src_to_dest = soft_beat_snap_map(
                                 positions,
-                                spread_event_positions,
-                                strict=False,
+                                grid_width=grid_width,
+                                content_width=content_width,
+                                beats=beats,
+                                min_gap=unit_anchor_min_gap,
                             )
-                        }
-                    final_flag_positions = [
-                        (
-                            src_to_dest.get(col, _scale_col(col, grid_width, content_width)),
-                            denom,
-                            dot,
-                        )
-                        for (col, denom, dot) in ordered_flags
-                    ]
+                            src_to_dest = trim_right_slack_for_onsets(
+                                src_to_dest,
+                                all_positions=positions,
+                                visible_positions=ordered_flags,
+                                content_width=content_width,
+                                min_gap=unit_anchor_min_gap,
+                            )
+                        elif spacing_fill == "smart":
+                            src_to_dest = smart_group_map(
+                                positions,
+                                ordered_flags,
+                                content_width,
+                                min_gap=event_min_gap,
+                            )
+                        else:
+                            _, src_to_dest = _build_chord_scale_map(
+                                positions,
+                                grid_width,
+                                content_width,
+                                min_gap=event_min_gap,
+                            )
+                        if content_width > 1 and src_to_dest:
+                            anchor_width = max(1, content_width - 1)
+                            seeded_event_positions = [
+                                (
+                                    _scale_col(
+                                        src_to_dest.get(
+                                            col,
+                                            _scale_col(col, grid_width, content_width),
+                                        ),
+                                        content_width,
+                                        anchor_width,
+                                    ),
+                                    2,
+                                    False,
+                                )
+                                for (col, _denom, _dot) in positions
+                            ]
+                            spread_event_positions = spread_flag_positions(
+                                seeded_event_positions,
+                                anchor_width,
+                                min_gap=unit_anchor_min_gap,
+                            )
+                            src_to_dest = {
+                                raw_col: scaled_col
+                                for (raw_col, _d1, _dot1), (scaled_col, _d2, _dot2) in zip(
+                                    positions,
+                                    spread_event_positions,
+                                    strict=False,
+                                )
+                            }
+                        final_flag_positions = [
+                            (
+                                src_to_dest.get(col, _scale_col(col, grid_width, content_width)),
+                                denom,
+                                dot,
+                            )
+                            for (col, denom, dot) in ordered_flags
+                        ]
                     dur_source_positions = [
                         (
                             raw_col,
@@ -1340,6 +1487,8 @@ def render_systems(  # noqa: C901, PLR0912
                         barpad=0,
                         flagstyle=flagstyle,
                         flaglean=flaglean,
+                        stem_width=style_policy.stem_width,
+                        dotplacement=style_policy.dotplacement,
                         min_gap=flag_min_gap,
                     )
                     flag_cells = pad_row(flag_cells, display_width, draw_pad)
@@ -1638,6 +1787,9 @@ def render_systems(  # noqa: C901, PLR0912
                                     )
                             break
             else:
+                src_to_dest: dict[int, int] = {}
+                grid_map: list[int] = list(range(max(1, grid_width)))
+                dur_source_positions: list[tuple[int, int]] = []
                 span_rows_to_draw: dict[int, list[str]] = {}
                 span_y_values = {
                     row_start + (rows[key] or 0)
@@ -1685,6 +1837,7 @@ def render_systems(  # noqa: C901, PLR0912
                         b == abs_bar and value not in ("", "-", " ")
                         for (b, _s, _c), value in overrides.items()
                     ) or any(b == abs_bar for (b, _s, _c) in durations)
+                visible_note_cols = _note_event_columns(cells, total_strings, grid_width)
                 if hide_redundant:
                     if has_explicit_content:
                         flag_positions = flag_positions_from_durations(
@@ -1707,20 +1860,107 @@ def render_systems(  # noqa: C901, PLR0912
                         default_duration,
                         dotted=dotted,
                     )
-                flagstyle = settings.get("flagstyle", "standard")
-                flaglean = settings.get("flaglean", "right")
-                flag_cells, stem_cells = build_flag_rows(
+                flag_positions = _anchor_flag_positions_to_note_cols(
                     flag_positions,
-                    spacing_mode="auto" if scale_bar else spacing_mode,
-                    display_width=display_width,
-                    bar_width=bar_width,
-                    barpad=draw_pad if scale_bar else pad,
-                    flagstyle=flagstyle,
-                    flaglean=flaglean,
+                    visible_note_cols,
                 )
-                if draw_pad and not scale_bar:
+                flagstyle = style_policy.flagstyle
+                flaglean = style_policy.flaglean
+                if scale_bar:
+                    content_width = max(1, display_width - draw_pad * 2)
+                    event_positions = [(col, 2, False) for col in visible_note_cols]
+                    event_min_gap = 1 if spacing_fill == "compact" else 2
+                    if event_positions:
+                        _, src_to_dest = _build_chord_scale_map(
+                            event_positions,
+                            grid_width,
+                            content_width,
+                            min_gap=event_min_gap,
+                        )
+                        if content_width > 1 and src_to_dest:
+                            anchor_width = max(1, content_width - 1)
+                            seeded_event_positions = [
+                                (
+                                    _scale_col(
+                                        src_to_dest.get(
+                                            col,
+                                            _scale_col(col, grid_width, content_width),
+                                        ),
+                                        content_width,
+                                        anchor_width,
+                                    ),
+                                    2,
+                                    False,
+                                )
+                                for col in visible_note_cols
+                            ]
+                            spread_event_positions = spread_flag_positions(
+                                seeded_event_positions,
+                                anchor_width,
+                                min_gap=event_min_gap,
+                            )
+                            src_to_dest = {
+                                raw_col: scaled_col
+                                for (raw_col, _d1, _dot1), (scaled_col, _d2, _dot2) in zip(
+                                    event_positions,
+                                    spread_event_positions,
+                                    strict=False,
+                                )
+                            }
+                    final_flag_positions = [
+                        (
+                            src_to_dest.get(col, _scale_col(col, grid_width, content_width)),
+                            denom,
+                            dot,
+                        )
+                        for (col, denom, dot) in flag_positions
+                    ]
+                    dur_source_positions = [
+                        (
+                            raw_col,
+                            src_to_dest.get(
+                                raw_col,
+                                _scale_col(raw_col, grid_width, content_width),
+                            ),
+                        )
+                        for (raw_col, _denom, _dot) in flag_positions
+                    ]
+                    flag_cells, stem_cells = build_flag_rows(
+                        final_flag_positions,
+                        spacing_mode="fixed",
+                        display_width=content_width,
+                        bar_width=content_width,
+                        barpad=0,
+                        flagstyle=flagstyle,
+                        flaglean=flaglean,
+                        stem_width=style_policy.stem_width,
+                        dotplacement=style_policy.dotplacement,
+                    )
                     flag_cells = pad_row(flag_cells, display_width, draw_pad)
                     stem_cells = pad_row(stem_cells, display_width, draw_pad)
+                    grid_map = _grid_display_map(
+                        grid_width=grid_width,
+                        content_width=content_width,
+                        src_to_dest=src_to_dest,
+                    )
+                else:
+                    flag_cells, stem_cells = build_flag_rows(
+                        flag_positions,
+                        spacing_mode=spacing_mode,
+                        display_width=display_width,
+                        bar_width=bar_width,
+                        barpad=pad,
+                        flagstyle=flagstyle,
+                        flaglean=flaglean,
+                        stem_width=style_policy.stem_width,
+                        dotplacement=style_policy.dotplacement,
+                    )
+                    if draw_pad:
+                        flag_cells = pad_row(flag_cells, display_width, draw_pad)
+                        stem_cells = pad_row(stem_cells, display_width, draw_pad)
+                    dur_source_positions = [
+                        (raw_col, raw_col) for (raw_col, _d, _dot) in flag_positions
+                    ]
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
                 if rows.get("flag2") is not None:
                     safe_addstr(
@@ -1730,21 +1970,34 @@ def render_systems(  # noqa: C901, PLR0912
                         "".join(stem_cells),
                     )
                 if show_dur and rows["dur"] is not None:
-                    dur_cells = _bar_durations(
-                        durations,
-                        abs_bar,
-                        total_strings,
-                        bar_width,
-                        default_duration,
-                        hide_redundant=hide_redundant,
-                        dotted=dotted,
-                    )
                     if scale_bar:
                         content_width = max(1, display_width - draw_pad * 2)
-                        dur_cells = _scale_row(dur_cells, content_width, " ")
-                    dur_cells = pad_row(dur_cells, display_width, draw_pad)
+                        dur_cells = [" " for _ in range(content_width)]
+                        for (_raw_col, denom, dot), (_raw_key, target_col) in zip(
+                            flag_positions,
+                            dur_source_positions,
+                            strict=False,
+                        ):
+                            _place_duration_cells_aligned(
+                                dur_cells,
+                                target_col,
+                                duration_display(denom, dot),
+                            )
+                        dur_cells = pad_row(dur_cells, display_width, draw_pad)
+                    else:
+                        dur_cells = _bar_durations(
+                            durations,
+                            abs_bar,
+                            total_strings,
+                            bar_width,
+                            default_duration,
+                            hide_redundant=hide_redundant,
+                            dotted=dotted,
+                        )
+                        dur_cells = pad_row(dur_cells, display_width, draw_pad)
                     safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
             cursor_display_index = cursor_string if cursor_string < system_display_strings else None
+            rendered_staff_rows: list[str] = []
             for display_idx in range(system_display_strings):
                 actual = system_visual_indices[display_idx]
                 y = row_start + (rows["staff"] or 0) + display_idx
@@ -1764,7 +2017,13 @@ def render_systems(  # noqa: C901, PLR0912
                             content_width=content_width,
                         )
                     else:
-                        row_cells = _scale_row(row_cells, content_width, fill_char)
+                        row_cells = _scale_chord_row(
+                            row_cells,
+                            fill_char=fill_char,
+                            src_to_dest=src_to_dest,
+                            bar_width=grid_width,
+                            content_width=content_width,
+                        )
                     row_cells = pad_row(row_cells, display_width, draw_pad, pad_char=fill_char)
                 elif draw_pad:
                     row_cells = pad_row(row_cells, display_width, draw_pad, pad_char=fill_char)
@@ -1818,6 +2077,7 @@ def render_systems(  # noqa: C901, PLR0912
                 safe_addstr(stdscr, y, barline_x, barline)
                 if repeat_right and display_idx in repeat_rows:
                     safe_addstr(stdscr, y, barline_x, ":")
+                rendered_staff_rows.append(row_text)
 
                 if (
                     abs_bar == cursor_bar
@@ -1830,7 +2090,7 @@ def render_systems(  # noqa: C901, PLR0912
                         cursor_grid_col = _scale_col(cursor_col, bar_width, grid_width)
                         scaled_cursor_col = grid_map[cursor_grid_col]
                     else:
-                        scaled_cursor_col = _scale_col(cursor_col, bar_width, content_width)
+                        scaled_cursor_col = grid_map[cursor_col]
                     cell_x = bar_x + draw_pad + scaled_cursor_col
                     safe_addstr(
                         stdscr,
@@ -1846,7 +2106,7 @@ def render_systems(  # noqa: C901, PLR0912
                             highlight_grid_col = _scale_col(col, bar_width, grid_width)
                             scaled_hl_col = grid_map[highlight_grid_col]
                         else:
-                            scaled_hl_col = _scale_col(col, bar_width, content_width)
+                            scaled_hl_col = grid_map[col]
                         hl_x = bar_x + draw_pad + scaled_hl_col
                         safe_addstr(
                             stdscr,
@@ -1874,64 +2134,95 @@ def render_systems(  # noqa: C901, PLR0912
                     )
                 else:
                     scaled_play_col = _scale_col(playback_col, bar_width, content_width)
+                if bar.chords and 0 <= playback_col < len(bar.chords):
+                    chord = bar.chords[playback_col]
+                    note_strings = {note.string - 1 for note in chord.notes}
+                else:
+                    note_strings = set()
+                playback_cell_idx = draw_pad + scaled_play_col
+                for display_idx in range(system_display_strings):
+                    actual = system_visual_indices[display_idx]
+                    y = row_start + (rows["staff"] or 0) + display_idx
+                    row_text = (
+                        rendered_staff_rows[display_idx]
+                        if display_idx < len(rendered_staff_rows)
+                        else ""
+                    )
+                    if not (0 <= playback_cell_idx < len(row_text)):
+                        continue
+                    ch = row_text[playback_cell_idx]
+                    if bar.chords:
+                        if actual not in note_strings:
+                            continue
+                        if ch in {" ", "-", "|"}:
+                            continue
+                    elif ch in {" ", "-", "|"}:
+                        continue
+                    safe_addstr(
+                        stdscr,
+                        y,
+                        bar_x + playback_cell_idx,
+                        ch,
+                        A_REVERSE,
+                    )
                 marker_y = row_start + (rows["staff"] or 0) + system_display_strings
                 marker_x = bar_x + draw_pad + scaled_play_col
                 safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
 
             if rows.get("melody") is not None:
-                if getattr(bar, "melody_events", None) and text_onset_cols:
-                    melody_cells = _lane_melody_event_cells(
-                        bar.melody_events,
-                        onset_cols=text_onset_cols,
-                        width=display_width,
-                        left_pad=draw_pad,
-                    )
-                elif text_onset_cols:
-                    melody_cells = _lane_tokenized_onset_cells(
-                        getattr(bar, "melody_grid", None),
-                        onset_cols=text_onset_cols,
-                        width=display_width,
-                        left_pad=draw_pad,
-                    )
-                else:
-                    melody_cells = _text_bar_cells(getattr(bar, "melody_grid", None), display_width)
-                safe_addstr(stdscr, row_start + (rows["melody"] or 0), bar_x - 1, "|")
-                safe_addstr(stdscr, row_start + (rows["melody"] or 0), bar_x, "".join(melody_cells))
-                safe_addstr(
-                    stdscr,
-                    row_start + (rows["melody"] or 0),
-                    min(max(0, width - 2), bar_x + display_width),
-                    barline,
+                melody_row_base = row_start + (rows["melody"] or 0)
+                vocal_onset_cols = vocal_onset_cols_for_bar(
+                    bar,
+                    onset_cols=text_onset_cols,
+                    width=display_width,
+                    left_pad=draw_pad,
                 )
+                melody_rows = melody_rows_for_bar(
+                    bar,
+                    onset_cols=vocal_onset_cols,
+                    width=display_width,
+                    left_pad=draw_pad,
+                    tuning_pitches=tuning_pitches,
+                )
+                melody_key = (settings.get("key", "") or "").strip()
+                if abs_bar == 0 and melody_key and melody_rows:
+                    key_row = min(len(melody_rows) - 1, len(melody_rows) // 2)
+                    key_col = min(display_width - 1, max(1, draw_pad))
+                    key_text = melody_key[: max(0, display_width - key_col)]
+                    for offset, ch in enumerate(key_text):
+                        col = key_col + offset
+                        if 0 <= col < display_width:
+                            melody_rows[key_row][col] = ch
+                for melody_row_idx, melody_cells in enumerate(melody_rows[:melody_rows_count]):
+                    y = melody_row_base + melody_row_idx
+                    safe_addstr(stdscr, y, bar_x - 1, "|")
+                    safe_addstr(stdscr, y, bar_x, "".join(melody_cells))
+                    safe_addstr(
+                        stdscr,
+                        y,
+                        min(max(0, width - 2), bar_x + display_width),
+                        barline,
+                    )
             if lyric_row_offsets:
+                vocal_onset_cols = vocal_onset_cols_for_bar(
+                    bar,
+                    onset_cols=text_onset_cols,
+                    width=display_width,
+                    left_pad=draw_pad,
+                )
+                lyric_rows = lyric_rows_for_bar(
+                    bar,
+                    onset_cols=vocal_onset_cols,
+                    width=display_width,
+                    left_pad=draw_pad,
+                    lyric_rows_count=len(lyric_row_offsets),
+                )
                 for lyric_idx, lyric_row in enumerate(lyric_row_offsets):
-                    lyric_event_rows = getattr(bar, "lyric_event_rows", None) or []
-                    if lyric_idx < len(lyric_event_rows) and text_onset_cols:
-                        lyric_cells = _lane_lyric_event_cells(
-                            lyric_event_rows[lyric_idx],
-                            onset_cols=text_onset_cols,
-                            width=display_width,
-                            left_pad=draw_pad,
-                        )
-                    else:
-                        lyric_lines = visible_lyric_rows(
-                            getattr(bar, "lyrics", None),
-                            max_rows=len(lyric_row_offsets),
-                        )
-                        lyric_text = (
-                            lyric_lines[lyric_idx]
-                            if lyric_idx < len(lyric_lines)
-                            else None
-                        )
-                        if text_onset_cols:
-                            lyric_cells = _lane_tokenized_onset_cells(
-                                lyric_text,
-                                onset_cols=text_onset_cols,
-                                width=display_width,
-                                left_pad=draw_pad,
-                            )
-                        else:
-                            lyric_cells = _text_bar_cells(lyric_text, display_width)
+                    lyric_cells = (
+                        lyric_rows[lyric_idx]
+                        if lyric_idx < len(lyric_rows)
+                        else [" "] * display_width
+                    )
                     safe_addstr(stdscr, row_start + lyric_row, bar_x - 1, "|")
                     safe_addstr(stdscr, row_start + lyric_row, bar_x, "".join(lyric_cells))
                     safe_addstr(

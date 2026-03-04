@@ -74,6 +74,10 @@ def _plugin_root() -> list[RemoteTab]:
         for info in _discover_plugins()
     ]
 
+
+def _clear_plugin_confirm(state: EditorState) -> None:
+    state.plugins.confirm = ""
+
 def _load_plugin_module(name: str, path: Path):
     module_name = f"oud_plugin_{name}"
     if module_name in sys.modules:
@@ -147,7 +151,38 @@ def download_plugin_item(state: EditorState) -> Path | None:
         state.message = f"Download failed: {exc}"
         return None
     state.message = f"Downloaded {path.name}"
+    _clear_plugin_confirm(state)
     return path
+
+
+def download_plugin_folder_recursive(state: EditorState) -> list[Path] | None:
+    if not state.plugin_items:
+        state.message = "No plugin items"
+        return None
+    if state.plugin_name != "lutemusic":
+        state.message = "Plugin does not support folder downloads"
+        return None
+    item = state.plugin_items[state.plugin_index]
+    if not item.is_dir:
+        state.message = "Select a folder"
+        return None
+    token = f"download-tree:{item.url}"
+    if state.plugins.confirm != token:
+        state.plugins.confirm = token
+        state.message = "Press D again: download folder recursively (FT3 only)"
+        return None
+    from oud.plugins import lutemusic  # noqa: PLC0415
+
+    dest_dir = Path("lutemusic") / item.title
+    try:
+        paths = lutemusic.download_folder_ft3(item, dest_dir)
+    except OSError as exc:
+        state.message = f"Download failed: {exc}"
+        _clear_plugin_confirm(state)
+        return None
+    _clear_plugin_confirm(state)
+    state.message = f"Downloaded {len(paths)} ft3 files"
+    return paths
 
 
 def open_plugin_item(state: EditorState) -> None:  # noqa: PLR0911
@@ -175,6 +210,7 @@ def open_plugin_item(state: EditorState) -> None:  # noqa: PLR0911
         _select_index_item(state, kind)
         return
     if item.is_dir:
+        _clear_plugin_confirm(state)
         if state.plugin_name != "lutemusic":
             state.message = "Plugin does not support folders"
             return
@@ -251,6 +287,7 @@ def _plugin_action(state: EditorState, key: int) -> str | None:
         "down": bindings.down,
         "open": bindings.open,
         "download": bindings.download,
+        "download_tree": bindings.download_tree,
     }
     for name, keys in actions.items():
         if key in keys:
@@ -271,10 +308,12 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
     bindings = plugin_bindings(state)
     action = _plugin_action(state, key)
     if action == "exit":
+        _clear_plugin_confirm(state)
         if not _pop_stack(state):
             set_mode(state, "normal")
         return True
     if action == "back":
+        _clear_plugin_confirm(state)
         if not _pop_stack(state):
             set_mode(state, "normal")
         return True
@@ -300,6 +339,7 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
     )
     plugin_apply_nav(state, index=nav.index, offset=nav.offset, pending=nav.pending_prefix)
     if handled:
+        _clear_plugin_confirm(state)
         return True
     if action == "open":
         open_plugin_item(state)
@@ -307,4 +347,8 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
     if action == "download":
         download_plugin_item(state)
         return True
+    if action == "download_tree":
+        download_plugin_folder_recursive(state)
+        return True
+    _clear_plugin_confirm(state)
     return True

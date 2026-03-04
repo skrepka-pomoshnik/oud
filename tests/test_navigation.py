@@ -7,6 +7,7 @@ from oud.editor.navigation import (
     jump_row_visual,
     move_left,
     move_left_note,
+    move_left_visual,
     move_right,
     move_right_note,
     move_right_visual,
@@ -161,6 +162,48 @@ def test_visual_move_right_stops_on_note_inside_duplicate_render_column(
     monkeypatch.setattr("oud.editor.motions.cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4])
 
     move_right_visual(state)
+
+    assert state.cursor_col == 1
+
+
+def test_visual_move_left_wraps_at_bar_start(
+    monkeypatch,
+) -> None:
+    state = _state()
+    state.cursor_bar = 1
+    state.cursor_string = 0
+    state.cursor_col = 0
+    state.bar_width = 6
+
+    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr(
+        "oud.editor.motions.cursor_display_map_for_bar",
+        lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
+    )
+
+    move_left_visual(state)
+
+    assert state.cursor_bar == 0
+    assert state.cursor_col == 5
+
+
+def test_visual_move_left_stops_on_note_inside_duplicate_render_column(
+    monkeypatch,
+) -> None:
+    state = _state()
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 2
+    state.bar_width = 6
+    state.overrides[(0, 0, 1)] = "a"
+
+    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr(
+        "oud.editor.motions.cursor_display_map_for_bar",
+        lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
+    )
+
+    move_left_visual(state)
 
     assert state.cursor_col == 1
 

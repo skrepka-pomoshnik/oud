@@ -16,6 +16,7 @@ def plugin_enter_root(state: EditorState, items: list[RemoteTab]) -> None:
     state.plugins.query = ""
     state.plugins.query_active = False
     state.plugins.pending = ""
+    state.plugins.confirm = ""
 
 
 def plugin_push_view(state: EditorState) -> None:
@@ -42,6 +43,7 @@ def plugin_pop_view(state: EditorState) -> bool:
     state.plugins.query = ""
     state.plugins.query_active = False
     state.plugins.pending = ""
+    state.plugins.confirm = ""
     return True
 
 
@@ -57,6 +59,7 @@ def plugin_open_list(
     state.plugins.index = 0
     state.plugins.offset = 0
     state.plugins.pending = ""
+    state.plugins.confirm = ""
     state.plugins.query = ""
     state.plugins.query_active = False
     if plugin_name is not None:
@@ -66,11 +69,13 @@ def plugin_open_list(
 def plugin_search_start(state: EditorState) -> None:
     state.plugins.query_active = True
     state.plugins.query = ""
+    state.plugins.confirm = ""
 
 
 def plugin_search_cancel(state: EditorState) -> None:
     state.plugins.query_active = False
     state.plugins.query = ""
+    state.plugins.confirm = ""
 
 
 def plugin_search_backspace(state: EditorState) -> None:

@@ -182,6 +182,7 @@ class PluginBindings:
     down: tuple[int, ...]
     open: tuple[int, ...]
     download: tuple[int, ...]
+    download_tree: tuple[int, ...]
     search: tuple[int, ...]
     prefix: tuple[int, ...]
     bottom: tuple[int, ...]
@@ -409,6 +410,7 @@ def plugin_bindings(state) -> PluginBindings:
         down=(ord("j"), keycodes.down),
         open=(ord("l"), keycodes.enter, 10, 13),
         download=(ord("d"),),
+        download_tree=(ord("D"),),
         search=(ord("/"),),
         prefix=(ord("g"),),
         bottom=(ord("G"),),

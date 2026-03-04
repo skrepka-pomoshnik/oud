@@ -219,82 +219,188 @@ def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> 
     state.modified = True
 
 
-def paste_bar(state: EditorState, index: int) -> None:
+def paste_bar(state: EditorState, index: int, *, count: int = 1) -> None:
     if state.yanked_bar is None and not state.yanked_bars:
         state.message = "No yanked bar"
         return
-    payload = state.yanked_bars or ([state.yanked_bar] if state.yanked_bar is not None else [])
+    prev_breaks = set(state.stave_breaks)
+    base_payload = state.yanked_bars or ([state.yanked_bar] if state.yanked_bar is not None else [])
+    payload: list[YankedBar] = []
+    for _ in range(max(1, count)):
+        payload.extend(copy.deepcopy(base_payload))
     for offset, yanked in enumerate(payload):
         _paste_one_yanked_bar(state, index + offset, yanked)
+    inserted_snapshots = [snapshot_bar(state, index + offset) for offset in range(len(payload))]
+    record_action(
+        state,
+        UndoAction(
+            kind="bars-insert",
+            data={
+                "start": index,
+                "count": len(payload),
+                "snapshots": inserted_snapshots,
+                "prev": prev_breaks,
+                "new": set(state.stave_breaks),
+            },
+        ),
+    )
+    state.message = "Bar pasted" if len(payload) == 1 else f"Bars pasted: {len(payload)}"
 
 
-def cmd_bar(state: EditorState, args: str) -> None:
-    action = args.strip() or "add"
-    if action in ("add", "after"):
-        prev_breaks = set(state.stave_breaks)
-        insert_bar(state, state.cursor_bar + 1)
-        new_breaks = set(state.stave_breaks)
+def _parse_bar_action_args(args: str) -> tuple[str, int] | None:
+    tokens = args.split()
+    action = (tokens[0] if tokens else "add").strip()
+    count = 1
+    if len(tokens) > 1:
+        try:
+            count = max(1, int(tokens[1]))
+        except ValueError:
+            return None
+    return (action, count)
+
+
+def _cmd_bar_add_after(state: EditorState) -> None:
+    prev_breaks = set(state.stave_breaks)
+    insert_bar(state, state.cursor_bar + 1)
+    new_breaks = set(state.stave_breaks)
+    record_action(
+        state,
+        UndoAction(
+            kind="bar-insert",
+            data={"index": state.cursor_bar + 1, "prev": prev_breaks, "new": new_breaks},
+        ),
+    )
+    apply_motion_target(state, target_home_bar(state, state.cursor_bar + 1))
+    state.message = "Bar added"
+
+
+def _cmd_bar_insert_before(state: EditorState) -> None:
+    prev_breaks = set(state.stave_breaks)
+    insert_bar(state, state.cursor_bar)
+    new_breaks = set(state.stave_breaks)
+    record_action(
+        state,
+        UndoAction(
+            kind="bar-insert",
+            data={"index": state.cursor_bar, "prev": prev_breaks, "new": new_breaks},
+        ),
+    )
+    apply_motion_target(state, target_home_bar(state, state.cursor_bar))
+    state.message = "Bar inserted"
+
+
+def _cmd_bar_yank(state: EditorState, count: int) -> None:
+    if not state.piece.bars:
+        state.message = NO_BARS
+        return
+    bar_range = BarRange.from_start_count(state.cursor_bar, count).clamp(len(state.piece.bars))
+    if bar_range.is_empty:
+        state.message = NO_BARS
+        return
+    yank_bar(state, bar_range.start, count=bar_range.count)
+    state.message = "Bar yanked" if bar_range.count == 1 else f"Bars yanked: {bar_range.count}"
+
+
+def _cmd_bar_paste(state: EditorState, count: int) -> None:
+    paste_bar(state, state.cursor_bar + 1, count=count)
+
+
+def _normalized_bar_delete_range(state: EditorState, count: int) -> BarRange:
+    bar_range = BarRange.from_start_count(state.cursor_bar, count).clamp(len(state.piece.bars))
+    if bar_range.count >= len(state.piece.bars) and len(state.piece.bars) > 1:
+        return BarRange.from_start_count(bar_range.start, len(state.piece.bars) - 1).clamp(
+            len(state.piece.bars),
+        )
+    return bar_range
+
+
+def _cmd_bar_delete(state: EditorState, count: int) -> None:
+    if not state.piece.bars:
+        state.message = NO_BARS
+        return
+    bar_range = _normalized_bar_delete_range(state, count)
+    if bar_range.is_empty:
+        state.message = NO_BARS
+        return
+    index = bar_range.start
+    if len(state.piece.bars) == 1:
+        snapshot = snapshot_bar(state, index)
+        clear_bar_contents(state, index)
         record_action(
             state,
-            UndoAction(
-                kind="bar-insert",
-                data={"index": state.cursor_bar + 1, "prev": prev_breaks, "new": new_breaks},
-            ),
+            UndoAction(kind="bar-clear", data={"index": index, "snapshot": snapshot}),
         )
-        apply_motion_target(state, target_home_bar(state, state.cursor_bar + 1))
-        state.message = "Bar added"
-        return
-    if action in ("before", "insert"):
-        prev_breaks = set(state.stave_breaks)
-        insert_bar(state, state.cursor_bar)
-        new_breaks = set(state.stave_breaks)
-        record_action(
-            state,
-            UndoAction(
-                kind="bar-insert",
-                data={"index": state.cursor_bar, "prev": prev_breaks, "new": new_breaks},
-            ),
-        )
-        apply_motion_target(state, target_home_bar(state, state.cursor_bar))
-        state.message = "Bar inserted"
-        return
-    if action in ("del", "delete", "remove"):
-        if not state.piece.bars:
-            state.message = NO_BARS
-            return
-        bar_range = BarRange.single(state.cursor_bar).clamp(len(state.piece.bars))
-        index = bar_range.start
-        if len(state.piece.bars) == 1:
-            snapshot = snapshot_bar(state, index)
-            clear_bar_contents(state, index)
-            record_action(
-                state,
-                UndoAction(
-                    kind="bar-clear",
-                    data={"index": index, "snapshot": snapshot},
-                ),
-            )
-        else:
-            snapshot = snapshot_bar(state, index)
-            prev_breaks = set(state.stave_breaks)
-            delete_bar(state, state.cursor_bar)
-            new_breaks = set(state.stave_breaks)
-            record_action(
-                state,
-                UndoAction(
-                    kind="bar-delete",
-                    data={
-                        "index": index,
-                        "snapshot": snapshot,
-                        "prev": prev_breaks,
-                        "new": new_breaks,
-                    },
-                ),
-            )
         apply_motion_target(state, target_home_bar(state, state.cursor_bar))
         state.message = "Bar deleted"
         return
-    state.message = "Bar action: add/after/before/insert/del"
+    if bar_range.count == 1:
+        snapshot = snapshot_bar(state, index)
+        prev_breaks = set(state.stave_breaks)
+        delete_bar(state, state.cursor_bar)
+        new_breaks = set(state.stave_breaks)
+        record_action(
+            state,
+            UndoAction(
+                kind="bar-delete",
+                data={
+                    "index": index,
+                    "snapshot": snapshot,
+                    "prev": prev_breaks,
+                    "new": new_breaks,
+                },
+            ),
+        )
+        apply_motion_target(state, target_home_bar(state, state.cursor_bar))
+        state.message = "Bar deleted"
+        return
+    snapshots = [snapshot_bar(state, idx) for idx in bar_range.indices()]
+    prev_breaks = set(state.stave_breaks)
+    for _ in range(bar_range.count):
+        delete_bar(state, bar_range.start)
+    state.stave_breaks = {
+        b - bar_range.count if b >= bar_range.end else b
+        for b in state.stave_breaks
+        if b < bar_range.start or b >= bar_range.end
+    }
+    record_action(
+        state,
+        UndoAction(
+            kind="bars-delete",
+            data={
+                "start": bar_range.start,
+                "count": bar_range.count,
+                "snapshots": snapshots,
+                "prev": prev_breaks,
+                "new": set(state.stave_breaks),
+            },
+        ),
+    )
+    apply_motion_target(state, target_home_bar(state, bar_range.start))
+    state.message = f"Bars deleted: {bar_range.count}"
+
+
+def cmd_bar(state: EditorState, args: str) -> None:
+    parsed = _parse_bar_action_args(args)
+    if parsed is None:
+        state.message = "Bar count must be a positive integer"
+        return
+    action, count = parsed
+    if action in ("add", "after"):
+        _cmd_bar_add_after(state)
+        return
+    if action in ("before", "insert"):
+        _cmd_bar_insert_before(state)
+        return
+    if action in ("yank", "copy"):
+        _cmd_bar_yank(state, count)
+        return
+    if action in ("paste", "put"):
+        _cmd_bar_paste(state, count)
+        return
+    if action in ("del", "delete", "remove"):
+        _cmd_bar_delete(state, count)
+        return
+    state.message = "Bar action: add/after/before/insert/del/yank/paste [count]"
 
 
 def cmd_stave(state: EditorState, args: str) -> None:

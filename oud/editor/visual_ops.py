@@ -46,13 +46,12 @@ def yank_visual_rows(state: EditorState) -> int:
                     snippet = text[: c_col + 1]
                 else:
                     snippet = text
+            elif bar_index == c_bar:
+                snippet = text[c_col:]
+            elif bar_index == a_bar:
+                snippet = text[: a_col + 1]
             else:
-                if bar_index == c_bar:
-                    snippet = text[c_col:]
-                elif bar_index == a_bar:
-                    snippet = text[: a_col + 1]
-                else:
-                    snippet = text
+                snippet = text
             out.append((bar_index, actual_string, snippet))
     state.yanked_rows = out
     state.message = f"Rows yanked: {len(out)}"

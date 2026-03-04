@@ -7,7 +7,6 @@ from oud.core.render_utils import (
     chord_positions,
     format_fret,
     note_type_to_denom,
-    spread_flag_positions,
 )
 from oud.editor.controller_utils import cursor_key, string_index
 from oud.editor.edit_ops import apply_duration, apply_override, clear_cell_note, record_action
@@ -16,9 +15,15 @@ from oud.editor.insert_session import (
     exit_insert_mode,
     finish_replace_once,
 )
-from oud.editor.keymap import insert_bindings, italian_duration_digits
+from oud.editor.keymap import insert_bindings, italian_duration_digits, movement_keys
 from oud.editor.messages import UNSAVED_QUIT
 from oud.editor.midi_control import stop_midi
+from oud.editor.motions import (
+    apply_motion_target,
+    target_snap_previous_time_slot_if_needed,
+    target_snap_to_chord_slot,
+    target_step_display_row,
+)
 from oud.editor.navigation import move_left, move_right
 from oud.editor.ops import (
     chord_index_at_col,
@@ -30,7 +35,7 @@ from oud.editor.ops import (
     italian_to_fret,
     set_chord_note,
 )
-from oud.editor.rhythm import advance_if_overflow, column_denom, column_has_duration
+from oud.editor.rhythm import advance_if_overflow, cell_has_duration
 from oud.editor.state import EditorState, UndoAction
 
 
@@ -50,21 +55,34 @@ def _commit_pending_insert_edit(state: EditorState) -> None:
         clear_insert_transient(state)
 
 
-def _snap_to_previous_time_slot_if_needed(state: EditorState) -> None:
-    """Align to previous onset when layering notes on another string."""
+def _replace_mode_active(state: EditorState) -> bool:
+    return state.mode == "replace"
+
+
+def _replace_target_exists(state: EditorState) -> bool:
     bar = state.cursor_bar
     col = state.cursor_col
-    string = string_index(state, state.cursor_string)
-    if col <= 0:
-        return
     if _column_has_event(state, bar, col):
-        return
-    if not _column_has_event(state, bar, col - 1):
-        return
-    # Keep normal left-to-right typing on the same string unchanged.
-    if (bar, string, col - 1) in state.overrides or (bar, string, col - 1) in state.durations:
-        return
-    state.cursor_col = col - 1
+        return True
+    if 0 <= bar < len(state.piece.bars):
+        bar_obj = state.piece.bars[bar]
+        if bar_obj.chords:
+            return chord_index_at_col(bar_obj, state.bar_width, col) is not None
+    return False
+
+
+def _ensure_replace_target(state: EditorState) -> bool:
+    if not _replace_mode_active(state):
+        return True
+    if _replace_target_exists(state):
+        return True
+    state.message = "No note to replace"
+    return False
+
+
+def _snap_to_previous_time_slot_if_needed(state: EditorState) -> None:
+    """Align to previous onset when layering notes on another string."""
+    apply_motion_target(state, target_snap_previous_time_slot_if_needed(state))
 
 
 def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
@@ -97,35 +115,12 @@ def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
 
 
 def _snap_cursor_to_chord_slot(state: EditorState) -> None:
-    bar_index = state.cursor_bar
-    if bar_index < 0 or bar_index >= len(state.piece.bars):
-        return
-    bar = state.piece.bars[bar_index]
-    if not bar.chords:
-        return
-    has_grid = any(b == bar_index for (b, _s, _c) in state.overrides) or any(
-        b == bar_index for (b, _s, _c) in state.durations
-    )
-    if has_grid:
-        return
-    slots = [
-        col
-        for (col, _denom, _dot) in spread_flag_positions(
-            chord_positions(bar, state.bar_width, default_duration=4),
-            state.bar_width,
-            min_gap=1,
-        )
-    ]
-    if not slots or state.cursor_col in slots:
-        return
-    cur = state.cursor_col
-    state.cursor_col = min(
-        slots,
-        key=lambda col: (abs(col - cur), 0 if col <= cur else 1, -col),
-    )
+    apply_motion_target(state, target_snap_to_chord_slot(state))
 
 
 def _apply_duration_key(state: EditorState, dur: int) -> bool:
+    if not _ensure_replace_target(state):
+        return True
     _snap_to_previous_time_slot_if_needed(state)
     state.current_duration = dur
     advance_if_overflow(state, dur, string_index(state, state.cursor_string))
@@ -157,6 +152,8 @@ def _apply_duration_key(state: EditorState, dur: int) -> bool:
 
 
 def _handle_insert_dot(state: EditorState) -> bool:
+    if not _ensure_replace_target(state):
+        return True
     bar_col = (state.cursor_bar, state.cursor_col)
     _snap_cursor_to_chord_slot(state)
     bar_col = (state.cursor_bar, state.cursor_col)
@@ -198,6 +195,8 @@ def _handle_insert_dot(state: EditorState) -> bool:
 
 
 def _handle_insert_rest(state: EditorState) -> bool:
+    if not _ensure_replace_target(state):
+        return True
     advance_if_overflow(
         state,
         state.current_duration,
@@ -207,9 +206,16 @@ def _handle_insert_rest(state: EditorState) -> bool:
     if 0 <= state.cursor_bar < len(state.piece.bars):
         _flatten_chords_to_grid(state, state.cursor_bar)
     apply_override(state, cursor_key(state), "r")
-    if not column_has_duration(state, state.cursor_bar, state.cursor_col):
+    if not cell_has_duration(
+        state,
+        state.cursor_bar,
+        string_index(state, state.cursor_string),
+        state.cursor_col,
+    ):
         apply_duration(state, cursor_key(state), state.current_duration)
     if finish_replace_once(state):
+        return True
+    if _replace_mode_active(state):
         return True
     steps = 2 if state.settings.get("grid") == "on" else 1
     for _ in range(steps):
@@ -218,9 +224,11 @@ def _handle_insert_rest(state: EditorState) -> bool:
 
 
 def _handle_insert_note(state: EditorState, ch: str, style: str) -> bool:
+    if not _ensure_replace_target(state):
+        return True
     advance_if_overflow(
         state,
-        column_denom(state, state.cursor_bar, state.cursor_col),
+        state.current_duration,
         string_index(state, state.cursor_string),
     )
     _snap_cursor_to_chord_slot(state)
@@ -261,15 +269,17 @@ def _handle_insert_note(state: EditorState, ch: str, style: str) -> bool:
             apply_override(state, cursor_key(state), ch)
     else:
         apply_override(state, cursor_key(state), ch)
-    if not column_has_duration(state, bar, state.cursor_col):
+    if not cell_has_duration(state, bar, string, state.cursor_col):
         apply_duration(state, cursor_key(state), state.current_duration)
     return True
 
 
 def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
+    if not _ensure_replace_target(state):
+        return True
     advance_if_overflow(
         state,
-        column_denom(state, state.cursor_bar, state.cursor_col),
+        state.current_duration,
         string_index(state, state.cursor_string),
     )
     _snap_cursor_to_chord_slot(state)
@@ -309,7 +319,7 @@ def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
             if col >= state.bar_width:
                 break
             apply_override(state, (bar, string, col), ch)
-    if not column_has_duration(state, bar, state.cursor_col):
+    if not cell_has_duration(state, bar, string, state.cursor_col):
         apply_duration(state, cursor_key(state), state.current_duration)
     return True
 
@@ -338,6 +348,7 @@ def _handle_insert_bass_slash(  # noqa: C901, PLR0911, PLR0912
                 return True
             bar = state.cursor_bar
             col = state.cursor_col
+            advance_if_overflow(state, state.current_duration, target)
             if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
                 prev_chords = copy.deepcopy(state.piece.bars[bar].chords)
                 if state.current_duration:
@@ -367,10 +378,12 @@ def _handle_insert_bass_slash(  # noqa: C901, PLR0911, PLR0912
                     apply_override(state, (bar, target, col), ch)
             else:
                 apply_override(state, (bar, target, col), ch)
-            if not column_has_duration(state, bar, col):
+            if not cell_has_duration(state, bar, target, col):
                 apply_duration(state, (bar, target, col), state.current_duration)
             clear_insert_transient(state)
             if finish_replace_once(state):
+                return True
+            if _replace_mode_active(state):
                 return True
             steps = 2 if state.settings.get("grid") == "on" else 1
             for _ in range(steps):
@@ -398,7 +411,11 @@ def _handle_insert_duration_key(state: EditorState, key: int, style: str) -> boo
     return False
 
 
-def _handle_insert_italian_multifret(state: EditorState, key: int, style: str) -> bool:
+def _handle_insert_italian_multifret(  # noqa: PLR0911
+    state: EditorState,
+    key: int,
+    style: str,
+) -> bool:
     if not state.insert_prefix.startswith(","):
         return False
     state.insert_prefix = state.insert_prefix or ","
@@ -420,6 +437,9 @@ def _handle_insert_italian_multifret(state: EditorState, key: int, style: str) -
             if finish_replace_once(state):
                 clear_insert_transient(state)
                 return True
+            if _replace_mode_active(state):
+                clear_insert_transient(state)
+                return True
             steps = 2 if state.settings.get("grid") == "on" else 1
             for _ in range(steps):
                 move_right(state)
@@ -436,6 +456,8 @@ def _handle_insert_char(state: EditorState, key: int, style: str) -> bool:
         if valid:
             _handle_insert_note(state, ch, style)
             if finish_replace_once(state):
+                return True
+            if _replace_mode_active(state):
                 return True
             steps = 2 if state.settings.get("grid") == "on" else 1
             for _ in range(steps):
@@ -530,12 +552,12 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
 
     def _handle_up() -> bool:
         _commit_pending_insert_edit(state)
-        state.cursor_string -= 1
+        apply_motion_target(state, target_step_display_row(state, -1))
         return True
 
     def _handle_down() -> bool:
         _commit_pending_insert_edit(state)
-        state.cursor_string += 1
+        apply_motion_target(state, target_step_display_row(state, 1))
         return True
 
     def _handle_prefix() -> bool:
@@ -562,6 +584,21 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         ],
     ):
         return True
+
+    if _replace_mode_active(state):
+        move = movement_keys(state, include_arrows=False)
+        if key in move.left:
+            _handle_left()
+            return True
+        if key in move.right:
+            _handle_right()
+            return True
+        if key in move.up:
+            _handle_up()
+            return True
+        if key in move.down:
+            _handle_down()
+            return True
 
     style = state.settings.get("style", "french")
     if _handle_insert_bass_slash(state, key, style):

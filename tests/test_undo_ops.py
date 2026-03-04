@@ -4,6 +4,7 @@ from pathlib import Path
 
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.bar_ops import snapshot_bar
+from oud.editor.edit_ops import begin_undo_group, end_undo_group, record_action
 from oud.editor.state import EditorState, UndoAction
 from oud.editor.undo_ops import apply_action, redo, undo
 
@@ -62,6 +63,26 @@ def test_apply_action_simple_flags(tmp_path: Path) -> None:
         config_path=config_path,
     )
     assert state.annotations[(0, 0)] == "x"
+    apply_action(
+        state,
+        UndoAction(
+            kind="annotations-all",
+            data={"prev": {(0, 0): "x"}, "new": {}},
+        ),
+        redo=True,
+        config_path=config_path,
+    )
+    assert state.annotations == {}
+    apply_action(
+        state,
+        UndoAction(
+            kind="annotations-all",
+            data={"prev": {(0, 0): "x"}, "new": {}},
+        ),
+        redo=False,
+        config_path=config_path,
+    )
+    assert state.annotations == {(0, 0): "x"}
     apply_action(
         state,
         UndoAction(kind="highlight", data={"key": (0, 0, 0), "prev": False, "new": True}),
@@ -176,3 +197,43 @@ def test_undo_redo_stack(tmp_path: Path) -> None:
     assert state.settings["tempo"] == "90"
     redo(state, config_path=str(tmp_path / "cfg.toml"))
     assert state.settings["tempo"] == "120"
+
+
+def test_apply_action_group_replays_and_reverts_in_order(tmp_path: Path) -> None:
+    state = _state()
+    config_path = str(tmp_path / "cfg.toml")
+    group = UndoAction(
+        kind="group",
+        data={
+            "label": "compound",
+            "actions": [
+                UndoAction(kind="override", data={"key": (0, 0, 0), "prev": None, "new": "a"}),
+                UndoAction(
+                    kind="duration_col",
+                    data={"bar": 0, "col": 0, "prev": {}, "new": {(0, 0, 0): 4}},
+                ),
+            ],
+        },
+    )
+    apply_action(state, group, redo=True, config_path=config_path)
+    assert state.overrides[(0, 0, 0)] == "a"
+    assert state.durations[(0, 0, 0)] == 4
+    apply_action(state, group, redo=False, config_path=config_path)
+    assert (0, 0, 0) not in state.overrides
+    assert (0, 0, 0) not in state.durations
+
+
+def test_begin_end_undo_group_records_single_stack_entry() -> None:
+    state = _state()
+    begin_undo_group(state, label="x")
+    record_action(
+        state,
+        UndoAction(kind="override", data={"key": (0, 0, 0), "prev": None, "new": "a"}),
+    )
+    record_action(
+        state,
+        UndoAction(kind="dotted", data={"key": (0, 0), "prev": False, "new": True}),
+    )
+    assert end_undo_group(state) is True
+    assert len(state.undo_stack) == 1
+    assert state.undo_stack[0].kind == "group"

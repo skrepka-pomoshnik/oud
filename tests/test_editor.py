@@ -240,6 +240,23 @@ def test_clear_cell_removes_duration_column() -> None:
     assert (0, 1, 0) not in state.durations
 
 
+def test_clear_cell_note_records_single_grouped_undo() -> None:
+    state = _state()
+    state.overrides[(0, 0, 0)] = "a"
+    state.durations[(0, 0, 0)] = 4
+    state.dotted.add((0, 0))
+    edit_ops.clear_cell_note(state, 0, 0, 0)
+    assert (0, 0, 0) not in state.overrides
+    assert (0, 0, 0) not in state.durations
+    assert (0, 0) not in state.dotted
+    assert len(state.undo_stack) == 1
+    assert state.undo_stack[-1].kind == "group"
+    undo_ops.undo(state, config_path="config.toml")
+    assert state.overrides[(0, 0, 0)] == "a"
+    assert state.durations[(0, 0, 0)] == 4
+    assert (0, 0) in state.dotted
+
+
 def test_italian_fret_validation() -> None:
     assert ops.is_italian_fret("0") is True
     assert ops.is_italian_fret("9") is True
@@ -425,6 +442,30 @@ def test_duration_persists_for_new_notes() -> None:
     assert state.durations[(0, 0, 1)] == 8
 
 
+def test_insert_note_uses_selected_duration_for_overflow_not_other_row_column_duration() -> None:
+    state = _state()
+    state.mode = "insert"
+    state.bar_width = 40
+    state.piece.bars.append(Bar())
+    # Another row/same column stores a quarter duration.
+    state.overrides[(0, 0, 0)] = "a"
+    state.durations[(0, 0, 0)] = 4
+    # Target row is nearly full with 32nds: 28 * 1/8 quarter-beats = 3.5
+    for col in range(1, 29):
+        state.overrides[(0, 1, col)] = "a"
+        state.durations[(0, 1, col)] = 32
+    state.cursor_string = 1
+    state.cursor_col = 0
+    state.current_duration = 32
+
+    actions.handle_insert(state, ord("b"))
+
+    # 32nd should fit in bar 0; old bug treated it as quarter from row 0 col 0 and advanced.
+    assert state.cursor_bar == 0
+    assert state.overrides[(0, 1, 0)] == "b"
+    assert state.durations[(0, 1, 0)] == 32
+
+
 def test_insert_note_on_existing_column_does_not_rewrite_duration() -> None:
     state = _state()
     state.mode = "insert"
@@ -471,6 +512,10 @@ def test_repeated_add_remove_undo_keeps_column_duration_stable() -> None:
         assert state.durations[(0, 0, 0)] == 4
 
         undo_ops.undo(state, config_path="config.toml")
+        if (0, 1, 0) in state.overrides:
+            # With per-cell duration recording, insertion can be two undo steps
+            # (duration + override) instead of one.
+            undo_ops.undo(state, config_path="config.toml")
         assert (0, 1, 0) not in state.overrides
         assert state.durations[(0, 0, 0)] == 4
 

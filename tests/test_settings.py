@@ -5,12 +5,14 @@ def test_save_and_load_settings(tmp_path) -> None:
     path = tmp_path / "config.toml"
     settings = {
         "style": "italian",
+        "contrast": "high",
         "measures": "five",
         "tuning": "a4b4",
         "showtuning": "off",
         "strings": "7",
         "basslabels": "tuning",
         "flagstyle": "thin",
+        "dotplacement": "afterstem",
         "time": "O",
         "key": "G",
         "countdots": "on",
@@ -36,12 +38,14 @@ def test_save_and_load_settings(tmp_path) -> None:
     save_settings(str(path), settings)
     loaded = load_settings(str(path))
     assert loaded["style"] == "italian"
+    assert loaded["contrast"] == "high"
     assert loaded["measures"] == "five"
     assert loaded["tuning"] == "a4b4"
     assert loaded["showtuning"] == "off"
     assert loaded["basslabels"] == "tuning"
     assert loaded["strings"] == "7"
     assert loaded["flagstyle"] == "thin"
+    assert loaded["dotplacement"] == "afterstem"
     assert loaded["time"] == "O"
     assert loaded["key"] == "G"
     assert loaded["countdots"] == "on"

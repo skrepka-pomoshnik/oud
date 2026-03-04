@@ -3,15 +3,34 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
-import tempfile
-from pathlib import Path
 
 from oud.core.ft3 import build_durations, load_ft3
-from oud.core.help_text import help_lines
 from oud.core.tab_parser import load_tab, load_tab_data
-from oud.core.time_utils import parse_time_signature_value
-from oud.core.tuning_utils import tuning_preset
-from oud.editor.controller_utils import string_index
+from oud.editor.command_misc_ops import cmd_col as _cmd_col
+from oud.editor.command_misc_ops import cmd_cursor as _cmd_cursor
+from oud.editor.command_misc_ops import cmd_verify as _cmd_verify
+from oud.editor.command_misc_ops import cmd_vocal as _cmd_vocal
+from oud.editor.command_misc_ops import parse_time_signature as _parse_time_signature
+from oud.editor.command_misc_ops import row_first_note_col as _row_first_note_col
+from oud.editor.command_misc_ops import tuning_preset_value as _tuning_preset_value
+from oud.editor.command_notation_ops import cmd_arpeggio as _cmd_arpeggio
+from oud.editor.command_notation_ops import cmd_barline as _cmd_barline
+from oud.editor.command_notation_ops import cmd_dynamic as _cmd_dynamic
+from oud.editor.command_notation_ops import cmd_fermata as _cmd_fermata
+from oud.editor.command_notation_ops import cmd_repeat as _cmd_repeat
+from oud.editor.command_notation_ops import cmd_separee as _cmd_separee
+from oud.editor.command_notation_ops import cmd_time as _cmd_time
+from oud.editor.command_notation_ops import cmd_tuplet as _cmd_tuplet
+from oud.editor.command_notation_ops import set_annotation as _set_annotation
+from oud.editor.command_notation_ops import set_barline as _set_barline
+from oud.editor.command_notation_ops import set_dynamic as _set_dynamic
+from oud.editor.command_notation_ops import set_fermata as _set_fermata
+from oud.editor.command_notation_ops import set_highlight as _set_highlight
+from oud.editor.command_notation_ops import set_hold as _set_hold
+from oud.editor.command_notation_ops import set_ornament as _set_ornament
+from oud.editor.command_notation_ops import set_repeat as _set_repeat
+from oud.editor.command_notation_ops import set_slur as _set_slur
+from oud.editor.command_notation_ops import set_tie as _set_tie
 from oud.editor.file_ops import cmd_source as _cmd_source
 from oud.editor.file_ops import cmd_write as _cmd_write
 from oud.editor.file_ops import cmd_write_ascii as _cmd_write_ascii
@@ -25,25 +44,7 @@ from oud.editor.media_ops import cmd_midicmd_default as _cmd_midicmd_default
 from oud.editor.media_ops import cmd_musicxml as _cmd_musicxml
 from oud.editor.media_ops import cmd_play as _cmd_play
 from oud.editor.media_ops import print_pdf as _print_pdf
-from oud.editor.messages import MISSING_LESS, NO_PATH
-from oud.editor.notation_ops import cmd_arpeggio as _cmd_arpeggio
-from oud.editor.notation_ops import cmd_barline as _cmd_barline
-from oud.editor.notation_ops import cmd_dynamic as _cmd_dynamic
-from oud.editor.notation_ops import cmd_fermata as _cmd_fermata
-from oud.editor.notation_ops import cmd_repeat as _cmd_repeat
-from oud.editor.notation_ops import cmd_separee as _cmd_separee
-from oud.editor.notation_ops import cmd_time as _cmd_time
-from oud.editor.notation_ops import cmd_tuplet as _cmd_tuplet
-from oud.editor.notation_ops import set_annotation as _set_annotation
-from oud.editor.notation_ops import set_barline as _set_barline
-from oud.editor.notation_ops import set_dynamic as _set_dynamic
-from oud.editor.notation_ops import set_fermata as _set_fermata
-from oud.editor.notation_ops import set_highlight as _set_highlight
-from oud.editor.notation_ops import set_hold as _set_hold
-from oud.editor.notation_ops import set_ornament as _set_ornament
-from oud.editor.notation_ops import set_repeat as _set_repeat
-from oud.editor.notation_ops import set_slur as _set_slur
-from oud.editor.notation_ops import set_tie as _set_tie
+from oud.editor.messages import NO_PATH
 from oud.editor.score_ops import cmd_bar as _cmd_bar
 from oud.editor.score_ops import cmd_chord as _cmd_chord
 from oud.editor.score_ops import cmd_stave as _cmd_stave
@@ -65,44 +66,15 @@ from oud.settings import save_settings
 
 
 def row_first_note_col(state: EditorState) -> int:
-    bar = state.cursor_bar
-    string = string_index(state, min(state.cursor_string, state.piece.strings - 1))
-    cols = [col for (b, s, col) in state.overrides if b == bar and s == string]
-    if not cols:
-        return 0
-    return min(cols)
+    return _row_first_note_col(state)
 
 
 def tuning_preset_value(value: str) -> str | None:
-    return tuning_preset(value)
+    return _tuning_preset_value(value)
 
 
 def parse_time_signature(text: str) -> tuple[int, int] | None:
-    return parse_time_signature_value(text)
-
-
-def show_help(state: EditorState) -> None:
-    viewer = shutil.which("less")
-    if not viewer:
-        state.message = MISSING_LESS
-        return
-    content = "\n".join(help_lines()) + "\n"
-    if state.mode == "plugin" and state.plugin_name:
-        root = Path(__file__).resolve().parents[1]
-        plugin_help = root / "plugins" / f"{state.plugin_name}.txt"
-        if plugin_help.exists():
-            content = plugin_help.read_text(encoding="utf-8") + "\n"
-    with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as temp:
-        temp.write(content)
-        temp_path = Path(temp.name)
-    try:
-        if state.suspend_tui:
-            state.suspend_tui()
-        subprocess.run([viewer, str(temp_path)], check=False)  # noqa: S603
-    finally:
-        if state.resume_tui:
-            state.resume_tui()
-        temp_path.unlink(missing_ok=True)
+    return _parse_time_signature(text)
 
 
 def yank_bar(state: EditorState, index: int, *, count: int = 1) -> None:
@@ -119,32 +91,6 @@ def cmd_bar(state: EditorState, args: str) -> None:
 
 def cmd_stave(state: EditorState, args: str) -> None:
     _cmd_stave(state, args)
-
-
-def cmd_col(state: EditorState, args: str) -> None:
-    token = args.strip()
-    if not token.isdigit():
-        state.message = "Usage: col <1-based-column>"
-        return
-    state.cursor_col = max(0, int(token) - 1)
-    state.clamp()
-    state.message = f"Col {state.cursor_col + 1}"
-
-
-def cmd_cursor(state: EditorState, args: str) -> None:
-    tokens = [part for part in args.replace(",", " ").split() if part]
-    if not tokens or len(tokens) > 3 or any(not part.isdigit() for part in tokens):
-        state.message = "Usage: cursor <bar> [string] [col]"
-        return
-    state.cursor_bar = max(0, int(tokens[0]) - 1)
-    if len(tokens) >= 2:
-        state.cursor_string = max(0, int(tokens[1]) - 1)
-    if len(tokens) >= 3:
-        state.cursor_col = max(0, int(tokens[2]) - 1)
-    state.clamp()
-    state.message = (
-        f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{state.cursor_col + 1}"
-    )
 
 
 def cmd_open(state: EditorState, args: str) -> None:
@@ -261,6 +207,28 @@ def cmd_source(state: EditorState, target: str) -> None:
     _cmd_source(state, target, which_fn=shutil.which, run_fn=subprocess.run)
 
 
+def show_help(state: EditorState) -> None:
+    from oud.editor.command_misc_ops import show_help as _show_help  # noqa: PLC0415
+
+    _show_help(state, which_fn=shutil.which, run_fn=subprocess.run)
+
+
+def cmd_col(state: EditorState, args: str) -> None:
+    _cmd_col(state, args)
+
+
+def cmd_cursor(state: EditorState, args: str) -> None:
+    _cmd_cursor(state, args)
+
+
+def cmd_verify(state: EditorState, args: str = "") -> None:
+    _cmd_verify(state, args)
+
+
+def cmd_vocal(state: EditorState, args: str) -> None:
+    _cmd_vocal(state, args)
+
+
 def cmd_info(state: EditorState) -> None:
     _cmd_info(state)
 
@@ -271,6 +239,38 @@ def cmd_plugins(state: EditorState) -> None:
 
 def cmd_tool(state: EditorState, action: str, config_path: str) -> None:
     _cmd_tool(state, action, config_path, save_fn=save_settings)
+
+
+def cmd_transpose(state: EditorState, value: str) -> None:
+    _cmd_transpose(state, value)
+
+
+def cmd_retune(state: EditorState, value: str) -> None:
+    _cmd_retune(state, value)
+
+
+def cmd_courseshift(state: EditorState, value: str) -> None:
+    _cmd_courseshift(state, value)
+
+
+def cmd_write(state: EditorState, path: str) -> None:
+    _cmd_write(state, path)
+
+
+def cmd_write_default(state: EditorState, args: str) -> None:
+    _cmd_write_default(state, args)
+
+
+def cmd_write_ascii(state: EditorState, path: str) -> None:
+    _cmd_write_ascii(state, path)
+
+
+def cmd_write_ascii_default(state: EditorState, args: str) -> None:
+    _cmd_write_ascii_default(state, args)
+
+
+def cmd_chord(state: EditorState, args: str) -> None:
+    _cmd_chord(state, args)
 
 
 def cmd_time(state: EditorState, value: str) -> None:
@@ -303,65 +303,6 @@ def cmd_separee(state: EditorState, value: str) -> None:
 
 def cmd_tuplet(state: EditorState, value: str) -> None:
     _cmd_tuplet(state, value)
-
-
-def cmd_transpose(state: EditorState, value: str) -> None:
-    _cmd_transpose(state, value)
-
-
-def cmd_retune(state: EditorState, value: str) -> None:
-    _cmd_retune(state, value)
-
-
-def cmd_courseshift(state: EditorState, value: str) -> None:
-    _cmd_courseshift(state, value)
-
-
-def cmd_verify(state: EditorState, args: str = "") -> None:
-    mode = args.strip().lower()
-    if mode in ("", "bar"):
-        from oud.editor.verify_ops import verify_bar  # noqa: PLC0415
-
-        state.message = verify_bar(state, state.cursor_bar)
-        return
-    if mode in ("render", "view", "ui"):
-        from oud.editor.verify_ops import verify_render_bar  # noqa: PLC0415
-
-        state.message = verify_render_bar(state, state.cursor_bar)
-        return
-    state.message = "Verify modes: bar|render"
-
-
-def cmd_write(state: EditorState, path: str) -> None:
-    _cmd_write(state, path)
-
-
-def cmd_write_default(state: EditorState, args: str) -> None:
-    _cmd_write_default(state, args)
-
-
-def cmd_write_ascii(state: EditorState, path: str) -> None:
-    _cmd_write_ascii(state, path)
-
-
-def cmd_write_ascii_default(state: EditorState, args: str) -> None:
-    _cmd_write_ascii_default(state, args)
-
-
-def cmd_orn(state: EditorState, args: str) -> None:
-    set_ornament(state, args.strip())
-
-
-def cmd_annot(state: EditorState, args: str) -> None:
-    set_annotation(state, args.strip())
-
-
-def cmd_highlight(state: EditorState, args: str) -> None:
-    set_highlight(state, args.strip())
-
-
-def cmd_chord(state: EditorState, args: str) -> None:
-    _cmd_chord(state, args)
 
 
 def set_ornament(state: EditorState, value: str) -> None:

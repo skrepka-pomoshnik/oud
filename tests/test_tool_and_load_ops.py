@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from oud.core.model import Bar, Piece
-from oud.editor.load_ops import cmd_open
+from oud.editor.load_ops import cmd_open, load_piece_data
 from oud.editor.state import EditorState
 from oud.editor.tool_ops import cmd_info, cmd_plugins, cmd_tool
+from oud.editor.undo_ops import undo
 
 
 def _state() -> EditorState:
@@ -58,6 +59,8 @@ def test_cmd_tool_variants(tmp_path: Path) -> None:
     assert state.settings["flagstyle"] in ("board", "standard")
     cmd_tool(state, "comments", cfg, save_fn=_save)
     assert state.annotations == {}
+    undo(state, config_path=cfg)
+    assert state.annotations == {(0, 0): "x"}
     cmd_tool(state, "unknown", cfg, save_fn=_save)
     assert state.message == "Tool: reflow|gridflags|flagstyle|comments"
     assert saves
@@ -95,3 +98,20 @@ def test_cmd_open_appends_import_warning_to_message(tmp_path: Path) -> None:
     assert "lyric/melody text records" in state.message
     assert state.insert_prefix == ""
     assert state.replace_once is False
+
+
+def test_load_piece_data_returns_warning_piece_when_loader_raises(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    broken = tmp_path / "broken.ft3"
+    broken.write_text("", encoding="utf-8")
+    monkeypatch.setattr("oud.editor.load_ops.load_ft3", lambda _p: (_ for _ in ()).throw(ValueError("bad parse")))
+    piece, overrides, durations, dotted, bar_width = load_piece_data(str(broken))
+    assert piece.title == "broken"
+    assert piece.import_warnings
+    assert "Could not open broken.ft3" in piece.import_warnings[0]
+    assert overrides == {}
+    assert durations == {}
+    assert dotted == set()
+    assert bar_width is None

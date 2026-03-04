@@ -15,6 +15,9 @@ from oud.editor.motions import (
     target_move_right,
     target_move_right_note,
     target_move_right_visual,
+    target_snap_previous_time_slot_if_needed,
+    target_snap_to_chord_slot,
+    target_step_display_row,
 )
 from oud.editor.navigation import jump_row_visual, move_left_note, move_right_note
 from oud.editor.state import EditorState
@@ -262,3 +265,63 @@ def test_target_move_left_note_matches_wrapper_across_bar_boundary() -> None:
     move_left_note(state2)
 
     assert (target.bar, target.col, target.append_bar) == (state2.cursor_bar, state2.cursor_col, False)
+
+
+def test_target_step_display_row_changes_only_display_row() -> None:
+    state = _state()
+    state.cursor_bar = 1
+    state.cursor_col = 2
+    state.cursor_string = 3
+    target = target_step_display_row(state, -1)
+    assert (target.bar, target.col, target.cursor_string, target.append_bar) == (1, 2, 2, False)
+
+
+def test_target_snap_previous_time_slot_if_needed_moves_left_only_for_layering() -> None:
+    state = _state()
+    state.piece.strings = 6
+    state.bar_width = 8
+    state.cursor_bar = 0
+    state.cursor_col = 3
+    state.cursor_string = 1
+    state.overrides[(0, 0, 2)] = "a"
+    state.durations[(0, 0, 2)] = 4
+    target = target_snap_previous_time_slot_if_needed(state)
+    assert (target.bar, target.col) == (0, 2)
+
+    # Same-string previous event should keep normal left-to-right typing.
+    state.cursor_string = 0
+    target_same_string = target_snap_previous_time_slot_if_needed(state)
+    assert (target_same_string.bar, target_same_string.col) == (0, 3)
+
+
+def test_target_snap_to_chord_slot_chooses_nearest_spread_slot() -> None:
+    state = _state()
+    state.bar_width = 8
+    bar = Bar()
+    # Three chord onsets; cursor starts between them.
+    from oud.core.model import Chord, Note  # noqa: PLC0415
+
+    bar.chords = [
+        Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=0)]),
+        Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=1)]),
+        Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=2)]),
+    ]
+    state.piece.bars[0] = bar
+    from oud.core.render_utils import chord_positions, spread_flag_positions  # noqa: PLC0415
+
+    slots = [
+        col
+        for (col, _denom, _dot) in spread_flag_positions(
+            chord_positions(bar, state.bar_width, default_duration=4),
+            state.bar_width,
+            min_gap=1,
+        )
+    ]
+    between = next((c for c in range(state.bar_width) if c not in slots), None)
+    assert between is not None
+    state.cursor_bar = 0
+    state.cursor_col = between
+    target = target_snap_to_chord_slot(state)
+    assert target.bar == 0
+    assert target.col in set(slots)
+    assert target.col != between

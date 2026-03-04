@@ -15,11 +15,12 @@ from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.ui.adapter import Screen
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import _apply_overrides, render_piece
+from oud.ui.render_vocal import melody_row_count
 from tests.helpers_regression_cases import repeat_and_meter_change_piece
 
 
 class _Screen(Screen):
-    def __init__(self, h: int = 20, w: int = 80) -> None:
+    def __init__(self, h: int = 24, w: int = 80) -> None:
         self.h = h
         self.w = w
         self.calls: list[tuple[int, int, str, int]] = []
@@ -107,7 +108,12 @@ def _render_lines(kwargs: dict) -> list[str]:
 
 
 def _first_melody_row_idx(lines: list[str]) -> int:
-    return next(i for i, line in enumerate(lines) if line.startswith("  |") and "o" in line)
+    for idx in range(1, len(lines)):
+        if not lines[idx - 1].strip() and lines[idx].startswith("  |"):
+            return idx
+    return next(
+        i for i, line in enumerate(lines) if line.startswith("  |") and ("\\" in line or "o" in line)
+    )
 
 
 def _first_lyric_row(lines: list[str]) -> str:
@@ -115,7 +121,9 @@ def _first_lyric_row(lines: list[str]) -> str:
     return next(
         line
         for idx, line in enumerate(lines)
-        if idx > melody_start and line.startswith("  |") and re.search(r"[A-Za-z]{2,}", line)
+        if idx >= melody_start + melody_row_count()
+        and line.startswith("  |")
+        and re.search(r"[A-Za-z]{2,}", line)
     )
 
 
@@ -1189,8 +1197,8 @@ def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
     kwargs["settings"]["showmelody"] = "on"
     lines = _render_lines(kwargs)
     melody_start = _first_melody_row_idx(lines)
-    melody_block = lines[melody_start : melody_start + 5]
-    assert len(melody_block) == 5
+    melody_block = lines[melody_start : melody_start + melody_row_count()]
+    assert len(melody_block) == melody_row_count()
     assert any("o" in row for row in melody_block)
 
 
@@ -1216,7 +1224,7 @@ def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
     kwargs["settings"]["showlyrics"] = "on"
     lines = _render_lines(kwargs)
     melody_start = _first_melody_row_idx(lines)
-    melody_block = lines[melody_start : melody_start + 5]
+    melody_block = lines[melody_start : melody_start + melody_row_count()]
     lyric_line = _first_lyric_row(lines)
     first_barline = lyric_line.index("|")
     second_barline = lyric_line.index("|", first_barline + 1)

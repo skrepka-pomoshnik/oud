@@ -88,6 +88,22 @@ def test_flag_row_style_places_dot_after_flags_when_space() -> None:
     assert row == ["|", "\\", "\\", "\\", ".", " "]
 
 
+def test_flag_row_style_supports_afterstem_dot_placement() -> None:
+    row = flag_row_style(
+        [(0, 16, True)],
+        7,
+        stem="|",
+        flag="\\",
+        dotplacement="afterstem",
+    )
+    assert row == ["|", ".", "\\", "\\", "\\", " ", " "]
+
+
+def test_stem_row_style_supports_double_stem_width() -> None:
+    row = stem_row_style([(1, 8, False)], 5, stem="|", stem_width=2)
+    assert row == [" ", "|", "|", " ", " "]
+
+
 def test_flag_count_distinguishes_half_and_quarter() -> None:
     assert flag_count(2) == 0
     assert flag_count(4) == 1

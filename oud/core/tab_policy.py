@@ -228,11 +228,15 @@ def time_sig_inline_rows(  # noqa: C901, PLR0911, PLR0912
     if mode == "numeric":
         if raw in {"C", "c", "4/4"}:
             return [" 4"]
+        if raw in {"C|", "c|", "2/2"}:
+            return [" 2"]
         if raw in {"O", "o", "3/4"}:
             return [" 3"]
     if mode == "fraction":
         if raw in {"C", "c"}:
             return [" 4", " /", " 4"]
+        if raw in {"C|", "c|", "2/2"}:
+            return [" 2", " /", " 2"]
         if raw in {"O", "o"}:
             return [" 3", " /", " 4"]
     if "/" in raw:
@@ -249,16 +253,22 @@ def time_sig_inline_rows(  # noqa: C901, PLR0911, PLR0912
     if mode == "numeric":
         if text == "C":
             return [" 4"]
+        if text == "C|":
+            return [" 2"]
         if text == "O":
             return [" 3"]
     if mode == "fraction":
         if text == "C":
             return [" 4", " /", " 4"]
+        if text == "C|":
+            return [" 2", " /", " 2"]
         if text == "O":
             return [" 3", " /", " 4"]
     if text in {"C", "O"}:
         # Common/cut time cue centered in staff without stem clutter.
         return [" ", text[:1], " "]
+    if text == "C|":
+        return [" ", "C|", " "]
     if "/" in text:
         left, right = text.split("/", 1)
         top = f"{left[:2]:>2}"

@@ -348,6 +348,40 @@ def test_synthetic_beatsnap_soft_does_not_introduce_left_slack_on_cue_free_bar()
     assert first_note <= 2, second_seg
 
 
+@pytest.mark.parametrize("dotplacement", ["afterflag", "afterstem"])
+def test_flag_dotplacement_modes_keep_right_edge_alignment_and_visible_dot(
+    dotplacement: str,
+) -> None:
+    piece = Piece(
+        title="DotPolicy",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=6, dotted=True, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=7, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                ],
+            ),
+            Bar(
+                chords=[Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    state = regression_state(piece, justify="smart", width=80, bar_width=12)
+    state.settings["layout"] = "auto"
+    state.settings["dotplacement"] = dotplacement
+    lines = _render_state_lines(state, height=18)
+    flagged = [line for line in lines if "|" in line and ("\\" in line or "." in line)]
+    staff = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert flagged
+    assert any("." in line for line in flagged)
+    assert staff
+    right_edges = {line.rfind("|") for line in staff}
+    assert len(right_edges) == 1
+
+
 @pytest.mark.parametrize("justify", ["smart", "stretch"])
 def test_synthetic_multi_bar_no_broken_bar_seams(justify: str) -> None:
     state = regression_state(multi_bar_spacing_piece(), justify=justify, width=120, bar_width=12)
@@ -407,6 +441,56 @@ def test_synthetic_final_frame_smart_stem_anchors_have_notes_under() -> None:
             assert any(g not in ("-", " ", "|") for g in under), (i, col, seg_flag, under)
 
 
+def test_nonchord_duration_flags_anchor_only_to_visible_note_columns() -> None:
+    bar = Bar(
+        notes=[
+            Note(raw_pos=0, string=2, fret=3),
+            Note(raw_pos=0, string=3, fret=0),
+            Note(raw_pos=0, string=5, fret=2),
+            Note(raw_pos=0, string=2, fret=3),
+            Note(raw_pos=0, string=3, fret=0),
+            Note(raw_pos=0, string=5, fret=2),
+            Note(raw_pos=0, string=2, fret=2),
+            Note(raw_pos=0, string=2, fret=3),
+            Note(raw_pos=0, string=1, fret=0),
+            Note(raw_pos=0, string=5, fret=4),
+        ],
+        time_sig="O",
+    )
+    piece = Piece(title="AnchoredFlags", bars=[bar], strings=6, style="french")
+    state = regression_state(piece, justify="smart", width=120, bar_width=10)
+    state.settings["layout"] = "auto"
+    state.settings["showdur"] = "off"
+    state.settings["showspans"] = "off"
+    state.settings["showtactus"] = "off"
+    state.settings["flagstems"] = "single"
+    state.settings["flagredundant"] = "on"
+    # Explicit duration change arrives before the next note column and must anchor to
+    # that note, not to an empty inherited slot.
+    for col, denom in ((0, 8), (1, 16), (2, 16), (3, 16), (4, 16), (5, 4)):
+        state.durations[(0, 0, col)] = denom
+
+    lines = _render_state_lines(state, height=18)
+    staff_start = next(
+        idx
+        for idx, line in enumerate(lines)
+        if line.count("|") >= 2 and line.count("-") >= 8
+    )
+    flag_row = lines[staff_start - 2]
+    staff_rows = lines[staff_start : staff_start + 6]
+    barlines = [idx for idx, ch in enumerate(staff_rows[0]) if ch == "|"]
+    assert len(barlines) >= 2
+    x0 = barlines[0] + 1
+    x1 = barlines[1]
+    seg_flag = flag_row[x0:x1]
+    seg_staff = [row[x0:x1] for row in staff_rows]
+    for col, ch in enumerate(seg_flag):
+        if ch != "|":
+            continue
+        under = [row[col] for row in seg_staff]
+        assert any(g not in ("-", " ", "|") for g in under), (col, seg_flag, under)
+
+
 def test_geometry_double_stem_rows_anchor_to_dense_chords() -> None:
     piece = mk_piece(
         [
@@ -450,7 +534,12 @@ def test_geometry_double_stem_rows_anchor_to_dense_chords() -> None:
                 continue
             assert seg_flag[col] == "|" or seg_flag[col] in {"\\", "/", "="}
             under = [row[col] for row in seg_staff]
-            assert any(g not in ("-", " ", "|") for g in under), (col, seg_flag, seg_stem, under)
+            if any(g not in ("-", " ", "|") for g in under):
+                continue
+            # Double-width stems may occupy a continuation column immediately to the
+            # right of the onset anchor; that continuation column need not carry a
+            # notehead directly underneath.
+            assert col > 0 and seg_stem[col - 1] == "|", (col, seg_flag, seg_stem, under)
 
 
 def test_geometry_tie_and_gliss_cues_on_chords_preserve_noteheads() -> None:

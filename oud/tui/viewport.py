@@ -8,6 +8,7 @@ from oud.editor.visual_cursor_map import (
 )
 from oud.ui.layout_map import block_height as _block_height
 from oud.ui.render import _bass_strings_used
+from oud.ui.render_vocal import melody_row_count
 
 
 def rows_per_screen(state: EditorState, height: int) -> int:
@@ -25,6 +26,7 @@ def rows_per_screen(state: EditorState, height: int) -> int:
         or any((event.text or "").strip() for event in bar.melody_events)
         for bar in state.piece.bars
     )
+    melody_rows_count = melody_row_count() if show_melody else 0
     show_lyrics = state.settings.get("showlyrics", "on") == "on" and any(
         any(line.strip() for line in bar.lyrics)
         or any(
@@ -45,8 +47,8 @@ def rows_per_screen(state: EditorState, height: int) -> int:
                 )
             if rows == 0:
                 rows = len([line for line in bar.lyrics if line.strip()])
-            lyric_rows_count = max(lyric_rows_count, min(2, rows))
-            if lyric_rows_count >= 2:
+            lyric_rows_count = max(lyric_rows_count, rows)
+            if lyric_rows_count >= 99:
                 break
     used_bass = _bass_strings_used(state.piece, state.overrides)
     total_strings = state.piece.strings
@@ -65,6 +67,7 @@ def rows_per_screen(state: EditorState, height: int) -> int:
         show_tactus,
         double_stems,
         show_melody=show_melody,
+        melody_rows_count=melody_rows_count,
         show_lyrics=show_lyrics,
         lyric_rows_count=lyric_rows_count,
         vocal_pos=state.settings.get("vocalpos", "bottom"),
@@ -114,7 +117,10 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
         state.viewport_scroll_hold_ticks = hold - 1
         return
     rows, _row_for_bar, _start_for_row = _viewport_row_mapping(state, width, height)
-    cursor_row = _row_for_bar(state.cursor_bar)
+    target_bar = state.cursor_bar
+    if state.settings.get("playbackscroll", "off") == "on" and state.playback_bar is not None:
+        target_bar = max(0, state.playback_bar)
+    cursor_row = _row_for_bar(target_bar)
     first_row = _row_for_bar(state.bar_offset)
     scroll_mode = state.settings.get("scrollmode", "smooth")
 

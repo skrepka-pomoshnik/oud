@@ -13,7 +13,7 @@ from oud.tui.input import handle_command as handle_command_input
 from oud.tui.input import handle_search as handle_search_input
 from oud.tui.keycodes import keycodes_from_curses
 from oud.tui.viewport import ensure_cursor_visible
-from oud.ui.adapter import CursesScreen
+from oud.ui.adapter import CursesScreen, contrast_attr
 from oud.ui.framebuffer import FrameBuffer, draw_frame_rows, frame_diff_rows
 from oud.ui.render import render_piece
 
@@ -45,7 +45,6 @@ def run_loop(
     state.suspend_tui = suspend_tui
     state.resume_tui = resume_tui
 
-    screen = CursesScreen(stdscr)
     running = True
     while running:
         decay_transient_message(state)
@@ -55,6 +54,8 @@ def run_loop(
         state.clamp()
         update_playback_animation(state)
         ensure_cursor_visible(state, width, height)
+        base_attr = contrast_attr(state.settings.get("contrast", "normal"))
+        screen = CursesScreen(stdscr, base_attr=base_attr)
         frame_buffer = FrameBuffer(height, width)
         render_piece(
             frame_buffer,

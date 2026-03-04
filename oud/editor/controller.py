@@ -45,7 +45,7 @@ def handle_key(  # noqa: C901, PLR0911, PLR0912
         from oud.editor.plugin_ops import handle_plugin_key  # noqa: PLC0415
 
         return handle_plugin_key(state, key)
-    if state.mode == "insert":
+    if state.mode in ("insert", "replace"):
         return handle_insert(state, key)
     if state.mode == "command":
         return handle_command(state, key)

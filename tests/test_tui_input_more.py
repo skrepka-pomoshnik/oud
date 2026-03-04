@@ -131,6 +131,10 @@ def test_complete_set_value_uses_legit_options_only() -> None:
     assert text in {"set vocalpos=top", "set vocalpos=t"}
     assert msg is None or msg.startswith("Options:")
 
+    text, msg = complete_command_text(state, "set melodyview=")
+    assert text == "set melodyview="
+    assert msg is None
+
     text, msg = complete_command_text(state, "set layout=s")
     # layout accepts "spread" and legacy alias "stretch" route
     assert text.startswith("set layout=s")

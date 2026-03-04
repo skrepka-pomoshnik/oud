@@ -512,6 +512,8 @@ def _parse_time_signature(value: str) -> tuple[int, int, str]:
     text = value.strip()
     if text in ("C", "c", "4/4"):
         return 4, 4, "C"
+    if text in ("C|", "c|", "2/2"):
+        return 2, 2, "C|"
     if text in ("O", "o", "3/4"):
         return 3, 4, "O"
     if "/" in text:
@@ -767,11 +769,11 @@ def _ft3_fingering_glyph(value: str | None) -> str | None:
     if value == "thumb":
         return "t"
     if value == "dot1":
-        return "\u0307"
+        return "\u0323"  # combining dot below
     if value == "dot2":
-        return "\u0308"
+        return "\u0324"  # combining diaeresis below
     if value == "dot3":
-        return "\u20DB"
+        return "\u20E8"  # combining triple underdot
     return value[0]
 
 

@@ -124,6 +124,36 @@ def test_keyscript_movementmode_note_moves_between_notes_not_grid_cells() -> Non
     assert state.cursor_col == 0
 
 
+def test_keyscript_replace_mode_hjkl_move_instead_of_inserting_frets() -> None:
+    state = keyscript_state(width=24, height=20, bar_width=12)
+    press_keys(state, ["i", "a", 27])
+    assert state.overrides.get((0, 0, 0)) == "a"
+    assert state.cursor_col == 1
+    press_keys(state, ["h", "R"])
+    assert state.mode == "replace"
+    press_keys(state, ["l"])
+    assert state.cursor_col == 1
+    assert state.overrides.get((0, 0, 0)) == "a"
+    assert (0, 0, 1) not in state.overrides
+
+
+def test_keyscript_replace_mode_replaces_existing_cell_without_auto_advance() -> None:
+    state = keyscript_state(width=24, height=20, bar_width=12)
+    press_keys(state, ["i", "a", 27, "h", "R", "b"])
+    assert state.mode == "replace"
+    assert state.cursor_col == 0
+    assert state.overrides.get((0, 0, 0)) == "b"
+
+
+def test_keyscript_replace_mode_rejects_insert_on_empty_cell() -> None:
+    state = keyscript_state(width=24, height=20, bar_width=12)
+    press_keys(state, ["R", "a"])
+    assert state.mode == "replace"
+    assert state.cursor_col == 0
+    assert state.overrides == {}
+    assert state.message == "No note to replace"
+
+
 def test_keyscript_jk_fullscreen_alternating_bass_rows_keeps_cursor_visible_and_scrolls() -> None:
     base = piece_with_unused_then_used_bass_rows()
     piece = Piece(title="T", bars=base.bars * 10, strings=7, style="french")

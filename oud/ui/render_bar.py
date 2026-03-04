@@ -14,6 +14,8 @@ def build_flag_rows(
     barpad: int,
     flagstyle: str,
     flaglean: str = "right",
+    stem_width: int = 1,
+    dotplacement: str = "afterflag",
     min_gap: int = 1,
 ) -> tuple[list[str], list[str]]:
     stem, flag = flag_symbols(flagstyle, flaglean)
@@ -27,8 +29,10 @@ def build_flag_rows(
             bar_width,
             stem=stem,
             flag=flag,
+            stem_width=stem_width,
+            dotplacement=dotplacement,
         )
-        stem_cells = stem_row_style(clamped, bar_width, stem=stem)
+        stem_cells = stem_row_style(clamped, bar_width, stem=stem, stem_width=stem_width)
         return flag_cells, stem_cells
     if spacing_mode == "auto":
         content_width = max(1, display_width - barpad * 2)
@@ -46,12 +50,15 @@ def build_flag_rows(
             content_width,
             stem=stem,
             flag=flag,
+            stem_width=stem_width,
+            dotplacement=dotplacement,
         )
         flag_cells = pad_row(flag_cells, display_width, barpad)
         stem_cells = stem_row_style(
             scaled_positions,
             content_width,
             stem=stem,
+            stem_width=stem_width,
         )
         stem_cells = pad_row(stem_cells, display_width, barpad)
         return flag_cells, stem_cells
@@ -62,6 +69,8 @@ def build_flag_rows(
         bar_width,
         stem=stem,
         flag=flag,
+        stem_width=stem_width,
+        dotplacement=dotplacement,
     )
-    stem_cells = stem_row_style(spread_positions, bar_width, stem=stem)
+    stem_cells = stem_row_style(spread_positions, bar_width, stem=stem, stem_width=stem_width)
     return flag_cells, stem_cells

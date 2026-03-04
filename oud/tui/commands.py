@@ -65,6 +65,9 @@ from oud.editor.command_ops import (
 from oud.editor.command_ops import (
     cmd_verify as _cmd_verify,
 )
+from oud.editor.command_ops import (
+    cmd_vocal as _cmd_vocal,
+)
 from oud.editor.commands import (
     cmd_author,
     cmd_composer,
@@ -118,6 +121,7 @@ READ_ONLY_BLOCKED_COMMANDS = frozenset(
         "retune",
         "courseshift",
         "tool",
+        "vocal",
     },
 )
 
@@ -270,6 +274,10 @@ def cmd_verify(state: EditorState, _args: str) -> None:
     _cmd_verify(state, _args)
 
 
+def cmd_vocal(state: EditorState, args: str) -> None:
+    _cmd_vocal(state, args)
+
+
 def cmd_pause(state: EditorState, _args: str) -> None:
     _cmd_pause(state)
 
@@ -417,6 +425,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("convert", _with_config(cmd_convert)),
         CommandSpec("time", _no_config(cmd_time)),
         CommandSpec("verify", _no_config(cmd_verify)),
+        CommandSpec("vocal", _no_config(cmd_vocal)),
         CommandSpec("title", _no_config(cmd_title)),
         CommandSpec("author", _no_config(cmd_author)),
         CommandSpec("composer", _no_config(cmd_composer)),

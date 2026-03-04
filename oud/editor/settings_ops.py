@@ -55,6 +55,7 @@ _BOOL_KEYS = {
     "viewinvert",
     "showtuning",
     "restrainopenstrings",
+    "playbackscroll",
 }
 
 _DEPRECATED_SET_ALIASES = {
@@ -83,6 +84,7 @@ _INT_KEYS = {
 
 _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "style": ({"french", "italian"}, "Style must be french or italian"),
+    "contrast": ({"normal", "high"}, "Contrast must be normal/high"),
     "measures": ({"start", "every", "five"}, "Measures must be start/every/five"),
     "flagstyle": (
         {"standard", "italian", "thin", "board", "capirola", "englishgrid", "continental"},
@@ -90,6 +92,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     ),
     "flagstems": ({"single", "double"}, "Flagstems must be single/double"),
     "flaglean": ({"right", "left"}, "Flaglean must be right/left"),
+    "dotplacement": (
+        {"afterflag", "afterstem"},
+        "Dotplacement must be afterflag/afterstem",
+    ),
     "keys": (
         {"vim", "vim+arrows", "casual", "casual+arrows"},
         "Keys must be vim/vim+arrows/casual/casual+arrows",

@@ -61,3 +61,44 @@ def test_handle_plugin_key_jump_to_top_and_bottom() -> None:
     handle_plugin_key(state, ord("g"))
     handle_plugin_key(state, ord("g"))
     assert state.plugin_index == 0
+
+
+def test_handle_plugin_key_downloads_folder_recursively_with_confirmation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    state = _state()
+    enter_plugin_mode(state)
+    state.plugin_name = "lutemusic"
+    folder = RemoteTab(title="Composer", url="https://example.com/tabs/composer/", is_dir=True)
+    state.plugin_items = [folder]
+    calls: list[tuple[RemoteTab, Path]] = []
+
+    def _download_folder(item: RemoteTab, dest: Path) -> list[Path]:
+        calls.append((item, dest))
+        return [tmp_path / "a.ft3", tmp_path / "sub" / "b.ft3.gz"]
+
+    monkeypatch.setattr("oud.plugins.lutemusic.download_folder_ft3", _download_folder)
+
+    handle_plugin_key(state, ord("D"))
+    assert "Press D again" in state.message
+    assert calls == []
+    handle_plugin_key(state, ord("D"))
+    assert len(calls) == 1
+    assert calls[0][0] == folder
+    assert calls[0][1].as_posix().endswith("lutemusic/Composer")
+    assert state.message.startswith("Downloaded 2 ft3 files")
+
+
+def test_plugin_folder_download_confirmation_clears_on_navigation() -> None:
+    state = _state()
+    enter_plugin_mode(state)
+    state.plugin_name = "lutemusic"
+    state.plugin_items = [
+        RemoteTab(title="A", url="https://example.com/a/", is_dir=True),
+        RemoteTab(title="B", url="https://example.com/b/", is_dir=True),
+    ]
+    handle_plugin_key(state, ord("D"))
+    assert state.plugins.confirm
+    handle_plugin_key(state, ord("j"))
+    assert state.plugins.confirm == ""

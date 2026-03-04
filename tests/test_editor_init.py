@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from oud.core.model import Piece
 from oud.editor.init import init_state
 
 
@@ -31,3 +32,29 @@ def test_init_state_marks_read_only_viewer_mode(tmp_path: Path) -> None:
     state = init_state(None, config_path=str(cfg), read_only=True)
     assert state.read_only is True
     assert "Read-only" in state.message
+
+
+def test_init_state_directory_path_falls_back_to_new_piece_with_warning(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.toml"
+    folder = tmp_path / "scores"
+    folder.mkdir()
+    state = init_state(str(folder), config_path=str(cfg))
+    assert state.path is None
+    assert len(state.piece.bars) == 8
+    assert "Ignored directory path" in state.message
+
+
+def test_init_state_invalid_file_falls_back_to_new_piece_with_warning(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cfg = tmp_path / "config.toml"
+    broken = tmp_path / "broken.ft3"
+    broken.write_text("not a real ft3", encoding="utf-8")
+    warned = Piece(title="broken", bars=[])
+    warned.import_warnings.append("Could not open broken.ft3: bad parse")
+    monkeypatch.setattr("oud.editor.init.load_piece_data", lambda _path: (warned, {}, {}, set(), None))
+    state = init_state(str(broken), config_path=str(cfg))
+    assert state.path is None
+    assert len(state.piece.bars) == 8
+    assert "Could not open broken.ft3" in state.message

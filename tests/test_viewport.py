@@ -49,6 +49,26 @@ def test_ensure_cursor_visible_page_scrolls_by_page_rows() -> None:
     assert state.bar_offset == 8
 
 
+def test_ensure_cursor_visible_can_follow_playback_when_enabled() -> None:
+    state = _state()
+    state.settings["playbackscroll"] = "on"
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.playback_bar = 8
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 2
+
+
+def test_ensure_cursor_visible_ignores_playback_when_disabled() -> None:
+    state = _state()
+    state.settings["playbackscroll"] = "off"
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.playback_bar = 8
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 0
+
+
 def test_jk_auto_clamps_cursor_to_system_visible_rows_and_scrolls() -> None:
     base = piece_with_unused_then_used_bass_rows()
     # Repeat to create multiple systems with alternating hidden/visible bass rows.

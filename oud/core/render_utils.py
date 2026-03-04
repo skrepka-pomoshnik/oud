@@ -198,6 +198,7 @@ def flag_row_style(  # noqa: C901
     flag: str,
     dot: str = ".",
     stem_width: int = 1,
+    dotplacement: str = "afterflag",
 ) -> list[str]:
     row = [" " for _ in range(bar_width)]
     dot_positions: list[int] = []
@@ -208,12 +209,16 @@ def flag_row_style(  # noqa: C901
             if pos < bar_width and row[pos] == " ":
                 row[pos] = stem
         slash_count = flag_count(denom)
+        flag_start = col + max(1, stem_width)
+        if dotted and dotplacement == "afterstem":
+            dot_positions.append(flag_start)
+            flag_start += 1
         for i in range(slash_count):
-            pos = col + max(1, stem_width) + i
+            pos = flag_start + i
             if pos < bar_width:
                 row[pos] = flag
-        if dotted:
-            pos = col + max(1, stem_width) + slash_count
+        if dotted and dotplacement != "afterstem":
+            pos = flag_start + slash_count
             if pos < bar_width:
                 dot_positions.append(pos)
     for pos in dot_positions:

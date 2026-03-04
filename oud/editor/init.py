@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from oud.core.ft3 import build_durations
 from oud.core.model import Bar
 from oud.core.tuning_utils import tuning_count
@@ -16,7 +18,15 @@ def init_state(  # noqa: C901, PLR0912
     read_only: bool = False,
 ) -> EditorState:
     settings = load_settings(config_path)
+    requested_path = path
     piece, overrides, durations, dotted, bar_width = load_piece_data(path)
+    invalid_source = bool(
+        requested_path
+        and (
+            Path(requested_path).is_dir()
+            or (piece.import_warnings and not piece.bars)
+        ),
+    )
     if not piece.bars:
         try:
             initial_bars = int(settings.get("newbars", DEFAULT_SETTINGS.get("newbars", "8")))
@@ -30,8 +40,9 @@ def init_state(  # noqa: C901, PLR0912
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
-    state.path = path
-    state.settings["filepath"] = path or ""
+    valid_path = None if invalid_source else path
+    state.path = valid_path
+    state.settings["filepath"] = valid_path or ""
     is_tab = bool(path and path.lower().endswith(".tab"))
     if piece.style:
         state.settings["style"] = piece.style
