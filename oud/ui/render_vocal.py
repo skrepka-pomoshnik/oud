@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 
 from oud.core.model import Bar, LyricEvent, MelodyEvent
-from oud.ui.render_text_lanes import lyric_event_cells, melody_staff_rows
+from oud.ui.render_text_lanes import _MELODY_STAFF_ROWS, lyric_event_cells, melody_staff_rows
 
 
 def melody_row_count() -> int:
-    return 5
+    return _MELODY_STAFF_ROWS
 
 
 def _bar_melody_events(bar: Bar) -> list[MelodyEvent]:
@@ -281,7 +281,7 @@ def vocal_onset_cols_for_bar(
     event_count = max_onset + 1 if max_onset >= 0 else len(onset_cols)
     if event_count <= 0:
         return list(onset_cols)
-    if len(onset_cols) >= event_count:
+    if len(onset_cols) == event_count:
         return list(onset_cols)
     scaled: list[int] = []
     if len(melody_events) >= event_count:

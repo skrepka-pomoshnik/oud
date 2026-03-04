@@ -13,7 +13,7 @@ from oud.core.duet_score import (
     split_duet_triplet_set,
 )
 from oud.core.model import Piece
-from oud.core.tab_policy import rows_reversed
+from oud.core.tab_style import resolve_tab_style_policy
 from oud.core.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
 from oud.core.view_model import _block_height, _next_system_start, _tuning_labels
 from oud.ui.adapter import A_REVERSE, Screen
@@ -623,16 +623,10 @@ def render_piece(  # noqa: C901, PLR0912
 
     default_duration = 4
     include_meta = True
-    style = settings.get("style", "french")
+    policy = resolve_tab_style_policy(settings)
     show_dur = settings.get("showdur", "off") == "on"
-    show_fingerings = settings.get(
-        "showfingerings",
-        settings.get("showft3extras", "on"),
-    ) == "on"
-    show_ornaments = settings.get(
-        "showornaments",
-        settings.get("showft3extras", "on"),
-    ) == "on"
+    show_fingerings = policy.showfingerings
+    show_ornaments = policy.showornaments
     imported_extras_visible = (
         show_fingerings or show_ornaments
     ) and _piece_has_imported_ft3_extras(piece)
@@ -647,12 +641,10 @@ def render_piece(  # noqa: C901, PLR0912
     show_lyric_text = settings.get("showlyrics", "on") == "on" and _piece_has_lyrics(piece)
     lyric_rows_count = _piece_lyric_row_count(piece, max_rows=99) if show_lyric_text else 0
     hide_redundant = settings.get("flagredundant", "on") == "on"
-    double_stems = settings.get("flagstems", "single") == "double"
-    reverse_strings = rows_reversed(
-        style=style,
-        italian_orient=settings.get("italianorient", "normal"),
-        viewinvert=settings.get("viewinvert", "off"),
-    )
+    # Stem height and stem width are different concerns.
+    # Keep a second tablature stem row even for single-width stems.
+    double_stems = True
+    reverse_strings = policy.reverse_rows
     show_octaves = settings.get("tuninglabels", "relative") == "absolute"
     used_bass = _bass_strings_used(piece, overrides)
     bass_tokens = parse_bass_strings(settings.get("bassstrings", ""))
@@ -671,7 +663,7 @@ def render_piece(  # noqa: C901, PLR0912
         show_octaves=show_octaves,
         bass=bass_tokens or None if used_bass else None,
     )
-    basslabels = settings.get("basslabels", "tuning")
+    basslabels = policy.basslabels
     block_h = _block_height(
         include_meta,
         display_strings,

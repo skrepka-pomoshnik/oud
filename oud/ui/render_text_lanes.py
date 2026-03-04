@@ -5,8 +5,25 @@ import re
 from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
 from oud.core.vocal_line import chord_top_pitch, infer_vocal_events, token_pitch_value
 
-_MELODY_STAFF_ROWS = 5
-_CENTER_STAFF_ROW = _MELODY_STAFF_ROWS // 2
+_MELODY_FLAG_ROWS = 2
+_MELODY_PITCH_ROWS = 5
+_MELODY_STAFF_ROWS = _MELODY_FLAG_ROWS + _MELODY_PITCH_ROWS
+_BOTTOM_LINE_ROW = _MELODY_STAFF_ROWS - 1
+_BOTTOM_LINE_PITCH = 64  # E4 in treble staff
+_DIATONIC_DEGREES = {
+    0: 0,
+    1: 0,
+    2: 1,
+    3: 1,
+    4: 2,
+    5: 3,
+    6: 3,
+    7: 4,
+    8: 4,
+    9: 5,
+    10: 5,
+    11: 6,
+}
 
 
 def visible_lyric_rows(lines: list[str] | None, max_rows: int = 2) -> list[str]:
@@ -231,15 +248,18 @@ def melody_event_cells(
     return cells
 
 
-def _pitch_to_staff_row(pitch: int, lo: int, hi: int) -> int:
-    note_row_min = 2
+def _diatonic_staff_step(pitch: int) -> int:
+    octave = (pitch // 12) - 1
+    degree = _DIATONIC_DEGREES[pitch % 12]
+    return octave * 7 + degree
+
+
+def _pitch_to_staff_row(pitch: int) -> int:
+    base_step = _diatonic_staff_step(_BOTTOM_LINE_PITCH)
+    step = _diatonic_staff_step(pitch)
+    row = _BOTTOM_LINE_ROW - round((step - base_step) / 2)
+    note_row_min = _MELODY_FLAG_ROWS
     note_row_max = _MELODY_STAFF_ROWS - 1
-    if hi <= lo:
-        return note_row_min + ((note_row_max - note_row_min) // 2)
-    span = hi - lo
-    normalized = (pitch - lo) / span
-    row_span = note_row_max - note_row_min
-    row = note_row_max - round(normalized * row_span)
     return max(note_row_min, min(note_row_max, row))
 
 
@@ -278,6 +298,37 @@ def _fill_unpitched_event_rows(
             onset_pitch[ev.onset_index] = 64
 
 
+def _resampled_onset_cols(
+    *,
+    onset_cols: list[int],
+    event_count: int,
+    width: int,
+    left_pad: int,
+) -> list[int]:
+    if event_count <= 0:
+        return []
+    if len(onset_cols) == event_count:
+        return list(onset_cols)
+    if len(onset_cols) < event_count:
+        span = max(1, width - left_pad)
+        out: list[int] = []
+        for onset_idx in range(event_count):
+            frac = onset_idx / max(1, event_count - 1)
+            col = max(0, left_pad) + min(span - 1, round(frac * (span - 1)))
+            out.append(min(width - 1, col))
+        return out
+    first = max(0, left_pad)
+    last = min(width - 1, max(onset_cols))
+    if event_count == 1:
+        return [first if onset_cols else min(width - 1, max(0, left_pad))]
+    span = max(1, last - first)
+    out: list[int] = []
+    for onset_idx in range(event_count):
+        frac = onset_idx / max(1, event_count - 1)
+        out.append(first + round(frac * span))
+    return out
+
+
 def melody_staff_rows(
     events: list[MelodyEvent] | None,
     *,
@@ -289,7 +340,7 @@ def melody_staff_rows(
     tuning_pitches: list[int] | None = None,
 ) -> list[list[str]]:
     rows = [[" "] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
-    for staff_row in range(2, _MELODY_STAFF_ROWS):
+    for staff_row in range(_MELODY_FLAG_ROWS, _MELODY_STAFF_ROWS):
         rows[staff_row] = ["-"] * max(0, width)
     if width <= 0 or not onset_cols:
         return rows
@@ -313,16 +364,19 @@ def melody_staff_rows(
         ]
     if not vocal_events:
         return rows
-    pitch_values = [event.pitch for event in vocal_events]
-    lo = min(pitch_values)
-    hi = max(pitch_values)
+    onset_cols = _resampled_onset_cols(
+        onset_cols=onset_cols,
+        event_count=len(vocal_events),
+        width=width,
+        left_pad=left_pad,
+    )
     floor = max(0, left_pad)
     for event in vocal_events:
         onset_idx = event.onset_index
         if onset_idx < 0 or onset_idx >= len(onset_cols):
             continue
         col = max(floor, min(width - 1, onset_cols[onset_idx]))
-        row = _pitch_to_staff_row(event.pitch, lo, hi)
+        row = _pitch_to_staff_row(event.pitch)
         _draw_vocal_stem(rows, row=row, col=col, note_type=event.note_type, dotted=event.dotted)
         rows[row][col] = "o"
     return rows
@@ -339,9 +393,9 @@ def _draw_vocal_stem(
     if not rows or not (0 <= row < len(rows)):
         return
     flag_row = 0
-    rows[flag_row][col] = "|"
-    if len(rows) > 1 and row >= 2:
-        rows[1][col] = "|"
+    last_stem_row = min(max(0, row - 1), len(rows) - 1)
+    for stem_row in range(last_stem_row + 1):
+        rows[stem_row][col] = "|"
     flags = max(0, note_type - 4)
     for idx in range(1, flags + 1):
         tail_col = col + idx

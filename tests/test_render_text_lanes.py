@@ -1,5 +1,6 @@
 from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
 from oud.ui.render_text_lanes import (
+    _MELODY_STAFF_ROWS,
     lyric_event_cells,
     melody_event_cells,
     melody_staff_rows,
@@ -153,10 +154,11 @@ def test_melody_staff_rows_uses_chord_pitches_when_tokens_are_non_pitch() -> Non
         ],
         tuning_pitches=[67, 62, 57, 53, 48, 43],
     )
-    assert len(rows) == 5
+    assert len(rows) == _MELODY_STAFF_ROWS
     text_rows = ["".join(row) for row in rows]
     assert any(line[2] == "o" for line in text_rows)
     assert any(line[8] == "o" for line in text_rows)
+    assert sum(1 for line in text_rows if "-" in line) == 5
 
 
 def test_melody_staff_rows_uses_lyric_anchor_count_for_inferred_vocal_notes() -> None:
@@ -182,3 +184,47 @@ def test_melody_staff_rows_uses_lyric_anchor_count_for_inferred_vocal_notes() ->
     assert sum(line.count("o") for line in text_rows) == 3
     assert "|" in text_rows[0]
     assert "\\" in text_rows[0]
+    assert sum(1 for line in text_rows if "|" in line or "\\" in line or "." in line) >= 2
+
+
+def test_melody_staff_rows_ignores_extra_tab_onsets_when_lyrics_have_fewer_events() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(4, 3, 0)]),
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(5, 0, 0)]),
+        ],
+        lyric_event_rows=[[LyricEvent("Can", 0), LyricEvent("she", 1), LyricEvent("ex", 2)]],
+    )
+    rows = melody_staff_rows(
+        [],
+        onset_cols=[1, 2, 3, 12, 18],
+        width=24,
+        left_pad=1,
+        bar=bar,
+        bar_chords=bar.chords,
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert sum(line.count("o") for line in text_rows) == 3
+    assert "||" not in text_rows[0]
+
+
+def test_melody_staff_rows_use_fixed_treble_positions_for_d_a_d_prime() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0), MelodyEvent("a", 1), MelodyEvent("d'", 2)],
+        onset_cols=[2, 8, 14],
+        width=20,
+        left_pad=1,
+    )
+    text_rows = ["".join(row) for row in rows]
+    note_rows = [idx for idx, line in enumerate(text_rows) if "o" in line]
+    assert len(text_rows) == _MELODY_STAFF_ROWS
+    assert sum(1 for line in text_rows if "-" in line) == 5
+    assert len(note_rows) == 3
+    assert note_rows == sorted(note_rows)
+    assert len(set(note_rows)) == 3
+    assert min(note_rows) >= 1
+    assert max(note_rows) < _MELODY_STAFF_ROWS

@@ -279,7 +279,11 @@ def test_render_matrix_duration_text_stays_aligned_with_flags() -> None:
     )
     lines = _render_lines(piece, settings)
     flag_row = next(line for line in lines if "\\\\" in line)
-    dur_row = lines[lines.index(flag_row) + 1]
+    dur_row = next(
+        line
+        for line in lines[lines.index(flag_row) + 1 :]
+        if any(ch.isdigit() for ch in line)
+    )
     flag_cols = [idx for idx, ch in enumerate(flag_row) if ch == "|"]
     dur_starts = [
         idx
