@@ -113,8 +113,10 @@ def _anchor_melody_events(bar: Bar) -> list[tuple[int, int, str]]:
     ]
     if explicit:
         return [(ev.onset_index, ev.onset_index, ev.text) for ev in explicit]
-    lyric_onsets = lyric_anchor_onsets(bar)
-    return [(onset_index, onset_index, "") for onset_index in lyric_onsets]
+    # Structured FT3 lyrics are often available without an explicit melody lane.
+    # Anchoring melody to lyric onsets drops chord attacks and produces sparse,
+    # musically misleading note rows; use full chord fallback instead.
+    return []
 
 
 def _lyric_anchor_text(ev: LyricEvent) -> str:

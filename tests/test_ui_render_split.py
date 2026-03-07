@@ -407,6 +407,37 @@ def test_playback_highlights_active_note_cell_with_attribute() -> None:
     assert any(text == "a" and attr != 0 for (_y, _x, text, attr) in kwargs["stdscr"].calls)
 
 
+def test_playback_renders_separate_melody_marker_when_melody_visible() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=24, w=100)
+    kwargs["piece"] = Piece(
+        title="Melody Marker",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                ],
+                melody_events=[
+                    MelodyEvent("d", 0),
+                    MelodyEvent("a", 1),
+                    MelodyEvent("d'", 2),
+                ],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "off"
+    kwargs["playback_bar"] = 0
+    kwargs["playback_col"] = 1
+    lines = _render_lines(kwargs)
+    assert any("^" in line for line in lines)
+    assert any("v" in line for line in lines)
+
+
 def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
     def _dense_bar() -> Bar:
         return Bar(
@@ -1200,6 +1231,34 @@ def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
     melody_block = lines[melody_start : melody_start + melody_row_count()]
     assert len(melody_block) == melody_row_count()
     assert any("o" in row for row in melody_block)
+
+
+def test_inferred_melody_is_not_clipped_by_sparse_lyrics() -> None:
+    kwargs = _args("normal")
+    kwargs["bar_width"] = 24
+    kwargs["piece"] = Piece(
+        title="InferredVocalDense",
+        bars=[
+            Bar(
+                lyric_event_rows=[[LyricEvent("Can", 0), LyricEvent("she", 1)]],
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, 3, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(5, 4, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    lines = _render_lines(kwargs)
+    melody_start = _first_melody_row_idx(lines)
+    melody_block = lines[melody_start : melody_start + melody_row_count()]
+    noteheads = sum(row.count("o") for row in melody_block)
+    assert noteheads >= 5
 
 
 def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:

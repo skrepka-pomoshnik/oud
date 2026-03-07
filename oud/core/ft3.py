@@ -197,7 +197,8 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
 
 def at_next_note(s: int, f: int) -> bool:
     on_fret = 0x30 <= f <= 0x3E
-    on_diapason = 0x61 <= f <= 0x66
+    # French tab frets are letter-coded across a wider alphabet range, not just a..f.
+    on_diapason = 0x61 <= f <= 0x7A
     on_string = 0x02 <= s <= 0x08
     return on_string and (on_fret or on_diapason)
 

@@ -208,6 +208,17 @@ def _clean_text_token(token: str) -> str:
     return token.strip()
 
 
+def _clean_lyric_token(token: str) -> str:
+    cleaned = _clean_text_token(token)
+    if not cleaned:
+        return ""
+    if set(cleaned) <= {"_"}:
+        return cleaned
+    cleaned = re.sub(r"^[><:%#;,\d]+", "", cleaned)
+    cleaned = re.sub(r"[^\w'_\-]+$", "", cleaned)
+    return cleaned.strip()
+
+
 def _keep_lyric_token(token: str) -> bool:
     if not token:
         return False
@@ -257,7 +268,7 @@ def _tokenize_control_row(row: bytes) -> list[tuple[int, str]]:
         if not buf:
             return
         token = "".join(buf)
-        cleaned = _clean_text_token(token)
+        cleaned = _clean_lyric_token(token)
         if cleaned:
             tokens.append((start_col, cleaned))
         buf = []
@@ -283,7 +294,11 @@ def _likely_non_lyric_token(token: str) -> bool:
     lower = token.lower()
     if all(ch.isdigit() or ch == "." for ch in lower):
         return True
-    if re.fullmatch(r"[a-gh](?:[#b]|[',])*", lower):
+    if re.fullmatch(r"[a-gh](?:[#b]|[',])*", lower) and not (
+        len(lower) == 1 and lower in {"i", "a", "o"}
+    ):
+        return True
+    if lower in {"times", "new", "roman", "timesnewroman"}:
         return True
     return bool(any(ch in "@?><=|[]{}!\";:" for ch in token))
 
@@ -304,8 +319,17 @@ def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
     start = last_non_lyric + 1
     out = [tok for tok in tokens[start:] if _keep_lyric_token(tok) or set(tok) <= {"_"}]
     if out:
+        if " ".join(tok.lower() for tok in out) in {"times new roman", "new roman"}:
+            return []
         return out
-    return [tok for tok in tokens if _keep_lyric_token(tok) or set(tok) <= {"_"}]
+    fallback = [
+        tok
+        for tok in tokens
+        if (_keep_lyric_token(tok) or set(tok) <= {"_"}) and not _likely_non_lyric_token(tok)
+    ]
+    if " ".join(tok.lower() for tok in fallback) in {"times new roman", "new roman"}:
+        return []
+    return fallback
 
 
 def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEvent]:
@@ -313,7 +337,7 @@ def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEve
     onset_idx = 0
     chain_open = False
     for tok in tokens:
-        raw = _clean_text_token(tok)
+        raw = _clean_lyric_token(tok)
         if not raw:
             continue
         if set(raw) <= {"_"}:
@@ -432,7 +456,7 @@ def _lyric_events_from_line(line: str) -> list[LyricEvent]:
     onset_idx = 0
     chain_open = False
     for pos, tok in _line_tokens_with_positions(line):
-        raw = _clean_text_token(tok)
+        raw = _clean_lyric_token(tok)
         if not raw:
             continue
         if set(raw) <= {"_", "-"} and "_" in raw:

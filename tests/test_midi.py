@@ -1,4 +1,4 @@
-from oud.core.model import Bar, Chord, LyricEvent, Note, Piece
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.core.render_utils import chord_positions as render_chord_positions
 from oud.exports.midi import (
     BASE_NOTE_VELOCITY,
@@ -105,10 +105,11 @@ def test_export_midi_skips_note_ornament_when_disabled(tmp_path) -> None:
     assert track.count(bytes([0x90])) == 1
 
 
-def test_export_midi_includes_vocal_channel_for_lyric_anchored_bars(tmp_path) -> None:
+def test_export_midi_includes_vocal_channel_for_explicit_melody_bars(tmp_path) -> None:
     bar = Bar(
         chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
         lyric_event_rows=[[LyricEvent("Can", 0)]],
+        melody_events=[MelodyEvent("d", 0)],
     )
     piece = Piece(title="T", bars=[bar], strings=6)
     path = tmp_path / "vocal.mid"
@@ -122,6 +123,44 @@ def test_export_midi_includes_vocal_channel_for_lyric_anchored_bars(tmp_path) ->
     )
     track = _track_data(path)
     assert bytes([0xC1, 54]) in track
+    assert bytes([0x91]) in track
+
+
+def test_export_midi_skips_inferred_vocal_channel_by_default(tmp_path) -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+        lyric_event_rows=[[LyricEvent("Can", 0)]],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "vocal_inferred_off.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={},
+    )
+    track = _track_data(path)
+    assert bytes([0x91]) not in track
+
+
+def test_export_midi_allows_inferred_vocal_channel_when_enabled(tmp_path) -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+        lyric_event_rows=[[LyricEvent("Can", 0)]],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "vocal_inferred_on.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"midivocalinfer": "on"},
+    )
+    track = _track_data(path)
     assert bytes([0x91]) in track
 
 

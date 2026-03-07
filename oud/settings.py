@@ -67,6 +67,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "duetscoreview": "auto",
     "midipatch": "24",
     "midivocalpatch": "53",
+    "midivocalinfer": "off",
     "midigate": "85",
     "tempo": "90",
     "soundfont": "",

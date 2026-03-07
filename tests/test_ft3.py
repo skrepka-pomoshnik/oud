@@ -264,6 +264,14 @@ def test_load_ft3_extracts_arranger_from_real_file() -> None:
     assert piece.arranger == "Sarge Gerbode"
 
 
+def test_load_ft3_felice_high_letter_frets_are_not_dropped() -> None:
+    piece = load_ft3("lutemusic/01_felice_fu_quel_anon.ft3")
+    # Regression: bars around 13-16 were parsed as empty because note scanning only
+    # accepted a..f letter frets.
+    for bar_idx in (12, 13, 14, 15):  # 1-based bars 13..16
+        assert piece.bars[bar_idx].chords, bar_idx + 1
+
+
 def test_load_ft3_parses_footnote_parts_from_annotation(tmp_path) -> None:
     payload = (
         b"CPiece{\\rtf1\\ansi Demo}\r\n~"

@@ -73,3 +73,17 @@ def test_parse_ft3_structured_text_record_keeps_explicit_extender_tokens() -> No
     row = record.lyric_event_rows[0]
     assert row[1].extender is True
     assert row[1].text == ""
+
+
+def test_parse_ft3_structured_text_record_strips_control_prefix_and_font_row() -> None:
+    chunk = _structured_chunk(
+        b"\x01\x00\x03\x00\x08:Fe",
+        b">fu",
+        b"Times\x07New\x0eRoman",
+    )
+    record = parse_ft3_text_record(chunk)
+    words = [ev.text.lower() for row in record.lyric_event_rows for ev in row if ev.text]
+    assert "fe" in words
+    assert "fu" in words
+    assert "times" not in words
+    assert "roman" not in words

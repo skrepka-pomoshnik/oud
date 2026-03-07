@@ -279,6 +279,11 @@ def vocal_onset_cols_for_bar(
     lyric_rows = _bar_lyric_rows(bar)
     max_onset = _max_onset_index(lyric_rows, melody_events)
     event_count = max_onset + 1 if max_onset >= 0 else len(onset_cols)
+    # When melody is inferred from tablature (no explicit melody lane), chord
+    # onsets define the real melodic attacks and must not be clipped by sparse
+    # lyric-token onsets.
+    chord_count = len(getattr(bar, "chords", None) or [])
+    event_count = max(event_count, chord_count)
     if event_count <= 0:
         return list(onset_cols)
     if len(onset_cols) == event_count:

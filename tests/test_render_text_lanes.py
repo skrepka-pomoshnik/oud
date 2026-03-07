@@ -161,7 +161,7 @@ def test_melody_staff_rows_uses_chord_pitches_when_tokens_are_non_pitch() -> Non
     assert sum(1 for line in text_rows if "-" in line) == 5
 
 
-def test_melody_staff_rows_uses_lyric_anchor_count_for_inferred_vocal_notes() -> None:
+def test_melody_staff_rows_inferred_vocal_notes_cover_all_chord_onsets() -> None:
     bar = Bar(
         chords=[
             Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
@@ -181,13 +181,13 @@ def test_melody_staff_rows_uses_lyric_anchor_count_for_inferred_vocal_notes() ->
         tuning_pitches=[67, 62, 57, 53, 48, 43],
     )
     text_rows = ["".join(row) for row in rows]
-    assert sum(line.count("o") for line in text_rows) == 3
+    assert sum(line.count("o") for line in text_rows) == 4
     assert "|" in text_rows[0]
     assert "\\" in text_rows[0]
     assert sum(1 for line in text_rows if "|" in line or "\\" in line or "." in line) >= 2
 
 
-def test_melody_staff_rows_ignores_extra_tab_onsets_when_lyrics_have_fewer_events() -> None:
+def test_melody_staff_rows_does_not_clip_inferred_notes_to_lyric_count() -> None:
     bar = Bar(
         chords=[
             Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
@@ -208,8 +208,8 @@ def test_melody_staff_rows_ignores_extra_tab_onsets_when_lyrics_have_fewer_event
         tuning_pitches=[67, 62, 57, 53, 48, 43],
     )
     text_rows = ["".join(row) for row in rows]
-    assert sum(line.count("o") for line in text_rows) == 3
-    assert "||" not in text_rows[0]
+    assert sum(line.count("o") for line in text_rows) == 5
+    assert any(line[18] == "o" for line in text_rows)
 
 
 def test_melody_staff_rows_use_fixed_treble_positions_for_d_a_d_prime() -> None:

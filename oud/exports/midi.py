@@ -458,6 +458,13 @@ def _append_vocal_messages(
     tuning_pitches: list[int],
     settings: dict[str, str],
 ) -> None:
+    has_explicit_melody = bool(
+        (getattr(bar, "melody_events", None) or [])
+        or (getattr(bar, "melody_grid", None) or "").strip(),
+    )
+    allow_inferred = settings.get("midivocalinfer", "off") == "on"
+    if not has_explicit_melody and not allow_inferred:
+        return
     vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_pitches)
     if not vocal_events:
         return

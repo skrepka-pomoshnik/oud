@@ -55,6 +55,7 @@ from oud.core.view_model import (
     flag_count,
     flag_positions_from_durations,
 )
+from oud.core.vocal_line import infer_vocal_events
 from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
@@ -768,6 +769,31 @@ def _playback_in_range(bar, playback_col: int, bar_width: int) -> bool:
     if bar.chords:
         return playback_col < len(bar.chords)
     return playback_col < bar_width
+
+
+def _melody_playback_col(
+    *,
+    bar,
+    playback_col: int,
+    onset_cols: list[int],
+    tuning_pitches: list[int],
+) -> int | None:
+    if playback_col < 0 or not onset_cols:
+        return None
+    vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_pitches)
+    for event in vocal_events:
+        if event.chord_index != playback_col:
+            continue
+        if 0 <= event.onset_index < len(onset_cols):
+            return onset_cols[event.onset_index]
+    chord_count = len(bar.chords)
+    if chord_count > 1 and len(onset_cols) > 1:
+        mapped = round(playback_col * (len(onset_cols) - 1) / (chord_count - 1))
+        mapped = max(0, min(len(onset_cols) - 1, mapped))
+        return onset_cols[mapped]
+    if 0 <= playback_col < len(onset_cols):
+        return onset_cols[playback_col]
+    return onset_cols[-1]
 
 
 def _resolved_bar_time_value(
@@ -2203,6 +2229,22 @@ def render_systems(  # noqa: C901, PLR0912
                         min(max(0, width - 2), bar_x + display_width),
                         barline,
                     )
+                if (
+                    playback_bar is not None
+                    and playback_col is not None
+                    and abs_bar == playback_bar
+                    and _playback_in_range(bar, playback_col, bar_width)
+                ):
+                    melody_col = _melody_playback_col(
+                        bar=bar,
+                        playback_col=playback_col,
+                        onset_cols=vocal_onset_cols,
+                        tuning_pitches=tuning_pitches,
+                    )
+                    if melody_col is not None:
+                        marker_y = melody_row_base
+                        marker_x = bar_x + max(0, min(display_width - 1, melody_col))
+                        safe_addstr(stdscr, marker_y, marker_x, "v", A_BOLD)
             if lyric_row_offsets:
                 vocal_onset_cols = vocal_onset_cols_for_bar(
                     bar,

@@ -56,6 +56,7 @@ _BOOL_KEYS = {
     "showtuning",
     "restrainopenstrings",
     "playbackscroll",
+    "midivocalinfer",
 }
 
 _DEPRECATED_SET_ALIASES = {
