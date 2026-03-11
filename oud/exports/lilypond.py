@@ -5,9 +5,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from oud.core.duet_score import (
+    duet_staff_labels,
+    is_duet_score_piece,
+    split_duet_piece_staff,
+    split_duet_span_list,
+    split_duet_triplet_map,
+)
 from oud.core.model import Bar, Piece
 from oud.core.render_utils import chord_positions, note_type_to_denom
 from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
+from oud.core.vocal_line import infer_vocal_events
 
 
 def _escape_lilypond(text: str) -> str:
@@ -517,23 +525,77 @@ def _bar_sign_mark_tokens(bar: Bar) -> list[str]:
     return marks
 
 
-def export_lilypond(  # noqa: PLR0912, C901
-    path: str,
+def _piece_has_lyrics(piece: Piece) -> bool:
+    return any(
+        any(line.strip() for line in bar.lyrics) or bar.lyric_event_rows
+        for bar in piece.bars
+    )
+
+
+def _piece_has_melody(piece: Piece) -> bool:
+    for bar in piece.bars:
+        if any((event.text or "").strip() for event in bar.melody_events):
+            return True
+        if bar.melody_grid and bar.melody_grid.strip():
+            return True
+    return False
+
+
+def _initial_time_sig(piece: Piece, settings: dict[str, str]) -> str | None:
+    time_sig = settings.get("time", "") or ""
+    if not time_sig:
+        for bar in piece.bars:
+            if bar.time_sig:
+                time_sig = bar.time_sig
+                break
+    return _normalized_time_sig_or_none(time_sig)
+
+
+def _initial_key_sig(settings: dict[str, str]) -> tuple[str, str] | None:
+    key_sig = settings.get("key", "") or ""
+    if not key_sig:
+        return None
+    return _parse_key_signature(key_sig)
+
+
+def _append_global_prefix(body: list[str], piece: Piece, settings: dict[str, str]) -> str | None:
+    current_time_sig = _initial_time_sig(piece, settings)
+    time_sig_style_cmd = _time_sig_style_command(settings)
+    if time_sig_style_cmd:
+        body.append(f"  {time_sig_style_cmd}")
+    if current_time_sig:
+        body.append(f"  \\time {current_time_sig}")
+    parsed_key = _initial_key_sig(settings)
+    if parsed_key is not None:
+        key_pitch, key_mode = parsed_key
+        body.append(f"  \\key {key_pitch} \\{key_mode}")
+    return current_time_sig
+
+
+def _append_bar_time_change(body: list[str], bar: Bar, current_time_sig: str | None) -> str | None:
+    bar_time_sig = _normalized_time_sig_or_none(bar.time_sig)
+    if bar_time_sig and bar_time_sig != current_time_sig:
+        body.append(f"  \\time {bar_time_sig}")
+        return bar_time_sig
+    return current_time_sig
+
+
+def _build_tab_body(  # noqa: C901, PLR0912
+    *,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: dict[str, str] | None = None,
-    ornaments: dict[tuple[int, int], str] | None = None,
-    annotations: dict[tuple[int, int], str] | None = None,
-    slurs: list[tuple[int, int, int]] | None = None,
-    ties: list[tuple[int, int, int]] | None = None,
-    holds: list[tuple[int, int, int]] | None = None,
-) -> str:
-    _ = (bar_width, ornaments, annotations, slurs, ties, holds)
-    settings = settings or {}
-    title = piece.title or "Untitled"
-    composer = piece.composer or piece.author or ""
+    settings: dict[str, str],
+    slurs: list[tuple[int, int, int]] | None,
+    ties: list[tuple[int, int, int]] | None,
+    holds: list[tuple[int, int, int]] | None,
+) -> list[str]:
+    body: list[str] = []
+    current_time_sig = _append_global_prefix(body, piece, settings)
+    default_duration = 4
+    style = settings.get("style") or "french"
+    french_c = settings.get("frenchc") or "normal"
     tuning = settings.get("tuning", "") or ""
     tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
     tuning_pitches = _normalize_tuning_length(tuning_pitches, piece.strings)
@@ -543,52 +605,11 @@ def export_lilypond(  # noqa: PLR0912, C901
         source_tuning_pitches or tuning_pitches,
         piece.strings,
     )
-    main_pitches, bass_pitches = _split_tuning(tuning_pitches, piece.strings)
-    tuning_names = [_midi_to_lilypond(p) for p in main_pitches]
-    tuning_text = " ".join(tuning_names)
-    tuning_lookup = list(reversed(main_pitches))
     source_tuning_lookup = list(reversed(source_tuning_pitches))
-    bass_text = ""
-    extra_bass = settings.get("basstuning", "") or settings.get("bassstrings", "") or ""
-    if extra_bass:
-        bass_pitches = _parse_tuning(extra_bass)
-    if bass_pitches:
-        bass_text = " ".join(_midi_to_lilypond(p) for p in bass_pitches)
+    tuning_lookup = list(reversed(tuning_pitches))
 
-    time_sig = settings.get("time", "") or ""
-    if not time_sig:
-        for bar in piece.bars:
-            if bar.time_sig:
-                time_sig = bar.time_sig
-                break
-    key_sig = settings.get("key", "") or ""
-    header = [r'\version "2.24.0"', r"\header {"]
-    header.append(f'  title = "{_escape_lilypond(title)}"')
-    if composer:
-        header.append(f'  composer = "{_escape_lilypond(composer)}"')
-    header.append("}")
-
-    body: list[str] = []
-    current_time_sig = _normalized_time_sig_or_none(time_sig)
-    time_sig_style_cmd = _time_sig_style_command(settings)
-    if time_sig_style_cmd:
-        body.append(f"  {time_sig_style_cmd}")
-    if current_time_sig:
-        body.append(f"  \\time {current_time_sig}")
-    if key_sig:
-        parsed_key = _parse_key_signature(key_sig)
-        if parsed_key is not None:
-            key_pitch, key_mode = parsed_key
-            body.append(f"  \\key {key_pitch} \\{key_mode}")
-
-    default_duration = 4
-    style = settings.get("style") or "french"
-    french_c = settings.get("frenchc") or "normal"
     for b_idx, bar in enumerate(piece.bars):
-        bar_time_sig = _normalized_time_sig_or_none(bar.time_sig)
-        if bar_time_sig and bar_time_sig != current_time_sig:
-            body.append(f"  \\time {bar_time_sig}")
-            current_time_sig = bar_time_sig
+        current_time_sig = _append_bar_time_change(body, bar, current_time_sig)
         repeat_mark = _repeat_mark_token(bar)
         if repeat_mark:
             body.append(f"  {repeat_mark}")
@@ -622,8 +643,7 @@ def export_lilypond(  # noqa: PLR0912, C901
                 elif len(pitches) == 1:
                     body.append(f"  {pitches[0]}{dur}{suffix}{extra_suffix}")
                 else:
-                    chord_text = " ".join(pitches)
-                    body.append(f"  <{chord_text}>{dur}{suffix}{extra_suffix}")
+                    body.append(f"  <{' '.join(pitches)}>{dur}{suffix}{extra_suffix}")
         else:
             events = _collect_override_chords(
                 overrides,
@@ -636,7 +656,7 @@ def export_lilypond(  # noqa: PLR0912, C901
             )
             if not events:
                 body.append("  r4")
-            for _col, notes, denom in events:
+            for col, notes, denom in events:
                 dur = _duration_token(denom, False)
                 pitches = _lily_pitches_for_override_event(
                     notes,
@@ -645,13 +665,13 @@ def export_lilypond(  # noqa: PLR0912, C901
                     settings=settings,
                 )
                 suffix = ""
-                if _col in tie_starts:
+                if col in tie_starts:
                     suffix += "~"
-                if _col in hold_starts:
+                if col in hold_starts:
                     suffix += r"\laissezVibrer"
-                if _col in slur_starts:
+                if col in slur_starts:
                     suffix += "("
-                if _col in slur_ends:
+                if col in slur_ends:
                     suffix += ")"
                 if not pitches:
                     body.append(f"  r{dur}")
@@ -660,12 +680,220 @@ def export_lilypond(  # noqa: PLR0912, C901
                 else:
                     body.append(f"  <{' '.join(pitches)}>{dur}{suffix}")
         bar_marker = _barline_token(bar)
-        if bar_marker == "|":
-            body.append("  |")
-        else:
-            body.append(f'  \\bar "{bar_marker}"')
+        body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
+    return body
+
+
+def _lyric_tokens_for_row(row, event_count: int) -> list[str]:
+    by_onset = {ev.onset_index: ev for ev in row}
+    tokens: list[str] = []
+    for onset in range(event_count):
+        ev = by_onset.get(onset)
+        if ev is None:
+            tokens.append("_")
+            continue
+        if ev.extender:
+            tokens.append("__")
+            continue
+        text = (ev.text or "").strip()
+        if not text:
+            tokens.append("_")
+            continue
+        tokens.append(f'"{_escape_lilypond(text)}"')
+        if ev.syllabic in {"begin", "middle"}:
+            tokens.append("--")
+    return tokens
+
+
+def _build_vocal_bodies(
+    piece: Piece,
+    settings: dict[str, str],
+) -> tuple[list[str], list[list[str]]]:
+    melody_body: list[str] = []
+    lyric_bodies: list[list[str]] = []
+    current_time_sig = _append_global_prefix(melody_body, piece, settings)
+    tuning = settings.get("tuning", "") or piece.tuning or ""
+    tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
+    tuning_lookup = list(reversed(_normalize_tuning_length(tuning_pitches, piece.strings)))
+
+    for bar in piece.bars:
+        current_time_sig = _append_bar_time_change(melody_body, bar, current_time_sig)
+        vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_lookup)
+        melody_body.extend(
+            f"  {_midi_to_lilypond(event.pitch)}"
+            f"{_duration_token(note_type_to_denom(event.note_type) or 4, event.dotted)}"
+            for event in vocal_events
+        )
+        if not vocal_events:
+            melody_body.append("  r4")
+        bar_marker = _barline_token(bar)
+        melody_body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
+
+        rows = getattr(bar, "lyric_event_rows", None) or []
+        event_count = len(vocal_events)
+        if rows:
+            while len(lyric_bodies) < len(rows):
+                lyric_bodies.append([])
+            for idx, row in enumerate(rows):
+                lyric_bodies[idx].extend(_lyric_tokens_for_row(row, event_count))
+        elif lyric_bodies:
+            for row in lyric_bodies:
+                row.extend(["_"] * event_count)
+    return melody_body, lyric_bodies
+
+
+def _tab_staff_with_block(
+    label: str | None,
+    body: list[str],
+    settings: dict[str, str],
+    piece: Piece,
+) -> list[str]:
+    tuning = settings.get("tuning", "") or ""
+    tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
+    tuning_pitches = _normalize_tuning_length(tuning_pitches, piece.strings)
+    main_pitches, bass_pitches = _split_tuning(tuning_pitches, piece.strings)
+    tuning_text = " ".join(_midi_to_lilypond(p) for p in main_pitches)
+    bass_text = ""
+    extra_bass = settings.get("basstuning", "") or settings.get("bassstrings", "") or ""
+    if extra_bass:
+        bass_pitches = _parse_tuning(extra_bass)
+    if bass_pitches:
+        bass_text = " ".join(_midi_to_lilypond(p) for p in bass_pitches)
+
+    tab_body_prefix: list[str] = []
+    tab_body_prefix.append(f"  \\set TabStaff.stringTunings = \\stringTuning <{tuning_text}>")
+    if bass_text:
+        tab_body_prefix.append(
+            f"  \\set TabStaff.additionalBassStrings = \\stringTuning <{bass_text}>",
+        )
+    if settings.get("tabnotation", "minimal") == "full":
+        tab_body_prefix.append(r"  \tabFullNotation")
+        tab_body_prefix.append(r"  \set fingeringOrientations = #'(left)")
+        tab_body_prefix.append(r"  \set strokeFingerOrientations = #'(right)")
+    notehead_override = _ly_notehead_style_override(settings)
+    if notehead_override:
+        tab_body_prefix.append(notehead_override)
+
+    out = [r"\new TabStaff"]
+    with_lines: list[str] = []
+    if label:
+        escaped = _escape_lilypond(label)
+        with_lines.append(f'  instrumentName = "{escaped}"')
+        with_lines.append(f'  shortInstrumentName = "{escaped}"')
+    if with_lines:
+        out.append(r"\with {")
+        out.extend(with_lines)
+        out.append(r"}")
+    out.append("{")
+    out.extend(tab_body_prefix)
+    out.extend(body)
+    out.append(r"}")
+    return out
+
+
+def _build_main_blocks(
+    *,
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    settings: dict[str, str],
+    slurs: list[tuple[int, int, int]] | None,
+    ties: list[tuple[int, int, int]] | None,
+    holds: list[tuple[int, int, int]] | None,
+) -> list[str]:
+    if is_duet_score_piece(piece):
+        mode = settings.get("duetscoreview", "auto")
+        staff_indices = [0, 1] if mode in {"auto", "both"} else [0 if mode == "1" else 1]
+        labels = duet_staff_labels(piece)
+        blocks = [r"\new StaffGroup <<"]
+        for staff_index in staff_indices:
+            sub_piece = split_duet_piece_staff(piece, staff_index)
+            sub_overrides = split_duet_triplet_map(overrides, staff_index=staff_index, piece=piece)
+            sub_durations = split_duet_triplet_map(durations, staff_index=staff_index, piece=piece)
+            sub_slurs = split_duet_span_list(slurs or [], staff_index=staff_index, piece=piece)
+            sub_ties = split_duet_span_list(ties or [], staff_index=staff_index, piece=piece)
+            sub_holds = split_duet_span_list(holds or [], staff_index=staff_index, piece=piece)
+            sub_body = _build_tab_body(
+                piece=sub_piece,
+                overrides=sub_overrides,
+                durations=sub_durations,
+                bar_width=bar_width,
+                settings=settings,
+                slurs=sub_slurs,
+                ties=sub_ties,
+                holds=sub_holds,
+            )
+            blocks.extend(_tab_staff_with_block(labels[staff_index], sub_body, settings, sub_piece))
+        blocks.append(r">>")
+        return blocks
+
+    tab_body = _build_tab_body(
+        piece=piece,
+        overrides=overrides,
+        durations=durations,
+        bar_width=bar_width,
+        settings=settings,
+        slurs=slurs,
+        ties=ties,
+        holds=holds,
+    )
+    show_melody = settings.get("showmelody", "on") == "on" and _piece_has_melody(piece)
+    show_lyrics = settings.get("showlyrics", "on") == "on" and _piece_has_lyrics(piece)
+    if not show_melody and not show_lyrics:
+        return _tab_staff_with_block(None, tab_body, settings, piece)
+
+    melody_body, lyric_bodies = _build_vocal_bodies(piece, settings)
+    vocal_block = [r'\new Staff = "melodyStaff" <<', r'  \new Voice = "melodyVoice" {']
+    vocal_block.extend(melody_body)
+    vocal_block.extend([r"  }", r">>"])
+    lyric_blocks: list[str] = []
+    if show_lyrics:
+        for row in lyric_bodies:
+            lyric_blocks.append(r'\new Lyrics \lyricsto "melodyVoice" {')
+            lyric_blocks.append("  " + " ".join(row))
+            lyric_blocks.append(r"}")
+
+    tab_block = _tab_staff_with_block(None, tab_body, settings, piece)
+    blocks = [r"\new StaffGroup <<"]
+    vocal_pos = settings.get("vocalpos", "bottom")
+    if vocal_pos == "bottom":
+        blocks.extend(tab_block)
+        blocks.extend(vocal_block)
+        blocks.extend(lyric_blocks)
+    else:
+        blocks.extend(vocal_block)
+        blocks.extend(lyric_blocks)
+        blocks.extend(tab_block)
+    blocks.append(r">>")
+    return blocks
+
+
+def export_lilypond(
+    path: str,
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    settings: dict[str, str] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+    annotations: dict[tuple[int, int], str] | None = None,
+    slurs: list[tuple[int, int, int]] | None = None,
+    ties: list[tuple[int, int, int]] | None = None,
+    holds: list[tuple[int, int, int]] | None = None,
+) -> str:
+    _ = (bar_width, ornaments, annotations, slurs, ties, holds)
+    settings = settings or {}
+    title = piece.title or "Untitled"
+    composer = piece.composer or piece.author or ""
+    header = [r'\version "2.24.0"', r"\header {"]
+    header.append(f'  title = "{_escape_lilypond(title)}"')
+    if composer:
+        header.append(f'  composer = "{_escape_lilypond(composer)}"')
+    header.append("}")
 
     layout: list[str] = [r"\layout {", r"  \context {", r"    \Score"]
+    style = settings.get("style") or "french"
     if style == "french":
         layout.append("    tablatureFormat = #fret-letter-tablature-format")
     layout += [r"  }", r"  \context {", r"    \TabStaff"]
@@ -678,29 +906,24 @@ def export_lilypond(  # noqa: PLR0912, C901
             labels = ["a", "b", "r", "d", "e", "f", "g", "h", "i", "k", "l"]
         labels_text = " ".join(f"\"{label}\"" for label in labels)
         layout.append(f"    fretLabels = #'({labels_text})")
-    layout.append(f"    stringTunings = \\stringTuning <{tuning_text}>")
-    if bass_text:
-        layout.append(f"    additionalBassStrings = \\stringTuning <{bass_text}>")
     layout += [r"  }", r"}"]
-
-    tab_body_prefix: list[str] = []
-    if settings.get("tabnotation", "minimal") == "full":
-        tab_body_prefix.append(r"  \tabFullNotation")
-        tab_body_prefix.append(r"  \set fingeringOrientations = #'(left)")
-        tab_body_prefix.append(r"  \set strokeFingerOrientations = #'(right)")
-    notehead_override = _ly_notehead_style_override(settings)
-    if notehead_override:
-        tab_body_prefix.append(notehead_override)
+    blocks = _build_main_blocks(
+        piece=piece,
+        overrides=overrides,
+        durations=durations,
+        bar_width=bar_width,
+        settings=settings,
+        slurs=slurs,
+        ties=ties,
+        holds=holds,
+    )
     content = "\n".join(
         [
             *header,
             "",
             r"\paper { indent = 0\mm }",
             "",
-            r"\new TabStaff {",
-            *tab_body_prefix,
-            *body,
-            r"}",
+            *blocks,
             "",
             *layout,
             "",

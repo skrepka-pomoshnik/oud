@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from oud.core.ft3 import build_durations, load_ft3
-from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.exports import lilypond as lp
 from oud.exports.lilypond import export_lilypond
 
@@ -548,6 +548,106 @@ def test_export_lilypond_respects_timesigstyle_display_intent(tmp_path) -> None:
     )
     text = path.read_text(encoding="utf-8")
     assert "\\defaultTimeSignature" in text
+
+
+def test_export_lilypond_emits_vocal_staff_and_lyrics_when_enabled(tmp_path) -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)]),
+        ],
+        melody_events=[
+            MelodyEvent("d", 0, note_type=4),
+            MelodyEvent("a", 1, note_type=4),
+            MelodyEvent("d'", 2, note_type=4),
+        ],
+        lyric_event_rows=[
+            [
+                LyricEvent("Can", 0, syllabic="single"),
+                LyricEvent("she", 1, syllabic="single"),
+                LyricEvent("ex-", 2, syllabic="begin"),
+            ],
+        ],
+        time_sig="O",
+    )
+    piece = Piece(title="Can she excuse?", composer="John Dowland", bars=[bar], strings=6)
+    path = tmp_path / "vocal.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g2c3f3a3d4g4",
+            "style": "french",
+            "showmelody": "on",
+            "showlyrics": "on",
+            "vocalpos": "top",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\new StaffGroup <<" in text
+    assert '\\new Staff = "melodyStaff"' in text
+    assert '\\new Lyrics \\lyricsto "melodyVoice" {' in text
+    assert '"Can" "she" "ex-" --' in text
+    assert "\\new TabStaff" in text
+    assert "\\time 3/4" in text
+
+
+def test_export_lilypond_respects_vocalpos_bottom_order(tmp_path) -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+        melody_events=[MelodyEvent("d", 0, note_type=4)],
+        lyric_event_rows=[[LyricEvent("Can", 0)]],
+    )
+    piece = Piece(title="Order", bars=[bar], strings=6)
+    path = tmp_path / "vocal_order.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g2c3f3a3d4g4",
+            "showmelody": "on",
+            "showlyrics": "on",
+            "vocalpos": "bottom",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert text.index("\\new TabStaff") < text.index('\\new Staff = "melodyStaff"')
+
+
+def test_export_lilypond_emits_duet_staffgroup_with_labels(tmp_path) -> None:
+    top_bar_1 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])], time_sig="C")
+    top_bar_2 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)])])
+    bottom_bar_1 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)])])
+    bottom_bar_2 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, 3, 0)])])
+    piece = Piece(
+        title="Duet",
+        bars=[top_bar_1, top_bar_2, bottom_bar_1, bottom_bar_2],
+        strings=6,
+        part="score",
+        ensemble="lute 1: prime,lute 2: bass",
+    )
+    path = tmp_path / "duet.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4", "duetscoreview": "both"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\new StaffGroup <<" in text
+    assert text.count("\\new TabStaff") == 2
+    assert 'instrumentName = "Lute 1"' in text
+    assert 'instrumentName = "Lute 2"' in text
+    assert text.count("stringTunings = \\stringTuning") == 2
 
 
 def test_export_lilypond_ft3_meter_mapping_and_midpiece_changes_synthetic(tmp_path) -> None:
