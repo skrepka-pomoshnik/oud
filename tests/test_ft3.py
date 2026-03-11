@@ -180,7 +180,7 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     assert len(piece.bars) == 40
     assert all(bar.chords for bar in piece.bars)
     assert piece.import_warnings
-    assert "structured text records" in piece.import_warnings[0]
+    assert "structured records" in piece.import_warnings[0]
     assert any(bar.lyrics for bar in piece.bars)
     assert any(
         bar.melody_grid or bar.melody_events or bar.lyrics or bar.lyric_event_rows
@@ -189,6 +189,8 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     assert any(bar.lyric_event_rows for bar in piece.bars)
     first_with_lyrics = next(bar for bar in piece.bars if bar.lyrics)
     assert any("can" in line.lower() for line in first_with_lyrics.lyrics)
+    assert [ev.text for ev in piece.bars[0].melody_events[:3]] == ["d", "a", "d'"]
+    assert [ev.text for ev in piece.bars[1].melody_events[:3]] == ["c'", "b", "a"]
 
 
 def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> None:

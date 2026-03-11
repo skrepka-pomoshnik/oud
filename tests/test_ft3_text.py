@@ -87,3 +87,18 @@ def test_parse_ft3_structured_text_record_strips_control_prefix_and_font_row() -
     assert "fu" in words
     assert "times" not in words
     assert "roman" not in words
+
+
+def test_parse_ft3_structured_text_record_decodes_vocal_prefix_notes() -> None:
+    chunk = _structured_chunk(
+        bytes.fromhex(
+            "010000000001330500000000013308000000000400"
+            "a338d7bf610bd63f0000004000000040040000000000000000000000010003000843616e",
+        ),
+        b"Was\x06she",
+        b"I\x07ex-",
+        b"so",
+    )
+    record = parse_ft3_text_record(chunk)
+    assert [ev.text for ev in record.melody_events] == ["d", "a", "d'"]
+    assert [ev.onset_index for ev in record.melody_events] == [0, 1, 2]

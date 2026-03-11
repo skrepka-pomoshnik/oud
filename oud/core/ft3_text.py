@@ -408,6 +408,79 @@ def _structured_lyric_rows(tokens_by_row: list[list[str]]) -> list[list[str]]:
     return rows
 
 
+def _structured_vocal_row_prefix(row: bytes) -> bytes:
+    match = next(iter(re.finditer(rb"[A-Za-z][A-Za-z?'\-]*$", row)), None)
+    if match is None:
+        return row
+    return row[: match.start()]
+
+
+def _vocal_pitch_token(row_value: int, flags: int) -> str:
+    if row_value <= 0:
+        row_value = 1
+    scale = ["d", "e", "f", "g", "a", "b", "c"]
+    idx = row_value - 1
+    name = scale[idx % len(scale)]
+    octave = (idx + 1) // len(scale)
+    accidental = ""
+    if flags & 0x1000:
+        accidental = "b"
+    elif flags & 0x0002:
+        accidental = "#"
+    if octave > 0:
+        suffix = "'" * octave
+        return f"{name}{accidental}{suffix}"
+    return f"{name}{accidental}"
+
+
+def _vocal_note_type_from_code(code: int) -> int | None:
+    mapping = {
+        0x33: 4,
+        0x34: 5,
+        0x35: 6,
+    }
+    return mapping.get(code)
+
+
+def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
+    prefix = _structured_vocal_row_prefix(row)
+    if len(prefix) < 7:
+        return []
+    row_value = prefix[0]
+    first_flags = prefix[1]
+    events: list[MelodyEvent] = [
+        MelodyEvent(
+            text=_vocal_pitch_token(row_value, first_flags),
+            onset_index=0,
+            src_pos=-1,
+            note_type=None,
+            dotted=bool(first_flags & 0x10),
+        ),
+    ]
+    idx = 5
+    while idx + 7 <= len(prefix):
+        rec = prefix[idx : idx + 7]
+        if rec[0] != 0x01 or rec[1] not in (0x33, 0x34, 0x35):
+            break
+        flags = int.from_bytes(rec[3:5], "little")
+        events.append(
+            MelodyEvent(
+                text=_vocal_pitch_token(rec[2], flags),
+                onset_index=len(events),
+                src_pos=-1,
+                note_type=_vocal_note_type_from_code(rec[1]),
+                dotted=bool(flags & 0x10),
+            ),
+        )
+        idx += 7
+    if not events:
+        return []
+    count = int.from_bytes(prefix[idx : idx + 2], "little") if idx + 2 <= len(prefix) else 0
+    if count and count != len(events) + 1:
+        return []
+    return events
+
+
 def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
     rows = _split_record_rows(tail)
     if not rows:
@@ -418,6 +491,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
     if not tokens_by_row:
         return None
     verse_rows = _structured_lyric_rows(tokens_by_row)
+    melody_events = _structured_vocal_events(rows[0]) if rows else []
     if not verse_rows:
         return None
     lyric_lines = [" ".join(tokens).strip() for tokens in verse_rows if tokens]
@@ -431,7 +505,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
     return FT3TextRecord(
         melody_grid=None,
         lyrics=lyric_lines,
-        melody_events=[],
+        melody_events=melody_events,
         lyric_event_rows=lyric_event_rows,
         parse_mode="structured",
     )

@@ -21,6 +21,8 @@ class MelodyEvent:
     text: str
     onset_index: int
     src_pos: int = 0
+    note_type: int | None = None
+    dotted: bool = False
 
 
 @dataclass(frozen=True)

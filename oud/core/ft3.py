@@ -6,7 +6,7 @@ from pathlib import Path
 from statistics import median
 
 from oud.core.ft3_text import FT3TextRecord, is_ft3_text_record, parse_ft3_text_record
-from oud.core.model import Bar, Chord, Note, Piece
+from oud.core.model import Bar, Chord, MelodyEvent, Note, Piece
 
 
 def _strip_rtf(text: str) -> str:
@@ -438,6 +438,7 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
                 bar.lyrics = list(record.lyrics)
             if record.lyric_event_rows:
                 bar.lyric_event_rows = [list(row) for row in record.lyric_event_rows]
+            _finalize_explicit_vocal_melody(bar)
     if filtered_text_records:
         warning = _ft3_text_import_warning(parsed_text_records)
         if warning:
@@ -455,6 +456,81 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     if piece.comment is None:
         piece.comment = comment
     return piece
+
+
+def _time_signature_sixteenth_units(time_sig: str | None) -> int | None:
+    common = {
+        None: None,
+        "": None,
+        "C": 16,
+        "C|": 8,
+    }
+    if time_sig in common:
+        return common[time_sig]
+    if time_sig is None or "/" not in time_sig:
+        return None
+    num_text, denom_text = time_sig.split("/", 1)
+    if not (num_text.isdigit() and denom_text.isdigit()):
+        return None
+    denominator = int(denom_text)
+    if denominator <= 0:
+        return None
+    return (16 * int(num_text)) // denominator
+
+
+def _sixteenth_units_from_event(event: MelodyEvent) -> int | None:
+    if event.note_type is None:
+        return None
+    denom = note_type_to_denominator(event.note_type)
+    if denom is None or denom <= 0:
+        return None
+    units = 16 // denom
+    if event.dotted:
+        units = (units * 3) // 2
+    return units
+
+
+def _event_from_units(event: MelodyEvent, units: int) -> MelodyEvent:
+    mapping = {
+        16: (2, False),
+        12: (3, True),
+        8: (3, False),
+        6: (4, True),
+        4: (4, False),
+        3: (5, True),
+        2: (5, False),
+        1: (6, False),
+    }
+    note_type, dotted = mapping.get(units, (4, event.dotted))
+    return MelodyEvent(
+        text=event.text,
+        onset_index=event.onset_index,
+        src_pos=event.src_pos,
+        note_type=note_type,
+        dotted=dotted,
+    )
+
+
+def _finalize_explicit_vocal_melody(bar: Bar) -> None:
+    events = list(getattr(bar, "melody_events", None) or [])
+    if not events:
+        return
+    if events[0].note_type is not None:
+        return
+    total_units = _time_signature_sixteenth_units(bar.time_sig)
+    if total_units is None:
+        return
+    used_units = 0
+    for event in events[1:]:
+        units = _sixteenth_units_from_event(event)
+        if units is None:
+            return
+        used_units += units
+    remaining = total_units - used_units
+    if remaining <= 0:
+        return
+    events[0] = _event_from_units(events[0], remaining)
+    bar.melody_events = events
 
 
 def _bar_sum_quarter_beats(bar: Bar) -> float:

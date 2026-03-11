@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from oud.core.model import Bar, Chord, LyricEvent
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
 
 _DIATONIC_BASE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11, "h": 11}
 
@@ -55,24 +55,15 @@ def infer_vocal_events(
     if anchor_events:
         out: list[VocalEvent] = []
         for onset_index, chord_index, text in anchor_events:
-            if not (0 <= chord_index < len(bar.chords)):
-                continue
-            chord = bar.chords[chord_index]
-            pitch = token_pitch_value(text)
-            if pitch is None:
-                pitch = chord_top_pitch(chord, tuning_pitches)
-            if pitch is None:
-                continue
-            out.append(
-                VocalEvent(
-                    onset_index=onset_index,
-                    chord_index=chord_index,
-                    pitch=pitch,
-                    note_type=chord.note_type,
-                    dotted=bool(chord.dotted),
-                    text=text,
-                ),
+            event = _explicit_vocal_event(
+                onset_index=onset_index,
+                chord_index=chord_index,
+                source=text,
+                chords=bar.chords,
+                tuning_pitches=tuning_pitches,
             )
+            if event is not None:
+                out.append(event)
         if out:
             return out
     out = []
@@ -92,6 +83,36 @@ def infer_vocal_events(
     return out
 
 
+def _explicit_vocal_event(
+    *,
+    onset_index: int,
+    chord_index: int,
+    source: MelodyEvent | str,
+    chords: list[Chord],
+    tuning_pitches: list[int] | None,
+) -> VocalEvent | None:
+    chord = chords[chord_index] if 0 <= chord_index < len(chords) else None
+    token = source.text if isinstance(source, MelodyEvent) else source
+    pitch = token_pitch_value(token)
+    if pitch is None and chord is not None:
+        pitch = chord_top_pitch(chord, tuning_pitches)
+    if pitch is None:
+        return None
+    note_type = source.note_type if isinstance(source, MelodyEvent) else None
+    dotted = source.dotted if isinstance(source, MelodyEvent) else False
+    if note_type is None and chord is not None:
+        note_type = chord.note_type
+        dotted = bool(chord.dotted)
+    return VocalEvent(
+        onset_index=onset_index,
+        chord_index=chord_index,
+        pitch=pitch,
+        note_type=note_type or 4,
+        dotted=dotted,
+        text=token,
+    )
+
+
 def lyric_anchor_onsets(bar: Bar) -> list[int]:
     seen: set[int] = set()
     out: list[int] = []
@@ -107,12 +128,12 @@ def lyric_anchor_onsets(bar: Bar) -> list[int]:
     return out
 
 
-def _anchor_melody_events(bar: Bar) -> list[tuple[int, int, str]]:
+def _anchor_melody_events(bar: Bar) -> list[tuple[int, int, MelodyEvent | str]]:
     explicit = [
         ev for ev in getattr(bar, "melody_events", None) or [] if (ev.text or "").strip()
     ]
     if explicit:
-        return [(ev.onset_index, ev.onset_index, ev.text) for ev in explicit]
+        return [(ev.onset_index, ev.onset_index, ev) for ev in explicit]
     # Structured FT3 lyrics are often available without an explicit melody lane.
     # Anchoring melody to lyric onsets drops chord attacks and produces sparse,
     # musically misleading note rows; use full chord fallback instead.
