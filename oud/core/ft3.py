@@ -5,8 +5,18 @@ import re
 from pathlib import Path
 from statistics import median
 
+from oud.core.ft3_extras import decode_ft3_extras
 from oud.core.ft3_text import FT3TextRecord, is_ft3_text_record, parse_ft3_text_record
-from oud.core.model import Bar, Chord, MelodyEvent, Note, Piece
+from oud.core.model import (
+    Bar,
+    Chord,
+    ImportedBarContent,
+    ImportedScore,
+    ImportedStaff,
+    MelodyEvent,
+    Note,
+    Piece,
+)
 
 
 def _strip_rtf(text: str) -> str:
@@ -147,14 +157,28 @@ def _parse_footnote_parts(footnote: str | None) -> tuple[str | None, str | None,
     return source, editor, comment
 
 
+def _canonicalize_metadata_fields(annotations: dict[str, str]) -> dict[str, str]:
+    normalized = dict(annotations)
+    con_value = _annotation_lookup(annotations, "con")
+    source_value = _annotation_lookup(annotations, "source")
+    if con_value:
+        if source_value:
+            if con_value not in source_value:
+                normalized["source"] = f"{source_value} {con_value}".strip()
+        else:
+            normalized["source"] = con_value
+    return normalized
+
+
 def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
+    normalized = _canonicalize_metadata_fields(annotations)
     key_value = _annotation_lookup(annotations, "key")
     type_value = _annotation_lookup(annotations, "type")
     difficulty_value = _annotation_lookup(annotations, "difficulty")
     ensemble_value = _annotation_lookup(annotations, "ensemble")
     instrumentation_value = _annotation_lookup(annotations, "instrumentation")
     part_value = _annotation_lookup(annotations, "part")
-    source_value = _annotation_lookup(annotations, "source")
+    source_value = _annotation_lookup(normalized, "source")
     editor_value = _annotation_lookup(annotations, "editor")
     comment_value = _annotation_lookup(annotations, "comment")
     publisher_value = _annotation_lookup(annotations, "publisher/library")
@@ -193,6 +217,7 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
     piece.volume = volume_value
     piece.page = page_value
     piece.section_annotations = annotations
+    piece.raw_metadata = annotations
 
 
 def at_next_note(s: int, f: int) -> bool:
@@ -201,53 +226,6 @@ def at_next_note(s: int, f: int) -> bool:
     on_diapason = 0x61 <= f <= 0x7A
     on_string = 0x02 <= s <= 0x08
     return on_string and (on_fret or on_diapason)
-
-
-def _ft3_right_fingering(extras: int) -> str | None:
-    # Bit masks are adapted from the luteconv FT3 parser (thanks to that reverse-engineering work).
-    if extras & 0x0002:
-        return "thumb"
-    if extras & 0x0004:
-        return "dot1"
-    if extras & 0x0008:
-        return "dot2"
-    if extras & 0x0010:
-        return "dot3"
-    return None
-
-
-def _ft3_left_fingering(extras: int) -> str | None:
-    if extras & 0x0020:
-        return "1"
-    if extras & 0x0040:
-        return "2"
-    if extras & 0x0080:
-        return "3"
-    if extras & 0x0100:
-        return "4"
-    return None
-
-
-def _ft3_left_ornament(extras: int) -> str | None:
-    ornament = extras & 0xFE00
-    if ornament == 0x0400:
-        return "#"
-    if ornament == 0x0800:
-        return "+"
-    if ornament == 0x4A00:
-        return "dot-left"
-    if ornament == 0x0C00:
-        return "x"
-    if extras == 0x3400:
-        return "brackets"
-    return None
-
-
-def _ft3_right_ornament(extras: int) -> str | None:
-    ornament = extras & 0xFE00
-    if ornament == 0x0600:
-        return "#"
-    return None
 
 
 def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
@@ -306,15 +284,17 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
 
             if string is not None and fret is not None:
                 extras = (bar_data[ptr + 3] << 8) | bar_data[ptr + 2]
+                decoded = decode_ft3_extras(extras)
                 note = Note(
                     string=string,
                     fret=fret,
                     raw_pos=ptr,
-                    right_fingering=_ft3_right_fingering(extras),
-                    left_fingering=_ft3_left_fingering(extras),
-                    right_ornament=_ft3_right_ornament(extras),
-                    left_ornament=_ft3_left_ornament(extras),
+                    right_fingering=decoded.right_fingering,
+                    left_fingering=decoded.left_fingering,
+                    right_ornament=decoded.right_ornament,
+                    left_ornament=decoded.left_ornament,
                     ft3_extras=extras if extras else None,
+                    ft3_extra_residual=decoded.residual,
                 )
                 bar.notes.append(note)
                 chord.notes.append(note)
@@ -359,6 +339,7 @@ def _ft3_text_import_warning(records: list[FT3TextRecord]) -> str | None:
     ascii_fallback = any(record.parse_mode == "ascii" for record in records)
     has_lyrics = any(record.lyric_event_rows or record.lyrics for record in records)
     has_melody = any(record.melody_events or record.melody_grid for record in records)
+    has_editorial = any(record.editorial_text for record in records)
     if ascii_fallback:
         return "FT3 vocal text imported via raw fallback; lyric alignment may be approximate."
     if has_lyrics and not has_melody:
@@ -371,7 +352,119 @@ def _ft3_text_import_warning(records: list[FT3TextRecord]) -> str | None:
             "FT3 vocal text parsed from structured records; "
             "some vocal details may still be omitted."
         )
+    if has_editorial:
+        return "FT3 editorial text parsed from structured records."
     return None
+
+
+def _record_has_content(record: FT3TextRecord) -> bool:
+    return bool(
+        record.melody_grid
+        or record.lyrics
+        or record.melody_events
+        or record.lyric_event_rows
+        or record.editorial_text
+        or record.structured_rows,
+    )
+
+
+def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
+    if record.melody_grid:
+        bar.melody_grid = record.melody_grid
+    if record.melody_events:
+        bar.melody_events = list(record.melody_events)
+    if record.lyrics:
+        bar.lyrics = list(record.lyrics)
+    if record.lyric_event_rows:
+        bar.lyric_event_rows = [list(row) for row in record.lyric_event_rows]
+    if record.editorial_text:
+        bar.editorial_text.extend(text for text in record.editorial_text if text)
+    if record.structured_rows:
+        bar.structured_text_rows.extend(record.structured_rows)
+    _finalize_explicit_vocal_melody(bar)
+
+
+def _chunk_has_unknown_score_content(chunk: bytes, bar: Bar) -> bool:
+    if bar.chords or bar.notes:
+        return False
+    if bar.time_sig or bar.barline or bar.repeat:
+        return True
+    if len(chunk) <= 32:
+        return False
+    payload = chunk[32:]
+    nonzero = sum(1 for b in payload if b)
+    controls = sum(1 for b in payload if 0 < b < 32 and b not in (9, 10, 13))
+    return nonzero >= 12 or controls >= 4
+
+
+def _build_imported_score(
+    piece: Piece,
+    *,
+    unknown_bar_chunks: list[tuple[int, int]],
+) -> ImportedScore | None:
+    staffs: list[ImportedStaff] = []
+
+    note_staff = ImportedStaff(kind="note")
+    lyric_staff = ImportedStaff(kind="lyrics")
+    comment_staff = ImportedStaff(kind="comment")
+    unknown_staff = ImportedStaff(kind="unknown")
+
+    for bar_index, bar in enumerate(piece.bars):
+        if bar.melody_grid or bar.melody_events:
+            note_staff.bars.append(
+                ImportedBarContent(
+                    source_bar_index=bar_index,
+                    melody_grid=bar.melody_grid,
+                    melody_events=list(bar.melody_events),
+                    text_rows=[row for row in bar.structured_text_rows if row.kind == "vocal"],
+                ),
+            )
+        if bar.lyrics or bar.lyric_event_rows:
+            lyric_staff.bars.append(
+                ImportedBarContent(
+                    source_bar_index=bar_index,
+                    lyrics=list(bar.lyrics),
+                    lyric_event_rows=[list(row) for row in bar.lyric_event_rows],
+                    text_rows=[row for row in bar.structured_text_rows if row.kind == "lyrics"],
+                ),
+            )
+        if bar.editorial_text:
+            comment_staff.bars.append(
+                ImportedBarContent(
+                    source_bar_index=bar_index,
+                    editorial_text=list(bar.editorial_text),
+                    text_rows=[row for row in bar.structured_text_rows if row.kind == "editorial"],
+                ),
+            )
+        unknown_text_rows = [
+            row for row in bar.structured_text_rows if row.kind in {"unknown", "font"}
+        ]
+        if unknown_text_rows:
+            unknown_staff.bars.append(
+                ImportedBarContent(
+                    source_bar_index=bar_index,
+                    text_rows=unknown_text_rows,
+                    raw_kind="structured-text",
+                ),
+            )
+
+    for bar_index, raw_size in unknown_bar_chunks:
+        unknown_staff.bars.append(
+            ImportedBarContent(
+                source_bar_index=bar_index,
+                raw_kind="unknown",
+                raw_size=raw_size,
+            ),
+        )
+
+    staffs = [
+        staff
+        for staff in (note_staff, lyric_staff, comment_staff, unknown_staff)
+        if staff.bars
+    ]
+    if not staffs:
+        return None
+    return ImportedScore(source_format="ft3", staffs=staffs)
 
 
 def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
@@ -391,27 +484,41 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     author = None
 
     raw_chunks = re.split(b"\x03\x80", data)
-    filtered_text_records = 0
     parsed_text_records: list[FT3TextRecord] = []
     bar_chunks = raw_chunks
+    bar_text_records: list[list[FT3TextRecord]] = []
+    parsed_bars: list[Bar] = []
+    unknown_bar_chunks: list[tuple[int, int]] = []
     body_start = data.find(b"CBar")
     if body_start >= 0:
         body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
         # Always parse bars from the CBar body stream so CPiece/metadata bytes
         # cannot pollute bar 1 (common in duet-score files).
-        bar_chunks = body_chunks
-        text_record_count = sum(1 for chunk in body_chunks if is_ft3_text_record(chunk))
-        # Some FT3 files interleave lyric/melody text records in the body stream.
-        # Enable filtering/parsing only when this pattern is clearly present.
-        if text_record_count >= 2:
-            filtered_text_records = text_record_count
-            bar_chunks = []
-            for chunk in body_chunks:
-                if is_ft3_text_record(chunk):
-                    parsed_text_records.append(parse_ft3_text_record(chunk))
+        bar_chunks = []
+        bar_text_records = []
+        leading_records: list[FT3TextRecord] = []
+        for chunk in body_chunks:
+            if is_ft3_text_record(chunk):
+                record = parse_ft3_text_record(chunk)
+                if not _record_has_content(record):
                     continue
-                bar_chunks.append(chunk)
-    bars = [parse_bar(chunk) for chunk in bar_chunks]
+                parsed_text_records.append(record)
+                if bar_chunks:
+                    bar_text_records[-1].append(record)
+                else:
+                    leading_records.append(record)
+                continue
+            bar_chunks.append(chunk)
+            attached: list[FT3TextRecord] = []
+            if leading_records:
+                attached.append(leading_records.pop(0))
+            bar_text_records.append(attached)
+    for bar_index, chunk in enumerate(bar_chunks):
+        bar = parse_bar(chunk)
+        parsed_bars.append(bar)
+        if _chunk_has_unknown_score_content(chunk, bar):
+            unknown_bar_chunks.append((bar_index, len(chunk)))
+    bars = parsed_bars
     _apply_legacy_duration_fix(bars)
     _fill_missing_time_signatures(bars)
     max_string = 0
@@ -428,23 +535,27 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
         bars=bars,
         strings=strings,
     )
+    if bar_text_records:
+        for bar, records in zip(piece.bars, bar_text_records, strict=False):
+            for record in records:
+                _merge_text_record_into_bar(bar, record)
+    piece.imported_score = _build_imported_score(piece, unknown_bar_chunks=unknown_bar_chunks)
     if parsed_text_records:
-        for bar, record in zip(piece.bars, parsed_text_records, strict=False):
-            if record.melody_grid:
-                bar.melody_grid = record.melody_grid
-            if record.melody_events:
-                bar.melody_events = list(record.melody_events)
-            if record.lyrics:
-                bar.lyrics = list(record.lyrics)
-            if record.lyric_event_rows:
-                bar.lyric_event_rows = [list(row) for row in record.lyric_event_rows]
-            _finalize_explicit_vocal_melody(bar)
-    if filtered_text_records:
         warning = _ft3_text_import_warning(parsed_text_records)
         if warning:
             piece.import_warnings.append(warning)
+    if (
+        piece.imported_score is not None
+        and any(staff.kind == "unknown" for staff in piece.imported_score.staffs)
+        and not any(bar.chords for bar in piece.bars)
+    ):
+        piece.import_warnings.append(
+            "FT3 contains non-tab score data that is not decoded yet; imported as unknown staves.",
+        )
     annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
+    for bar in piece.bars:
+        _normalize_vocal_event_accidentals(bar, key=piece.key)
     source, editor, comment = _parse_footnote_parts(piece.footnote)
     piece.footnote_source = source
     piece.footnote_editor = editor
@@ -531,6 +642,114 @@ def _finalize_explicit_vocal_melody(bar: Bar) -> None:
         return
     events[0] = _event_from_units(events[0], remaining)
     bar.melody_events = events
+
+
+_MAJOR_KEY_SIGNATURES = {
+    "C": 0,
+    "G": 1,
+    "D": 2,
+    "A": 3,
+    "E": 4,
+    "B": 5,
+    "F#": 6,
+    "C#": 7,
+    "F": -1,
+    "Bb": -2,
+    "Eb": -3,
+    "Ab": -4,
+    "Db": -5,
+    "Gb": -6,
+    "Cb": -7,
+}
+_MINOR_KEY_SIGNATURES = {
+    "A": 0,
+    "E": 1,
+    "B": 2,
+    "F#": 3,
+    "C#": 4,
+    "G#": 5,
+    "D#": 6,
+    "A#": 7,
+    "D": -1,
+    "G": -2,
+    "C": -3,
+    "F": -4,
+    "Bb": -5,
+    "Eb": -6,
+    "Ab": -7,
+}
+_KEY_SHARP_ORDER = ("f", "c", "g", "d", "a", "e", "b")
+_KEY_FLAT_ORDER = ("b", "e", "a", "d", "g", "c", "f")
+
+
+def _normalized_key_signature_name(value: str | None) -> tuple[str, str] | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    compact = re.sub(r"\s+", "", text)
+    match = re.fullmatch(r"([A-Ga-g])([#b]?)(M|m)?", compact)
+    if match:
+        tonic = f"{match.group(1).upper()}{match.group(2)}"
+        mode = "minor" if match.group(3) == "m" else "major"
+        return tonic, mode
+    match = re.fullmatch(r"([A-Ga-g])([#b]?)\s*(maj(?:or)?|min(?:or)?)", text, re.I)
+    if match:
+        tonic = f"{match.group(1).upper()}{match.group(2)}"
+        mode = "minor" if match.group(3).lower().startswith("min") else "major"
+        return tonic, mode
+    return None
+
+
+def _key_signature_accidentals(key: str | None) -> dict[str, str]:
+    parsed = _normalized_key_signature_name(key)
+    if parsed is None:
+        return {}
+    tonic, mode = parsed
+    count = (
+        _MINOR_KEY_SIGNATURES.get(tonic)
+        if mode == "minor"
+        else _MAJOR_KEY_SIGNATURES.get(tonic)
+    )
+    if count is None or count == 0:
+        return {}
+    if count > 0:
+        return dict.fromkeys(_KEY_SHARP_ORDER[:count], "#")
+    return dict.fromkeys(_KEY_FLAT_ORDER[:-count], "b")
+
+
+def _normalize_vocal_event_accidentals(bar: Bar, *, key: str | None) -> None:
+    defaults = _key_signature_accidentals(key)
+    if not defaults:
+        return
+    normalized: list[MelodyEvent] = []
+    for event in getattr(bar, "melody_events", None) or []:
+        match = re.fullmatch(r"([a-g])([#b]?)([',]*)", event.text)
+        if match is None:
+            normalized.append(event)
+            continue
+        name, _accidental, octave = match.groups()
+        flags = event.accidental_flags or 0
+        if flags & 0x1000:
+            accidental = "b"
+        elif flags & 0x0002:
+            accidental = "#"
+        elif flags & 0x2000:
+            accidental = ""
+        else:
+            accidental = defaults.get(name, "")
+        normalized.append(
+            MelodyEvent(
+                text=f"{name}{accidental}{octave}",
+                onset_index=event.onset_index,
+                src_pos=event.src_pos,
+                note_type=event.note_type,
+                dotted=event.dotted,
+                accidental_flags=event.accidental_flags,
+            ),
+        )
+    bar.melody_events = normalized
 
 
 def _bar_sum_quarter_beats(bar: Bar) -> float:

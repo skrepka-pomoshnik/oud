@@ -14,6 +14,41 @@ class Note:
     right_ornament: str | None = None
     left_ornament: str | None = None
     ft3_extras: int | None = None
+    ft3_extra_residual: int | None = None
+
+
+@dataclass
+class ImportedTextRow:
+    row_index: int
+    kind: str
+    text: str = ""
+    tokens: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ImportedBarContent:
+    source_bar_index: int
+    melody_grid: str | None = None
+    lyrics: list[str] = field(default_factory=list)
+    melody_events: list[MelodyEvent] = field(default_factory=list)
+    lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
+    editorial_text: list[str] = field(default_factory=list)
+    text_rows: list[ImportedTextRow] = field(default_factory=list)
+    raw_kind: str | None = None
+    raw_size: int = 0
+
+
+@dataclass
+class ImportedStaff:
+    kind: str
+    label: str | None = None
+    bars: list[ImportedBarContent] = field(default_factory=list)
+
+
+@dataclass
+class ImportedScore:
+    source_format: str
+    staffs: list[ImportedStaff] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -23,6 +58,7 @@ class MelodyEvent:
     src_pos: int = 0
     note_type: int | None = None
     dotted: bool = False
+    accidental_flags: int | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +84,8 @@ class Bar:
     lyrics: list[str] = field(default_factory=list)
     melody_events: list[MelodyEvent] = field(default_factory=list)
     lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
+    editorial_text: list[str] = field(default_factory=list)
+    structured_text_rows: list[ImportedTextRow] = field(default_factory=list)
 
 
 @dataclass
@@ -82,6 +120,8 @@ class Piece:
     volume: str | None = None
     page: str | None = None
     section_annotations: dict[str, str] = field(default_factory=dict)
+    raw_metadata: dict[str, str] = field(default_factory=dict)
+    imported_score: ImportedScore | None = None
     import_warnings: list[str] = field(default_factory=list)
     tuning: str | None = None
     style: str | None = None

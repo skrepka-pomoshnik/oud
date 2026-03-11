@@ -87,6 +87,7 @@ def test_parse_ft3_structured_text_record_strips_control_prefix_and_font_row() -
     assert "fu" in words
     assert "times" not in words
     assert "roman" not in words
+    assert [row.kind for row in record.structured_rows] == ["lyrics", "lyrics", "font"]
 
 
 def test_parse_ft3_structured_text_record_decodes_vocal_prefix_notes() -> None:
@@ -102,3 +103,29 @@ def test_parse_ft3_structured_text_record_decodes_vocal_prefix_notes() -> None:
     record = parse_ft3_text_record(chunk)
     assert [ev.text for ev in record.melody_events] == ["d", "a", "d'"]
     assert [ev.onset_index for ev in record.melody_events] == [0, 1, 2]
+    assert [row.kind for row in record.structured_rows] == ["vocal", "lyrics", "lyrics", "lyrics"]
+
+
+def test_parse_ft3_structured_text_record_keeps_vocal_accidental_flags() -> None:
+    chunk = _structured_chunk(
+        bytes.fromhex(
+            "06001000000200"  # first note: bb from 0x1000
+            "010003000854657374",
+        ),
+        b"lyric",
+    )
+    record = parse_ft3_text_record(chunk)
+    assert record.melody_events[0].text == "bb"
+    assert record.melody_events[0].accidental_flags == 0x1000
+
+
+def test_parse_ft3_structured_text_record_classifies_single_prose_row_as_editorial() -> None:
+    chunk = _structured_chunk(
+        b"\x01Appendix\x0bOriginal\x17bars\x1fcommentary:",
+    )
+    record = parse_ft3_text_record(chunk)
+    assert record.parse_mode == "structured"
+    assert record.editorial_text == ["Appendix Original bars commentary:"]
+    assert record.lyrics == []
+    assert record.lyric_event_rows == []
+    assert [row.kind for row in record.structured_rows] == ["editorial"]

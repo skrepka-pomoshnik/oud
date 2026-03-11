@@ -2,11 +2,12 @@ import gzip
 
 from oud.core.ft3 import (
     _fill_missing_time_signatures,
+    _normalize_vocal_event_accidentals,
     load_ft3,
     note_type_to_denominator,
     parse_bar,
 )
-from oud.core.model import Bar, Chord, Note
+from oud.core.model import Bar, Chord, MelodyEvent, Note
 
 
 def test_load_minimal_ft3(tmp_path) -> None:
@@ -119,7 +120,40 @@ def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
     note = bar.notes[0]
     assert note.left_ornament == "brackets"
-    assert note.right_ornament is None
+
+
+def test_parse_bar_decodes_ft3_extras_compositionally_with_residual_bits() -> None:
+    bar = parse_bar(_ft3_bar_with_one_note(extras=0x3440 | 0x0001))
+    note = bar.notes[0]
+    assert note.left_fingering == "2"
+    assert note.left_ornament == "brackets"
+    assert note.ft3_extra_residual == 0x0001
+
+
+def test_normalize_vocal_event_accidentals_uses_key_signature_and_explicit_natural() -> None:
+    bar = Bar(
+        melody_events=[
+            MelodyEvent("f", 0),
+            MelodyEvent("f", 1, accidental_flags=0x2000),
+            MelodyEvent("b", 2),
+            MelodyEvent("g", 3, accidental_flags=0x0002),
+        ],
+    )
+    _normalize_vocal_event_accidentals(bar, key="GM")
+    assert [ev.text for ev in bar.melody_events] == ["f#", "f", "b", "g#"]
+
+
+def test_normalize_vocal_event_accidentals_applies_flat_key_defaults() -> None:
+    bar = Bar(
+        melody_events=[
+            MelodyEvent("b", 0),
+            MelodyEvent("e", 1),
+            MelodyEvent("a", 2, accidental_flags=0x2000),
+            MelodyEvent("b", 3, accidental_flags=0x1000),
+        ],
+    )
+    _normalize_vocal_event_accidentals(bar, key="Fm")
+    assert [ev.text for ev in bar.melody_events] == ["bb", "eb", "a", "bb"]
 
 
 def test_load_ft3_strips_rtf_title(tmp_path) -> None:
@@ -190,7 +224,7 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     first_with_lyrics = next(bar for bar in piece.bars if bar.lyrics)
     assert any("can" in line.lower() for line in first_with_lyrics.lyrics)
     assert [ev.text for ev in piece.bars[0].melody_events[:3]] == ["d", "a", "d'"]
-    assert [ev.text for ev in piece.bars[1].melody_events[:3]] == ["c'", "b", "a"]
+    assert [ev.text for ev in piece.bars[1].melody_events[:3]] == ["c'", "bb", "a"]
 
 
 def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> None:
@@ -212,6 +246,101 @@ def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> No
     piece = load_ft3(str(path))
     assert piece.import_warnings
     assert "structured text records" in piece.import_warnings[0]
+
+
+def test_load_ft3_attaches_single_structured_editorial_record_to_preceding_bar(tmp_path) -> None:
+    text_record = bytes(32) + b"\x01Appendix\x0bOriginal\x17bars\x1fcommentary:\r\n"
+    payload = (
+        b"CPieceTest\x03\x80CBar"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+        + text_record
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+    )
+    path = tmp_path / "single_comment.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    bars_with_chords = [bar for bar in piece.bars if bar.chords]
+    assert len(bars_with_chords) == 3
+    assert bars_with_chords[0].editorial_text == []
+    assert bars_with_chords[1].editorial_text == ["Appendix Original bars commentary:"]
+    assert bars_with_chords[2].editorial_text == []
+
+
+def test_load_ft3_canonicalizes_con_metadata_into_source(tmp_path) -> None:
+    payload = (
+        b"CPiece{\\rtf1\\ansi Demo}\r\n~"
+        b"\x00\x00source: main source\r\n"
+        b"con: continuation text\r\n"
+        b"CBar\x03\x80"
+    )
+    path = tmp_path / "meta_con.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.source == "main source continuation text"
+    assert piece.raw_metadata["con"] == "continuation text"
+
+
+def test_load_ft3_builds_imported_score_for_text_layers(tmp_path) -> None:
+    text_record = (
+        bytes(32)
+        + bytes.fromhex(
+            "010000000001330500000000013308000000000400"
+            "a338d7bf610bd63f0000004000000040040000000000000000000000010003000843616e",
+        )
+        + b"\r\nWas\x06she\r\nI\x07ex-\r\nso\r\n"
+    )
+    payload = (
+        b"CPieceTest\x03\x80CBar"
+        + text_record
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+    )
+    path = tmp_path / "imported_score.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is not None
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "note" in staffs
+    assert "lyrics" in staffs
+    assert staffs["note"].bars[0].text_rows[0].kind == "vocal"
+    assert staffs["lyrics"].bars[0].text_rows[0].kind == "lyrics"
+
+
+def test_load_ft3_marks_unknown_non_tab_score_chunks_in_imported_score(tmp_path) -> None:
+    unknown_bar = bytearray(64)
+    unknown_bar[0] = 0x06
+    unknown_bar[8] = 0x04
+    unknown_bar[9] = 0x03
+    unknown_bar[40:48] = b"\x99\x98\x97\x96\x95\x94\x93\x92"
+    payload = b"CPiece\x04Test\x03\x80CBar" + bytes(unknown_bar) + b"\x03\x80"
+    path = tmp_path / "unknown_score.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is not None
+    unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
+    assert unknown_staff.bars[0].source_bar_index == 0
+    assert piece.import_warnings
+    assert "unknown staves" in piece.import_warnings[-1]
+
+
+def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) -> None:
+    text_record = (
+        bytes(32)
+        + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n"
+    )
+    payload = b"CPiece\x04Test\x03\x80CBar" + text_record + b"\x03\x80" + _ft3_bar_with_one_note() + b"\x03\x80"
+    path = tmp_path / "font_rows.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is not None
+    unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
+    assert any(row.kind == "font" for bar in unknown_staff.bars for row in bar.text_rows)
 
 
 def test_pavan_01_8c_infers_eight_courses() -> None:
