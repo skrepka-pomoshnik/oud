@@ -325,14 +325,28 @@ def test_load_ft3_marks_unknown_non_tab_score_chunks_in_imported_score(tmp_path)
     assert piece.imported_score is not None
     unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
     assert unknown_staff.bars[0].source_bar_index == 0
+    assert unknown_staff.bars[0].raw_kind == "barline-raw"
     assert piece.import_warnings
     assert "unknown staves" in piece.import_warnings[-1]
+
+
+def test_load_ft3_classifies_raw_note_staff_chunks_in_imported_score(tmp_path) -> None:
+    chunk = bytearray(96)
+    chunk[0] = 0x06
+    chunk[32:46] = b"\x04\x00\x00\x00\x00\x01\x33\x06\x00\x00\x00\x00\x01\x34"
+    payload = b"CPiece\x04Test\x03\x80CBar" + bytes(chunk) + b"\x03\x80"
+    path = tmp_path / "raw_note_staff.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is not None
+    unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
+    assert unknown_staff.bars[0].raw_kind == "note-staff-raw"
 
 
 def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) -> None:
     text_record = (
         bytes(32)
-        + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n"
+        + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n%%%%\r\n"
     )
     payload = b"CPiece\x04Test\x03\x80CBar" + text_record + b"\x03\x80" + _ft3_bar_with_one_note() + b"\x03\x80"
     path = tmp_path / "font_rows.ft3"
@@ -341,6 +355,22 @@ def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) 
     assert piece.imported_score is not None
     unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
     assert any(row.kind == "font" for bar in unknown_staff.bars for row in bar.text_rows)
+
+
+def test_load_ft3_does_not_create_unknown_staff_for_font_and_control_rows_only(tmp_path) -> None:
+    text_record = (
+        bytes(32)
+        + b"Times\x07New\x0eRoman\r\n"
+        + b"\x013\x072\r\n"
+        + b"}\r\n"
+    )
+    payload = b"CPiece\x04Test\x03\x80CBar" + text_record + b"\x03\x80" + _ft3_bar_with_one_note() + b"\x03\x80"
+    path = tmp_path / "font_control_only.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is None or all(
+        staff.kind != "unknown" for staff in piece.imported_score.staffs
+    )
 
 
 def test_pavan_01_8c_infers_eight_courses() -> None:

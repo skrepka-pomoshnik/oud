@@ -90,6 +90,29 @@ def test_parse_ft3_structured_text_record_strips_control_prefix_and_font_row() -
     assert [row.kind for row in record.structured_rows] == ["lyrics", "lyrics", "font"]
 
 
+def test_parse_ft3_structured_text_record_falls_back_to_legacy_lyric_punctuation() -> None:
+    chunk = _structured_chunk(
+        b"\x01\x00\x03\x00\x08Fe-:li-",
+        b"li-<ce",
+        b"quan-:to.",
+    )
+    record = parse_ft3_text_record(chunk)
+    assert record.parse_mode == "structured"
+    assert record.lyrics == ["Fe-li- li-ce quan-to."]
+    assert [row.kind for row in record.structured_rows] == ["lyrics", "lyrics", "lyrics"]
+
+
+def test_parse_ft3_structured_text_record_classifies_placeholder_rows_as_control() -> None:
+    chunk = _structured_chunk(
+        b"\x013\x072",
+        b"@@?",
+        b"-",
+    )
+    record = parse_ft3_text_record(chunk)
+    assert record is not None
+    assert [row.kind for row in record.structured_rows] == ["control", "control", "lyrics"]
+
+
 def test_parse_ft3_structured_text_record_decodes_vocal_prefix_notes() -> None:
     chunk = _structured_chunk(
         bytes.fromhex(

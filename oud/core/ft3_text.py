@@ -354,29 +354,72 @@ def _structured_row_text(row: bytes) -> str:
 
 def _is_font_noise_text(text: str) -> bool:
     compact = re.sub(r"\s+", "", text).lower()
-    return compact in {"timesnewroman", "newroman"}
+    return (
+        compact in {"timesnewroman", "newroman", "}"}
+        or compact.startswith(r"{\rtf")
+        or r"\fonttbl" in compact
+    )
+
+
+def _normalized_legacy_lyric_text(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[:;<>=\"?@]+", "", text)).strip()
+
+
+def _fallback_lyric_tokens_from_text(text: str) -> list[str]:
+    normalized = _normalized_legacy_lyric_text(text)
+    if not normalized:
+        return []
+    if re.fullmatch(r"[-_]+", normalized):
+        return ["_"]
+    if not any(ch.isalpha() for ch in normalized):
+        return []
+    tokens = [tok for tok in normalized.split() if tok]
+    if not tokens:
+        return []
+    return [tok for tok in tokens if any(ch.isalpha() for ch in tok) or set(tok) <= {"_"}]
+
+
+def _looks_like_control_text(text: str, raw_tokens: list[str]) -> bool:
+    compact = re.sub(r"\s+", "", text)
+    if not compact:
+        return False
+    if set(compact) <= {"?", "@", "-", "_"}:
+        return True
+    alpha = sum(ch.isalpha() for ch in compact)
+    digits = sum(ch.isdigit() for ch in compact)
+    punct = sum(not ch.isalnum() for ch in compact)
+    if digits and alpha == 0:
+        return True
+    return bool(raw_tokens and alpha <= 1 and digits >= 1 and punct >= 1)
 
 
 def _classify_structured_row(row: bytes, row_index: int) -> ImportedTextRow | None:
     text = _structured_row_text(row)
     raw_tokens = _raw_control_tokens_from_row(row)
     lyric_tokens = _lyric_tokens_from_control_row(row)
+    fallback_lyric_tokens = _fallback_lyric_tokens_from_text(text)
     if not text and not raw_tokens and not lyric_tokens:
         return None
+    kind = "unknown"
+    row_text = text
+    row_tokens = raw_tokens
     if row_index == 0 and _structured_vocal_events(row):
-        return ImportedTextRow(row_index=row_index, kind="vocal", text=text, tokens=raw_tokens)
-    if raw_tokens and _looks_like_editorial_tokens(raw_tokens):
-        return ImportedTextRow(
-            row_index=row_index,
-            kind="editorial",
-            text=" ".join(raw_tokens).strip(),
-            tokens=raw_tokens,
-        )
-    if _is_font_noise_text(text):
-        return ImportedTextRow(row_index=row_index, kind="font", text=text, tokens=raw_tokens)
-    if lyric_tokens:
-        return ImportedTextRow(row_index=row_index, kind="lyrics", text=text, tokens=lyric_tokens)
-    return ImportedTextRow(row_index=row_index, kind="unknown", text=text, tokens=raw_tokens)
+        kind = "vocal"
+    elif raw_tokens and _looks_like_editorial_tokens(raw_tokens):
+        kind = "editorial"
+        row_text = " ".join(raw_tokens).strip()
+    elif _is_font_noise_text(text):
+        kind = "font"
+    elif lyric_tokens:
+        kind = "lyrics"
+        row_tokens = lyric_tokens
+    elif fallback_lyric_tokens:
+        kind = "lyrics"
+        row_text = _normalized_legacy_lyric_text(text)
+        row_tokens = fallback_lyric_tokens
+    elif _looks_like_control_text(text, raw_tokens):
+        kind = "control"
+    return ImportedTextRow(row_index=row_index, kind=kind, text=row_text, tokens=row_tokens)
 
 
 def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEvent]:
@@ -556,15 +599,13 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
     has_controls = any(any(0 < b < 32 and b not in (9, 10, 13) for b in row) for row in rows)
     if not has_controls:
         return None
-    structured_rows = [
-        classified
+    classified_rows = [
+        (row, classified)
         for row_index, row in enumerate(rows)
         if (classified := _classify_structured_row(row, row_index)) is not None
     ]
+    structured_rows = [classified for _row, classified in classified_rows]
     raw_tokens_by_row = [tokens for row in rows if (tokens := _raw_control_tokens_from_row(row))]
-    tokens_by_row = [tokens for row in rows if (tokens := _lyric_tokens_from_control_row(row))]
-    if not tokens_by_row:
-        return None
     editorial_text: list[str] = []
     if len(raw_tokens_by_row) == 1 and _looks_like_editorial_tokens(raw_tokens_by_row[0]):
         editorial_text = [" ".join(raw_tokens_by_row[0]).strip()]
@@ -577,6 +618,19 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
             structured_rows=structured_rows,
             parse_mode="structured",
         )
+    tokens_by_row = [
+        tokens
+        for row, classified in classified_rows
+        if classified.kind not in {"font", "control", "editorial"}
+        if (
+            tokens := (
+                _lyric_tokens_from_control_row(row)
+                or _fallback_lyric_tokens_from_text(_structured_row_text(row))
+            )
+        )
+    ]
+    if not tokens_by_row:
+        return None
     verse_rows = _structured_lyric_rows(tokens_by_row)
     melody_events = _structured_vocal_events(rows[0]) if rows else []
     lyric_lines = [" ".join(tokens).strip() for tokens in verse_rows if tokens]

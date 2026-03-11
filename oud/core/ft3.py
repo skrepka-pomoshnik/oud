@@ -384,23 +384,40 @@ def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
     _finalize_explicit_vocal_melody(bar)
 
 
-def _chunk_has_unknown_score_content(chunk: bytes, bar: Bar) -> bool:
+def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
     if bar.chords or bar.notes:
-        return False
+        return None
+    raw_kind: str | None = None
     if bar.time_sig or bar.barline or bar.repeat:
-        return True
-    if len(chunk) <= 32:
-        return False
-    payload = chunk[32:]
-    nonzero = sum(1 for b in payload if b)
-    controls = sum(1 for b in payload if 0 < b < 32 and b not in (9, 10, 13))
-    return nonzero >= 12 or controls >= 4
+        raw_kind = "barline-raw"
+    elif len(chunk) > 32:
+        payload = chunk[32:]
+        nonzero = sum(1 for b in payload if b)
+        controls = sum(1 for b in payload if 0 < b < 32 and b not in (9, 10, 13))
+        if nonzero >= 12 or controls >= 4:
+            if b"{\\rtf" in payload or b"\\fonttbl" in payload:
+                raw_kind = "comment-rtf-raw"
+            else:
+                note_staff_markers = (b"\x01\x32", b"\x01\x33", b"\x01\x34", b"\x01\x35")
+                has_note_staff_markers = any(marker in payload for marker in note_staff_markers)
+                has_text = b"\r\n" in payload and any(
+                    (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A) for b in payload
+                )
+                if has_note_staff_markers and has_text:
+                    raw_kind = "note-lyric-raw"
+                elif has_note_staff_markers:
+                    raw_kind = "note-staff-raw"
+                elif has_text:
+                    raw_kind = "text-score-raw"
+                else:
+                    raw_kind = "unknown"
+    return raw_kind
 
 
 def _build_imported_score(
     piece: Piece,
     *,
-    unknown_bar_chunks: list[tuple[int, int]],
+    unknown_bar_chunks: list[tuple[int, int, str]],
 ) -> ImportedScore | None:
     staffs: list[ImportedStaff] = []
 
@@ -436,23 +453,24 @@ def _build_imported_score(
                     text_rows=[row for row in bar.structured_text_rows if row.kind == "editorial"],
                 ),
             )
-        unknown_text_rows = [
-            row for row in bar.structured_text_rows if row.kind in {"unknown", "font"}
+        unknown_text_rows = [row for row in bar.structured_text_rows if row.kind == "unknown"]
+        meta_text_rows = [
+            row for row in bar.structured_text_rows if row.kind in {"font", "control"}
         ]
         if unknown_text_rows:
             unknown_staff.bars.append(
                 ImportedBarContent(
                     source_bar_index=bar_index,
-                    text_rows=unknown_text_rows,
+                    text_rows=unknown_text_rows + meta_text_rows,
                     raw_kind="structured-text",
                 ),
             )
 
-    for bar_index, raw_size in unknown_bar_chunks:
+    for bar_index, raw_size, raw_kind in unknown_bar_chunks:
         unknown_staff.bars.append(
             ImportedBarContent(
                 source_bar_index=bar_index,
-                raw_kind="unknown",
+                raw_kind=raw_kind,
                 raw_size=raw_size,
             ),
         )
@@ -488,7 +506,7 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     bar_chunks = raw_chunks
     bar_text_records: list[list[FT3TextRecord]] = []
     parsed_bars: list[Bar] = []
-    unknown_bar_chunks: list[tuple[int, int]] = []
+    unknown_bar_chunks: list[tuple[int, int, str]] = []
     body_start = data.find(b"CBar")
     if body_start >= 0:
         body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
@@ -516,8 +534,8 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     for bar_index, chunk in enumerate(bar_chunks):
         bar = parse_bar(chunk)
         parsed_bars.append(bar)
-        if _chunk_has_unknown_score_content(chunk, bar):
-            unknown_bar_chunks.append((bar_index, len(chunk)))
+        if raw_kind := _classify_unknown_score_chunk(chunk, bar):
+            unknown_bar_chunks.append((bar_index, len(chunk), raw_kind))
     bars = parsed_bars
     _apply_legacy_duration_fix(bars)
     _fill_missing_time_signatures(bars)
