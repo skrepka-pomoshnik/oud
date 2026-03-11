@@ -3,12 +3,14 @@ from __future__ import annotations
 import re
 
 from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
+from oud.core.time_utils import parse_time_signature_value
 from oud.core.vocal_line import chord_top_pitch, infer_vocal_events, token_pitch_value
 
 _MELODY_FLAG_ROWS = 2
-_MELODY_PITCH_ROWS = 5
+_MELODY_PITCH_ROWS = 10
 _MELODY_STAFF_ROWS = _MELODY_FLAG_ROWS + _MELODY_PITCH_ROWS
-_BOTTOM_LINE_ROW = _MELODY_STAFF_ROWS - 1
+_TOP_LINE_ROW = _MELODY_FLAG_ROWS
+_BOTTOM_LINE_ROW = _MELODY_FLAG_ROWS + 8
 _BOTTOM_LINE_PITCH = 64  # E4 in treble staff
 _DIATONIC_DEGREES = {
     0: 0,
@@ -257,10 +259,20 @@ def _diatonic_staff_step(pitch: int) -> int:
 def _pitch_to_staff_row(pitch: int) -> int:
     base_step = _diatonic_staff_step(_BOTTOM_LINE_PITCH)
     step = _diatonic_staff_step(pitch)
-    row = _BOTTOM_LINE_ROW - round((step - base_step) / 2)
+    row = _BOTTOM_LINE_ROW - (step - base_step)
     note_row_min = _MELODY_FLAG_ROWS
     note_row_max = _MELODY_STAFF_ROWS - 1
     return max(note_row_min, min(note_row_max, row))
+
+
+def _pitch_rows(pitch: int) -> tuple[int, int]:
+    base_step = _diatonic_staff_step(_BOTTOM_LINE_PITCH)
+    step = _diatonic_staff_step(pitch)
+    raw_row = _BOTTOM_LINE_ROW - (step - base_step)
+    note_row_min = _MELODY_FLAG_ROWS
+    note_row_max = _MELODY_STAFF_ROWS - 1
+    clamped_row = max(note_row_min, min(note_row_max, raw_row))
+    return raw_row, clamped_row
 
 
 def _event_pitch_map(events: list[MelodyEvent] | None) -> dict[int, int]:
@@ -271,6 +283,29 @@ def _event_pitch_map(events: list[MelodyEvent] | None) -> dict[int, int]:
         pitch = token_pitch_value(ev.text)
         if pitch is not None:
             mapping[ev.onset_index] = pitch
+    return mapping
+
+
+def _event_accidental_map(events: list[MelodyEvent] | None) -> dict[int, str]:
+    mapping: dict[int, str] = {}
+    for ev in events or []:
+        if ev.onset_index in mapping:
+            continue
+        flags = ev.accidental_flags or 0
+        if flags & 0x1000:
+            mapping[ev.onset_index] = "b"
+            continue
+        if flags & 0x0002:
+            mapping[ev.onset_index] = "#"
+            continue
+        if flags & 0x2000:
+            mapping[ev.onset_index] = "n"
+            continue
+        token = ev.text.strip()
+        if "#" in token:
+            mapping[ev.onset_index] = "#"
+        elif "b" in token[1:]:
+            mapping[ev.onset_index] = "b"
     return mapping
 
 
@@ -340,7 +375,7 @@ def melody_staff_rows(
     tuning_pitches: list[int] | None = None,
 ) -> list[list[str]]:
     rows = [[" "] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
-    for staff_row in range(_MELODY_FLAG_ROWS, _MELODY_STAFF_ROWS):
+    for staff_row in range(_TOP_LINE_ROW, _BOTTOM_LINE_ROW + 1, 2):
         rows[staff_row] = ["-"] * max(0, width)
     if width <= 0 or not onset_cols:
         return rows
@@ -364,22 +399,58 @@ def melody_staff_rows(
         ]
     if not vocal_events:
         return rows
-    onset_cols = _resampled_onset_cols(
-        onset_cols=onset_cols,
-        event_count=len(vocal_events),
-        width=width,
-        left_pad=left_pad,
-    )
+    required_onsets = max((event.onset_index for event in vocal_events), default=-1) + 1
+    if len(onset_cols) < required_onsets:
+        onset_cols = _resampled_onset_cols(
+            onset_cols=onset_cols,
+            event_count=required_onsets,
+            width=width,
+            left_pad=left_pad,
+        )
+    onset_accidental = _event_accidental_map(events)
     floor = max(0, left_pad)
     for event in vocal_events:
         onset_idx = event.onset_index
         if onset_idx < 0 or onset_idx >= len(onset_cols):
             continue
         col = max(floor, min(width - 1, onset_cols[onset_idx]))
-        row = _pitch_to_staff_row(event.pitch)
+        raw_row, row = _pitch_rows(event.pitch)
         _draw_vocal_stem(rows, row=row, col=col, note_type=event.note_type, dotted=event.dotted)
+        _draw_vocal_ledger(rows, raw_row=raw_row, row=row, col=col)
+        accidental = onset_accidental.get(onset_idx, "")
+        if accidental:
+            _draw_vocal_accidental(rows, row=row, col=col, accidental=accidental, floor=floor)
         rows[row][col] = "o"
     return rows
+
+
+def draw_melody_time_signature(
+    rows: list[list[str]],
+    *,
+    time_sig: str | None,
+    left_pad: int,
+) -> None:
+    if not rows or not time_sig:
+        return
+    parsed = parse_time_signature_value(time_sig)
+    if parsed is None:
+        return
+    beats, unit = parsed
+    col = max(0, left_pad)
+    if not rows[0] or col >= len(rows[0]):
+        return
+    numerator = str(beats)
+    denominator = str(unit)
+    top_row = min(len(rows) - 1, _TOP_LINE_ROW + 2)
+    bottom_row = min(len(rows) - 1, _TOP_LINE_ROW + 4)
+    for offset, ch in enumerate(numerator):
+        target = col + offset
+        if target < len(rows[top_row]):
+            rows[top_row][target] = ch
+    for offset, ch in enumerate(denominator):
+        target = col + offset
+        if target < len(rows[bottom_row]):
+            rows[bottom_row][target] = ch
 
 
 def _draw_vocal_stem(
@@ -406,6 +477,44 @@ def _draw_vocal_stem(
         dot_col = col + flags + 1
         if 0 <= dot_col < len(rows[flag_row]):
             rows[flag_row][dot_col] = "."
+
+
+def _draw_vocal_ledger(
+    rows: list[list[str]],
+    *,
+    raw_row: int,
+    row: int,
+    col: int,
+) -> None:
+    if not rows or not (0 <= row < len(rows)):
+        return
+    needs_top_ledger = raw_row <= (_TOP_LINE_ROW - 2)
+    needs_bottom_ledger = raw_row >= (_BOTTOM_LINE_ROW + 2)
+    if not (needs_top_ledger or needs_bottom_ledger):
+        return
+    start = max(0, col - 1)
+    stop = min(len(rows[row]), col + 2)
+    for idx in range(start, stop):
+        if rows[row][idx] == " ":
+            rows[row][idx] = "-"
+
+
+def _draw_vocal_accidental(
+    rows: list[list[str]],
+    *,
+    row: int,
+    col: int,
+    accidental: str,
+    floor: int,
+) -> None:
+    if not accidental or not rows or not (0 <= row < len(rows)):
+        return
+    for target in (col - 1, col - 2):
+        if target < floor or target < 0:
+            continue
+        if rows[row][target] in {" ", "-"}:
+            rows[row][target] = accidental
+            return
 
 
 def lyric_event_cells(

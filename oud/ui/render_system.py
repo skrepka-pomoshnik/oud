@@ -60,6 +60,7 @@ from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
+from oud.ui.render_text_lanes import draw_melody_time_signature
 from oud.ui.render_vocal import lyric_rows_for_bar, melody_rows_for_bar, vocal_onset_cols_for_bar
 
 
@@ -2210,15 +2211,12 @@ def render_systems(  # noqa: C901, PLR0912
                     left_pad=draw_pad,
                     tuning_pitches=tuning_pitches,
                 )
-                melody_key = (settings.get("key", "") or "").strip()
-                if abs_bar == 0 and melody_key and melody_rows:
-                    key_row = min(len(melody_rows) - 1, len(melody_rows) // 2)
-                    key_col = min(display_width - 1, max(1, draw_pad))
-                    key_text = melody_key[: max(0, display_width - key_col)]
-                    for offset, ch in enumerate(key_text):
-                        col = key_col + offset
-                        if 0 <= col < display_width:
-                            melody_rows[key_row][col] = ch
+                if abs_bar == 0 and melody_rows:
+                    draw_melody_time_signature(
+                        melody_rows,
+                        time_sig=bar.time_sig or settings.get("time", ""),
+                        left_pad=draw_pad,
+                    )
                 for melody_row_idx, melody_cells in enumerate(melody_rows[:melody_rows_count]):
                     y = melody_row_base + melody_row_idx
                     safe_addstr(stdscr, y, bar_x - 1, "|")

@@ -1,6 +1,7 @@
 from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
 from oud.ui.render_text_lanes import (
     _MELODY_STAFF_ROWS,
+    draw_melody_time_signature,
     lyric_event_cells,
     melody_event_cells,
     melody_staff_rows,
@@ -158,7 +159,7 @@ def test_melody_staff_rows_uses_chord_pitches_when_tokens_are_non_pitch() -> Non
     text_rows = ["".join(row) for row in rows]
     assert any(line[2] == "o" for line in text_rows)
     assert any(line[8] == "o" for line in text_rows)
-    assert sum(1 for line in text_rows if "-" in line) == 5
+    assert sum(1 for line in text_rows if "-" in line) >= 5
 
 
 def test_melody_staff_rows_inferred_vocal_notes_cover_all_chord_onsets() -> None:
@@ -220,11 +221,61 @@ def test_melody_staff_rows_use_fixed_treble_positions_for_d_a_d_prime() -> None:
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    note_rows = [idx for idx, line in enumerate(text_rows) if "o" in line]
     assert len(text_rows) == _MELODY_STAFF_ROWS
     assert sum(1 for line in text_rows if "-" in line) == 5
-    assert len(note_rows) == 3
-    assert note_rows == sorted(note_rows)
-    assert len(set(note_rows)) == 3
-    assert min(note_rows) >= 1
-    assert max(note_rows) < _MELODY_STAFF_ROWS
+    assert text_rows[4][14] == "o"  # d' on the 4th line
+    assert text_rows[7][8] == "o"  # a in a staff space
+    assert text_rows[11][2] == "o"  # d below the bottom line
+
+
+def test_melody_staff_rows_keeps_explicit_onsets_in_tab_columns() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0), MelodyEvent("a", 1), MelodyEvent("d'", 2)],
+        onset_cols=[2, 8, 14, 19, 23],
+        width=26,
+        left_pad=1,
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert text_rows[11][2] == "o"
+    assert text_rows[7][8] == "o"
+    assert text_rows[4][14] == "o"
+    assert all(line[19] != "o" for line in text_rows)
+    assert all(line[23] != "o" for line in text_rows)
+
+
+def test_melody_staff_rows_draws_ledger_cue_for_note_below_visible_staff() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("c", 0)],
+        onset_cols=[4],
+        width=12,
+        left_pad=1,
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert text_rows[11][4] == "o"
+    assert text_rows[11][3] == "-"
+    assert text_rows[11][5] == "-"
+
+
+def test_melody_staff_rows_draws_accidental_next_to_notehead() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("bb", 0, accidental_flags=0x1000)],
+        onset_cols=[4],
+        width=12,
+        left_pad=1,
+    )
+    text_rows = ["".join(row) for row in rows]
+    note_row = next(idx for idx, line in enumerate(text_rows) if line[4] == "o")
+    assert text_rows[note_row][3] == "b"
+
+
+def test_draw_melody_time_signature_places_stacked_meter_digits() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0)],
+        onset_cols=[6],
+        width=16,
+        left_pad=1,
+    )
+    draw_melody_time_signature(rows, time_sig="3/4", left_pad=1)
+    text_rows = ["".join(row) for row in rows]
+    assert text_rows[4][1] == "3"
+    assert text_rows[6][1] == "4"

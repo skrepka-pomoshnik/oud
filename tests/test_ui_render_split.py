@@ -20,7 +20,7 @@ from tests.helpers_regression_cases import repeat_and_meter_change_piece
 
 
 class _Screen(Screen):
-    def __init__(self, h: int = 24, w: int = 80) -> None:
+    def __init__(self, h: int = 32, w: int = 80) -> None:
         self.h = h
         self.w = w
         self.calls: list[tuple[int, int, str, int]] = []
@@ -98,7 +98,7 @@ def _args(mode: str = "normal"):
 
 def _render_lines(kwargs: dict) -> list[str]:
     stdscr = kwargs.get("stdscr")
-    h = getattr(stdscr, "h", 24)
+    h = getattr(stdscr, "h", 32)
     w = getattr(stdscr, "w", 80)
     fb = FrameBuffer(h, w)
     run_kwargs = dict(kwargs)
