@@ -592,6 +592,10 @@ def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
     return events
 
 
+def decode_ft3_vocal_events(row: bytes) -> list[MelodyEvent]:
+    return _structured_vocal_events(row)
+
+
 def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
     rows = _split_record_rows(tail)
     if not rows:

@@ -29,6 +29,9 @@ class ImportedTextRow:
 class ImportedBarContent:
     source_bar_index: int
     melody_grid: str | None = None
+    time_sig: str | None = None
+    barline: str | None = None
+    repeat: str | None = None
     lyrics: list[str] = field(default_factory=list)
     melody_events: list[MelodyEvent] = field(default_factory=list)
     lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)

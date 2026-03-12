@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import gzip
 import re
+from dataclasses import replace
 from pathlib import Path
 from statistics import median
 
 from oud.core.ft3_extras import decode_ft3_extras
-from oud.core.ft3_text import FT3TextRecord, is_ft3_text_record, parse_ft3_text_record
+from oud.core.ft3_text import (
+    FT3TextRecord,
+    decode_ft3_vocal_events,
+    is_ft3_text_record,
+    parse_ft3_text_record,
+)
 from oud.core.model import (
     Bar,
     Chord,
@@ -40,7 +46,7 @@ def read_ft3(path: str) -> bytes:
         magic = f.read(2)
         f.seek(0)
 
-        if magic == b"\x1F\x8B":
+        if magic == b"\x1f\x8b":
             with gzip.open(path, "rb") as gz:
                 return gz.read()
 
@@ -414,70 +420,165 @@ def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
     return raw_kind
 
 
-def _build_imported_score(
-    piece: Piece,
+def _decode_raw_score_record(raw_kind: str, chunk: bytes) -> FT3TextRecord | None:
+    if raw_kind not in {"note-staff-raw", "note-lyric-raw"}:
+        return None
+    payload = chunk[32:] if len(chunk) > 32 else chunk
+    record = parse_ft3_text_record(bytes(32) + payload)
+    if record and _record_has_content(record):
+        return record
+    melody_events = decode_ft3_vocal_events(payload)
+    if not melody_events:
+        return None
+    return FT3TextRecord(
+        melody_grid=None,
+        lyrics=[],
+        melody_events=melody_events,
+        lyric_event_rows=[],
+        editorial_text=[],
+        structured_rows=[],
+        parse_mode="structured",
+    )
+
+
+def _imported_bar_base(bar_index: int, bar: Bar) -> ImportedBarContent:
+    return ImportedBarContent(
+        source_bar_index=bar_index,
+        time_sig=bar.time_sig,
+        barline=bar.barline,
+        repeat=bar.repeat,
+    )
+
+
+def _import_decoded_bar_text_layers(
     *,
-    unknown_bar_chunks: list[tuple[int, int, str]],
-) -> ImportedScore | None:
-    staffs: list[ImportedStaff] = []
-
-    note_staff = ImportedStaff(kind="note")
-    lyric_staff = ImportedStaff(kind="lyrics")
-    comment_staff = ImportedStaff(kind="comment")
-    unknown_staff = ImportedStaff(kind="unknown")
-
-    for bar_index, bar in enumerate(piece.bars):
-        if bar.melody_grid or bar.melody_events:
-            note_staff.bars.append(
-                ImportedBarContent(
-                    source_bar_index=bar_index,
-                    melody_grid=bar.melody_grid,
-                    melody_events=list(bar.melody_events),
-                    text_rows=[row for row in bar.structured_text_rows if row.kind == "vocal"],
-                ),
-            )
-        if bar.lyrics or bar.lyric_event_rows:
-            lyric_staff.bars.append(
-                ImportedBarContent(
-                    source_bar_index=bar_index,
-                    lyrics=list(bar.lyrics),
-                    lyric_event_rows=[list(row) for row in bar.lyric_event_rows],
-                    text_rows=[row for row in bar.structured_text_rows if row.kind == "lyrics"],
-                ),
-            )
-        if bar.editorial_text:
-            comment_staff.bars.append(
-                ImportedBarContent(
-                    source_bar_index=bar_index,
-                    editorial_text=list(bar.editorial_text),
-                    text_rows=[row for row in bar.structured_text_rows if row.kind == "editorial"],
-                ),
-            )
-        unknown_text_rows = [row for row in bar.structured_text_rows if row.kind == "unknown"]
-        meta_text_rows = [
-            row for row in bar.structured_text_rows if row.kind in {"font", "control"}
-        ]
-        if unknown_text_rows:
-            unknown_staff.bars.append(
-                ImportedBarContent(
-                    source_bar_index=bar_index,
-                    text_rows=unknown_text_rows + meta_text_rows,
-                    raw_kind="structured-text",
-                ),
-            )
-
-    for bar_index, raw_size, raw_kind in unknown_bar_chunks:
+    note_staff: ImportedStaff,
+    lyric_staff: ImportedStaff,
+    comment_staff: ImportedStaff,
+    unknown_staff: ImportedStaff,
+    bar_index: int,
+    bar: Bar,
+) -> None:
+    base = _imported_bar_base(bar_index, bar)
+    if bar.melody_grid or bar.melody_events:
+        note_staff.bars.append(
+            replace(
+                base,
+                melody_grid=bar.melody_grid,
+                melody_events=list(bar.melody_events),
+                text_rows=[row for row in bar.structured_text_rows if row.kind == "vocal"],
+            ),
+        )
+    if bar.lyrics or bar.lyric_event_rows:
+        lyric_staff.bars.append(
+            replace(
+                base,
+                lyrics=list(bar.lyrics),
+                lyric_event_rows=[list(row) for row in bar.lyric_event_rows],
+                text_rows=[row for row in bar.structured_text_rows if row.kind == "lyrics"],
+            ),
+        )
+    if bar.editorial_text:
+        comment_staff.bars.append(
+            replace(
+                base,
+                editorial_text=list(bar.editorial_text),
+                text_rows=[row for row in bar.structured_text_rows if row.kind == "editorial"],
+            ),
+        )
+    unknown_text_rows = [row for row in bar.structured_text_rows if row.kind == "unknown"]
+    meta_text_rows = [row for row in bar.structured_text_rows if row.kind in {"font", "control"}]
+    if unknown_text_rows:
         unknown_staff.bars.append(
-            ImportedBarContent(
-                source_bar_index=bar_index,
+            replace(base, text_rows=unknown_text_rows + meta_text_rows, raw_kind="structured-text"),
+        )
+
+
+def _append_raw_imported_bar(
+    *,
+    note_staff: ImportedStaff,
+    lyric_staff: ImportedStaff,
+    barline_staff: ImportedStaff,
+    unknown_staff: ImportedStaff,
+    bar_index: int,
+    raw_size: int,
+    raw_kind: str,
+    source_bar: Bar,
+    decoded: FT3TextRecord | None,
+) -> None:
+    base = _imported_bar_base(bar_index, source_bar)
+    if raw_kind == "barline-raw":
+        barline_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+        return
+    if decoded is not None and decoded.melody_events:
+        note_staff.bars.append(
+            replace(
+                base,
+                melody_events=list(decoded.melody_events),
+                text_rows=[row for row in decoded.structured_rows if row.kind == "vocal"],
                 raw_kind=raw_kind,
                 raw_size=raw_size,
             ),
         )
+    if (
+        raw_kind == "note-lyric-raw"
+        and decoded is not None
+        and (decoded.lyrics or decoded.lyric_event_rows)
+    ):
+        lyric_staff.bars.append(
+            replace(
+                base,
+                lyrics=list(decoded.lyrics),
+                lyric_event_rows=[list(row) for row in decoded.lyric_event_rows],
+                text_rows=[row for row in decoded.structured_rows if row.kind == "lyrics"],
+                raw_kind=raw_kind,
+                raw_size=raw_size,
+            ),
+        )
+        return
+    if decoded is not None and raw_kind in {"note-staff-raw", "note-lyric-raw"}:
+        return
+    unknown_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
 
+
+def _build_imported_score(
+    piece: Piece,
+    *,
+    unknown_bar_chunks: list[tuple[int, int, str, bytes]],
+) -> ImportedScore | None:
+    note_staff = ImportedStaff(kind="note")
+    lyric_staff = ImportedStaff(kind="lyrics")
+    comment_staff = ImportedStaff(kind="comment")
+    barline_staff = ImportedStaff(kind="barline")
+    unknown_staff = ImportedStaff(kind="unknown")
+
+    for bar_index, bar in enumerate(piece.bars):
+        _import_decoded_bar_text_layers(
+            note_staff=note_staff,
+            lyric_staff=lyric_staff,
+            comment_staff=comment_staff,
+            unknown_staff=unknown_staff,
+            bar_index=bar_index,
+            bar=bar,
+        )
+
+    for bar_index, raw_size, raw_kind, chunk in unknown_bar_chunks:
+        source_bar = piece.bars[bar_index] if 0 <= bar_index < len(piece.bars) else Bar()
+        decoded = _decode_raw_score_record(raw_kind, chunk)
+        _append_raw_imported_bar(
+            note_staff=note_staff,
+            lyric_staff=lyric_staff,
+            barline_staff=barline_staff,
+            unknown_staff=unknown_staff,
+            bar_index=bar_index,
+            raw_size=raw_size,
+            raw_kind=raw_kind,
+            source_bar=source_bar,
+            decoded=decoded,
+        )
     staffs = [
         staff
-        for staff in (note_staff, lyric_staff, comment_staff, unknown_staff)
+        for staff in (note_staff, lyric_staff, comment_staff, barline_staff, unknown_staff)
         if staff.bars
     ]
     if not staffs:
@@ -506,7 +607,7 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     bar_chunks = raw_chunks
     bar_text_records: list[list[FT3TextRecord]] = []
     parsed_bars: list[Bar] = []
-    unknown_bar_chunks: list[tuple[int, int, str]] = []
+    unknown_bar_chunks: list[tuple[int, int, str, bytes]] = []
     body_start = data.find(b"CBar")
     if body_start >= 0:
         body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
@@ -535,7 +636,7 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
         bar = parse_bar(chunk)
         parsed_bars.append(bar)
         if raw_kind := _classify_unknown_score_chunk(chunk, bar):
-            unknown_bar_chunks.append((bar_index, len(chunk), raw_kind))
+            unknown_bar_chunks.append((bar_index, len(chunk), raw_kind, chunk))
     bars = parsed_bars
     _apply_legacy_duration_fix(bars)
     _fill_missing_time_signatures(bars)
@@ -726,9 +827,7 @@ def _key_signature_accidentals(key: str | None) -> dict[str, str]:
         return {}
     tonic, mode = parsed
     count = (
-        _MINOR_KEY_SIGNATURES.get(tonic)
-        if mode == "minor"
-        else _MAJOR_KEY_SIGNATURES.get(tonic)
+        _MINOR_KEY_SIGNATURES.get(tonic) if mode == "minor" else _MAJOR_KEY_SIGNATURES.get(tonic)
     )
     if count is None or count == 0:
         return {}

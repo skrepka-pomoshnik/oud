@@ -88,7 +88,9 @@ def test_parse_bar_decodes_ft3_note_extras_fingerings_and_ornaments() -> None:
 def test_load_ft3_parses_bar_stream_from_cbar_body_not_metadata(tmp_path) -> None:
     # Metadata blob deliberately contains note-like bytes before CBar.
     fake_meta = bytes(32) + bytes([0x02, 0x00, 0x00, 0x00]) + bytes([0x02, 0x61, 0, 0, 0])
-    payload = b"CPieceTest" + fake_meta + b"\x03\x80" + b"CBar" + _ft3_bar_with_one_note() + b"\x03\x80"
+    payload = (
+        b"CPieceTest" + fake_meta + b"\x03\x80" + b"CBar" + _ft3_bar_with_one_note() + b"\x03\x80"
+    )
     path = tmp_path / "cbar_body.ft3"
     path.write_bytes(payload)
     piece = load_ft3(str(path))
@@ -101,7 +103,10 @@ def test_load_ft3_parses_bar_stream_from_cbar_body_not_metadata(tmp_path) -> Non
 def test_fill_missing_time_signatures_backfills_leading_pickup_bar() -> None:
     bars = [
         Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
-        Bar(time_sig="C|", chords=[Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)])]),
+        Bar(
+            time_sig="C|",
+            chords=[Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0)])],
+        ),
     ]
     _fill_missing_time_signatures(bars)
     assert bars[0].time_sig == "C|"
@@ -228,10 +233,7 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
 
 
 def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> None:
-    text_record = (
-        bytes(32)
-        + b"\x01\x00\x03\x00\x08Can\r\nWas\x06she\r\nI\x07ex-\r\nso\r\n"
-    )
+    text_record = bytes(32) + b"\x01\x00\x03\x00\x08Can\r\nWas\x06she\r\nI\x07ex-\r\nso\r\n"
     payload = (
         b"CPieceTest\x03\x80CBar"
         + text_record
@@ -323,11 +325,13 @@ def test_load_ft3_marks_unknown_non_tab_score_chunks_in_imported_score(tmp_path)
     path.write_bytes(payload)
     piece = load_ft3(str(path))
     assert piece.imported_score is not None
-    unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
-    assert unknown_staff.bars[0].source_bar_index == 0
-    assert unknown_staff.bars[0].raw_kind == "barline-raw"
-    assert piece.import_warnings
-    assert "unknown staves" in piece.import_warnings[-1]
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "barline" in staffs
+    assert "unknown" not in staffs
+    assert staffs["barline"].bars[0].source_bar_index == 0
+    assert staffs["barline"].bars[0].raw_kind == "barline-raw"
+    assert staffs["barline"].bars[0].time_sig == "3/4"
+    assert not piece.import_warnings or "unknown staves" not in piece.import_warnings[-1]
 
 
 def test_load_ft3_classifies_raw_note_staff_chunks_in_imported_score(tmp_path) -> None:
@@ -339,16 +343,43 @@ def test_load_ft3_classifies_raw_note_staff_chunks_in_imported_score(tmp_path) -
     path.write_bytes(payload)
     piece = load_ft3(str(path))
     assert piece.imported_score is not None
-    unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
-    assert unknown_staff.bars[0].raw_kind == "note-staff-raw"
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "note" in staffs
+    assert "unknown" not in staffs
+    note_bar = next(bar for bar in staffs["note"].bars if bar.raw_kind == "note-staff-raw")
+    assert [event.text for event in note_bar.melody_events] == ["g", "b", "d"]
+
+
+def test_load_ft3_decodes_raw_note_lyric_bars_into_note_and_lyric_staffs(tmp_path) -> None:
+    chunk = (
+        bytes(32)
+        + bytes.fromhex("010000000001330500000000013308000000000400")
+        + b"\x01\x00\x03\x00\x03Can\r\n"
+    )
+    payload = b"CPiece\x04Test\x03\x80CBar" + chunk + b"\x03\x80"
+    path = tmp_path / "raw_note_lyric.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is not None
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "note" in staffs
+    assert "lyrics" in staffs
+    assert "unknown" not in staffs
+    note_bar = next(bar for bar in staffs["note"].bars if bar.raw_kind == "note-lyric-raw")
+    lyric_bar = next(bar for bar in staffs["lyrics"].bars if bar.raw_kind == "note-lyric-raw")
+    assert [event.text for event in note_bar.melody_events] == ["d", "a", "d'"]
+    assert lyric_bar.lyrics == ["Can"]
 
 
 def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) -> None:
-    text_record = (
-        bytes(32)
-        + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n%%%%\r\n"
+    text_record = bytes(32) + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n%%%%\r\n"
+    payload = (
+        b"CPiece\x04Test\x03\x80CBar"
+        + text_record
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
     )
-    payload = b"CPiece\x04Test\x03\x80CBar" + text_record + b"\x03\x80" + _ft3_bar_with_one_note() + b"\x03\x80"
     path = tmp_path / "font_rows.ft3"
     path.write_bytes(payload)
     piece = load_ft3(str(path))
@@ -358,13 +389,14 @@ def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) 
 
 
 def test_load_ft3_does_not_create_unknown_staff_for_font_and_control_rows_only(tmp_path) -> None:
-    text_record = (
-        bytes(32)
-        + b"Times\x07New\x0eRoman\r\n"
-        + b"\x013\x072\r\n"
-        + b"}\r\n"
+    text_record = bytes(32) + b"Times\x07New\x0eRoman\r\n" + b"\x013\x072\r\n" + b"}\r\n"
+    payload = (
+        b"CPiece\x04Test\x03\x80CBar"
+        + text_record
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
     )
-    payload = b"CPiece\x04Test\x03\x80CBar" + text_record + b"\x03\x80" + _ft3_bar_with_one_note() + b"\x03\x80"
     path = tmp_path / "font_control_only.ft3"
     path.write_bytes(payload)
     piece = load_ft3(str(path))
