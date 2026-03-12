@@ -77,11 +77,13 @@ def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
     state.playback_index = 0
     state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.25)
-    update_playback_animation(state)
+    assert update_playback_animation(state) is True
     assert state.playback_bar == 0
     assert state.playback_col == 1
+    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.3)
+    assert update_playback_animation(state) is False
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.75)
-    update_playback_animation(state)
+    assert update_playback_animation(state) is True
     assert state.playback_col == 4
 
 
@@ -95,7 +97,7 @@ def test_update_playback_animation_accepts_legacy_tuple_entries(monkeypatch) -> 
     state.playback_index = 0
     state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.6)
-    update_playback_animation(state)
+    assert update_playback_animation(state) is True
     assert state.playback_col == 5
 
 

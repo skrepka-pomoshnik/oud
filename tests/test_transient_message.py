@@ -29,10 +29,10 @@ def test_decay_transient_message_expires_only_after_ttl() -> None:
     state.mode = "normal"
     state.message = "Saved"
     state.message_ttl_ticks = 2
-    decay_transient_message(state)
+    assert decay_transient_message(state) is True
     assert state.message == "Saved"
     assert state.message_ttl_ticks == 1
-    decay_transient_message(state)
+    assert decay_transient_message(state) is True
     assert state.message == ""
     assert state.message_ttl_ticks == 0
 
@@ -43,7 +43,7 @@ def test_decay_transient_message_skips_command_and_search_modes() -> None:
         state.mode = mode
         state.message = "Saved"
         state.message_ttl_ticks = 1
-        decay_transient_message(state)
+        assert decay_transient_message(state) is False
         assert state.message == "Saved"
         assert state.message_ttl_ticks == 1
 
@@ -53,6 +53,6 @@ def test_decay_transient_message_clears_stale_zero_ttl_message() -> None:
     state.mode = "insert"
     state.message = "Saved"
     state.message_ttl_ticks = 0
-    decay_transient_message(state)
+    assert decay_transient_message(state) is True
     assert state.message == ""
     assert state.message_ttl_ticks == 0

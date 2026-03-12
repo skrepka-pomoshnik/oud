@@ -34,6 +34,7 @@ def run_loop(
 
     state = init_state(path, config_path=config_path, read_only=read_only)
     state.keycodes = keycodes_from_curses()
+
     def suspend_tui() -> None:
         curses.def_prog_mode()
         curses.endwin()
@@ -46,74 +47,8 @@ def run_loop(
     state.resume_tui = resume_tui
 
     running = True
+    needs_render = True
     while running:
-        decay_transient_message(state)
-        height, width = stdscr.getmaxyx()
-        state.screen_height = height
-        state.screen_width = width
-        state.clamp()
-        update_playback_animation(state)
-        ensure_cursor_visible(state, width, height)
-        base_attr = contrast_attr(state.settings.get("contrast", "normal"))
-        screen = CursesScreen(stdscr, base_attr=base_attr)
-        frame_buffer = FrameBuffer(height, width)
-        render_piece(
-            frame_buffer,
-            state.piece,
-            state.bar_offset,
-            state.cursor_bar,
-            state.cursor_string,
-            state.cursor_col,
-            state.bar_width,
-            state.overrides,
-            state.durations,
-            state.ornaments,
-            state.annotations,
-            state.highlights,
-            state.dotted,
-            state.slurs,
-            state.ties,
-            state.holds,
-            state.mode,
-            state.cmdline,
-            state.message,
-            status_line(state),
-            state.searchline,
-            state.settings,
-            export_ascii(
-                state.piece,
-                state.overrides,
-                state.durations,
-                state.bar_width,
-                settings=state.settings,
-                ornaments=state.ornaments,
-                annotations=state.annotations,
-                slurs=state.slurs,
-                ties=state.ties,
-                holds=state.holds,
-            ).splitlines()
-            if state.ascii_preview
-            else None,
-            state.stave_breaks,
-            state.plugin_title,
-            [
-                f"{item.title}{'/' if item.is_dir else ''}"
-                for item in state.plugin_items
-            ],
-            state.plugin_index,
-            state.plugin_offset,
-            state.help_offset if state.mode != "info" else state.info_offset,
-            state.playback_bar,
-            state.playback_col,
-        )
-        frame = frame_buffer.snapshot()
-        view_resize(state, height=height, width=width)
-        dirty = frame_diff_rows(state.last_frame, frame)
-        dirty = view_merge_dirty(state, dirty)
-        draw_frame_rows(screen, frame, dirty)
-        screen.refresh()
-        view_commit_frame(state, frame)
-
         key = stdscr.getch()
         if key != -1:
             running = handle_key_impl(
@@ -128,5 +63,72 @@ def run_loop(
                 ),
                 handle_search=handle_search_input,
             )
+            needs_render = True
+
+        message_changed = decay_transient_message(state)
+        height, width = stdscr.getmaxyx()
+        state.screen_height = height
+        state.screen_width = width
+        state.clamp()
+        playback_changed = update_playback_animation(state)
+        resized = view_resize(state, height=height, width=width)
+        if needs_render or message_changed or playback_changed or resized or state.dirty_rows:
+            ensure_cursor_visible(state, width, height)
+            base_attr = contrast_attr(state.settings.get("contrast", "normal"))
+            screen = CursesScreen(stdscr, base_attr=base_attr)
+            frame_buffer = FrameBuffer(height, width)
+            render_piece(
+                frame_buffer,
+                state.piece,
+                state.bar_offset,
+                state.cursor_bar,
+                state.cursor_string,
+                state.cursor_col,
+                state.bar_width,
+                state.overrides,
+                state.durations,
+                state.ornaments,
+                state.annotations,
+                state.highlights,
+                state.dotted,
+                state.slurs,
+                state.ties,
+                state.holds,
+                state.mode,
+                state.cmdline,
+                state.message,
+                status_line(state),
+                state.searchline,
+                state.settings,
+                export_ascii(
+                    state.piece,
+                    state.overrides,
+                    state.durations,
+                    state.bar_width,
+                    settings=state.settings,
+                    ornaments=state.ornaments,
+                    annotations=state.annotations,
+                    slurs=state.slurs,
+                    ties=state.ties,
+                    holds=state.holds,
+                ).splitlines()
+                if state.ascii_preview
+                else None,
+                state.stave_breaks,
+                state.plugin_title,
+                [f"{item.title}{'/' if item.is_dir else ''}" for item in state.plugin_items],
+                state.plugin_index,
+                state.plugin_offset,
+                state.help_offset if state.mode != "info" else state.info_offset,
+                state.playback_bar,
+                state.playback_col,
+            )
+            frame = frame_buffer.snapshot()
+            dirty = frame_diff_rows(state.last_frame, frame)
+            dirty = view_merge_dirty(state, dirty)
+            draw_frame_rows(screen, frame, dirty)
+            screen.refresh()
+            view_commit_frame(state, frame)
+            needs_render = False
 
     return 0

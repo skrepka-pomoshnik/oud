@@ -11,15 +11,18 @@ def reset_transient_message_ttl(state) -> None:
         state.message_ttl_ticks = 0
 
 
-def decay_transient_message(state) -> None:
+def decay_transient_message(state) -> bool:
     if getattr(state, "mode", "") not in {"normal", "insert"}:
-        return
+        return False
     if not getattr(state, "message", ""):
-        return
+        return False
     ticks = int(getattr(state, "message_ttl_ticks", 0))
     if ticks <= 0:
+        previous = getattr(state, "message", "")
         state.message = ""
-        return
+        return bool(previous)
     state.message_ttl_ticks = ticks - 1
     if state.message_ttl_ticks <= 0:
         state.message = ""
+        return True
+    return True

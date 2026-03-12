@@ -44,14 +44,25 @@ def reset_playback_animation(state: EditorState) -> None:
     prime_playback_animation(state, [])
 
 
-def update_playback_animation(state: EditorState) -> None:
+def update_playback_animation(state: EditorState) -> bool:
+    before = (state.playback.bar, state.playback.col, state.playback.index, state.midi_proc)
+
+    def after() -> tuple[int | None, int | None, int, object]:
+        return (
+            state.playback.bar,
+            state.playback.col,
+            state.playback.index,
+            state.midi_proc,
+        )
+
     proc = state.midi_proc
     if proc is None or state.playback.started_at is None or not state.playback.timeline:
         clear_playback_cursor(state)
-        return
+        return before != after()
     if proc.poll() is not None:
         state.midi_proc = None
         reset_playback_animation(state)
-        return
+        return before != after()
     elapsed = time.monotonic() - state.playback.started_at
     advance_playback_cursor(state, elapsed)
+    return before != after()

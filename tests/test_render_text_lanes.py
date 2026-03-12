@@ -223,9 +223,9 @@ def test_melody_staff_rows_use_fixed_treble_positions_for_d_a_d_prime() -> None:
     text_rows = ["".join(row) for row in rows]
     assert len(text_rows) == _MELODY_STAFF_ROWS
     assert sum(1 for line in text_rows if "-" in line) == 5
-    assert text_rows[4][14] == "o"  # d' on the 4th line
-    assert text_rows[7][8] == "o"  # a in a staff space
-    assert text_rows[11][2] == "o"  # d below the bottom line
+    assert text_rows[3][14] == "o"  # d' on the 4th line
+    assert text_rows[6][8] == "o"  # a in a staff space
+    assert text_rows[10][2] == "o"  # d below the bottom line
 
 
 def test_melody_staff_rows_keeps_explicit_onsets_in_tab_columns() -> None:
@@ -236,9 +236,9 @@ def test_melody_staff_rows_keeps_explicit_onsets_in_tab_columns() -> None:
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    assert text_rows[11][2] == "o"
-    assert text_rows[7][8] == "o"
-    assert text_rows[4][14] == "o"
+    assert text_rows[10][2] == "o"
+    assert text_rows[6][8] == "o"
+    assert text_rows[3][14] == "o"
     assert all(line[19] != "o" for line in text_rows)
     assert all(line[23] != "o" for line in text_rows)
 
@@ -251,9 +251,9 @@ def test_melody_staff_rows_draws_ledger_cue_for_note_below_visible_staff() -> No
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    assert text_rows[11][4] == "o"
-    assert text_rows[11][3] == "-"
-    assert text_rows[11][5] == "-"
+    assert text_rows[10][4] == "o"
+    assert text_rows[10][3] == "-"
+    assert text_rows[10][5] == "-"
 
 
 def test_melody_staff_rows_draws_accidental_next_to_notehead() -> None:
@@ -277,5 +277,5 @@ def test_draw_melody_time_signature_places_stacked_meter_digits() -> None:
     )
     draw_melody_time_signature(rows, time_sig="3/4", left_pad=1)
     text_rows = ["".join(row) for row in rows]
-    assert text_rows[4][1] == "3"
-    assert text_rows[6][1] == "4"
+    assert text_rows[3][1] == "3"
+    assert text_rows[5][1] == "4"

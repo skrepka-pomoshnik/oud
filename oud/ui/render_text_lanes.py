@@ -6,7 +6,7 @@ from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
 from oud.core.time_utils import parse_time_signature_value
 from oud.core.vocal_line import chord_top_pitch, infer_vocal_events, token_pitch_value
 
-_MELODY_FLAG_ROWS = 2
+_MELODY_FLAG_ROWS = 1
 _MELODY_PITCH_ROWS = 10
 _MELODY_STAFF_ROWS = _MELODY_FLAG_ROWS + _MELODY_PITCH_ROWS
 _TOP_LINE_ROW = _MELODY_FLAG_ROWS
