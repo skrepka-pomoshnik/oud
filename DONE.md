@@ -2,6 +2,14 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-03-13
+- Decoded `note-staff-raw` FT3 bars into imported `note` staffs instead of leaving them in generic unknown import buckets.
+- Decoded `note-lyric-raw` FT3 bars into imported `note` + `lyrics` staffs.
+- Split `barline-raw` FT3 material into a dedicated imported `barline` staff.
+- Kept FT3 imported bar context (`time_sig`, `barline`, `repeat`) on imported score content.
+- Reduced redundant TUI redraw during playback by only re-rendering on actual playback/message/resize changes.
+- Tightened bottom vocal layout by removing the extra spacer row between tablature and note staff while keeping playback marker visibility.
+
 ## 2026-02-07
 - Added reprise marker support end-to-end: `:repeat` now accepts structural + cue variants (`both`, `dc/ds`, `fine/coda`, `*alfine/*alcoda`) with normalization and limit handling in `oud/editor/notation_ops.py`.
 - Added reprise export/render coverage: repeat cue marks are emitted in LilyPond export and tested in `tests/test_lilypond.py`.

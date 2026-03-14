@@ -10,6 +10,8 @@ This document describes the current feature set, common use cases, and day-to-da
 - TAB and FT3 import.
 - TAB and ASCII export.
 - MIDI and LilyPond export.
+- Vocal note-staff and lyric rendering for supported FT3 text records.
+- Partial mixed-score FT3 import layer for non-tab note/barline/text staves.
 - Minimal dependency runtime.
 
 ## 2) Run and Open Files
@@ -146,6 +148,7 @@ Durations are tracked per onset column and rendered according to current flag st
 
 - `:midi [path]` export MIDI
 - `:play [bar] [tempo]` play from bar
+- `:pause` stop active playback
 - `:midicmd [path]` show actual external playback command
 - `:lilypond [path]` export LilyPond
 - `:pdf` compile PDF from LilyPond
@@ -222,6 +225,7 @@ Notes:
 - Primary UI is TUI/curses only (Qt backend is future work).
 - Some advanced historical symbols/layouts are partial or pending.
 - Import is best-effort for proprietary formats (FT3/JT* semantics vary).
+- Mixed/non-tab FT3 material is now classified into imported staffs, but full readonly viewer parity for 4-part/general-score FT3 is still incomplete.
 - Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
 
 ## 12) Status and Info Split
@@ -243,7 +247,30 @@ Entry points:
 - `/Users/s/Documents/Python/frnm/app.py` -> `/Users/s/Documents/Python/frnm/oud/app.py`
 - `/Users/s/Documents/Python/frnm/cli.py` -> `/Users/s/Documents/Python/frnm/oud/cli.py`
 
-## 13) LilyPond Parity Audit (Current)
+## 12) FT3 Import Layer (Current)
+
+FT3 import now has two layers:
+
+- `Piece.bars`: the editable tablature projection used by the editor/TUI.
+- `Piece.imported_score`: a read-oriented import layer for structured/non-tab FT3 content.
+
+`imported_score` currently stores:
+
+- `note` staffs from structured vocal rows and decoded `note-staff-raw` / `note-lyric-raw` bars
+- `lyrics` staffs from structured lyric rows and decoded `note-lyric-raw` bars
+- `comment` staffs from editorial FT3 text rows
+- `barline` staffs from `barline-raw`
+- `unknown` only for content still not decoded
+
+This keeps raw FT3 material out of generic unknown blobs and makes later readonly mixed-score rendering tractable.
+
+## 13) Rendering Notes
+
+- Lower vocal note staff now sits directly under the tablature staff; the extra spacer row was removed from bottom vocal layout.
+- Melody playback redraw is event-driven, so the TUI no longer repaints the full frame on idle playback ticks.
+- `^` playback marker remains visible even when melody rows are shown.
+
+## 14) LilyPond Parity Audit (Current)
 
 This is a practical parity tracker for LilyPond `TabStaff`-style features in the TUI/ASCII renderer.
 Status values:

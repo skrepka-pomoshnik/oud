@@ -34,7 +34,7 @@ def _alloc_bottom_vocal_rows(
 ) -> tuple[int | None, tuple[int, ...]]:
     melody = None
     lyric = ()
-    text_base = staff + strings + 1  # one row under staff for playback marker ^
+    text_base = staff + strings
     if show_melody:
         melody = text_base
     if lyric_rows > 0:

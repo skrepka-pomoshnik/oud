@@ -2,6 +2,12 @@
 
 Minimal curses editor for Renaissance lute tablature.
 
+Current import/export focus:
+
+- `.tab` and `.ft3` editing in TUI
+- vocal note-staff + lyrics rendering for supported FT3 text records
+- partial mixed-score FT3 import layer for non-tab note/barline/text staves
+
 ## Docs
 
 - User/developer usage reference: `DOCS.md`
@@ -44,6 +50,8 @@ python3 app.py examples/example.ft3
  1|--------------------------|
 ```
 
+ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
+
 ## Commands
 
 ```
@@ -61,6 +69,12 @@ python3 app.py examples/example.ft3
 :set barsperline=0   auto bars/row
 :set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart
 ```
+
+## FT3 Support
+
+- Structured FT3 vocal/lyric rows are imported and rendered in TUI.
+- Raw non-tab FT3 note bars and barline-only bars are now classified into dedicated imported staffs instead of generic unknown blobs.
+- Fully mixed non-tab FT3 scores are still partial: import layer exists, full readonly viewer parity is not finished yet.
 
 ## Status + Info
 

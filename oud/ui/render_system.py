@@ -2194,6 +2194,9 @@ def render_systems(  # noqa: C901, PLR0912
                     )
                 marker_y = row_start + (rows["staff"] or 0) + system_display_strings
                 marker_x = bar_x + draw_pad + scaled_play_col
+                if rows.get("melody") is not None and marker_y >= row_start + (rows["melody"] or 0):
+                    marker_y = row_start + (rows["melody"] or 0)
+                    marker_x = max(0, bar_x - 2)
                 safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
 
             if rows.get("melody") is not None:

@@ -108,11 +108,23 @@ def _render_lines(kwargs: dict) -> list[str]:
 
 
 def _first_melody_row_idx(lines: list[str]) -> int:
-    for idx in range(1, len(lines)):
-        if not lines[idx - 1].strip() and lines[idx].startswith("  |"):
+    block_rows = melody_row_count()
+    for idx in range(len(lines)):
+        if not lines[idx].startswith("  |"):
+            continue
+        if idx > 0 and lines[idx - 1].startswith("  |"):
+            continue
+        block = lines[idx : idx + block_rows]
+        if len(block) < block_rows:
+            continue
+        if not all(line.startswith("  |") for line in block):
+            continue
+        if any(("\\" in line or "o" in line or "^" in line or "v" in line) for line in block):
             return idx
     return next(
-        i for i, line in enumerate(lines) if line.startswith("  |") and ("\\" in line or "o" in line)
+        i
+        for i, line in enumerate(lines)
+        if line.startswith("  |") and ("\\" in line or "o" in line or "^" in line or "v" in line)
     )
 
 

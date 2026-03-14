@@ -115,7 +115,7 @@ def test_layout_block_rows_vocal_bottom_places_melody_after_staff() -> None:
         vocal_pos="bottom",
     )
     assert rows["melody"] is not None and rows["staff"] is not None
-    assert rows["melody"] > rows["staff"] + 5
+    assert rows["melody"] == rows["staff"] + 6
 
 
 def test_block_height_expands_with_melody_note_staff_rows() -> None:
