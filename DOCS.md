@@ -181,6 +181,22 @@ Notes:
 - `barsperline=0` means auto.
 - `barpad` controls left/right inner padding inside bars.
 
+## 7.1 Tonality and Accidentals
+
+Tonal accidentals are centralized in [oud/core/key_signature.py](/Users/s/Documents/Python/frnm/oud/core/key_signature.py).
+
+- `normalize_key_signature_name()` accepts `GM`, `Dm`, `Bb major`, `f# minor`
+- `key_signature_count()` returns the standard circle-of-fifths count
+- `key_signature_accidentals()` returns the altered pitch classes for that tonality
+
+Examples:
+
+- `GM` -> `{"f": "#"}`
+- `DM` -> `{"f": "#", "c": "#"}`
+- `Fm` -> `{"b": "b", "e": "b", "a": "b", "d": "b"}`
+
+This should be the single source of truth for tonal default accidentals in FT3 vocal parsing and future import/export paths.
+
 ## 8) Plugin System (Current)
 
 - Open plugin menu with `:plugins` or `gp` in normal mode.

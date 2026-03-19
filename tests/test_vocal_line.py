@@ -27,4 +27,5 @@ def test_infer_vocal_events_prefers_explicit_melody_pitch_tokens() -> None:
     )
     events = infer_vocal_events(bar, tuning_pitches=[67, 62, 57, 53, 48, 43])
     assert len(events) == 1
+    assert events[0].pitch is not None
     assert events[0].pitch > 64

@@ -14,12 +14,14 @@ from oud.core.ft3_text import (
     parse_ft3_text_record,
     refine_ft3_raw_text_record,
 )
+from oud.core.key_signature import key_signature_accidentals
 from oud.core.model import (
     Bar,
     Chord,
     ImportedBarContent,
     ImportedScore,
     ImportedStaff,
+    LyricEvent,
     MelodyEvent,
     Note,
     Piece,
@@ -53,7 +55,7 @@ def _parallel_raw_bar_targets(raw_kinds: list[str], *, bar_count: int) -> list[i
     for raw_kind in raw_kinds:
         target_index = min(bar_index, bar_count - 1)
         targets.append(target_index)
-        if raw_kind != "barline-raw":
+        if raw_kind:
             bar_index += 1
     return targets
 
@@ -267,7 +269,28 @@ def at_next_note(s: int, f: int) -> bool:
     return on_string and (on_fret or on_diapason)
 
 
-def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
+def _decode_ft3_note_position(
+    string_byte: int,
+    fret_byte: int,
+    note_flag: int,
+) -> tuple[int, int] | None:
+    if string_byte < 8:
+        fret = fret_byte - 0x61 if 0x61 <= fret_byte <= 0x7A else fret_byte - 0x30
+        return string_byte - 1, fret
+
+    if string_byte != 0x08:
+        return None
+
+    if note_flag == 0x00 and 0x61 <= fret_byte <= 0x7A:
+        return 7, fret_byte - 0x61
+    if (note_flag & 0x20) and 0x30 <= fret_byte <= 0x39:
+        return fret_byte - 0x30 + 7, 0
+    if (note_flag & 0x48) == 0x48 and 0x61 <= fret_byte <= 0x7A:
+        return 8, fret_byte - 0x61
+    return None
+
+
+def parse_bar(bar_data: bytes) -> Bar:
     bar = Bar()
     bar.time_sig = parse_time_signature(bar_data)
     _parse_bar_markers(bar_data, bar)
@@ -296,32 +319,14 @@ def parse_bar(bar_data: bytes) -> Bar:  # noqa: PLR0912, C901
         ptr += 4
 
         while ptr + 5 <= len(bar_data) and at_next_note(bar_data[ptr], bar_data[ptr + 1]):
-            string = None
-            fret = None
+            decoded_position = _decode_ft3_note_position(
+                bar_data[ptr],
+                bar_data[ptr + 1],
+                bar_data[ptr + 4],
+            )
 
-            if bar_data[ptr] < 8:
-                string = bar_data[ptr] - 1
-                fret_byte = bar_data[ptr + 1]
-                fret = fret_byte - 0x61 if 0x61 <= fret_byte <= 0x7A else fret_byte - 0x30
-            elif bar_data[ptr] == 8:
-                flag = bar_data[ptr + 4]
-                if flag == 0x00:
-                    fret_byte = bar_data[ptr + 1]
-                    if 0x61 <= fret_byte <= 0x7A:
-                        string = 7
-                        fret = fret_byte - 0x61
-                elif flag & 0x20:
-                    course_byte = bar_data[ptr + 1]
-                    if 0x30 <= course_byte <= 0x39:
-                        string = course_byte - 0x30 + 7
-                        fret = 0
-                elif flag & 0x48 == 0x48:
-                    fret_byte = bar_data[ptr + 1]
-                    if 0x61 <= fret_byte <= 0x7A:
-                        string = 8
-                        fret = fret_byte - 0x61
-
-            if string is not None and fret is not None:
+            if decoded_position is not None:
+                string, fret = decoded_position
                 extras = (bar_data[ptr + 3] << 8) | bar_data[ptr + 2]
                 decoded = decode_ft3_extras(extras)
                 note = Note(
@@ -418,15 +423,135 @@ def _has_unclassified_bar_header_markers(bar_data: bytes) -> bool:
     return bool(bar_data[0] & 0x20)
 
 
+def _next_melody_onset(events: list[MelodyEvent]) -> int:
+    return max((event.onset_index for event in events), default=-1) + 1
+
+
+def _next_lyric_onset(rows: list[list[LyricEvent]]) -> int:
+    return max(
+        (
+            max((event.onset_index for event in row), default=-1) + 1
+            for row in rows
+        ),
+        default=0,
+    )
+
+
+def _append_text_rows(existing: list[str], incoming: list[str]) -> list[str]:
+    merged = list(existing)
+    for idx, text in enumerate(incoming):
+        if not text:
+            continue
+        while len(merged) <= idx:
+            merged.append("")
+        merged[idx] = f"{merged[idx]} {text}".strip() if merged[idx] else text
+    return merged
+
+
+def _shift_melody_events(events: list[MelodyEvent], offset: int) -> list[MelodyEvent]:
+    if offset <= 0:
+        return list(events)
+    return [
+        MelodyEvent(
+            text=event.text,
+            onset_index=event.onset_index + offset,
+            src_pos=event.src_pos,
+            note_type=event.note_type,
+            dotted=event.dotted,
+            accidental_flags=event.accidental_flags,
+            is_rest=event.is_rest,
+        )
+        for event in events
+    ]
+
+
+def _shift_lyric_rows(
+    rows: list[list[LyricEvent]],
+    offset: int,
+) -> list[list[LyricEvent]]:
+    if offset <= 0:
+        return [list(row) for row in rows]
+    return [
+        [
+            LyricEvent(
+                text=event.text,
+                onset_index=event.onset_index + offset,
+                verse=event.verse,
+                syllabic=event.syllabic,
+                src_pos=event.src_pos,
+                extender=event.extender,
+            )
+            for event in row
+        ]
+        for row in rows
+    ]
+
+
+def _merge_melody_record_into_bar(
+    bar: Bar,
+    *,
+    melody_grid: str | None,
+    melody_events: list[MelodyEvent],
+) -> None:
+    if melody_grid:
+        bar.melody_grid = bar.melody_grid or melody_grid
+    if not melody_events:
+        return
+    incoming = list(melody_events)
+    if bar.melody_events and min((event.onset_index for event in incoming), default=0) == 0:
+        incoming = _shift_melody_events(incoming, _next_melody_onset(bar.melody_events))
+    bar.melody_events.extend(incoming)
+
+
+def _merge_lyric_record_into_bar(
+    bar: Bar,
+    *,
+    lyrics: list[str],
+    lyric_event_rows: list[list[LyricEvent]],
+) -> None:
+    if lyrics:
+        filtered_lines = [line for line in lyrics if _is_meaningful_lyric_line(line)]
+        if filtered_lines:
+            bar.lyrics = _append_text_rows(bar.lyrics, filtered_lines)
+    if not lyric_event_rows:
+        return
+    incoming_rows = [list(row) for row in lyric_event_rows]
+    if bar.lyric_event_rows and any(row for row in incoming_rows):
+        lyric_offset = _next_melody_onset(bar.melody_events) or _next_lyric_onset(
+            bar.lyric_event_rows,
+        )
+        incoming_rows = _shift_lyric_rows(incoming_rows, lyric_offset)
+    while len(bar.lyric_event_rows) < len(incoming_rows):
+        bar.lyric_event_rows.append([])
+    for idx, row in enumerate(incoming_rows):
+        bar.lyric_event_rows[idx].extend(row)
+
+
+def _is_meaningful_lyric_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if set(stripped) <= {"_", "-", " "}:
+        return False
+    words = re.findall(r"[A-Za-z][A-Za-z'-]*", stripped)
+    if not words:
+        return False
+    return not (
+        len(words) == 1 and len(words[0]) == 1 and words[0].lower() not in {"i", "a", "o"}
+    )
+
+
 def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
-    if record.melody_grid:
-        bar.melody_grid = record.melody_grid
-    if record.melody_events:
-        bar.melody_events = list(record.melody_events)
-    if record.lyrics:
-        bar.lyrics = list(record.lyrics)
-    if record.lyric_event_rows:
-        bar.lyric_event_rows = [list(row) for row in record.lyric_event_rows]
+    _merge_melody_record_into_bar(
+        bar,
+        melody_grid=record.melody_grid,
+        melody_events=list(record.melody_events),
+    )
+    _merge_lyric_record_into_bar(
+        bar,
+        lyrics=list(record.lyrics),
+        lyric_event_rows=[list(row) for row in record.lyric_event_rows],
+    )
     if record.editorial_text:
         bar.editorial_text.extend(text for text in record.editorial_text if text)
     if record.structured_rows:
@@ -465,11 +590,11 @@ def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
 
 
 def _decode_raw_score_record(raw_kind: str, chunk: bytes) -> FT3TextRecord | None:
-    if raw_kind not in {"note-staff-raw", "note-lyric-raw", "text-score-raw"}:
+    if raw_kind not in {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}:
         return None
     payload = chunk[32:] if len(chunk) > 32 else chunk
     record = parse_ft3_text_record(bytes(32) + payload)
-    if raw_kind in {"note-lyric-raw", "text-score-raw"}:
+    if raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"}:
         record = refine_ft3_raw_text_record(record, bytes(32) + payload)
     if record and _record_has_content(record):
         return record
@@ -556,7 +681,6 @@ def _append_raw_imported_bar(
     base = _imported_bar_base(bar_index, source_bar)
     if raw_kind == "barline-raw":
         barline_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
-        return
     if decoded is not None and decoded.melody_events:
         note_staff.bars.append(
             replace(
@@ -568,7 +692,7 @@ def _append_raw_imported_bar(
             ),
         )
     if (
-        raw_kind == "note-lyric-raw"
+        raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"}
         and decoded is not None
         and (decoded.lyrics or decoded.lyric_event_rows)
     ):
@@ -582,8 +706,10 @@ def _append_raw_imported_bar(
                 raw_size=raw_size,
             ),
         )
-        return
-    if decoded is not None and raw_kind in {"note-staff-raw", "note-lyric-raw"}:
+        if raw_kind != "barline-raw":
+            return
+    raw_text_kinds = {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}
+    if decoded is not None and raw_kind in raw_text_kinds:
         return
     unknown_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
 
@@ -781,7 +907,11 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
     for bar in piece.bars:
-        _normalize_vocal_event_accidentals(bar, key=piece.key)
+        _normalize_vocal_event_accidentals(
+            bar,
+            key=piece.key,
+            raw_fallback=_bar_uses_raw_vocal_fallback(bar),
+        )
     source, editor, comment = _parse_footnote_parts(piece.footnote)
     piece.footnote_source = source
     piece.footnote_editor = editor
@@ -845,6 +975,8 @@ def _event_from_units(event: MelodyEvent, units: int) -> MelodyEvent:
         src_pos=event.src_pos,
         note_type=note_type,
         dotted=dotted,
+        accidental_flags=event.accidental_flags,
+        is_rest=event.is_rest,
     )
 
 
@@ -870,85 +1002,30 @@ def _finalize_explicit_vocal_melody(bar: Bar) -> None:
     bar.melody_events = events
 
 
-_MAJOR_KEY_SIGNATURES = {
-    "C": 0,
-    "G": 1,
-    "D": 2,
-    "A": 3,
-    "E": 4,
-    "B": 5,
-    "F#": 6,
-    "C#": 7,
-    "F": -1,
-    "Bb": -2,
-    "Eb": -3,
-    "Ab": -4,
-    "Db": -5,
-    "Gb": -6,
-    "Cb": -7,
-}
-_MINOR_KEY_SIGNATURES = {
-    "A": 0,
-    "E": 1,
-    "B": 2,
-    "F#": 3,
-    "C#": 4,
-    "G#": 5,
-    "D#": 6,
-    "A#": 7,
-    "D": -1,
-    "G": -2,
-    "C": -3,
-    "F": -4,
-    "Bb": -5,
-    "Eb": -6,
-    "Ab": -7,
-}
-_KEY_SHARP_ORDER = ("f", "c", "g", "d", "a", "e", "b")
-_KEY_FLAT_ORDER = ("b", "e", "a", "d", "g", "c", "f")
+def _bar_uses_raw_vocal_fallback(bar: Bar) -> bool:
+    for row in getattr(bar, "structured_text_rows", None) or []:
+        if row.kind != "vocal":
+            continue
+        text = (row.text or "").strip()
+        if text and text[0].isdigit():
+            return True
+    return False
 
 
-def _normalized_key_signature_name(value: str | None) -> tuple[str, str] | None:
-    if not value:
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    compact = re.sub(r"\s+", "", text)
-    match = re.fullmatch(r"([A-Ga-g])([#b]?)(M|m)?", compact)
-    if match:
-        tonic = f"{match.group(1).upper()}{match.group(2)}"
-        mode = "minor" if match.group(3) == "m" else "major"
-        return tonic, mode
-    match = re.fullmatch(r"([A-Ga-g])([#b]?)\s*(maj(?:or)?|min(?:or)?)", text, re.I)
-    if match:
-        tonic = f"{match.group(1).upper()}{match.group(2)}"
-        mode = "minor" if match.group(3).lower().startswith("min") else "major"
-        return tonic, mode
-    return None
-
-
-def _key_signature_accidentals(key: str | None) -> dict[str, str]:
-    parsed = _normalized_key_signature_name(key)
-    if parsed is None:
-        return {}
-    tonic, mode = parsed
-    count = (
-        _MINOR_KEY_SIGNATURES.get(tonic) if mode == "minor" else _MAJOR_KEY_SIGNATURES.get(tonic)
-    )
-    if count is None or count == 0:
-        return {}
-    if count > 0:
-        return dict.fromkeys(_KEY_SHARP_ORDER[:count], "#")
-    return dict.fromkeys(_KEY_FLAT_ORDER[:-count], "b")
-
-
-def _normalize_vocal_event_accidentals(bar: Bar, *, key: str | None) -> None:
-    defaults = _key_signature_accidentals(key)
+def _normalize_vocal_event_accidentals(
+    bar: Bar,
+    *,
+    key: str | None,
+    raw_fallback: bool = False,
+) -> None:
+    defaults = key_signature_accidentals(key)
     if not defaults:
         return
     normalized: list[MelodyEvent] = []
     for event in getattr(bar, "melody_events", None) or []:
+        if event.is_rest:
+            normalized.append(event)
+            continue
         match = re.fullmatch(r"([a-g])([#b]?)([',]*)", event.text)
         if match is None:
             normalized.append(event)
@@ -960,7 +1037,7 @@ def _normalize_vocal_event_accidentals(bar: Bar, *, key: str | None) -> None:
         elif flags & 0x0002:
             accidental = "#"
         elif flags & 0x2000:
-            accidental = ""
+            accidental = defaults.get(name, "") if raw_fallback else ""
         else:
             accidental = defaults.get(name, "")
         normalized.append(
@@ -971,6 +1048,7 @@ def _normalize_vocal_event_accidentals(bar: Bar, *, key: str | None) -> None:
                 note_type=event.note_type,
                 dotted=event.dotted,
                 accidental_flags=event.accidental_flags,
+                is_rest=event.is_rest,
             ),
         )
     bar.melody_events = normalized
@@ -1124,7 +1202,7 @@ def parse_time_signature(bar_data: bytes) -> str | None:
     if time_signature == 0x02:
         return "C|"
     if time_signature == 0x03:
-        return "O"
+        return "3/4"
     if time_signature == 0x06:
         beats = bar_data[9]
         beat_type = bar_data[8]

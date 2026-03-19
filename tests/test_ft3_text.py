@@ -1,4 +1,10 @@
-from oud.core.ft3_text import is_ft3_text_record, parse_ft3_text_record, refine_ft3_raw_text_record
+from oud.core.ft3_text import (
+    _structured_lyric_rows_from_positioned_rows,
+    decode_ft3_vocal_events,
+    is_ft3_text_record,
+    parse_ft3_text_record,
+    refine_ft3_raw_text_record,
+)
 
 
 def _text_chunk(*lines: str) -> bytes:
@@ -63,7 +69,7 @@ def test_parse_ft3_structured_text_record_builds_ordered_verses() -> None:
     assert [ev.verse for ev in record.lyric_event_rows[1]] == [1, 1, 1]
 
 
-def test_refine_ft3_raw_text_record_preserves_singleton_verse_rows() -> None:
+def test_refine_ft3_raw_text_record_clusters_raw_fallback_lanes() -> None:
     chunk = _structured_chunk(
         b"\x08Now",
         b"\x01I",
@@ -73,8 +79,34 @@ def test_refine_ft3_raw_text_record_preserves_singleton_verse_rows() -> None:
     )
     record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
     assert record.parse_mode == "structured"
-    assert record.lyrics == ["Now", "I", "I I", "am", "do"]
-    assert [len(row) for row in record.lyric_event_rows] == [1, 1, 2, 1, 1]
+    assert record.lyrics == ["Now I", "I am do"]
+    assert [len(row) for row in record.lyric_event_rows] == [2, 3]
+
+
+def test_refine_ft3_raw_text_record_coalesces_split_primary_lane() -> None:
+    chunk = _structured_chunk(
+        bytes.fromhex("0100000000013305000000000300") + b"\x12Now",
+        b"Dear",
+        b"Dear\x0bO",
+        b"when",
+        b"if",
+    )
+    record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
+    assert record.lyrics == ["Now O", "Dear when", "Dear if"]
+    assert [len(row) for row in record.lyric_event_rows] == [2, 2, 2]
+
+
+def test_refine_ft3_raw_text_record_reconstructs_three_verses() -> None:
+    chunk = _structured_chunk(
+        bytes.fromhex("060000000001330500000000030009bcfdbf8b9df83f0000803f030000000000000000000001000200124e6f772c"),
+        b"Dear,",
+        b"Dear,\x0bO",
+        b"when",
+        b"if",
+    )
+    record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
+    assert record.lyrics == ["Now O", "Dear when", "Dear if"]
+    assert [len(row) for row in record.lyric_event_rows] == [2, 2, 2]
 
 
 def test_refine_ft3_raw_text_record_drops_vocal_pitch_tail_token() -> None:
@@ -86,6 +118,18 @@ def test_refine_ft3_raw_text_record_drops_vocal_pitch_tail_token() -> None:
     )
     record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
     assert record.lyrics == ["Can she ex-", "Was I so"]
+
+
+def test_parse_ft3_text_record_accepts_half_note_vocal_code_0x32() -> None:
+    row = bytes.fromhex("070000000001330700000000013207000000000400")
+    events = decode_ft3_vocal_events(row)
+    assert [(ev.text, ev.note_type) for ev in events] == [("c'", None), ("c'", 4), ("c'", 3)]
+
+
+def test_decode_ft3_vocal_events_treats_0x40_flag_as_rest() -> None:
+    row = bytes.fromhex("0500000000013306400000000300")
+    events = decode_ft3_vocal_events(row)
+    assert [(ev.text, ev.note_type, ev.is_rest) for ev in events] == [("a", None, False), ("r", 4, True)]
 
 
 def test_parse_ft3_structured_text_record_keeps_explicit_extender_tokens() -> None:
@@ -177,3 +221,17 @@ def test_parse_ft3_structured_text_record_classifies_single_prose_row_as_editori
     assert record.lyrics == []
     assert record.lyric_event_rows == []
     assert [row.kind for row in record.structured_rows] == ["editorial"]
+
+
+def test_raw_positioned_lyric_rows_prefer_cluster_merges_nearby_lanes() -> None:
+    rows = [
+        [(11, "Ab-")],
+        [(0, "I")],
+        [(0, "For"), (16, "sence")],
+        [(0, "lov'd")],
+        [(0, "my")],
+    ]
+    assert _structured_lyric_rows_from_positioned_rows(rows, prefer_cluster=True) == [
+        ["Ab-", "sence"],
+        ["I", "For", "lov'd", "my"],
+    ]

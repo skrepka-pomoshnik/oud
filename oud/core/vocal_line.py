@@ -11,10 +11,11 @@ _DIATONIC_BASE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11, "h": 
 class VocalEvent:
     onset_index: int
     chord_index: int
-    pitch: int
+    pitch: int | None
     note_type: int
     dotted: bool
     text: str = ""
+    is_rest: bool = False
 
 
 def token_pitch_value(token: str) -> int | None:
@@ -93,6 +94,24 @@ def _explicit_vocal_event(
 ) -> VocalEvent | None:
     chord = chords[chord_index] if 0 <= chord_index < len(chords) else None
     token = source.text if isinstance(source, MelodyEvent) else source
+    is_rest = isinstance(source, MelodyEvent) and source.is_rest
+    if not is_rest and token.strip().lower() in {"r", "rest"}:
+        is_rest = True
+    if is_rest:
+        note_type = source.note_type if isinstance(source, MelodyEvent) else None
+        dotted = source.dotted if isinstance(source, MelodyEvent) else False
+        if note_type is None and chord is not None:
+            note_type = chord.note_type
+            dotted = bool(chord.dotted)
+        return VocalEvent(
+            onset_index=onset_index,
+            chord_index=chord_index,
+            pitch=None,
+            note_type=note_type or 4,
+            dotted=dotted,
+            text=token,
+            is_rest=True,
+        )
     pitch = token_pitch_value(token)
     if pitch is None and chord is not None:
         pitch = chord_top_pitch(chord, tuning_pitches)
@@ -110,6 +129,7 @@ def _explicit_vocal_event(
         note_type=note_type or 4,
         dotted=dotted,
         text=token,
+        is_rest=False,
     )
 
 
@@ -130,7 +150,9 @@ def lyric_anchor_onsets(bar: Bar) -> list[int]:
 
 def _anchor_melody_events(bar: Bar) -> list[tuple[int, int, MelodyEvent | str]]:
     explicit = [
-        ev for ev in getattr(bar, "melody_events", None) or [] if (ev.text or "").strip()
+        ev
+        for ev in getattr(bar, "melody_events", None) or []
+        if (ev.text or "").strip() or ev.is_rest
     ]
     if explicit:
         return [(ev.onset_index, ev.onset_index, ev) for ev in explicit]

@@ -63,6 +63,7 @@ class MelodyEvent:
     note_type: int | None = None
     dotted: bool = False
     accidental_flags: int | None = None
+    is_rest: bool = False
 
 
 @dataclass(frozen=True)

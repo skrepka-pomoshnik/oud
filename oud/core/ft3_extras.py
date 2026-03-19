@@ -25,15 +25,17 @@ _LEFT_FINGERING_BITS: tuple[tuple[int, str], ...] = (
     (0x0080, "3"),
     (0x0100, "4"),
 )
-_ORNAMENT_PATTERNS: tuple[tuple[int, str, str], ...] = (
-    # Patterns are adapted from luteconv's FT3 reverse-engineering, but decoded
-    # compositionally here so they can coexist with fingering bits.
-    (0x4A00, "left_ornament", "dot-left"),
-    (0x3400, "left_ornament", "brackets"),
-    (0x0600, "right_ornament", "#"),
-    (0x0C00, "left_ornament", "x"),
-    (0x0800, "left_ornament", "+"),
-    (0x0400, "left_ornament", "#"),
+_LEFT_ORNAMENT_HIGH_BYTE_BITS: tuple[tuple[int, str], ...] = (
+    (0x0400, "#"),
+    (0x0800, "+"),
+    (0x0C00, "x"),
+)
+_RIGHT_ORNAMENT_HIGH_BYTE_BITS: tuple[tuple[int, str], ...] = (
+    (0x0600, "#"),
+)
+_LEFT_ORNAMENT_EXACT_PATTERNS: tuple[tuple[int, str], ...] = (
+    (0x4A00, "dot-left"),
+    (0x3400, "brackets"),
 )
 
 
@@ -54,17 +56,25 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
     left_fingering, used = _pick_single_flag(extras, _LEFT_FINGERING_BITS)
     consumed |= used
 
-    right_ornament: str | None = None
     left_ornament: str | None = None
-    for mask, target, value in _ORNAMENT_PATTERNS:
-        if extras & mask != mask:
-            continue
-        consumed |= mask
-        if target == "right_ornament":
-            right_ornament = value
-        else:
+    for mask, value in _LEFT_ORNAMENT_EXACT_PATTERNS:
+        if extras == mask:
+            consumed |= mask
             left_ornament = value
-        break
+            break
+    if left_ornament is None:
+        for mask, value in _LEFT_ORNAMENT_HIGH_BYTE_BITS:
+            if (extras & 0xFE00) == mask:
+                consumed |= mask
+                left_ornament = value
+                break
+
+    right_ornament: str | None = None
+    for mask, value in _RIGHT_ORNAMENT_HIGH_BYTE_BITS:
+        if (extras & 0xFE00) == mask:
+            consumed |= mask
+            right_ornament = value
+            break
 
     residual = extras & ~consumed
     return DecodedFT3Extras(

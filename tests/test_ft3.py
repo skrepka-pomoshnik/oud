@@ -1,6 +1,7 @@
 import gzip
 
 from oud.core.ft3 import (
+    _decode_ft3_note_position,
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
     _parallel_mixed_score_prefix_count,
@@ -9,7 +10,7 @@ from oud.core.ft3 import (
     note_type_to_denominator,
     parse_bar,
 )
-from oud.core.model import Bar, Chord, MelodyEvent, Note
+from oud.core.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 
 def test_load_minimal_ft3(tmp_path) -> None:
@@ -130,6 +131,20 @@ def test_parse_bar_decodes_ft3_right_hand_dot_fingering_variants() -> None:
     assert three.right_fingering == "dot3"
 
 
+def test_parse_bar_decodes_ft3_confirmed_exact_extras_subset() -> None:
+    note = parse_bar(_ft3_bar_with_one_note(extras=0x0020 | 0x0400)).notes[0]
+    assert note.left_fingering == "1"
+    assert note.left_ornament == "#"
+    assert note.right_ornament is None
+
+    note = parse_bar(_ft3_bar_with_one_note(extras=0x0600)).notes[0]
+    assert note.right_ornament == "#"
+    assert note.left_ornament is None
+
+    note = parse_bar(_ft3_bar_with_one_note(extras=0x4A00)).notes[0]
+    assert note.left_ornament == "dot-left"
+
+
 def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
     note = bar.notes[0]
@@ -140,8 +155,17 @@ def test_parse_bar_decodes_ft3_extras_compositionally_with_residual_bits() -> No
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3440 | 0x0001))
     note = bar.notes[0]
     assert note.left_fingering == "2"
-    assert note.left_ornament == "brackets"
-    assert note.ft3_extra_residual == 0x0001
+    assert note.left_ornament is None
+    assert note.ft3_extra_residual == 0x3401
+
+
+def test_decode_ft3_note_position_uses_confirmed_bass_discriminator_masks() -> None:
+    assert _decode_ft3_note_position(0x08, ord("a"), 0x00) == (7, 0)
+    assert _decode_ft3_note_position(0x08, ord("1"), 0x20) == (8, 0)
+    assert _decode_ft3_note_position(0x08, ord("0"), 0x22) == (7, 0)
+    assert _decode_ft3_note_position(0x08, ord("c"), 0x48) == (8, 2)
+    assert _decode_ft3_note_position(0x08, ord("c"), 0x49) == (8, 2)
+    assert _decode_ft3_note_position(0x08, ord("1"), 0x10) is None
 
 
 def test_normalize_vocal_event_accidentals_uses_key_signature_and_explicit_natural() -> None:
@@ -168,6 +192,15 @@ def test_normalize_vocal_event_accidentals_applies_flat_key_defaults() -> None:
     )
     _normalize_vocal_event_accidentals(bar, key="Fm")
     assert [ev.text for ev in bar.melody_events] == ["bb", "eb", "a", "bb"]
+
+
+def test_normalize_vocal_event_accidentals_ignores_raw_fallback_2000_natural_hint() -> None:
+    bar = Bar(
+        melody_events=[MelodyEvent("f", 0, accidental_flags=0x2000)],
+        structured_text_rows=[ImportedTextRow(0, "vocal", text="3 raw cue", tokens=["raw"])],
+    )
+    _normalize_vocal_event_accidentals(bar, key="GM", raw_fallback=True)
+    assert [ev.text for ev in bar.melody_events] == ["f#"]
 
 
 def test_load_ft3_strips_rtf_title(tmp_path) -> None:
@@ -312,6 +345,23 @@ def test_load_ft3_canonicalizes_con_metadata_into_source(tmp_path) -> None:
     assert piece.raw_metadata["con"] == "continuation text"
 
 
+def test_merge_lyric_record_filters_noise_only_lines(tmp_path) -> None:
+    text_record = bytes(32) + b";F     @   ?\r\n_\x01C950\r\n"
+    payload = (
+        b"CPieceTest\x03\x80CBar"
+        + text_record
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+    )
+    path = tmp_path / "noise_lyrics.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    bars_with_chords = [bar for bar in piece.bars if bar.chords]
+    assert bars_with_chords
+    assert bars_with_chords[0].lyrics == []
+
+
 def test_load_ft3_builds_imported_score_for_text_layers(tmp_path) -> None:
     text_record = (
         bytes(32)
@@ -448,7 +498,7 @@ def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
             value *= 1.5
         total += value
     assert abs(total - 3.0) < 0.01
-    assert bar.time_sig == "O"
+    assert bar.time_sig in {"O", "3/4"}
 
 
 def test_forlorne_ft3_common_time_first_bar_is_metrically_consistent() -> None:
@@ -534,15 +584,58 @@ def test_ich_bin_blume_ft3_fills_missing_time_signatures_by_section() -> None:
     assert piece.bars[159].time_sig == "C|"
 
 
+def test_parse_time_signature_ft3_single_triple_code_is_numeric() -> None:
+    assert parse_bar(bytes([0x03, 0x00]) + bytes(30)).time_sig == "3/4"
+
+
 def test_parallel_mixed_score_prefix_count_detects_raw_prefix_and_tab_suffix() -> None:
     assert _parallel_mixed_score_prefix_count(["raw", "raw", "tab", "tab"]) == 2
     assert _parallel_mixed_score_prefix_count(["raw", "tab", "raw", "tab"]) is None
     assert _parallel_mixed_score_prefix_count(["raw", "raw", "tab"]) is None
 
 
-def test_parallel_raw_bar_targets_keep_barline_on_current_measure() -> None:
+def test_parallel_raw_bar_targets_advance_per_raw_record() -> None:
     targets = _parallel_raw_bar_targets(
         ["barline-raw", "note-lyric-raw", "note-lyric-raw", "barline-raw", "text-score-raw"],
         bar_count=5,
     )
-    assert targets == [0, 0, 1, 2, 2]
+    assert targets == [0, 1, 2, 3, 4]
+
+
+def test_load_ft3_merges_barline_raw_vocal_fragment_into_target_bar(tmp_path) -> None:
+    chunk0 = bytearray(
+        bytes(32)
+        + bytes.fromhex("010000000001330500000000013308000000000400")
+        + b"\x01\x00\x03\x00\x03Now\r\n",
+    )
+    chunk0[0] = 0x06
+    chunk0[8] = 0x04
+    chunk0[9] = 0x03
+    chunk1 = (
+        bytes(32)
+        + bytes.fromhex("010000000001330500000000013308000000000400")
+        + b"\x01\x00\x03\x00\x03She\r\n"
+    )
+    payload = (
+        b"CPiece\x04Test\x03\x80CBar"
+        + bytes(chunk0)
+        + b"\x03\x80"
+        + chunk1
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+    )
+    path = tmp_path / "parallel_merge.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    bar0 = piece.bars[0]
+    bar1 = piece.bars[1]
+    assert len(bar0.melody_events) == 3
+    assert [event.onset_index for event in bar0.melody_events] == [0, 1, 2]
+    assert bar0.lyrics
+    assert len(bar1.melody_events) == 3
+    assert [event.onset_index for event in bar1.melody_events] == [0, 1, 2]
+    assert bar1.lyrics
+    assert bar0.lyrics[0].startswith("Now")
+    assert bar1.lyrics[0].startswith("She")

@@ -423,6 +423,10 @@ def _looks_like_control_text(text: str, raw_tokens: list[str]) -> bool:
     return bool(raw_tokens and alpha <= 1 and digits >= 1 and punct >= 1)
 
 
+def _vocal_text_tokens(raw_tokens: list[str]) -> list[str]:
+    return [tok for tok in raw_tokens if not _likely_non_lyric_token(tok)]
+
+
 def _classify_structured_row(row: bytes, row_index: int) -> ImportedTextRow | None:
     text = _structured_row_text(row)
     raw_tokens = _raw_control_tokens_from_row(row)
@@ -435,6 +439,7 @@ def _classify_structured_row(row: bytes, row_index: int) -> ImportedTextRow | No
     row_tokens = raw_tokens
     if row_index == 0 and _structured_vocal_events(row):
         kind = "vocal"
+        row_tokens = _vocal_text_tokens(raw_tokens)
     elif raw_tokens and _looks_like_editorial_tokens(raw_tokens):
         kind = "editorial"
         row_text = " ".join(raw_tokens).strip()
@@ -528,11 +533,15 @@ def _structured_lyric_rows(tokens_by_row: list[list[str]]) -> list[list[str]]:
     return rows
 
 
-def _cluster_lyric_lanes(positioned_rows: list[list[tuple[int, str]]]) -> list[list[str]]:
+def _cluster_lyric_lanes(
+    positioned_rows: list[list[tuple[int, str]]],
+    *,
+    tolerance: int = 3,
+) -> list[list[str]]:
     lane_positions: list[int] = []
     for row in positioned_rows:
         for pos, _tok in row:
-            if any(abs(pos - existing) <= 3 for existing in lane_positions):
+            if any(abs(pos - existing) <= tolerance for existing in lane_positions):
                 continue
             lane_positions.append(pos)
     if len(lane_positions) <= 1:
@@ -551,14 +560,25 @@ def _cluster_lyric_lanes(positioned_rows: list[list[tuple[int, str]]]) -> list[l
 
 def _structured_lyric_rows_from_positioned_rows(
     positioned_rows: list[list[tuple[int, str]]],
+    *,
+    prefer_cluster: bool = False,
 ) -> list[list[str]]:
     if not positioned_rows:
         return []
     token_counts = [len(row) for row in positioned_rows]
     mostly_singletons = sum(count == 1 for count in token_counts) >= max(3, len(token_counts) - 1)
-    if len(positioned_rows) >= 4 and mostly_singletons:
+    lane_rows = _cluster_lyric_lanes(
+        positioned_rows,
+        tolerance=6 if prefer_cluster else 3,
+    )
+    if prefer_cluster and len(lane_rows) >= 2:
+        return lane_rows
+    if (
+        len(positioned_rows) >= 4
+        and mostly_singletons
+        and (not prefer_cluster or len(lane_rows) < 3)
+    ):
         return [[tok for _pos, tok in row] for row in positioned_rows if row]
-    lane_rows = _cluster_lyric_lanes(positioned_rows)
     if lane_rows:
         return lane_rows
     return _structured_lyric_rows([[tok for _pos, tok in row] for row in positioned_rows])
@@ -624,15 +644,77 @@ def _structured_positioned_lyric_rows(
 
 
 def _record_with_verse_rows(record: FT3TextRecord, verse_rows: list[list[str]]) -> FT3TextRecord:
-    lyric_lines = [" ".join(tokens).strip() for tokens in verse_rows if tokens]
+    normalized_rows = [_collapse_consecutive_duplicate_tokens(tokens) for tokens in verse_rows]
+    lyric_lines = [" ".join(tokens).strip() for tokens in normalized_rows if tokens]
     lyric_event_rows: list[list[LyricEvent]] = []
-    for verse, tokens in enumerate(verse_rows):
+    for verse, tokens in enumerate(normalized_rows):
         events = _events_from_lyric_tokens(tokens, verse=verse)
         if events:
             lyric_event_rows.append(events)
     if not lyric_lines and not lyric_event_rows:
         return record
     return replace(record, lyrics=lyric_lines, lyric_event_rows=lyric_event_rows)
+
+
+def _coalesce_raw_multi_verse_rows(
+    verse_rows: list[list[str]],
+    *,
+    melody_event_count: int,
+) -> list[list[str]]:
+    if len(verse_rows) <= 2 or melody_event_count <= 1:
+        return verse_rows
+    lead_rows = 0
+    for row in verse_rows:
+        if len(row) != 1 or lead_rows >= melody_event_count:
+            break
+        lead_rows += 1
+    if lead_rows < 2:
+        return verse_rows
+    primary: list[str] = []
+    for row in verse_rows[:lead_rows]:
+        primary.extend(row)
+    secondary: list[str] = []
+    for row in verse_rows[lead_rows:]:
+        secondary.extend(row)
+    out = [primary]
+    if secondary:
+        out.append(secondary)
+    return out
+
+
+def _reconstruct_three_verse_raw_rows(
+    positioned_rows: list[list[tuple[int, str]]],
+    *,
+    melody_event_count: int,
+) -> list[list[str]] | None:
+    if melody_event_count < 1 or len(positioned_rows) < 3 or not positioned_rows[0]:
+        return None
+    lyric_tokens = [tok for row in positioned_rows[1:] for _pos, tok in row]
+    invalid_shape = len(lyric_tokens) < 2 or any(len(row) > 2 for row in positioned_rows[1:])
+    if invalid_shape:
+        return None
+    primary = [tok for _pos, tok in positioned_rows[0]]
+    if not primary:
+        return None
+    verse_two: list[str] = []
+    verse_three: list[str] = []
+    cycle = [verse_two, verse_three, primary]
+    cycle_index = 0
+    for row in positioned_rows[1:]:
+        for _pos, tok in row:
+            cycle[cycle_index].append(tok)
+            cycle_index = (cycle_index + 1) % len(cycle)
+    rows = [primary, verse_two, verse_three]
+    return rows if sum(1 for row in rows if row) >= 3 else None
+
+
+def _collapse_consecutive_duplicate_tokens(tokens: list[str]) -> list[str]:
+    out: list[str] = []
+    for token in tokens:
+        if out and out[-1].lower() == token.lower():
+            continue
+        out.append(token)
+    return out
 
 
 def _looks_like_editorial_tokens(tokens: list[str]) -> bool:
@@ -681,6 +763,7 @@ def _vocal_pitch_token(row_value: int, flags: int) -> str:
 
 def _vocal_note_type_from_code(code: int) -> int | None:
     mapping = {
+        0x32: 3,
         0x33: 4,
         0x34: 5,
         0x35: 6,
@@ -707,17 +790,19 @@ def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
     idx = 5
     while idx + 7 <= len(prefix):
         rec = prefix[idx : idx + 7]
-        if rec[0] != 0x01 or rec[1] not in (0x33, 0x34, 0x35):
+        if rec[0] != 0x01 or rec[1] not in (0x32, 0x33, 0x34, 0x35):
             break
         flags = int.from_bytes(rec[3:5], "little")
+        is_rest = bool(flags & 0x0040)
         events.append(
             MelodyEvent(
-                text=_vocal_pitch_token(rec[2], flags),
+                text="r" if is_rest else _vocal_pitch_token(rec[2], flags),
                 onset_index=len(events),
                 src_pos=-1,
                 note_type=_vocal_note_type_from_code(rec[1]),
                 dotted=bool(flags & 0x10),
                 accidental_flags=flags,
+                is_rest=is_rest,
             ),
         )
         idx += 7
@@ -803,7 +888,14 @@ def _melody_events_from_line(line: str | None) -> list[MelodyEvent]:
         cleaned = _clean_text_token(tok)
         if not cleaned:
             continue
-        events.append(MelodyEvent(text=cleaned, onset_index=onset_idx, src_pos=pos))
+        events.append(
+            MelodyEvent(
+                text=cleaned,
+                onset_index=onset_idx,
+                src_pos=pos,
+                is_rest=cleaned.strip().lower() in {"r", "rest"},
+            ),
+        )
         onset_idx += 1
     return events
 
@@ -910,7 +1002,20 @@ def refine_ft3_raw_text_record(record: FT3TextRecord, chunk: bytes) -> FT3TextRe
     positioned_tokens_by_row = _structured_positioned_lyric_rows(tail)
     if not positioned_tokens_by_row:
         return record
-    verse_rows = _structured_lyric_rows_from_positioned_rows(positioned_tokens_by_row)
+    three_verse_rows = _reconstruct_three_verse_raw_rows(
+        positioned_tokens_by_row,
+        melody_event_count=len(record.melody_events),
+    )
+    if three_verse_rows:
+        return _record_with_verse_rows(record, three_verse_rows)
+    verse_rows = _structured_lyric_rows_from_positioned_rows(
+        positioned_tokens_by_row,
+        prefer_cluster=True,
+    )
     if not verse_rows:
         return record
+    verse_rows = _coalesce_raw_multi_verse_rows(
+        verse_rows,
+        melody_event_count=len(record.melody_events),
+    )
     return _record_with_verse_rows(record, verse_rows)
