@@ -12,6 +12,7 @@ from oud.core.ft3_text import (
     decode_ft3_vocal_events,
     is_ft3_text_record,
     parse_ft3_text_record,
+    refine_ft3_raw_text_record,
 )
 from oud.core.model import (
     Bar,
@@ -23,6 +24,38 @@ from oud.core.model import (
     Note,
     Piece,
 )
+
+
+def _is_tab_bar(bar: Bar) -> bool:
+    return bool(bar.chords or bar.notes)
+
+
+def _parallel_mixed_score_prefix_count(kinds: list[str]) -> int | None:
+    first_tab = next((idx for idx, kind in enumerate(kinds) if kind == "tab"), -1)
+    if first_tab <= 0:
+        return None
+    prefix = kinds[:first_tab]
+    suffix = kinds[first_tab:]
+    if any(kind != "raw" for kind in prefix):
+        return None
+    if not suffix or any(kind != "tab" for kind in suffix):
+        return None
+    if len(prefix) != len(suffix):
+        return None
+    return len(prefix)
+
+
+def _parallel_raw_bar_targets(raw_kinds: list[str], *, bar_count: int) -> list[int]:
+    if bar_count <= 0:
+        return []
+    targets: list[int] = []
+    bar_index = 0
+    for raw_kind in raw_kinds:
+        target_index = min(bar_index, bar_count - 1)
+        targets.append(target_index)
+        if raw_kind != "barline-raw":
+            bar_index += 1
+    return targets
 
 
 def _strip_rtf(text: str) -> str:
@@ -335,6 +368,11 @@ def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
     elif right_repeat:
         bar.repeat = ":."
 
+    # Corpus-backed hint: byte0 bit 0x40 appears on section/final boundary bars
+    # and behaves like a forced system break for FT3 layout.
+    if b0 & 0x40:
+        bar.system_break = True
+
     if (b0 & 0x80) or (b1 & 0x01):
         bar.barline = "||"
 
@@ -372,6 +410,12 @@ def _record_has_content(record: FT3TextRecord) -> bool:
         or record.editorial_text
         or record.structured_rows,
     )
+
+
+def _has_unclassified_bar_header_markers(bar_data: bytes) -> bool:
+    if len(bar_data) < 1:
+        return False
+    return bool(bar_data[0] & 0x20)
 
 
 def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
@@ -421,10 +465,12 @@ def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
 
 
 def _decode_raw_score_record(raw_kind: str, chunk: bytes) -> FT3TextRecord | None:
-    if raw_kind not in {"note-staff-raw", "note-lyric-raw"}:
+    if raw_kind not in {"note-staff-raw", "note-lyric-raw", "text-score-raw"}:
         return None
     payload = chunk[32:] if len(chunk) > 32 else chunk
     record = parse_ft3_text_record(bytes(32) + payload)
+    if raw_kind in {"note-lyric-raw", "text-score-raw"}:
+        record = refine_ft3_raw_text_record(record, bytes(32) + payload)
     if record and _record_has_content(record):
         return record
     melody_events = decode_ft3_vocal_events(payload)
@@ -447,6 +493,7 @@ def _imported_bar_base(bar_index: int, bar: Bar) -> ImportedBarContent:
         time_sig=bar.time_sig,
         barline=bar.barline,
         repeat=bar.repeat,
+        system_break=bar.system_break,
     )
 
 
@@ -608,35 +655,90 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     bar_text_records: list[list[FT3TextRecord]] = []
     parsed_bars: list[Bar] = []
     unknown_bar_chunks: list[tuple[int, int, str, bytes]] = []
+    parallel_meta_bars: list[tuple[int, Bar]] = []
+    has_unclassified_bar_markers = False
     body_start = data.find(b"CBar")
     if body_start >= 0:
         body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
-        # Always parse bars from the CBar body stream so CPiece/metadata bytes
-        # cannot pollute bar 1 (common in duet-score files).
-        bar_chunks = []
-        bar_text_records = []
-        leading_records: list[FT3TextRecord] = []
+        body_entries: list[tuple[str, bytes, Bar, str | None]] = []
         for chunk in body_chunks:
-            if is_ft3_text_record(chunk):
-                record = parse_ft3_text_record(chunk)
-                if not _record_has_content(record):
+            has_unclassified_bar_markers = (
+                has_unclassified_bar_markers or _has_unclassified_bar_header_markers(chunk)
+            )
+            parsed = parse_bar(chunk)
+            raw_kind = _classify_unknown_score_chunk(chunk, parsed)
+            kind = "other"
+            if _is_tab_bar(parsed):
+                kind = "tab"
+            elif raw_kind is not None:
+                kind = "raw"
+            body_entries.append((kind, chunk, parsed, raw_kind))
+        parallel_prefix_count = _parallel_mixed_score_prefix_count(
+            [kind for kind, _chunk, _parsed, _raw_kind in body_entries],
+        )
+        if parallel_prefix_count is not None:
+            prefix_entries = body_entries[:parallel_prefix_count]
+            tab_entries = body_entries[parallel_prefix_count:]
+            bar_chunks = [chunk for _kind, chunk, _parsed, _raw_kind in tab_entries]
+            bar_text_records = [[] for _ in tab_entries]
+            raw_targets = _parallel_raw_bar_targets(
+                [raw_kind or "" for _kind, _chunk, _parsed, raw_kind in prefix_entries],
+                bar_count=len(tab_entries),
+            )
+            for target_index, (_kind, chunk, parsed, raw_kind) in zip(
+                raw_targets,
+                prefix_entries,
+                strict=False,
+            ):
+                if raw_kind is None:
                     continue
-                parsed_text_records.append(record)
-                if bar_chunks:
-                    bar_text_records[-1].append(record)
-                else:
-                    leading_records.append(record)
-                continue
-            bar_chunks.append(chunk)
-            attached: list[FT3TextRecord] = []
-            if leading_records:
-                attached.append(leading_records.pop(0))
-            bar_text_records.append(attached)
+                unknown_bar_chunks.append((target_index, len(chunk), raw_kind, chunk))
+                decoded = _decode_raw_score_record(raw_kind, chunk)
+                if decoded is not None and _record_has_content(decoded):
+                    parsed_text_records.append(decoded)
+                    bar_text_records[target_index].append(decoded)
+                if parsed.time_sig or parsed.barline or parsed.repeat or parsed.system_break:
+                    parallel_meta_bars.append((target_index, parsed))
+        else:
+            # Always parse bars from the CBar body stream so CPiece/metadata bytes
+            # cannot pollute bar 1 (common in duet-score files).
+            bar_chunks = []
+            bar_text_records = []
+            leading_records: list[FT3TextRecord] = []
+            for chunk in body_chunks:
+                if is_ft3_text_record(chunk):
+                    record = parse_ft3_text_record(chunk)
+                    if not _record_has_content(record):
+                        continue
+                    parsed_text_records.append(record)
+                    if bar_chunks:
+                        bar_text_records[-1].append(record)
+                    else:
+                        leading_records.append(record)
+                    continue
+                bar_chunks.append(chunk)
+                attached: list[FT3TextRecord] = []
+                if leading_records:
+                    attached.append(leading_records.pop(0))
+                bar_text_records.append(attached)
     for bar_index, chunk in enumerate(bar_chunks):
+        has_unclassified_bar_markers = (
+            has_unclassified_bar_markers or _has_unclassified_bar_header_markers(chunk)
+        )
         bar = parse_bar(chunk)
         parsed_bars.append(bar)
         if raw_kind := _classify_unknown_score_chunk(chunk, bar):
             unknown_bar_chunks.append((bar_index, len(chunk), raw_kind, chunk))
+    for bar_index, meta_bar in parallel_meta_bars:
+        if 0 <= bar_index < len(parsed_bars):
+            target = parsed_bars[bar_index]
+            if target.time_sig is None:
+                target.time_sig = meta_bar.time_sig
+            if target.barline is None:
+                target.barline = meta_bar.barline
+            if target.repeat is None:
+                target.repeat = meta_bar.repeat
+            target.system_break = target.system_break or meta_bar.system_break
     bars = parsed_bars
     _apply_legacy_duration_fix(bars)
     _fill_missing_time_signatures(bars)
@@ -663,6 +765,11 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
         warning = _ft3_text_import_warning(parsed_text_records)
         if warning:
             piece.import_warnings.append(warning)
+    if has_unclassified_bar_markers:
+        piece.import_warnings.append(
+            "FT3 contains additional bar header markers; "
+            "only repeats, double bars, and system breaks are decoded.",
+        )
     if (
         piece.imported_score is not None
         and any(staff.kind == "unknown" for staff in piece.imported_score.staffs)

@@ -3,6 +3,8 @@ import gzip
 from oud.core.ft3 import (
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
+    _parallel_mixed_score_prefix_count,
+    _parallel_raw_bar_targets,
     load_ft3,
     note_type_to_denominator,
     parse_bar,
@@ -50,6 +52,13 @@ def test_parse_bar_decodes_right_repeat_from_byte1_bit2_marker() -> None:
     bar = parse_bar(bytes([0x80, 0x03]) + bytes(30))
     assert bar.barline == "||"
     assert bar.repeat == ":."
+
+
+def test_parse_bar_decodes_ft3_system_break_hint() -> None:
+    bar = parse_bar(bytes([0x40, 0x00]) + bytes(30))
+    assert bar.system_break is True
+    assert bar.barline is None
+    assert bar.repeat is None
 
 
 def _ft3_bar_with_one_note(*, extras: int = 0) -> bytes:
@@ -218,6 +227,14 @@ def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
     piece = load_ft3("lutemusic/can_she_excuse.ft3")
     assert len(piece.bars) == 40
     assert all(bar.chords for bar in piece.bars)
+
+
+def test_can_she_excuse_ft3_drops_noise_token_from_second_verse_bar_38() -> None:
+    piece = load_ft3("lutemusic/can_she_excuse.ft3")
+    bar = piece.bars[37]
+    lyric_rows = [[ev.text for ev in row] for row in bar.lyric_event_rows]
+    assert lyric_rows == [["come", "her", "will", "Thy"], ["it", "was", "I", "Who"]]
+    assert all("WN" not in text for row in lyric_rows for text in row)
     assert piece.import_warnings
     assert "structured records" in piece.import_warnings[0]
     assert any(bar.lyrics for bar in piece.bars)
@@ -248,6 +265,14 @@ def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> No
     piece = load_ft3(str(path))
     assert piece.import_warnings
     assert "structured text records" in piece.import_warnings[0]
+
+
+def test_load_ft3_warns_on_additional_unclassified_bar_header_markers(tmp_path) -> None:
+    payload = b"CPieceTest\x03\x80CBar" + bytes([0x20, 0x00]) + bytes(30) + b"\x03\x80"
+    path = tmp_path / "header_markers.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert any("additional bar header markers" in warning for warning in piece.import_warnings)
 
 
 def test_load_ft3_attaches_single_structured_editorial_record_to_preceding_bar(tmp_path) -> None:
@@ -507,3 +532,17 @@ def test_ich_bin_blume_ft3_fills_missing_time_signatures_by_section() -> None:
     assert piece.bars[128].time_sig == "6/8"
     assert piece.bars[140].time_sig == "6/8"
     assert piece.bars[159].time_sig == "C|"
+
+
+def test_parallel_mixed_score_prefix_count_detects_raw_prefix_and_tab_suffix() -> None:
+    assert _parallel_mixed_score_prefix_count(["raw", "raw", "tab", "tab"]) == 2
+    assert _parallel_mixed_score_prefix_count(["raw", "tab", "raw", "tab"]) is None
+    assert _parallel_mixed_score_prefix_count(["raw", "raw", "tab"]) is None
+
+
+def test_parallel_raw_bar_targets_keep_barline_on_current_measure() -> None:
+    targets = _parallel_raw_bar_targets(
+        ["barline-raw", "note-lyric-raw", "note-lyric-raw", "barline-raw", "text-score-raw"],
+        bar_count=5,
+    )
+    assert targets == [0, 0, 1, 2, 2]

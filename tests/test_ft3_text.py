@@ -1,4 +1,4 @@
-from oud.core.ft3_text import is_ft3_text_record, parse_ft3_text_record
+from oud.core.ft3_text import is_ft3_text_record, parse_ft3_text_record, refine_ft3_raw_text_record
 
 
 def _text_chunk(*lines: str) -> bytes:
@@ -61,6 +61,31 @@ def test_parse_ft3_structured_text_record_builds_ordered_verses() -> None:
     assert record.lyrics == ["Can she ex-", "Was I so"]
     assert [ev.verse for ev in record.lyric_event_rows[0]] == [0, 0, 0]
     assert [ev.verse for ev in record.lyric_event_rows[1]] == [1, 1, 1]
+
+
+def test_refine_ft3_raw_text_record_preserves_singleton_verse_rows() -> None:
+    chunk = _structured_chunk(
+        b"\x08Now",
+        b"\x01I",
+        b"\x01I\x08I",
+        b"\x01am",
+        b"\x01do",
+    )
+    record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
+    assert record.parse_mode == "structured"
+    assert record.lyrics == ["Now", "I", "I I", "am", "do"]
+    assert [len(row) for row in record.lyric_event_rows] == [1, 1, 2, 1, 1]
+
+
+def test_refine_ft3_raw_text_record_drops_vocal_pitch_tail_token() -> None:
+    chunk = _structured_chunk(
+        b"\x01\x00\x03\x00\x05a\x08Can",
+        b"Was\x06she",
+        b"I\x07ex-",
+        b"so",
+    )
+    record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
+    assert record.lyrics == ["Can she ex-", "Was I so"]
 
 
 def test_parse_ft3_structured_text_record_keeps_explicit_extender_tokens() -> None:

@@ -499,13 +499,12 @@ def _next_system_start(
     breaks: set[int],
 ) -> int:
     total = len(bars)
-    if not breaks:
-        return min(total, start + per_line)
-    for offset in range(1, per_line + 1):
-        idx = start + offset
-        if idx in breaks:
-            return idx
-    return min(total, start + per_line)
+    limit = min(total, start + per_line)
+    for idx in range(start, limit):
+        next_idx = idx + 1
+        if next_idx in breaks or bars[idx].system_break:
+            return next_idx
+    return limit
 
 
 def _parse_time_signature(value: str) -> tuple[int, int, str]:

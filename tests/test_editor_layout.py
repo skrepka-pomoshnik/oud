@@ -110,6 +110,23 @@ def test_dynamic_system_starts_respect_chordwrap_threshold() -> None:
     assert starts == [0, 1, 2, 3]
 
 
+def test_dynamic_system_starts_respect_imported_system_break_hint() -> None:
+    bars = [Bar() for _ in range(5)]
+    bars[1].system_break = True
+    state = EditorState(
+        Piece(bars=bars, strings=6),
+        {
+            "layout": "packed",
+            "barsperline": "4",
+            "maxbars": "0",
+            "bargap": "1",
+            "linelen": "0",
+        },
+    )
+    state.bar_width = 10
+    assert dynamic_system_starts(state, width=200) == [0, 2]
+
+
 def test_jump_system_row_dynamic_prefers_visual_x_alignment() -> None:
     bars = [Bar() for _ in range(6)]
     bars[0] = Bar(

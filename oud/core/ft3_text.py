@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from oud.core.model import ImportedTextRow, LyricEvent, MelodyEvent
 
@@ -223,6 +223,27 @@ def _clean_lyric_token(token: str) -> str:
     return cleaned.strip()
 
 
+def _trim_leading_single_letter_lyric_noise(tokens: list[str]) -> list[str]:
+    trimmed = list(tokens)
+    while (
+        len(trimmed) > 1
+        and len(trimmed[0]) == 1
+        and trimmed[0].islower()
+        and trimmed[0] not in {"i", "o"}
+    ):
+        trimmed = trimmed[1:]
+    return trimmed
+
+
+def _trim_leading_single_letter_positioned_noise(
+    tokens: list[tuple[int, str]],
+) -> list[tuple[int, str]]:
+    trimmed = list(tokens)
+    while len(trimmed) > 1 and len(trimmed[0][1]) == 1 and trimmed[0][1].islower():
+        trimmed = trimmed[1:]
+    return trimmed
+
+
 def _keep_lyric_token(token: str) -> bool:
     if not token:
         return False
@@ -296,6 +317,8 @@ def _likely_non_lyric_token(token: str) -> bool:
     if not token:
         return True
     lower = token.lower()
+    if token.isupper() and 1 < len(token) <= 3:
+        return True
     if all(ch.isdigit() or ch == "." for ch in lower):
         return True
     if re.fullmatch(r"[a-gh](?:[#b]|[',])*", lower) and not (
@@ -323,6 +346,7 @@ def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
             last_non_lyric = idx
     start = last_non_lyric + 1
     out = [tok for tok in tokens[start:] if _keep_lyric_token(tok) or set(tok) <= {"_"}]
+    out = _trim_leading_single_letter_lyric_noise(out)
     if out:
         if " ".join(tok.lower() for tok in out) in {"times new roman", "new roman"}:
             return []
@@ -332,6 +356,7 @@ def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
         for tok in tokens
         if (_keep_lyric_token(tok) or set(tok) <= {"_"}) and not _likely_non_lyric_token(tok)
     ]
+    fallback = _trim_leading_single_letter_lyric_noise(fallback)
     if " ".join(tok.lower() for tok in fallback) in {"times new roman", "new roman"}:
         return []
     return fallback
@@ -376,7 +401,12 @@ def _fallback_lyric_tokens_from_text(text: str) -> list[str]:
     tokens = [tok for tok in normalized.split() if tok]
     if not tokens:
         return []
-    return [tok for tok in tokens if any(ch.isalpha() for ch in tok) or set(tok) <= {"_"}]
+    return [
+        tok
+        for tok in tokens
+        if (any(ch.isalpha() for ch in tok) or set(tok) <= {"_"})
+        and (set(tok) <= {"_"} or (_keep_lyric_token(tok) and not _likely_non_lyric_token(tok)))
+    ]
 
 
 def _looks_like_control_text(text: str, raw_tokens: list[str]) -> bool:
@@ -496,6 +526,113 @@ def _structured_lyric_rows(tokens_by_row: list[list[str]]) -> list[list[str]]:
     if secondary:
         rows.append(secondary)
     return rows
+
+
+def _cluster_lyric_lanes(positioned_rows: list[list[tuple[int, str]]]) -> list[list[str]]:
+    lane_positions: list[int] = []
+    for row in positioned_rows:
+        for pos, _tok in row:
+            if any(abs(pos - existing) <= 3 for existing in lane_positions):
+                continue
+            lane_positions.append(pos)
+    if len(lane_positions) <= 1:
+        return []
+    lane_positions.sort(reverse=True)
+    lane_rows: list[list[str]] = [[] for _ in lane_positions]
+    for row in positioned_rows:
+        for pos, tok in row:
+            lane_idx = min(
+                range(len(lane_positions)),
+                key=lambda idx: abs(pos - lane_positions[idx]),
+            )
+            lane_rows[lane_idx].append(tok)
+    return [row for row in lane_rows if row]
+
+
+def _structured_lyric_rows_from_positioned_rows(
+    positioned_rows: list[list[tuple[int, str]]],
+) -> list[list[str]]:
+    if not positioned_rows:
+        return []
+    token_counts = [len(row) for row in positioned_rows]
+    mostly_singletons = sum(count == 1 for count in token_counts) >= max(3, len(token_counts) - 1)
+    if len(positioned_rows) >= 4 and mostly_singletons:
+        return [[tok for _pos, tok in row] for row in positioned_rows if row]
+    lane_rows = _cluster_lyric_lanes(positioned_rows)
+    if lane_rows:
+        return lane_rows
+    return _structured_lyric_rows([[tok for _pos, tok in row] for row in positioned_rows])
+
+
+def _filtered_structured_lyric_tokens(tokens: list[str]) -> list[str]:
+    out: list[str] = []
+    for tok in tokens:
+        if not tok:
+            continue
+        if set(tok) <= {"_"}:
+            out.append(tok)
+            continue
+        if _keep_lyric_token(tok) and not _likely_non_lyric_token(tok):
+            out.append(tok)
+    return out
+
+
+def _filtered_positioned_lyric_tokens(row: bytes) -> list[tuple[int, str]]:
+    tokens: list[tuple[int, str]] = []
+    for pos, tok in _tokenize_control_row(row):
+        cleaned = _clean_lyric_token(tok)
+        if cleaned:
+            tokens.append((pos, cleaned))
+    if not tokens:
+        return []
+    last_non_lyric = -1
+    for idx, (_pos, tok) in enumerate(tokens):
+        if (_likely_non_lyric_token(tok) or not _keep_lyric_token(tok)) and set(tok) != {"_"}:
+            last_non_lyric = idx
+    filtered = [
+        (pos, tok)
+        for pos, tok in tokens[last_non_lyric + 1 :]
+        if set(tok) <= {"_"} or (_keep_lyric_token(tok) and not _likely_non_lyric_token(tok))
+    ]
+    if filtered:
+        return filtered
+    return [
+        (pos, tok)
+        for pos, tok in tokens
+        if set(tok) <= {"_"} or (_keep_lyric_token(tok) and not _likely_non_lyric_token(tok))
+    ]
+
+
+def _structured_positioned_lyric_rows(
+    tail: bytes,
+) -> list[list[tuple[int, str]]]:
+    rows = _split_record_rows(tail)
+    classified_rows = [
+        (row, classified)
+        for row_index, row in enumerate(rows)
+        if (classified := _classify_structured_row(row, row_index)) is not None
+    ]
+    positioned_tokens_by_row: list[list[tuple[int, str]]] = []
+    for row, classified in classified_rows:
+        if classified.kind not in {"vocal", "lyrics"}:
+            continue
+        filtered = _filtered_positioned_lyric_tokens(row)
+        filtered = _trim_leading_single_letter_positioned_noise(filtered)
+        if filtered:
+            positioned_tokens_by_row.append(filtered)
+    return positioned_tokens_by_row
+
+
+def _record_with_verse_rows(record: FT3TextRecord, verse_rows: list[list[str]]) -> FT3TextRecord:
+    lyric_lines = [" ".join(tokens).strip() for tokens in verse_rows if tokens]
+    lyric_event_rows: list[list[LyricEvent]] = []
+    for verse, tokens in enumerate(verse_rows):
+        events = _events_from_lyric_tokens(tokens, verse=verse)
+        if events:
+            lyric_event_rows.append(events)
+    if not lyric_lines and not lyric_event_rows:
+        return record
+    return replace(record, lyrics=lyric_lines, lyric_event_rows=lyric_event_rows)
 
 
 def _looks_like_editorial_tokens(tokens: list[str]) -> bool:
@@ -623,7 +760,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
             parse_mode="structured",
         )
     tokens_by_row = [
-        tokens
+        filtered
         for row, classified in classified_rows
         if classified.kind not in {"font", "control", "editorial"}
         if (
@@ -632,6 +769,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
                 or _fallback_lyric_tokens_from_text(_structured_row_text(row))
             )
         )
+        if (filtered := _filtered_structured_lyric_tokens(tokens))
     ]
     if not tokens_by_row:
         return None
@@ -763,3 +901,16 @@ def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:
         structured_rows=[],
         parse_mode="ascii",
     )
+
+
+def refine_ft3_raw_text_record(record: FT3TextRecord, chunk: bytes) -> FT3TextRecord:
+    if record.parse_mode != "structured" or not record.structured_rows:
+        return record
+    tail = chunk[32:] if len(chunk) > 32 else chunk
+    positioned_tokens_by_row = _structured_positioned_lyric_rows(tail)
+    if not positioned_tokens_by_row:
+        return record
+    verse_rows = _structured_lyric_rows_from_positioned_rows(positioned_tokens_by_row)
+    if not verse_rows:
+        return record
+    return _record_with_verse_rows(record, verse_rows)

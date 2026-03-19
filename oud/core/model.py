@@ -32,6 +32,7 @@ class ImportedBarContent:
     time_sig: str | None = None
     barline: str | None = None
     repeat: str | None = None
+    system_break: bool = False
     lyrics: list[str] = field(default_factory=list)
     melody_events: list[MelodyEvent] = field(default_factory=list)
     lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
@@ -80,6 +81,7 @@ class Bar:
     barline: str | None = None
     repeat: str | None = None
     time_sig: str | None = None
+    system_break: bool = False
     dynamic: str | None = None
     fermata: bool = False
     chords: list[Chord] = field(default_factory=list)
