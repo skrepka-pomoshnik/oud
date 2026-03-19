@@ -1,6 +1,6 @@
 import pytest
 
-from oud.core.model import Bar, Piece
+from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 from oud.tui.viewport import ensure_cursor_visible
@@ -26,6 +26,43 @@ def _state(bars: int = 40) -> EditorState:
     state = EditorState(piece, settings)
     state.screen_width = 80
     state.screen_height = 40
+    state.bar_width = 8
+    return state
+
+
+def _duet_halves_state(logical_bars: int = 10) -> EditorState:
+    top_bars = [
+        Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, idx % 3, 0)])])
+        for idx in range(logical_bars)
+    ]
+    bottom_bars = [
+        Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, idx % 4, 0)])])
+        for idx in range(logical_bars)
+    ]
+    piece = Piece(
+        title="Duet",
+        bars=top_bars + bottom_bars,
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    settings = {
+        "style": "french",
+        "layout": "auto",
+        "barsperline": "2",
+        "bargap": "1",
+        "showdur": "off",
+        "showextras": "off",
+        "showtactus": "off",
+        "flagstems": "single",
+        "playbackscroll": "on",
+        "duetscoreview": "both",
+        "scrollmode": "smooth",
+    }
+    state = EditorState(piece, settings)
+    state.screen_width = 80
+    state.screen_height = 12
     state.bar_width = 8
     return state
 
@@ -67,6 +104,64 @@ def test_ensure_cursor_visible_ignores_playback_when_disabled() -> None:
     state.playback_bar = 8
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
     assert state.bar_offset == 0
+
+
+def test_ensure_cursor_visible_maps_duet_halves_playback_to_logical_rows() -> None:
+    state = _duet_halves_state()
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.playback_bar = 14  # bottom staff, logical bar 4 in halves storage
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 8
+
+
+def test_ensure_cursor_visible_duet_single_staff_follows_hidden_staff_playback_logically() -> None:
+    state = _duet_halves_state()
+    state.settings["duetscoreview"] = "1"
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.playback_bar = 16  # hidden bottom staff, logical bar 6
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 12
+
+
+def test_ensure_cursor_visible_follows_vocal_playback_with_text_lanes_visible() -> None:
+    piece = Piece(
+        title="Vocal",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("d", 0)],
+                lyric_event_rows=[[LyricEvent(f"w{idx}", 0)]],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, idx % 4, 0)])],
+            )
+            for idx in range(10)
+        ],
+        strings=6,
+        style="french",
+    )
+    settings = {
+        "style": "french",
+        "layout": "packed",
+        "barsperline": "2",
+        "bargap": "1",
+        "showdur": "off",
+        "showextras": "off",
+        "showtactus": "off",
+        "flagstems": "single",
+        "showmelody": "on",
+        "showlyrics": "on",
+        "playbackscroll": "on",
+        "scrollmode": "smooth",
+    }
+    state = EditorState(piece, settings)
+    state.screen_width = 80
+    state.screen_height = 14
+    state.bar_width = 8
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.playback_bar = 8
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 8
 
 
 def test_jk_auto_clamps_cursor_to_system_visible_rows_and_scrolls() -> None:

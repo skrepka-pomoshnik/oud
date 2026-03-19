@@ -118,6 +118,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("ShowOrnaments:", settings.get("showornaments", settings.get("showft3extras"))),
         line("ShowMelody:", settings.get("showmelody")),
         line("ShowLyrics:", settings.get("showlyrics")),
+        line("PlayVerses:", settings.get("playverses", "all")),
         line("ShowTactus:", settings.get("showtactus")),
         line("Measures:", settings.get("measures")),
         line("MeasuresStep:", settings.get("measuresstep")),

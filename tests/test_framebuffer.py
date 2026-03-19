@@ -1,7 +1,7 @@
 import unicodedata
 
 from oud.ui.adapter import CursesError, Screen
-from oud.ui.framebuffer import Frame, draw_frame_rows
+from oud.ui.framebuffer import Frame, draw_frame_rows, overlay_dirty_rows
 
 
 def _display_cols(text: str) -> int:
@@ -89,3 +89,23 @@ def test_draw_frame_rows_screen_base_attr_applies_to_plain_rows() -> None:
     frame = Frame(lines=["abcd"], attrs=[(0, 0, 0, 0)])
     draw_frame_rows(screen, frame, {0})
     assert screen.attr_calls == [16]
+
+
+def test_overlay_dirty_rows_updates_only_selected_rows() -> None:
+    base = Frame(
+        lines=["abcdef", "ghijkl"],
+        attrs=[(0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0)],
+    )
+    current = Frame(
+        lines=["abXdef", "ghijkl"],
+        attrs=[(0, 0, 1, 0, 0, 0), (0, 0, 0, 0, 0, 0)],
+    )
+    next_frame = overlay_dirty_rows(
+        current,
+        base_frame=base,
+        ops=[(1, 2, "Y", 3)],
+        rows={0, 1},
+    )
+    assert next_frame.lines[0] == "abcdef"
+    assert next_frame.lines[1] == "ghYjkl"
+    assert next_frame.attrs[1][2] == 3

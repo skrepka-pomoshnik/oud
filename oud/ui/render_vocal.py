@@ -3,11 +3,17 @@ from __future__ import annotations
 import re
 
 from oud.core.model import Bar, LyricEvent, MelodyEvent
-from oud.ui.render_text_lanes import _MELODY_STAFF_ROWS, lyric_event_cells, melody_staff_rows
+from oud.ui.render_text_lanes import (
+    lyric_event_cells,
+    melody_staff_rows,
+)
+from oud.ui.render_text_lanes import (
+    melody_row_count as _melody_row_count,
+)
 
 
-def melody_row_count() -> int:
-    return _MELODY_STAFF_ROWS
+def melody_row_count(view: str | None = None) -> int:
+    return _melody_row_count(view)
 
 
 def _bar_melody_events(bar: Bar) -> list[MelodyEvent]:
@@ -33,6 +39,7 @@ def melody_rows_for_bar(
     width: int,
     left_pad: int,
     tuning_pitches: list[int] | None,
+    melody_view: str | None = None,
 ) -> list[list[str]]:
     events = _bar_melody_events(bar)
     return melody_staff_rows(
@@ -43,6 +50,7 @@ def melody_rows_for_bar(
         bar=bar,
         bar_chords=getattr(bar, "chords", None),
         tuning_pitches=tuning_pitches,
+        melody_view=melody_view,
     )
 
 

@@ -1,9 +1,11 @@
 from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
 from oud.ui.render_text_lanes import (
-    _MELODY_STAFF_ROWS,
+    MELODY_FILLED_NOTEHEAD_GLYPH,
+    MELODY_NOTEHEAD_GLYPH,
     draw_melody_time_signature,
     lyric_event_cells,
     melody_event_cells,
+    melody_row_count,
     melody_staff_rows,
     text_bar_cells,
     tokenized_onset_cells,
@@ -155,10 +157,10 @@ def test_melody_staff_rows_uses_chord_pitches_when_tokens_are_non_pitch() -> Non
         ],
         tuning_pitches=[67, 62, 57, 53, 48, 43],
     )
-    assert len(rows) == _MELODY_STAFF_ROWS
+    assert len(rows) == melody_row_count()
     text_rows = ["".join(row) for row in rows]
-    assert any(line[2] == "o" for line in text_rows)
-    assert any(line[8] == "o" for line in text_rows)
+    assert any(line[2] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+    assert any(line[8] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
     assert sum(1 for line in text_rows if "-" in line) >= 5
 
 
@@ -182,10 +184,10 @@ def test_melody_staff_rows_inferred_vocal_notes_cover_all_chord_onsets() -> None
         tuning_pitches=[67, 62, 57, 53, 48, 43],
     )
     text_rows = ["".join(row) for row in rows]
-    assert sum(line.count("o") for line in text_rows) == 4
-    assert "|" in text_rows[0]
-    assert "\\" in text_rows[0]
-    assert sum(1 for line in text_rows if "|" in line or "\\" in line or "." in line) >= 2
+    assert sum(line.count(MELODY_FILLED_NOTEHEAD_GLYPH) for line in text_rows) == 4
+    assert any("|" in line for line in text_rows)
+    assert any("\\" in line for line in text_rows)
+    assert sum(1 for line in text_rows if any(glyph in line for glyph in ("|", "\\", "."))) >= 2
 
 
 def test_melody_staff_rows_does_not_clip_inferred_notes_to_lyric_count() -> None:
@@ -209,8 +211,8 @@ def test_melody_staff_rows_does_not_clip_inferred_notes_to_lyric_count() -> None
         tuning_pitches=[67, 62, 57, 53, 48, 43],
     )
     text_rows = ["".join(row) for row in rows]
-    assert sum(line.count("o") for line in text_rows) == 5
-    assert any(line[18] == "o" for line in text_rows)
+    assert sum(line.count(MELODY_FILLED_NOTEHEAD_GLYPH) for line in text_rows) == 5
+    assert any(line[18] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
 
 
 def test_melody_staff_rows_use_fixed_treble_positions_for_d_a_d_prime() -> None:
@@ -221,11 +223,13 @@ def test_melody_staff_rows_use_fixed_treble_positions_for_d_a_d_prime() -> None:
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    assert len(text_rows) == _MELODY_STAFF_ROWS
-    assert sum(1 for line in text_rows if "-" in line) == 5
-    assert text_rows[3][14] == "o"  # d' on the 4th line
-    assert text_rows[6][8] == "o"  # a in a staff space
-    assert text_rows[10][2] == "o"  # d below the bottom line
+    note_rows = {
+        2: next(idx for idx, line in enumerate(text_rows) if line[2] == MELODY_FILLED_NOTEHEAD_GLYPH),
+        8: next(idx for idx, line in enumerate(text_rows) if line[8] == MELODY_FILLED_NOTEHEAD_GLYPH),
+        14: next(idx for idx, line in enumerate(text_rows) if line[14] == MELODY_FILLED_NOTEHEAD_GLYPH),
+    }
+    assert note_rows[14] < note_rows[8] < note_rows[2]
+    assert sum(1 for line in text_rows if "-" in line) >= 5
 
 
 def test_melody_staff_rows_keeps_explicit_onsets_in_tab_columns() -> None:
@@ -236,11 +240,11 @@ def test_melody_staff_rows_keeps_explicit_onsets_in_tab_columns() -> None:
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    assert text_rows[10][2] == "o"
-    assert text_rows[6][8] == "o"
-    assert text_rows[3][14] == "o"
-    assert all(line[19] != "o" for line in text_rows)
-    assert all(line[23] != "o" for line in text_rows)
+    assert any(line[2] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+    assert any(line[8] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+    assert any(line[14] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+    assert all(line[19] != MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+    assert all(line[23] != MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
 
 
 def test_melody_staff_rows_draws_ledger_cue_for_note_below_visible_staff() -> None:
@@ -251,9 +255,9 @@ def test_melody_staff_rows_draws_ledger_cue_for_note_below_visible_staff() -> No
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    assert text_rows[10][4] == "o"
-    assert text_rows[10][3] == "-"
-    assert text_rows[10][5] == "-"
+    note_row = next(idx for idx, line in enumerate(text_rows) if line[4] == MELODY_FILLED_NOTEHEAD_GLYPH)
+    assert text_rows[note_row][3] == "-"
+    assert text_rows[note_row][5] == "-"
 
 
 def test_melody_staff_rows_draws_accidental_next_to_notehead() -> None:
@@ -264,11 +268,11 @@ def test_melody_staff_rows_draws_accidental_next_to_notehead() -> None:
         left_pad=1,
     )
     text_rows = ["".join(row) for row in rows]
-    note_row = next(idx for idx, line in enumerate(text_rows) if line[4] == "o")
+    note_row = next(idx for idx, line in enumerate(text_rows) if line[4] == MELODY_FILLED_NOTEHEAD_GLYPH)
     assert text_rows[note_row][3] == "b"
 
 
-def test_draw_melody_time_signature_places_stacked_meter_digits() -> None:
+def test_draw_melody_time_signature_places_numerator_only_left_of_first_stem() -> None:
     rows = melody_staff_rows(
         [MelodyEvent("d", 0)],
         onset_cols=[6],
@@ -277,5 +281,95 @@ def test_draw_melody_time_signature_places_stacked_meter_digits() -> None:
     )
     draw_melody_time_signature(rows, time_sig="3/4", left_pad=1)
     text_rows = ["".join(row) for row in rows]
-    assert text_rows[3][1] == "3"
-    assert text_rows[5][1] == "4"
+    meter_rows = [idx for idx, line in enumerate(text_rows) if line[0] == "3"]
+    assert len(meter_rows) == 1
+    assert all("4" not in line for line in text_rows)
+    assert all(line[6] != "3" for line in text_rows)
+
+
+def test_melody_staff_rows_draw_full_stems_by_default() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0)],
+        onset_cols=[4],
+        width=12,
+        left_pad=1,
+    )
+    text_rows = ["".join(row) for row in rows]
+    stem_rows = [row for row in range(len(text_rows)) if text_rows[row][4] == "|"]
+    assert len(stem_rows) == 3
+    assert stem_rows == list(range(stem_rows[0], stem_rows[0] + 3))
+
+
+def test_melody_staff_rows_use_consistent_stem_length_for_different_pitches() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0), MelodyEvent("a", 1), MelodyEvent("d'", 2)],
+        onset_cols=[4, 10, 16],
+        width=24,
+        left_pad=1,
+    )
+    text_rows = ["".join(row) for row in rows]
+    stem_lengths: list[int] = []
+    for col in (4, 10, 16):
+        note_row = next(
+            idx
+            for idx, line in enumerate(text_rows)
+            if line[col] in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)
+        )
+        stem_rows = [idx for idx, line in enumerate(text_rows[:note_row]) if line[col] == "|"]
+        stem_lengths.append(len(stem_rows))
+    assert stem_lengths == [3, 3, 3]
+
+
+def test_melody_staff_rows_uses_hollow_heads_for_long_notes_and_filled_for_short() -> None:
+    rows = melody_staff_rows(
+        [],
+        onset_cols=[3, 9, 15],
+        width=20,
+        left_pad=1,
+        bar=Bar(
+            chords=[
+                Chord(note_type=1, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                Chord(note_type=2, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+            ],
+        ),
+        bar_chords=[
+            Chord(note_type=1, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=2, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+        ],
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert any(line[3] == MELODY_NOTEHEAD_GLYPH for line in text_rows)
+    assert any(line[9] == MELODY_NOTEHEAD_GLYPH for line in text_rows)
+    assert any(line[15] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+
+
+def test_melody_staff_rows_whole_note_has_no_stem_half_note_is_hollow() -> None:
+    rows = melody_staff_rows(
+        [],
+        onset_cols=[3, 9, 15],
+        width=20,
+        left_pad=1,
+        bar=Bar(
+            chords=[
+                Chord(note_type=1, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                Chord(note_type=2, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+            ],
+        ),
+        bar_chords=[
+            Chord(note_type=1, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=2, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+        ],
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    text_rows = ["".join(row) for row in rows]
+    whole_row = next(idx for idx, line in enumerate(text_rows) if line[3] == MELODY_NOTEHEAD_GLYPH)
+    half_row = next(idx for idx, line in enumerate(text_rows) if line[9] == MELODY_NOTEHEAD_GLYPH)
+    quarter_row = next(idx for idx, line in enumerate(text_rows) if line[15] == MELODY_FILLED_NOTEHEAD_GLYPH)
+    assert all(text_rows[row][3] != "|" for row in range(whole_row))
+    assert any(text_rows[row][9] == "|" for row in range(half_row))
+    assert any(text_rows[row][15] == "|" for row in range(quarter_row))

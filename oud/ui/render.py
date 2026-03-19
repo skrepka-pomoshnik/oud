@@ -387,6 +387,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 basslabels=basslabels,
                 chord_wrap_limit=chord_wrap_limit,
                 lyric_rows_count=0,
+                playback_cache=None,
             )
         top_row_start = top_header + 1
         bottom_row_start = bottom_header + 1
@@ -557,6 +558,7 @@ def render_piece(  # noqa: C901, PLR0912
     playback_bar: int | None = None,
     playback_col: int | None = None,
     glisses: list[tuple[int, int, int]] | None = None,
+    playback_cache=None,
 ) -> None:
     stdscr.erase()
     height, width = stdscr.getmaxyx()
@@ -748,8 +750,8 @@ def render_piece(  # noqa: C901, PLR0912
         default_duration=default_duration,
         tuning_labels=tuning_labels,
         basslabels=basslabels,
-            chord_wrap_limit=chord_wrap_limit,
-            lyric_rows_count=0,
+        chord_wrap_limit=chord_wrap_limit,
+        lyric_rows_count=0,
         )
     if not rendered_duet:
         render_systems(
@@ -806,6 +808,7 @@ def render_piece(  # noqa: C901, PLR0912
             tuning_labels=tuning_labels,
             basslabels=basslabels,
             chord_wrap_limit=chord_wrap_limit,
+            playback_cache=playback_cache,
         )
 
     if display_strings > 0:

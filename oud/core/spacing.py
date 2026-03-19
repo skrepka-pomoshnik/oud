@@ -82,7 +82,6 @@ def auto_bar_plan(  # noqa: C901, PLR0911, PLR0912
     if not widths or extra <= 0:
         return bar_indices, widths, gaps
     if len(widths) == 1:
-        widths[0] += extra
         return bar_indices, widths, gaps
     if spacing_fill == "stretch":
         # Edge-stretch: keep inter-bar gaps compact and spend extra space

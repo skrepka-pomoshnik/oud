@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from oud.core.duet_score import duet_bar_mapping, duet_logical_bar_count, is_duet_score_piece
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import bars_per_line, dynamic_system_starts, system_index, system_start_index
 from oud.editor.state import EditorState
@@ -76,7 +77,50 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     return max(1, available // block_h)
 
 
+def _duet_viewport_row_mapping(state: EditorState, width: int, height: int):
+    per_line = bars_per_line(state, width)
+    rows = rows_per_screen(state, height)
+    logical_bars = duet_logical_bar_count(state.piece)
+    logical_breaks = sorted(
+        {
+            logical
+            for raw in state.stave_breaks
+            if raw > 0
+            for _staff, logical in [duet_bar_mapping(raw, piece=state.piece)]
+        },
+    )
+    starts = [0]
+    idx = 0
+    while idx < logical_bars:
+        next_break = next((b for b in logical_breaks if b > idx), logical_bars)
+        limit = min(next_break, idx + per_line)
+        if limit >= logical_bars:
+            break
+        starts.append(limit)
+        idx = limit
+
+    def row_for_bar(bar_index: int) -> int:
+        logical = max(0, bar_index // 2)
+        for idx, _start in enumerate(starts):
+            if idx + 1 < len(starts) and logical >= starts[idx + 1]:
+                continue
+            return idx
+        return max(0, len(starts) - 1)
+
+    def start_for_row(row_index: int) -> int:
+        if row_index <= 0:
+            return (starts[0] if starts else 0) * 2
+        if row_index >= len(starts):
+            return (starts[-1] if starts else 0) * 2
+        return starts[row_index] * 2
+
+    return rows, row_for_bar, start_for_row
+
+
 def _viewport_row_mapping(state: EditorState, width: int, height: int):
+    if is_duet_score_piece(state.piece):
+        return _duet_viewport_row_mapping(state, width, height)
+
     per_line = bars_per_line(state, width)
     rows = rows_per_screen(state, height)
     if state.settings.get("layout", "packed") == "auto":
@@ -120,6 +164,9 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
     target_bar = state.cursor_bar
     if state.settings.get("playbackscroll", "off") == "on" and state.playback_bar is not None:
         target_bar = max(0, state.playback_bar)
+    if is_duet_score_piece(state.piece):
+        _staff, logical = duet_bar_mapping(target_bar, piece=state.piece)
+        target_bar = logical * 2
     cursor_row = _row_for_bar(target_bar)
     first_row = _row_for_bar(state.bar_offset)
     scroll_mode = state.settings.get("scrollmode", "smooth")

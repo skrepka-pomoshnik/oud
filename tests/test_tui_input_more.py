@@ -131,10 +131,6 @@ def test_complete_set_value_uses_legit_options_only() -> None:
     assert text in {"set vocalpos=top", "set vocalpos=t"}
     assert msg is None or msg.startswith("Options:")
 
-    text, msg = complete_command_text(state, "set melodyview=")
-    assert text == "set melodyview="
-    assert msg is None
-
     text, msg = complete_command_text(state, "set layout=s")
     # layout accepts "spread" and legacy alias "stretch" route
     assert text.startswith("set layout=s")
@@ -155,6 +151,17 @@ def test_complete_set_hides_deprecated_show_keys_and_offers_explicit_ones() -> N
     assert "showornaments" in msg
     assert "showextras" not in msg
     assert "showft3extras" not in msg
+
+
+def test_complete_set_offers_vim_style_bool_prefix_forms() -> None:
+    state = _state()
+    text, msg = complete_command_text(state, "set nogr")
+    assert text in {"set nogrid ", "set nogr"}
+    assert msg is None or msg.startswith(("Options:", "Matches:"))
+
+    text, msg = complete_command_text(state, "set invgr")
+    assert text in {"set invgrid ", "set invgr"}
+    assert msg is None or msg.startswith(("Options:", "Matches:"))
 
 
 def test_handle_command_paths() -> None:

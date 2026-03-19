@@ -84,6 +84,19 @@ def test_set_command_updates_style_and_strings(tmp_path) -> None:
     assert state.settings["strings"] == "7"
 
 
+def test_set_command_supports_vim_style_boolean_tokens(tmp_path) -> None:
+    state = _state()
+    cfg = str(tmp_path / "cfg.toml")
+    apply_set_command(state, "grid", cfg)
+    assert state.settings["grid"] == "on"
+    apply_set_command(state, "nogrid", cfg)
+    assert state.settings["grid"] == "off"
+    apply_set_command(state, "invgrid", cfg)
+    assert state.settings["grid"] == "on"
+    apply_set_command(state, "grid!", cfg)
+    assert state.settings["grid"] == "off"
+
+
 def test_title_command_updates_piece() -> None:
     state = _state()
     cmd_title(state, "Title")

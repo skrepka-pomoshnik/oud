@@ -69,6 +69,60 @@ def frame_diff_rows(prev: Frame | None, curr: Frame) -> set[int]:
     return rows
 
 
+def overlay_frame(
+    frame: Frame,
+    ops: list[tuple[int, int, str, int]],
+) -> Frame:
+    chars = [_split_display_clusters(line) for line in frame.lines]
+    attrs = [list(row) for row in frame.attrs]
+    for y, x, text, attr in ops:
+        if y < 0 or y >= len(chars):
+            continue
+        clusters = _split_display_clusters(text)
+        for idx, cluster in enumerate(clusters):
+            target_x = x + idx
+            if target_x < 0 or target_x >= len(chars[y]):
+                continue
+            chars[y][target_x] = cluster
+            attrs[y][target_x] = attr
+    return Frame(
+        lines=["".join(row) for row in chars],
+        attrs=[tuple(row) for row in attrs],
+    )
+
+
+def overlay_dirty_rows(
+    current_frame: Frame,
+    *,
+    base_frame: Frame,
+    ops: list[tuple[int, int, str, int]],
+    rows: set[int],
+) -> Frame:
+    if not rows:
+        return current_frame
+    next_lines = list(current_frame.lines)
+    next_attrs = list(current_frame.attrs)
+    row_ops: dict[int, list[tuple[int, int, str, int]]] = {}
+    for y, x, text, attr in ops:
+        if y in rows:
+            row_ops.setdefault(y, []).append((y, x, text, attr))
+    for row in rows:
+        if row < 0 or row >= len(base_frame.lines):
+            continue
+        chars = _split_display_clusters(base_frame.lines[row])
+        attrs = list(base_frame.attrs[row])
+        for _y, x, text, attr in row_ops.get(row, []):
+            for idx, cluster in enumerate(_split_display_clusters(text)):
+                target_x = x + idx
+                if target_x < 0 or target_x >= len(chars):
+                    continue
+                chars[target_x] = cluster
+                attrs[target_x] = attr
+        next_lines[row] = "".join(chars)
+        next_attrs[row] = tuple(attrs)
+    return Frame(lines=next_lines, attrs=next_attrs)
+
+
 def _split_display_clusters(text: str) -> list[str]:
     clusters: list[str] = []
     for ch in text:

@@ -17,7 +17,12 @@ from oud.editor.prompt_state import (
 from oud.editor.prompt_state import (
     command_history_prev as command_history_prev_state,
 )
-from oud.editor.settings_ops import set_key_names, set_preset_names, set_value_options
+from oud.editor.settings_ops import (
+    is_bool_set_token,
+    set_key_names,
+    set_preset_names,
+    set_value_options,
+)
 from oud.editor.state import EditorState
 from oud.tui.commands import command_names, no_space_commands, path_commands
 from oud.tui.prompt import PromptBindings, update_prompt
@@ -86,6 +91,8 @@ def complete_command_text(  # noqa: PLR0911, C901, PLR0912
         if len(matches) == 1:
             match = matches[0]
             if match in presets:
+                return f"{cmd} {match} ", None
+            if is_bool_set_token(match):
                 return f"{cmd} {match} ", None
             return f"{cmd} {match}=", None
         return cmdline, "Options: " + " ".join(matches[:8])

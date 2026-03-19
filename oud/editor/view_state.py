@@ -9,6 +9,9 @@ def view_resize(state: EditorState, *, height: int, width: int) -> bool:
     if state.last_frame_size == size:
         return False
     state.last_frame = None
+    state.last_base_frame = None
+    state.playback_overlay_cache = None
+    state.playback_overlay_key = None
     state.last_frame_size = size
     state.dirty_rows = set(range(max(0, height)))
     return True

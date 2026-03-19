@@ -15,6 +15,7 @@ from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.ui.adapter import Screen
 from oud.ui.framebuffer import FrameBuffer
 from oud.ui.render import _apply_overrides, render_piece
+from oud.ui.render_text_lanes import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from oud.ui.render_vocal import melody_row_count
 from tests.helpers_regression_cases import repeat_and_meter_change_piece
 
@@ -108,6 +109,7 @@ def _render_lines(kwargs: dict) -> list[str]:
 
 
 def _first_melody_row_idx(lines: list[str]) -> int:
+    notehead_glyphs = (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)
     block_rows = melody_row_count()
     for idx in range(len(lines)):
         if not lines[idx].startswith("  |"):
@@ -119,13 +121,21 @@ def _first_melody_row_idx(lines: list[str]) -> int:
             continue
         if not all(line.startswith("  |") for line in block):
             continue
-        if any(("\\" in line or "o" in line or "^" in line or "v" in line) for line in block):
+        if any(("\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line) for line in block):
             return idx
-    return next(
+    anchor = next(
         i
         for i, line in enumerate(lines)
-        if line.startswith("  |") and ("\\" in line or "o" in line or "^" in line or "v" in line)
+        if line.startswith("  |")
+        and ("\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line)
     )
+    while anchor > 0:
+        prev = lines[anchor - 1]
+        if prev.startswith("  |") or not prev.strip():
+            anchor -= 1
+            continue
+        break
+    return anchor
 
 
 def _first_lyric_row(lines: list[str]) -> str:
@@ -448,6 +458,41 @@ def test_playback_renders_separate_melody_marker_when_melody_visible() -> None:
     lines = _render_lines(kwargs)
     assert any("^" in line for line in lines)
     assert any("v" in line for line in lines)
+
+
+def test_playback_markers_do_not_mutate_vocal_text_geometry() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=28, w=110)
+    kwargs["piece"] = Piece(
+        title="Vocal Stable",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                ],
+                melody_events=[
+                    MelodyEvent("d", 0),
+                    MelodyEvent("a", 1),
+                    MelodyEvent("d'", 2),
+                ],
+                lyric_event_rows=[
+                    [LyricEvent("Can", 0), LyricEvent("she", 1), LyricEvent("excuse", 2)],
+                ],
+            ),
+        ],
+        strings=6,
+        style="french",
+    )
+    kwargs["settings"]["showmelody"] = "on"
+    kwargs["settings"]["showlyrics"] = "on"
+    baseline = _render_lines(kwargs)
+    kwargs["playback_bar"] = 0
+    kwargs["playback_col"] = 1
+    with_playback = _render_lines(kwargs)
+    normalized_playback = [line.replace("^", " ").replace("v", " ") for line in with_playback]
+    assert normalized_playback == baseline
 
 
 def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
@@ -1214,12 +1259,16 @@ def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
     kwargs["settings"]["showlyrics"] = "on"
     lines = _render_lines(kwargs)
     text = "\n".join(lines)
-    assert any(line.startswith("  |") and "o" in line for line in lines)
+    assert any(
+        line.startswith("  |")
+        and any(glyph in line for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
+        for line in lines
+    )
     assert any(line.startswith("  |") and re.search(r"[A-Za-z]", line) for line in lines)
     assert "Can" in text
     assert "Was" in text
     assert any("Was s" in line or "Was she" in line for line in lines)
-    assert "o" in text
+    assert any(glyph in text for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
 
 
 def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
@@ -1242,7 +1291,10 @@ def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
     melody_start = _first_melody_row_idx(lines)
     melody_block = lines[melody_start : melody_start + melody_row_count()]
     assert len(melody_block) == melody_row_count()
-    assert any("o" in row for row in melody_block)
+    assert any(
+        any(glyph in row for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
+        for row in melody_block
+    )
 
 
 def test_inferred_melody_is_not_clipped_by_sparse_lyrics() -> None:
@@ -1269,7 +1321,10 @@ def test_inferred_melody_is_not_clipped_by_sparse_lyrics() -> None:
     lines = _render_lines(kwargs)
     melody_start = _first_melody_row_idx(lines)
     melody_block = lines[melody_start : melody_start + melody_row_count()]
-    noteheads = sum(row.count("o") for row in melody_block)
+    noteheads = sum(
+        row.count(MELODY_NOTEHEAD_GLYPH) + row.count(MELODY_FILLED_NOTEHEAD_GLYPH)
+        for row in melody_block
+    )
     assert noteheads >= 5
 
 
@@ -1301,7 +1356,10 @@ def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
     second_barline = lyric_line.index("|", first_barline + 1)
     lyric_inner = lyric_line[first_barline + 1 : second_barline]
     assert not any("Can" in row for row in melody_block)
-    assert any("o" in row for row in melody_block)
+    assert any(
+        any(glyph in row for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
+        for row in melody_block
+    )
     assert lyric_inner.find("Was") < lyric_inner.find("I") < lyric_inner.find("so")
 
 
@@ -1357,7 +1415,7 @@ def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
     kwargs["settings"]["showlyrics"] = "off"
     lines = _render_lines(kwargs)
     text = "\n".join(lines)
-    assert not any(line.startswith("  |") and "o" in line for line in lines)
+    assert not any(line.startswith("  |") and MELODY_NOTEHEAD_GLYPH in line for line in lines)
     assert not any(line.startswith("  |") and "Can" in line for line in lines)
     assert "Can" not in text
 
@@ -1492,7 +1550,7 @@ def test_ft3_structured_text_events_render_onset_aligned_over_raw_text_fallback(
     assert "raw melody should not win" not in text
     assert "ex" in text and "cuse" in text and "me" in text
     assert "-" in text
-    assert "o" in text
+    assert any(glyph in text for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
 
 
 def test_ft3_structured_text_events_keep_later_onsets_stable_after_long_first_token() -> None:

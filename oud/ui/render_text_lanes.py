@@ -6,9 +6,12 @@ from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
 from oud.core.time_utils import parse_time_signature_value
 from oud.core.vocal_line import chord_top_pitch, infer_vocal_events, token_pitch_value
 
+MELODY_NOTEHEAD_GLYPH = "◊"
+MELODY_FILLED_NOTEHEAD_GLYPH = "◆"
 _MELODY_FLAG_ROWS = 1
 _MELODY_PITCH_ROWS = 10
 _MELODY_STAFF_ROWS = _MELODY_FLAG_ROWS + _MELODY_PITCH_ROWS
+_MELODY_STEM_LEN = 3
 _TOP_LINE_ROW = _MELODY_FLAG_ROWS
 _BOTTOM_LINE_ROW = _MELODY_FLAG_ROWS + 8
 _BOTTOM_LINE_PITCH = 64  # E4 in treble staff
@@ -26,6 +29,11 @@ _DIATONIC_DEGREES = {
     10: 5,
     11: 6,
 }
+
+
+def melody_row_count(view: str | None = None) -> int:
+    _ = view
+    return _MELODY_STAFF_ROWS
 
 
 def visible_lyric_rows(lines: list[str] | None, max_rows: int = 2) -> list[str]:
@@ -256,7 +264,7 @@ def _diatonic_staff_step(pitch: int) -> int:
     return octave * 7 + degree
 
 
-def _pitch_to_staff_row(pitch: int) -> int:
+def _raw_pitch_row(pitch: int) -> int:
     base_step = _diatonic_staff_step(_BOTTOM_LINE_PITCH)
     step = _diatonic_staff_step(pitch)
     row = _BOTTOM_LINE_ROW - (step - base_step)
@@ -265,13 +273,12 @@ def _pitch_to_staff_row(pitch: int) -> int:
     return max(note_row_min, min(note_row_max, row))
 
 
-def _pitch_rows(pitch: int) -> tuple[int, int]:
+def _pitch_rows(pitch: int, view: str | None) -> tuple[int, int]:
+    _ = view
     base_step = _diatonic_staff_step(_BOTTOM_LINE_PITCH)
     step = _diatonic_staff_step(pitch)
     raw_row = _BOTTOM_LINE_ROW - (step - base_step)
-    note_row_min = _MELODY_FLAG_ROWS
-    note_row_max = _MELODY_STAFF_ROWS - 1
-    clamped_row = max(note_row_min, min(note_row_max, raw_row))
+    clamped_row = max(_MELODY_FLAG_ROWS, min(_MELODY_STAFF_ROWS - 1, raw_row))
     return raw_row, clamped_row
 
 
@@ -373,7 +380,9 @@ def melody_staff_rows(
     bar: Bar | None = None,
     bar_chords: list[Chord] | None = None,
     tuning_pitches: list[int] | None = None,
+    melody_view: str | None = None,
 ) -> list[list[str]]:
+    _ = melody_view
     rows = [[" "] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
     for staff_row in range(_TOP_LINE_ROW, _BOTTOM_LINE_ROW + 1, 2):
         rows[staff_row] = ["-"] * max(0, width)
@@ -414,13 +423,19 @@ def melody_staff_rows(
         if onset_idx < 0 or onset_idx >= len(onset_cols):
             continue
         col = max(floor, min(width - 1, onset_cols[onset_idx]))
-        raw_row, row = _pitch_rows(event.pitch)
-        _draw_vocal_stem(rows, row=row, col=col, note_type=event.note_type, dotted=event.dotted)
+        raw_row, row = _pitch_rows(event.pitch, melody_view)
+        _draw_vocal_stem(
+            rows,
+            row=row,
+            col=col,
+            note_type=event.note_type,
+            dotted=event.dotted,
+        )
         _draw_vocal_ledger(rows, raw_row=raw_row, row=row, col=col)
         accidental = onset_accidental.get(onset_idx, "")
         if accidental:
             _draw_vocal_accidental(rows, row=row, col=col, accidental=accidental, floor=floor)
-        rows[row][col] = "o"
+        rows[row][col] = _melody_notehead_glyph(event.note_type)
     return rows
 
 
@@ -435,22 +450,26 @@ def draw_melody_time_signature(
     parsed = parse_time_signature_value(time_sig)
     if parsed is None:
         return
-    beats, unit = parsed
-    col = max(0, left_pad)
+    beats, _unit = parsed
+    col = max(0, left_pad - 1)
     if not rows[0] or col >= len(rows[0]):
         return
     numerator = str(beats)
-    denominator = str(unit)
-    top_row = min(len(rows) - 1, _TOP_LINE_ROW + 2)
-    bottom_row = min(len(rows) - 1, _TOP_LINE_ROW + 4)
+    top_row = min(len(rows) - 1, _TOP_LINE_ROW + 3)
     for offset, ch in enumerate(numerator):
         target = col + offset
         if target < len(rows[top_row]):
             rows[top_row][target] = ch
-    for offset, ch in enumerate(denominator):
-        target = col + offset
-        if target < len(rows[bottom_row]):
-            rows[bottom_row][target] = ch
+
+
+def _stem_glyph_rows(*, last_stem_row: int) -> dict[int, str]:
+    return dict.fromkeys(range(last_stem_row + 1), "|")
+
+
+def _melody_notehead_glyph(note_type: int) -> str:
+    if note_type >= 4:
+        return MELODY_FILLED_NOTEHEAD_GLYPH
+    return MELODY_NOTEHEAD_GLYPH
 
 
 def _draw_vocal_stem(
@@ -463,10 +482,14 @@ def _draw_vocal_stem(
 ) -> None:
     if not rows or not (0 <= row < len(rows)):
         return
-    flag_row = 0
-    last_stem_row = min(max(0, row - 1), len(rows) - 1)
-    for stem_row in range(last_stem_row + 1):
-        rows[stem_row][col] = "|"
+    if note_type <= 1:
+        return
+    stem_top = max(0, row - _MELODY_STEM_LEN)
+    stem_bottom = min(max(0, row - 1), len(rows) - 1)
+    stem_glyph = "|"
+    for stem_row in range(stem_top, stem_bottom + 1):
+        rows[stem_row][col] = stem_glyph
+    flag_row = stem_top
     flags = max(0, note_type - 4)
     for idx in range(1, flags + 1):
         tail_col = col + idx

@@ -20,6 +20,9 @@ def test_view_resize_initializes_frame_cache_and_marks_all_rows() -> None:
     changed = view_resize(state, height=5, width=10)
     assert changed is True
     assert state.last_frame is None
+    assert state.last_base_frame is None
+    assert state.playback_overlay_cache is None
+    assert state.playback_overlay_key is None
     assert state.last_frame_size == (5, 10)
     assert state.dirty_rows == {0, 1, 2, 3, 4}
 

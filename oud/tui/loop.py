@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import curses
 
+from oud.core.duet_score import is_duet_score_piece
 from oud.editor.init import init_state
 from oud.editor.playback import update_playback_animation
 from oud.editor.status import status_line
@@ -14,7 +15,13 @@ from oud.tui.input import handle_search as handle_search_input
 from oud.tui.keycodes import keycodes_from_curses
 from oud.tui.viewport import ensure_cursor_visible
 from oud.ui.adapter import CursesScreen, contrast_attr
-from oud.ui.framebuffer import FrameBuffer, draw_frame_rows, frame_diff_rows
+from oud.ui.framebuffer import (
+    FrameBuffer,
+    draw_frame_rows,
+    frame_diff_rows,
+    overlay_dirty_rows,
+    overlay_frame,
+)
 from oud.ui.render import render_piece
 
 
@@ -49,6 +56,7 @@ def run_loop(
     running = True
     needs_render = True
     while running:
+        stdscr.timeout(20 if state.midi_proc is not None else 50)
         key = stdscr.getch()
         if key != -1:
             running = handle_key_impl(
@@ -72,11 +80,66 @@ def run_loop(
         state.clamp()
         playback_changed = update_playback_animation(state)
         resized = view_resize(state, height=height, width=width)
+        playback_only = (
+            playback_changed
+            and not needs_render
+            and not message_changed
+            and not resized
+            and not state.dirty_rows
+        )
+        can_overlay_playback = (
+            playback_only
+            and state.last_base_frame is not None
+            and state.playback_overlay_cache is not None
+        )
         if needs_render or message_changed or playback_changed or resized or state.dirty_rows:
             ensure_cursor_visible(state, width, height)
             base_attr = contrast_attr(state.settings.get("contrast", "normal"))
             screen = CursesScreen(stdscr, base_attr=base_attr)
+            if can_overlay_playback:
+                prev_key = state.playback_overlay_key or (-1, -1)
+                playback_key = (
+                    state.playback_bar if state.playback_bar is not None else -1,
+                    state.playback_col if state.playback_col is not None else -1,
+                )
+                prev_ops = state.playback_overlay_cache.get(prev_key, [])
+                next_ops = state.playback_overlay_cache.get(playback_key, [])
+                dirty = {y for y, _x, _text, _attr in prev_ops}
+                dirty |= {y for y, _x, _text, _attr in next_ops}
+                frame = overlay_dirty_rows(
+                    state.last_frame or state.last_base_frame,
+                    base_frame=state.last_base_frame,
+                    ops=next_ops,
+                    rows=dirty,
+                )
+                draw_frame_rows(screen, frame, dirty)
+                screen.refresh()
+                state.playback_overlay_key = playback_key
+                view_commit_frame(state, frame)
+                needs_render = False
+                continue
+            ascii_preview_lines = (
+                export_ascii(
+                    state.piece,
+                    state.overrides,
+                    state.durations,
+                    state.bar_width,
+                    settings=state.settings,
+                    ornaments=state.ornaments,
+                    annotations=state.annotations,
+                    slurs=state.slurs,
+                    ties=state.ties,
+                    holds=state.holds,
+                ).splitlines()
+                if state.ascii_preview
+                else None
+            )
             frame_buffer = FrameBuffer(height, width)
+            playback_cache: dict[tuple[int, int], list[tuple[int, int, str, int]]] | None = (
+                {}
+                if not is_duet_score_piece(state.piece)
+                else None
+            )
             render_piece(
                 frame_buffer,
                 state.piece,
@@ -100,30 +163,33 @@ def run_loop(
                 status_line(state),
                 state.searchline,
                 state.settings,
-                export_ascii(
-                    state.piece,
-                    state.overrides,
-                    state.durations,
-                    state.bar_width,
-                    settings=state.settings,
-                    ornaments=state.ornaments,
-                    annotations=state.annotations,
-                    slurs=state.slurs,
-                    ties=state.ties,
-                    holds=state.holds,
-                ).splitlines()
-                if state.ascii_preview
-                else None,
+                ascii_preview_lines,
                 state.stave_breaks,
                 state.plugin_title,
                 [f"{item.title}{'/' if item.is_dir else ''}" for item in state.plugin_items],
                 state.plugin_index,
                 state.plugin_offset,
                 state.help_offset if state.mode != "info" else state.info_offset,
-                state.playback_bar,
-                state.playback_col,
+                None if playback_cache is not None else state.playback_bar,
+                None if playback_cache is not None else state.playback_col,
+                playback_cache=playback_cache,
             )
-            frame = frame_buffer.snapshot()
+            base_frame = frame_buffer.snapshot()
+            state.last_base_frame = base_frame
+            state.playback_overlay_cache = playback_cache
+            if playback_cache is not None:
+                playback_key = (
+                    state.playback_bar if state.playback_bar is not None else -1,
+                    state.playback_col if state.playback_col is not None else -1,
+                )
+                frame = overlay_frame(
+                    base_frame,
+                    playback_cache.get(playback_key, []),
+                )
+                state.playback_overlay_key = playback_key
+            else:
+                frame = base_frame
+                state.playback_overlay_key = None
             dirty = frame_diff_rows(state.last_frame, frame)
             dirty = view_merge_dirty(state, dirty)
             draw_frame_rows(screen, frame, dirty)

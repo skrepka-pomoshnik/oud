@@ -13,6 +13,7 @@ from oud.editor.transient_message import DEFAULT_MESSAGE_TTL_TICKS
 
 if TYPE_CHECKING:
     from oud.core.plugin_model import RemoteTab
+    from oud.core.tab_parser import TabData
     from oud.ui.framebuffer import Frame
 
 
@@ -89,7 +90,13 @@ class EditorState:
         self.resume_tui: Callable[[], None] | None = None
         self.dirty_rows: set[int] = set()
         self.last_frame: Frame | None = None
+        self.last_base_frame: Frame | None = None
         self.last_frame_size: tuple[int, int] | None = None
+        self.playback_overlay_cache: (
+            dict[tuple[int, int], list[tuple[int, int, str, int]]] | None
+        ) = None
+        self.playback_overlay_key: tuple[int, int] | None = None
+        self.tab_data: TabData | None = None
         self.viewport_scroll_hold_ticks = 0
         # Temporary bridge marker for preset-based partial conversion (guitar/lute).
         self.partial_preset_convert_applied: str | None = None

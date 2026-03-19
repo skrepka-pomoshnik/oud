@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
+from oud.core.model import Bar, Chord, LyricEvent, Note
 from oud.core.render_utils import smart_group_map, spread_flag_positions
 from oud.core.view_model import _filter_redundant_positions, bar_cells_from_chords
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
@@ -11,6 +12,7 @@ from oud.ui.render_system import (
     _chord_positions_distinct,
     _grid_display_map,
     _place_duration_cells_aligned,
+    _required_auto_display_width_for_bar,
     _required_flag_content_width,
     _scale_chord_row,
 )
@@ -78,6 +80,31 @@ def test_place_duration_cells_aligned_keeps_stem_anchor() -> None:
     _place_duration_cells_aligned(row, 1, "16")
     _place_duration_cells_aligned(row, 3, "32")
     assert "".join(row).startswith("81632")
+
+
+def test_required_auto_display_width_accounts_for_lyric_text() -> None:
+    bar = Bar(
+        chords=[
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+            Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+        ],
+        lyric_event_rows=[
+            [LyricEvent("remember", 0), LyricEvent("torment", 1)],
+        ],
+    )
+    width = _required_auto_display_width_for_bar(
+        bar,
+        total_strings=6,
+        bar_width=8,
+        default_duration=4,
+        style="french",
+        french_c="normal",
+        fretlabelmode="auto",
+        show_dur=False,
+        hide_redundant=True,
+        barpad=1,
+    )
+    assert width >= len("remember torment") + 2
 
 
 def test_required_flag_content_width_accounts_for_tails() -> None:

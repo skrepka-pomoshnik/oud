@@ -489,6 +489,50 @@ def _append_vocal_messages(
         )
 
 
+def _playverse_count(piece: Piece, settings: dict[str, str]) -> int:
+    mode = settings.get("playverses", "all")
+    if mode == "once":
+        return 1
+    count = 1
+    for bar in piece.bars:
+        lyric_rows = getattr(bar, "lyric_event_rows", None) or []
+        if lyric_rows:
+            count = max(count, len(lyric_rows))
+            continue
+        raw_lyrics = [line for line in (getattr(bar, "lyrics", None) or []) if line.strip()]
+        if raw_lyrics:
+            count = max(count, len(raw_lyrics))
+    return count
+
+
+def _shift_timeline_events(
+    events: list[tuple[int, int, int, int]],
+    *,
+    tick_offset: int,
+) -> list[tuple[int, int, int, int]]:
+    if tick_offset <= 0:
+        return list(events)
+    return [(bar, start + tick_offset, duration, col) for bar, start, duration, col in events]
+
+
+def _timeline_total_ticks(events: list[tuple[int, int, int, int]]) -> int:
+    return max((start + duration for _bar, start, duration, _col in events), default=0)
+
+
+def _shift_midi_events(
+    events: list[tuple[int, bytes]],
+    *,
+    tick_offset: int,
+) -> list[tuple[int, bytes]]:
+    if tick_offset <= 0:
+        return list(events)
+    return [(start + tick_offset, payload) for start, payload in events]
+
+
+def _midi_total_ticks(events: list[tuple[int, bytes]]) -> int:
+    return max((start for start, _payload in events), default=0)
+
+
 def build_playback_timeline(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
@@ -506,7 +550,7 @@ def build_playback_timeline(
     timeline_events: list[tuple[int, int, int, int]] = []
     sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
     if is_duet_score_piece(piece):
-        timeline_events = _duet_timeline_events(
+        base_events = _duet_timeline_events(
             piece,
             overrides=overrides,
             durations=durations,
@@ -516,6 +560,12 @@ def build_playback_timeline(
             start_bar=start_bar,
             dotted=dotted,
         )
+        pass_count = _playverse_count(piece, settings)
+        pass_ticks = _timeline_total_ticks(base_events)
+        for pass_idx in range(pass_count):
+            timeline_events.extend(
+                _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks),
+            )
         return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
     current_time = 0
     for b_idx, bar in enumerate(piece.bars):
@@ -544,6 +594,15 @@ def build_playback_timeline(
             )
             max_end = max(max_end, start + duration)
         current_time += max_end
+    base_events = list(timeline_events)
+    pass_count = _playverse_count(piece, settings)
+    pass_ticks = _timeline_total_ticks(base_events)
+    if pass_count > 1 and pass_ticks > 0:
+        timeline_events = []
+        for pass_idx in range(pass_count):
+            timeline_events.extend(
+                _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks),
+            )
     return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
 
 
@@ -623,64 +682,95 @@ def _write_track(events: list[tuple[int, bytes]]) -> bytes:
     return header + data
 
 
-def export_midi(  # noqa: C901
-    path: str,
+def _repeated_midi_note_events(
+    base_note_events: list[tuple[int, bytes]],
+    *,
     piece: Piece,
-    overrides: dict[tuple[int, int, int], str],
-    durations: dict[tuple[int, int, int], int],
-    bar_width: int,
-    settings: dict[str, str] | None = None,
-    bpm: int = 90,
-    start_bar: int = 0,
-    dotted: set[tuple[int, int]] | None = None,
-    ornaments: dict[tuple[int, int], str] | None = None,
+    settings: dict[str, str],
+) -> list[tuple[int, bytes]]:
+    pass_count = _playverse_count(piece, settings)
+    pass_ticks = _midi_total_ticks(base_note_events)
+    if pass_count <= 1 or pass_ticks <= 0:
+        return list(base_note_events)
+    note_events: list[tuple[int, bytes]] = []
+    for pass_idx in range(pass_count):
+        note_events.extend(
+            _shift_midi_events(base_note_events, tick_offset=pass_idx * pass_ticks),
+        )
+    return note_events
+
+
+def _write_midi_file(
+    path: str,
+    *,
+    bpm: int,
+    program: int,
+    vocal_program: int,
+    note_events: list[tuple[int, bytes]],
 ) -> str:
-    settings = settings or {}
-    tuning = _resolved_tuning_for_piece(piece, settings)
-    pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
-    if len(pitches) < piece.strings:
-        pitches.extend(_default_tuning(piece.strings)[len(pitches) :])
-    program = int(settings.get("midipatch", "0") or "0")
-    vocal_program = int(
-        settings.get("midivocalpatch", str(DEFAULT_VOCAL_PATCH)) or str(DEFAULT_VOCAL_PATCH),
-    )
-    style = settings.get("style") or "french"
-    gate_text = settings.get("midigate", "85")
-    gate_percent = 85
-    if gate_text.isdigit():
-        gate_percent = max(10, min(100, int(gate_text)))
-    gate = gate_percent / 100.0
-    show_ornaments = _show_ornaments(settings)
-    ornament_mode = settings.get("ft3ornaments", "both")
     events: list[tuple[int, bytes]] = []
     events.append((0, _meta_tempo(bpm)))
     events.append((0, _program_change(0, program)))
     events.append((0, _program_change(1, vocal_program)))
+    events.extend(note_events)
+    track = _write_track(events)
+    header = b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big")
+    header += TICKS_PER_QUARTER.to_bytes(2, "big")
+    data = header + track
+    Path(path).write_bytes(data)
+    return f"Wrote {path}"
 
-    default_duration = 4
-    if is_duet_score_piece(piece):
-        events.extend(
-            _duet_note_events(
-                piece,
-                overrides=overrides,
-                durations=durations,
-                bar_width=bar_width,
-                style=style,
-                default_duration=default_duration,
-                start_bar=start_bar,
-                dotted=dotted,
-                settings=settings,
-                gate=gate,
-                pitches=pitches,
-                ornaments=ornaments,
-            ),
-        )
-        track = _write_track(events)
-        header = b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big")
-        header += TICKS_PER_QUARTER.to_bytes(2, "big")
-        data = header + track
-        Path(path).write_bytes(data)
-        return f"Wrote {path}"
+
+def _duet_midi_note_events(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    dotted: set[tuple[int, int]] | None,
+    settings: dict[str, str],
+    gate: float,
+    pitches: list[int],
+    ornaments: dict[tuple[int, int], str] | None,
+) -> list[tuple[int, bytes]]:
+    base_note_events = _duet_note_events(
+        piece,
+        overrides=overrides,
+        durations=durations,
+        bar_width=bar_width,
+        style=style,
+        default_duration=default_duration,
+        start_bar=start_bar,
+        dotted=dotted,
+        settings=settings,
+        gate=gate,
+        pitches=pitches,
+        ornaments=ornaments,
+    )
+    return _repeated_midi_note_events(base_note_events, piece=piece, settings=settings)
+
+
+def _single_score_midi_note_events(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    dotted: set[tuple[int, int]] | None,
+    settings: dict[str, str],
+    gate: float,
+    pitches: list[int],
+    ornaments: dict[tuple[int, int], str] | None,
+) -> list[tuple[int, bytes]]:
+    note_events: list[tuple[int, bytes]] = []
+    show_ornaments = _show_ornaments(settings)
+    ornament_mode = settings.get("ft3ornaments", "both")
     current_time = 0
     for b_idx, bar in enumerate(piece.bars):
         if b_idx < start_bar:
@@ -716,7 +806,7 @@ def export_midi(  # noqa: C901
                         ornament_mode=ornament_mode,
                     ) or bar_ornament
                 _append_note_messages(
-                    events,
+                    note_events,
                     channel=0,
                     start_tick=current_time + start,
                     note_len=note_len,
@@ -726,7 +816,7 @@ def export_midi(  # noqa: C901
                 )
             max_end = max(max_end, start + duration)
         _append_vocal_messages(
-            events,
+            note_events,
             bar=bar,
             chord_events=chord_events,
             base_time=current_time,
@@ -734,13 +824,75 @@ def export_midi(  # noqa: C901
             settings=settings,
         )
         current_time += max_end
+    return _repeated_midi_note_events(note_events, piece=piece, settings=settings)
 
-    track = _write_track(events)
-    header = b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big")
-    header += TICKS_PER_QUARTER.to_bytes(2, "big")
-    data = header + track
-    Path(path).write_bytes(data)
-    return f"Wrote {path}"
+
+def export_midi(
+    path: str,
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    settings: dict[str, str] | None = None,
+    bpm: int = 90,
+    start_bar: int = 0,
+    dotted: set[tuple[int, int]] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+) -> str:
+    settings = settings or {}
+    tuning = _resolved_tuning_for_piece(piece, settings)
+    pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
+    if len(pitches) < piece.strings:
+        pitches.extend(_default_tuning(piece.strings)[len(pitches) :])
+    program = int(settings.get("midipatch", "0") or "0")
+    vocal_program = int(
+        settings.get("midivocalpatch", str(DEFAULT_VOCAL_PATCH)) or str(DEFAULT_VOCAL_PATCH),
+    )
+    style = settings.get("style") or "french"
+    gate_text = settings.get("midigate", "85")
+    gate_percent = 85
+    if gate_text.isdigit():
+        gate_percent = max(10, min(100, int(gate_text)))
+    gate = gate_percent / 100.0
+
+    default_duration = 4
+    if is_duet_score_piece(piece):
+        note_events = _duet_midi_note_events(
+            piece,
+            overrides=overrides,
+            durations=durations,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
+            start_bar=start_bar,
+            dotted=dotted,
+            settings=settings,
+            gate=gate,
+            pitches=pitches,
+            ornaments=ornaments,
+        )
+    else:
+        note_events = _single_score_midi_note_events(
+            piece,
+            overrides=overrides,
+            durations=durations,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
+            start_bar=start_bar,
+            dotted=dotted,
+            settings=settings,
+            gate=gate,
+            pitches=pitches,
+            ornaments=ornaments,
+        )
+    return _write_midi_file(
+        path,
+        bpm=bpm,
+        program=program,
+        vocal_program=vocal_program,
+        note_events=note_events,
+    )
 
 
 def _midi_command(

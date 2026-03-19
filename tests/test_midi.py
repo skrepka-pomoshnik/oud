@@ -337,6 +337,61 @@ def test_build_playback_timeline_duet_score_pairs_play_simultaneously() -> None:
     assert second_pair[0].start > 0.0
 
 
+def test_build_playback_timeline_repeats_for_multiple_lyric_verses_when_enabled() -> None:
+    piece = Piece(
+        title="Verses",
+        bars=[
+            Bar(
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+                lyric_event_rows=[
+                    [LyricEvent("Can", 0, verse=0)],
+                    [LyricEvent("Was", 0, verse=1)],
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french", "playverses": "all"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert len(timeline) == 2
+    assert timeline[1].start >= timeline[0].end
+
+
+def test_build_playback_timeline_plays_once_when_playverses_disabled() -> None:
+    piece = Piece(
+        title="Verses",
+        bars=[
+            Bar(
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+                lyric_event_rows=[
+                    [LyricEvent("Can", 0, verse=0)],
+                    [LyricEvent("Was", 0, verse=1)],
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french", "playverses": "once"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert len(timeline) == 1
+
+
 def test_midi_chord_positions_match_render_positions() -> None:
     bar = Bar(
         chords=[

@@ -63,6 +63,8 @@ from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
 from oud.ui.render_text_lanes import draw_melody_time_signature
 from oud.ui.render_vocal import lyric_rows_for_bar, melody_rows_for_bar, vocal_onset_cols_for_bar
 
+PlaybackOverlayCache = dict[tuple[int, int], list[tuple[int, int, str, int]]]
+
 
 def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
     if len(base) != len(user):
@@ -652,6 +654,28 @@ def _required_auto_display_width_for_bar(
             min_content,
             _required_duration_content_width(ordered_flags, min_gap=flag_gap),
         )
+    lyric_rows = getattr(bar, "lyric_event_rows", None) or []
+    if lyric_rows:
+        lyric_content = max(
+            (
+                sum(len((ev.text or "").strip()) for ev in row if (ev.text or "").strip())
+                + max(0, sum(1 for ev in row if (ev.text or "").strip()) - 1)
+                for row in lyric_rows
+            ),
+            default=0,
+        )
+        min_content = max(min_content, lyric_content)
+    elif getattr(bar, "lyrics", None):
+        lyric_content = max(
+            (len(" ".join(part for part in bar.lyrics if part.strip()).strip()),),
+            default=0,
+        )
+        min_content = max(min_content, lyric_content)
+    melody_events = getattr(bar, "melody_events", None) or []
+    if melody_events:
+        melody_content = sum(max(1, len((ev.text or "").strip())) for ev in melody_events)
+        melody_content += max(0, len(melody_events) - 1)
+        min_content = max(min_content, melody_content)
     return max(1, min_content + (barpad * 2) + max(0, cue_pad_total))
 
 
@@ -797,6 +821,167 @@ def _melody_playback_col(
     return onset_cols[-1]
 
 
+def _tab_playback_highlight_ops(
+    *,
+    bar,
+    playback_col: int,
+    bar_width: int,
+    grid_width: int,
+    positions: list[tuple[int, int, bool]],
+    src_to_dest: dict[int, int],
+    draw_pad: int,
+    display_width: int,
+    row_start: int,
+    rows: dict[str, int | None],
+    system_display_strings: int,
+    system_visual_indices: list[int],
+    rendered_staff_rows: list[str],
+    bar_x: int,
+) -> tuple[list[tuple[int, int, str, int]], int]:
+    content_width = max(1, display_width - draw_pad * 2)
+    if bar.chords:
+        scaled_play_col = _playback_scaled_col_for_chords(
+            playback_col=playback_col,
+            bar_width=bar_width,
+            grid_width=grid_width,
+            content_width=content_width,
+            positions=positions,
+            src_to_dest=src_to_dest,
+        )
+    else:
+        scaled_play_col = _scale_col(playback_col, bar_width, content_width)
+    if bar.chords and 0 <= playback_col < len(bar.chords):
+        chord = bar.chords[playback_col]
+        note_strings = {note.string - 1 for note in chord.notes}
+    else:
+        note_strings = set()
+    playback_cell_idx = draw_pad + scaled_play_col
+    ops: list[tuple[int, int, str, int]] = []
+    for display_idx in range(system_display_strings):
+        actual = system_visual_indices[display_idx]
+        y = row_start + (rows["staff"] or 0) + display_idx
+        row_text = (
+            rendered_staff_rows[display_idx]
+            if display_idx < len(rendered_staff_rows)
+            else ""
+        )
+        if not (0 <= playback_cell_idx < len(row_text)):
+            continue
+        ch = row_text[playback_cell_idx]
+        if bar.chords:
+            if actual not in note_strings or ch in {" ", "-", "|"}:
+                continue
+        elif ch in {" ", "-", "|"}:
+            continue
+        ops.append((y, bar_x + playback_cell_idx, ch, A_REVERSE))
+    return ops, scaled_play_col
+
+
+def _playback_marker_ops(
+    *,
+    bar,
+    playback_col: int,
+    scaled_play_col: int,
+    row_start: int,
+    rows: dict[str, int | None],
+    system_display_strings: int,
+    draw_pad: int,
+    bar_x: int,
+    display_width: int,
+    tuning_pitches: list[int],
+    melody_row_base: int | None,
+    vocal_onset_cols: list[int],
+    rendered_melody_rows: list[str] | None,
+) -> list[tuple[int, int, str, int]]:
+    marker_y = row_start + (rows["staff"] or 0) + system_display_strings
+    marker_x = bar_x + draw_pad + scaled_play_col
+    if melody_row_base is not None and marker_y >= melody_row_base:
+        marker_y = melody_row_base
+        marker_x = max(0, bar_x - 2)
+    ops: list[tuple[int, int, str, int]] = [(marker_y, marker_x, "^", A_BOLD)]
+    if melody_row_base is None:
+        return ops
+    melody_col = _melody_playback_col(
+        bar=bar,
+        playback_col=playback_col,
+        onset_cols=vocal_onset_cols,
+        tuning_pitches=tuning_pitches,
+    )
+    if melody_col is None:
+        return ops
+    melody_x = bar_x + max(0, min(display_width - 1, melody_col))
+    if rendered_melody_rows:
+        for rel_y, melody_row in enumerate(rendered_melody_rows):
+            if 0 <= melody_col < len(melody_row) and melody_row[melody_col] == " ":
+                ops.append((melody_row_base + rel_y, melody_x, "v", A_BOLD))
+                return ops
+    ops.append(
+        (
+            melody_row_base,
+            max(0, bar_x - 2),
+            "v",
+            A_BOLD,
+        ),
+    )
+    return ops
+
+
+def _playback_overlay_ops_for_bar(
+    *,
+    bar,
+    playback_col: int,
+    bar_width: int,
+    grid_width: int,
+    positions: list[tuple[int, int, bool]],
+    src_to_dest: dict[int, int],
+    draw_pad: int,
+    display_width: int,
+    row_start: int,
+    rows: dict[str, int | None],
+    system_display_strings: int,
+    system_visual_indices: list[int],
+    rendered_staff_rows: list[str],
+    bar_x: int,
+    tuning_pitches: list[int],
+    melody_row_base: int | None,
+    vocal_onset_cols: list[int],
+    rendered_melody_rows: list[str] | None,
+) -> list[tuple[int, int, str, int]]:
+    if not _playback_in_range(bar, playback_col, bar_width):
+        return []
+    note_ops, scaled_play_col = _tab_playback_highlight_ops(
+        bar=bar,
+        playback_col=playback_col,
+        bar_width=bar_width,
+        grid_width=grid_width,
+        positions=positions,
+        src_to_dest=src_to_dest,
+        draw_pad=draw_pad,
+        display_width=display_width,
+        row_start=row_start,
+        rows=rows,
+        system_display_strings=system_display_strings,
+        system_visual_indices=system_visual_indices,
+        rendered_staff_rows=rendered_staff_rows,
+        bar_x=bar_x,
+    )
+    return note_ops + _playback_marker_ops(
+        bar=bar,
+        playback_col=playback_col,
+        scaled_play_col=scaled_play_col,
+        row_start=row_start,
+        rows=rows,
+        system_display_strings=system_display_strings,
+        draw_pad=draw_pad,
+        bar_x=bar_x,
+        display_width=display_width,
+        tuning_pitches=tuning_pitches,
+        melody_row_base=melody_row_base,
+        vocal_onset_cols=vocal_onset_cols,
+        rendered_melody_rows=rendered_melody_rows,
+    )
+
+
 def _resolved_bar_time_value(
     piece,
     bar_index: int,
@@ -865,6 +1050,7 @@ def render_systems(  # noqa: C901, PLR0912
     show_lyrics: bool = False,
     lyric_rows_count: int = 0,
     vocal_pos: str = "bottom",
+    playback_cache: PlaybackOverlayCache | None = None,
 ) -> None:
     if glisses is None:
         glisses = []
@@ -1039,6 +1225,8 @@ def render_systems(  # noqa: C901, PLR0912
             french_c = settings.get("frenchc", "normal")
             fretlabelmode = settings.get("fretlabelmode", "auto")
             chord_positions_all: list[tuple[int, int, bool]] = []
+            positions: list[tuple[int, int, bool]] = []
+            src_to_dest: dict[int, int] = {}
             grid_width = bar_width
             if bar.chords:
                 chord_positions_all, grid_width = _chord_positions_distinct(
@@ -2143,109 +2331,44 @@ def render_systems(  # noqa: C901, PLR0912
                             A_BOLD,
                         )
 
-            if (
-                playback_bar is not None
-                and playback_col is not None
-                and abs_bar == playback_bar
-                and _playback_in_range(bar, playback_col, bar_width)
-            ):
-                content_width = max(1, display_width - draw_pad * 2)
-                if bar.chords:
-                    scaled_play_col = _playback_scaled_col_for_chords(
-                        playback_col=playback_col,
-                        bar_width=bar_width,
-                        grid_width=grid_width,
-                        content_width=content_width,
-                        positions=positions,
-                        src_to_dest=src_to_dest,
-                    )
-                else:
-                    scaled_play_col = _scale_col(playback_col, bar_width, content_width)
-                if bar.chords and 0 <= playback_col < len(bar.chords):
-                    chord = bar.chords[playback_col]
-                    note_strings = {note.string - 1 for note in chord.notes}
-                else:
-                    note_strings = set()
-                playback_cell_idx = draw_pad + scaled_play_col
-                for display_idx in range(system_display_strings):
-                    actual = system_visual_indices[display_idx]
-                    y = row_start + (rows["staff"] or 0) + display_idx
-                    row_text = (
-                        rendered_staff_rows[display_idx]
-                        if display_idx < len(rendered_staff_rows)
-                        else ""
-                    )
-                    if not (0 <= playback_cell_idx < len(row_text)):
-                        continue
-                    ch = row_text[playback_cell_idx]
-                    if bar.chords:
-                        if actual not in note_strings:
-                            continue
-                        if ch in {" ", "-", "|"}:
-                            continue
-                    elif ch in {" ", "-", "|"}:
-                        continue
-                    safe_addstr(
-                        stdscr,
-                        y,
-                        bar_x + playback_cell_idx,
-                        ch,
-                        A_REVERSE,
-                    )
-                marker_y = row_start + (rows["staff"] or 0) + system_display_strings
-                marker_x = bar_x + draw_pad + scaled_play_col
-                if rows.get("melody") is not None and marker_y >= row_start + (rows["melody"] or 0):
-                    marker_y = row_start + (rows["melody"] or 0)
-                    marker_x = max(0, bar_x - 2)
-                safe_addstr(stdscr, marker_y, marker_x, "^", A_BOLD)
-
-            if rows.get("melody") is not None:
-                melody_row_base = row_start + (rows["melody"] or 0)
-                vocal_onset_cols = vocal_onset_cols_for_bar(
-                    bar,
-                    onset_cols=text_onset_cols,
-                    width=display_width,
-                    left_pad=draw_pad,
-                )
-                melody_rows = melody_rows_for_bar(
-                    bar,
-                    onset_cols=vocal_onset_cols,
-                    width=display_width,
-                    left_pad=draw_pad,
-                    tuning_pitches=tuning_pitches,
-                )
-                if abs_bar == 0 and melody_rows:
-                    draw_melody_time_signature(
-                        melody_rows,
-                        time_sig=bar.time_sig or settings.get("time", ""),
+                playback_vocal_onset_cols: list[int] = []
+                melody_row_base: int | None = None
+                rendered_melody_rows: list[str] | None = None
+                if rows.get("melody") is not None:
+                    melody_row_base = row_start + (rows["melody"] or 0)
+                    playback_vocal_onset_cols = vocal_onset_cols_for_bar(
+                        bar,
+                        onset_cols=text_onset_cols,
+                        width=display_width,
                         left_pad=draw_pad,
                     )
-                for melody_row_idx, melody_cells in enumerate(melody_rows[:melody_rows_count]):
-                    y = melody_row_base + melody_row_idx
-                    safe_addstr(stdscr, y, bar_x - 1, "|")
-                    safe_addstr(stdscr, y, bar_x, "".join(melody_cells))
-                    safe_addstr(
-                        stdscr,
-                        y,
-                        min(max(0, width - 2), bar_x + display_width),
-                        barline,
-                    )
-                if (
-                    playback_bar is not None
-                    and playback_col is not None
-                    and abs_bar == playback_bar
-                    and _playback_in_range(bar, playback_col, bar_width)
-                ):
-                    melody_col = _melody_playback_col(
-                        bar=bar,
-                        playback_col=playback_col,
-                        onset_cols=vocal_onset_cols,
+                    melody_rows = melody_rows_for_bar(
+                        bar,
+                        onset_cols=playback_vocal_onset_cols,
+                        width=display_width,
+                        left_pad=draw_pad,
                         tuning_pitches=tuning_pitches,
                     )
-                    if melody_col is not None:
-                        marker_y = melody_row_base
-                        marker_x = bar_x + max(0, min(display_width - 1, melody_col))
-                        safe_addstr(stdscr, marker_y, marker_x, "v", A_BOLD)
+                    if abs_bar == 0 and melody_rows:
+                        draw_melody_time_signature(
+                            melody_rows,
+                            time_sig=bar.time_sig or settings.get("time", ""),
+                            left_pad=draw_pad,
+                        )
+                    rendered_melody_rows = ["".join(row) for row in melody_rows]
+                    for melody_row_idx, melody_cells in enumerate(melody_rows[:melody_rows_count]):
+                        y = melody_row_base + melody_row_idx
+                        row_text = "".join(melody_cells)
+                        if row_text.strip():
+                            safe_addstr(stdscr, y, bar_x - 1, "|")
+                        safe_addstr(stdscr, y, bar_x, "".join(melody_cells))
+                        if row_text.strip():
+                            safe_addstr(
+                                stdscr,
+                                y,
+                                min(max(0, width - 2), bar_x + display_width),
+                                barline,
+                            )
             if lyric_row_offsets:
                 vocal_onset_cols = vocal_onset_cols_for_bar(
                     bar,
@@ -2274,6 +2397,57 @@ def render_systems(  # noqa: C901, PLR0912
                         min(max(0, width - 2), bar_x + display_width),
                         barline,
                     )
+
+            if playback_cache is not None:
+                playback_limit = len(bar.chords) if bar.chords else bar_width
+                for overlay_col in range(max(0, playback_limit)):
+                    playback_cache[(abs_bar, overlay_col)] = _playback_overlay_ops_for_bar(
+                        bar=bar,
+                        playback_col=overlay_col,
+                        bar_width=bar_width,
+                        grid_width=grid_width,
+                        positions=positions,
+                        src_to_dest=src_to_dest,
+                        draw_pad=draw_pad,
+                        display_width=display_width,
+                        row_start=row_start,
+                        rows=rows,
+                        system_display_strings=system_display_strings,
+                        system_visual_indices=system_visual_indices,
+                        rendered_staff_rows=rendered_staff_rows,
+                        bar_x=bar_x,
+                        tuning_pitches=tuning_pitches,
+                        melody_row_base=melody_row_base,
+                        vocal_onset_cols=playback_vocal_onset_cols,
+                        rendered_melody_rows=rendered_melody_rows,
+                    )
+            if (
+                playback_bar is not None
+                and playback_col is not None
+                and abs_bar == playback_bar
+            ):
+                playback_ops = _playback_overlay_ops_for_bar(
+                    bar=bar,
+                    playback_col=playback_col,
+                    bar_width=bar_width,
+                    grid_width=grid_width,
+                    positions=positions,
+                    src_to_dest=src_to_dest,
+                    draw_pad=draw_pad,
+                    display_width=display_width,
+                    row_start=row_start,
+                    rows=rows,
+                    system_display_strings=system_display_strings,
+                    system_visual_indices=system_visual_indices,
+                    rendered_staff_rows=rendered_staff_rows,
+                    bar_x=bar_x,
+                    tuning_pitches=tuning_pitches,
+                    melody_row_base=melody_row_base,
+                    vocal_onset_cols=playback_vocal_onset_cols,
+                    rendered_melody_rows=rendered_melody_rows,
+                )
+                for y, x, text, attr in playback_ops:
+                    safe_addstr(stdscr, y, x, text, attr)
 
             if spacing_mode == "auto":
                 next_gap = gaps_after[local_idx] if local_idx < len(gaps_after) else 0

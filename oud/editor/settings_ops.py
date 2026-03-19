@@ -56,6 +56,7 @@ _BOOL_KEYS = {
     "showtuning",
     "restrainopenstrings",
     "playbackscroll",
+    "playverses",
     "midivocalinfer",
 }
 
@@ -160,6 +161,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "vocalpos": (
         {"top", "bottom"},
         "Vocalpos must be top/bottom",
+    ),
+    "playverses": (
+        {"once", "all"},
+        "Playverses must be once/all",
     ),
     "ft3fingering": (
         {"off", "left", "right", "both"},
@@ -360,9 +365,21 @@ def set_key_names() -> tuple[str, ...]:
     keys.update(_BOOL_KEYS)
     keys.update(_INT_KEYS)
     keys.update(_ENUM_VALUES.keys())
+    keys.update(f"no{key}" for key in _BOOL_KEYS)
+    keys.update(f"inv{key}" for key in _BOOL_KEYS)
     keys.discard("showextras")
     keys.discard("showft3extras")
     return tuple(sorted(keys))
+
+
+def is_bool_set_token(token: str) -> bool:
+    if token in _BOOL_KEYS:
+        return True
+    if token.startswith("no") and token[2:] in _BOOL_KEYS:
+        return True
+    if token.startswith("inv") and token[3:] in _BOOL_KEYS:
+        return True
+    return token.endswith("!") and token[:-1] in _BOOL_KEYS
 
 
 def set_value_options(key: str) -> tuple[str, ...]:  # noqa: PLR0911, C901
@@ -430,7 +447,7 @@ _HANDLERS: dict[str, SetHandler] = {
 }
 
 
-def apply_set_command(  # noqa: C901, PLR0912
+def apply_set_command(  # noqa: C901
     state: EditorState,
     args: str,
     config_path: str,
@@ -442,14 +459,8 @@ def apply_set_command(  # noqa: C901, PLR0912
         return
     for token in args.split():
         if "=" not in token:
-            if token in _BOOL_KEYS:
-                state.settings[token] = "on"
+            if _apply_bool_token(state, token):
                 continue
-            if token.startswith("no"):
-                key = token[2:]
-                if key in _BOOL_KEYS:
-                    state.settings[key] = "off"
-                    continue
             if _apply_meta_preset(state, token):
                 continue
             state.message = f"Invalid set token: {token}"
@@ -481,6 +492,28 @@ def apply_set_command(  # noqa: C901, PLR0912
             continue
         state.message = f"Unknown set key: {key}"
     save_fn(config_path, state.settings)
+
+
+def _apply_bool_token(state: EditorState, token: str) -> bool:
+    if token in _BOOL_KEYS:
+        return _set_bool(state, token, "on")
+    if token.startswith("no"):
+        key = token[2:]
+        if key in _BOOL_KEYS:
+            return _set_bool(state, key, "off")
+    if token.startswith("inv"):
+        key = token[3:]
+        if key in _BOOL_KEYS:
+            current = state.settings.get(key, DEFAULT_SETTINGS.get(key, "off"))
+            value = "off" if current == "on" else "on"
+            return _set_bool(state, key, value)
+    if token.endswith("!"):
+        key = token[:-1]
+        if key in _BOOL_KEYS:
+            current = state.settings.get(key, DEFAULT_SETTINGS.get(key, "off"))
+            value = "off" if current == "on" else "on"
+            return _set_bool(state, key, value)
+    return False
 
 
 def convert_overrides(state: EditorState, target_style: str) -> None:

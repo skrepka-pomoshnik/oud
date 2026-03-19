@@ -4,6 +4,7 @@ from pathlib import Path
 
 from oud.core.ft3 import build_durations
 from oud.core.model import Bar
+from oud.core.tab_parser import load_tab_data
 from oud.core.tuning_utils import tuning_count
 from oud.editor.load_ops import load_piece_data
 from oud.editor.messages import READ_ONLY_VIEWER
@@ -40,6 +41,8 @@ def init_state(  # noqa: C901, PLR0912
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
+    if path and path.lower().endswith(".tab"):
+        state.tab_data = load_tab_data(path)
     valid_path = None if invalid_source else path
     state.path = valid_path
     state.settings["filepath"] = valid_path or ""

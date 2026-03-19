@@ -95,3 +95,23 @@ def test_auto_bar_plan_compact_never_exceeds_width() -> None:
     )
     assert indices
     assert _total(widths, gaps) <= 32
+
+
+def test_auto_bar_plan_does_not_stretch_single_bar_system_to_full_width() -> None:
+    bars = _bars(1)
+    indices, widths, gaps = auto_bar_plan(
+        bars=bars,
+        bar_start=0,
+        usable_width=60,
+        bar_width=8,
+        overrides={},
+        durations={},
+        default_duration=4,
+        dotted=set(),
+        bar_gap=1,
+        spacing_fill="stretch",
+        stave_breaks=set(),
+    )
+    assert indices == [0]
+    assert gaps == []
+    assert widths == [4]

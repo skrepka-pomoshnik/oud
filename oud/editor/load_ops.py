@@ -92,14 +92,19 @@ def cmd_open(
             durations = parsed.durations
             dotted = parsed.dotted
             bar_width = parsed.bar_width
+            state.tab_data = parsed
         else:
             state.piece = load_tab_fn(path)
+            state.tab_data = None
     elif path.lower().endswith(".mxl"):
         state.piece = load_mxl_fn(path)
+        state.tab_data = None
     elif path.lower().endswith((".musicxml", ".xml")):
         state.piece = load_musicxml_fn(path)
+        state.tab_data = None
     else:
         state.piece = load_ft3_fn(path)
+        state.tab_data = None
     state.path = path
     state.settings["filepath"] = path
     state.overrides = overrides

@@ -78,6 +78,7 @@ HELP_LINES = [
     ":set frenchc=normal|alt",
     ":set midipatch=... midivocalpatch=... midigate=... soundfont=... tempo=...",
     ":set showmelody=on|off showlyrics=on|off vocalpos=top|bottom",
+    ":set playverses=once|all playbackscroll=on|off",
     ":set charstyle=... title=... author=... composer=...",
     ":tool reflow|gridflags|flagstyle|comments",
 ]

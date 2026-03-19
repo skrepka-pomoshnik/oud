@@ -70,9 +70,10 @@ def start_midi(
     )
     prime_playback_animation(state, timeline)
     soundfont = state.settings.get("soundfont", "") or None
+    launched_at = time.monotonic()
     state.message, state.midi_proc = play_midi(path, soundfont=soundfont)
     if state.midi_proc is not None:
-        start_playback_clock(state, time.monotonic())
+        start_playback_clock(state, launched_at)
 
 
 def pause_midi(state: EditorState) -> None:

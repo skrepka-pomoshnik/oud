@@ -61,10 +61,12 @@ def test_start_midi(monkeypatch) -> None:
 
     monkeypatch.setattr("oud.editor.midi_control.export_midi", _export_midi)
     monkeypatch.setattr("oud.editor.midi_control.play_midi", _play_midi)
+    monkeypatch.setattr("oud.editor.midi_control.time.monotonic", lambda: 123.5)
     start_midi(state, start_bar=1, path="out.mid", bpm=120)
     messages.append(state.message)
     assert state.midi_proc is not None
     assert messages[-1] == "Playing"
+    assert state.playback_started_at == 123.5
 
 
 def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
