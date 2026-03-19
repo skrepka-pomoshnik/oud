@@ -128,6 +128,73 @@ def _select_index_item(state: EditorState, kind: str) -> None:
     state.message = f"Loaded {len(items)} entries"
 
 
+def _open_random_lutemusic_ft3(state: EditorState) -> None:
+    from oud.plugins import lutemusic  # noqa: PLC0415
+
+    state.message = "Searching random FT3..."
+    item = lutemusic.random_ft3()
+    if item is None:
+        state.message = "No random FT3 found"
+        return
+    _push_stack(state)
+    plugin_open_list(
+        state,
+        title=f"{lutemusic.PLUGIN_TITLE}: random",
+        items=[item],
+        plugin_name="lutemusic",
+    )
+    state.message = f"Random: {item.title}"
+
+
+def _open_plugin_root_item(state: EditorState, item: RemoteTab) -> bool:
+    if item.url == "lutemusic:random":
+        _open_random_lutemusic_ft3(state)
+        return True
+    if not item.url.startswith("plugin:"):
+        return False
+    name = item.url.split(":", 1)[1]
+    try:
+        info = next(info for info in _discover_plugins() if info.name == name)
+        module = _load_plugin_module(name, info.path)
+    except Exception:
+        state.message = f"Failed to load plugin {name}"
+        return True
+    _push_stack(state)
+    plugin_open_list(
+        state,
+        title=str(getattr(module, "PLUGIN_TITLE", name)),
+        items=list(getattr(module, "root_items", list)()),
+        plugin_name=name,
+    )
+    if not state.plugin_items:
+        state.message = "Plugin has no items"
+    return True
+
+
+def _open_lutemusic_dir_item(state: EditorState, item: RemoteTab) -> bool:
+    if item.url.startswith("lutemusic:index:"):
+        kind = item.url.split(":")[-1]
+        _select_index_item(state, kind)
+        return True
+    if not item.is_dir:
+        return False
+    _clear_plugin_confirm(state)
+    if state.plugin_name != "lutemusic":
+        state.message = "Plugin does not support folders"
+        return True
+    state.message = "Fetching lutemusic..."
+    from oud.plugins import lutemusic  # noqa: PLC0415
+
+    items = lutemusic.fetch_supported_tabs(item.url)
+    if not items:
+        state.message = "No supported files found"
+        return True
+    _push_stack(state)
+    plugin_open_list(state, title=item.title, items=items)
+    state.message = f"Loaded {len(items)} entries"
+    return True
+
+
 def download_plugin_item(state: EditorState) -> Path | None:
     if not state.plugin_items:
         state.message = "No plugin items"
@@ -185,45 +252,11 @@ def download_plugin_folder_recursive(state: EditorState) -> list[Path] | None:
     return paths
 
 
-def open_plugin_item(state: EditorState) -> None:  # noqa: PLR0911
+def open_plugin_item(state: EditorState) -> None:
     item = state.plugin_items[state.plugin_index]
-    if item.url.startswith("plugin:"):
-        name = item.url.split(":", 1)[1]
-        try:
-            info = next(info for info in _discover_plugins() if info.name == name)
-            module = _load_plugin_module(name, info.path)
-        except Exception:
-            state.message = f"Failed to load plugin {name}"
-            return
-        _push_stack(state)
-        plugin_open_list(
-            state,
-            title=str(getattr(module, "PLUGIN_TITLE", name)),
-            items=list(getattr(module, "root_items", list)()),
-            plugin_name=name,
-        )
-        if not state.plugin_items:
-            state.message = "Plugin has no items"
+    if _open_plugin_root_item(state, item):
         return
-    if item.url.startswith("lutemusic:index:"):
-        kind = item.url.split(":")[-1]
-        _select_index_item(state, kind)
-        return
-    if item.is_dir:
-        _clear_plugin_confirm(state)
-        if state.plugin_name != "lutemusic":
-            state.message = "Plugin does not support folders"
-            return
-        state.message = "Fetching lutemusic..."
-        from oud.plugins import lutemusic  # noqa: PLC0415
-
-        items = lutemusic.fetch_supported_tabs(item.url)
-        if not items:
-            state.message = "No supported files found"
-            return
-        _push_stack(state)
-        plugin_open_list(state, title=item.title, items=items)
-        state.message = f"Loaded {len(items)} entries"
+    if _open_lutemusic_dir_item(state, item):
         return
     if state.plugin_name and state.plugin_name != "lutemusic":
         state.message = "Plugin does not support opening files"

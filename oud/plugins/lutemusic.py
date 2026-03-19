@@ -1,6 +1,7 @@
 # oud-plugin: v1
 from __future__ import annotations
 
+import random
 from html.parser import HTMLParser
 from pathlib import Path
 from posixpath import normpath
@@ -131,6 +132,7 @@ def fetch_supported_tabs(url: str, *, limit: int = 200) -> list[RemoteTab]:
 
 def root_items() -> list[RemoteTab]:
     return [
+        RemoteTab(title="Random FT3", url="lutemusic:random", is_dir=False),
         RemoteTab(title="Tabs", url="lutemusic:index:tabs", is_dir=True),
         RemoteTab(title="Composers", url="lutemusic:index:composers", is_dir=True),
         RemoteTab(title="Sources", url="lutemusic:index:sources", is_dir=True),
@@ -200,3 +202,42 @@ def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -
             local_path = dest_dir / _safe_rel_path(rel)
             downloaded.append(_download_url_to(child.url, local_path))
     return downloaded
+
+
+def random_ft3(
+    *,
+    start_urls: list[str] | None = None,
+    limit: int = 200,
+    max_visits: int = 200,
+    rng: random.Random | None = None,
+) -> RemoteTab | None:
+    walker = rng or random.Random()  # noqa: S311 - UI random pick, not crypto
+    pending = list(start_urls or LUTEMUSIC_URLS.values())
+    seen_dirs: set[str] = set()
+    visited = 0
+    while pending and visited < max_visits:
+        choice_index = walker.randrange(len(pending))
+        url = pending.pop(choice_index)
+        if url in seen_dirs:
+            continue
+        seen_dirs.add(url)
+        visited += 1
+        items = fetch_supported_tabs(url, limit=limit)
+        if not items:
+            continue
+        walker.shuffle(items)
+        dirs: list[RemoteTab] = []
+        files: list[RemoteTab] = []
+        for item in items:
+            if item.is_dir:
+                dirs.append(item)
+                continue
+            if _is_ft3_link(item.url):
+                files.append(item)
+        if files:
+            return walker.choice(files)
+        for item in dirs:
+            next_url = item.url if item.url.endswith("/") else f"{item.url}/"
+            if next_url not in seen_dirs:
+                pending.append(next_url)
+    return None

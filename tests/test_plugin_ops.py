@@ -30,12 +30,30 @@ def test_handle_plugin_key_selects_index_item(monkeypatch) -> None:
     state = _state()
     enter_plugin_mode(state)
     items = [RemoteTab(title="Song", url="https://example.com/song.tab", is_dir=False)]
-    monkeypatch.setattr("oud.plugins.lutemusic.fetch_supported_tabs", lambda _url: items)
+
+    def _fetch(_url: str, limit: int = 200) -> list[RemoteTab]:
+        _ = limit
+        return items
+
+    monkeypatch.setattr("oud.plugins.lutemusic.fetch_supported_tabs", _fetch)
     handle_plugin_key(state, 10)
     assert state.plugin_title == "Lutemusic"
     assert state.plugin_items
+    state.plugin_index = 1
     handle_plugin_key(state, 10)
     assert state.plugin_items == items
+
+
+def test_handle_plugin_key_selects_random_lutemusic_item(monkeypatch) -> None:
+    state = _state()
+    enter_plugin_mode(state)
+    state.plugin_items = [RemoteTab(title="Random FT3", url="lutemusic:random", is_dir=False)]
+    random_item = RemoteTab(title="Rnd", url="https://example.com/rnd.ft3", is_dir=False)
+    monkeypatch.setattr("oud.plugins.lutemusic.random_ft3", lambda: random_item)
+    handle_plugin_key(state, 10)
+    assert state.plugin_name == "lutemusic"
+    assert state.plugin_items == [random_item]
+    assert state.message == "Random: Rnd"
 
 
 def test_handle_plugin_key_downloads_item(monkeypatch, tmp_path: Path) -> None:
