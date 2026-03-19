@@ -719,11 +719,12 @@ def _build_vocal_bodies(
     for bar in piece.bars:
         current_time_sig = _append_bar_time_change(melody_body, bar, current_time_sig)
         vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_lookup)
-        melody_body.extend(
-            f"  {_midi_to_lilypond(event.pitch)}"
-            f"{_duration_token(note_type_to_denom(event.note_type) or 4, event.dotted)}"
-            for event in vocal_events
-        )
+        for event in vocal_events:
+            duration = _duration_token(note_type_to_denom(event.note_type) or 4, event.dotted)
+            if getattr(event, "is_rest", False) or event.pitch is None:
+                melody_body.append(f"  r{duration}")
+                continue
+            melody_body.append(f"  {_midi_to_lilypond(event.pitch)}{duration}")
         if not vocal_events:
             melody_body.append("  r4")
         bar_marker = _barline_token(bar)

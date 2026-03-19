@@ -222,6 +222,80 @@ def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
     assert called["bars_limit"] == 0
 
 
+def test_cut_time_cue_keeps_four_equal_eighth_onsets_visibly_separate() -> None:
+    piece = Piece(
+        title="CutTime",
+        strings=6,
+        bars=[
+            Bar(
+                time_sig="C|",
+                chords=[
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0), Note(6, 0, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 3, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 1, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 0, 0)]),
+                ],
+            ),
+        ],
+    )
+    kwargs = _args("normal")
+    kwargs["piece"] = piece
+    kwargs["stdscr"] = _Screen(h=18, w=40)
+    kwargs["settings"]["layout"] = "auto"
+    kwargs["settings"]["justify"] = "stretch"
+    kwargs["settings"]["barsperline"] = "0"
+    kwargs["settings"]["maxbars"] = "0"
+    lines = _render_lines(kwargs)
+    staff = lines[4:10]
+    bar_edges = [idx for idx, ch in enumerate(staff[0]) if ch == "|"]
+    assert len(bar_edges) >= 2
+    lo, hi = bar_edges[0] + 1, bar_edges[1]
+    note_cols: set[int] = set()
+    for row in staff:
+        for idx, ch in enumerate(row[lo:hi], start=lo):
+            if ch not in {"-", " ", "|", ":"} and not ch.isupper():
+                note_cols.add(idx)
+    assert len(note_cols) == 4
+    assert min(note_cols) >= 7
+
+
+def test_grid_grouped_eighths_keep_four_visible_note_columns_with_hidden_redundant_flags() -> None:
+    piece = Piece(
+        title="GridPacked",
+        strings=6,
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=5, dotted=False, grid="start", notes=[Note(2, 0, 0), Note(3, 1, 0)]),
+                    Chord(note_type=5, dotted=False, grid="mid", notes=[Note(2, 1, 0), Note(4, 2, 0)]),
+                    Chord(note_type=5, dotted=False, grid="mid", notes=[Note(4, 3, 0)]),
+                    Chord(note_type=5, dotted=False, grid="end", notes=[Note(2, 3, 0)]),
+                ],
+            ),
+        ],
+    )
+    kwargs = _args("normal")
+    kwargs["piece"] = piece
+    kwargs["stdscr"] = _Screen(h=18, w=40)
+    kwargs["settings"]["layout"] = "auto"
+    kwargs["settings"]["justify"] = "smart"
+    kwargs["settings"]["beatsnap"] = "soft"
+    kwargs["settings"]["flagredundant"] = "on"
+    kwargs["settings"]["barsperline"] = "0"
+    kwargs["settings"]["maxbars"] = "0"
+    lines = _render_lines(kwargs)
+    staff = lines[4:10]
+    bar_edges = [idx for idx, ch in enumerate(staff[0]) if ch == "|"]
+    assert len(bar_edges) >= 2
+    lo, hi = bar_edges[0] + 1, bar_edges[1]
+    note_cols: set[int] = set()
+    for row in staff:
+        for idx, ch in enumerate(row[lo:hi], start=lo):
+            if ch not in {"-", " ", "|", ":"} and not ch.isupper():
+                note_cols.add(idx)
+    assert len(note_cols) == 4
+
+
 def test_render_header_hides_tuning_and_shows_readable_meta() -> None:
     kwargs = _args("normal")
     kwargs["piece"].title = "Lachrimae"
@@ -699,6 +773,39 @@ def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
     assert not symbol_calls
 
 
+def test_render_common_triple_cue_keeps_gap_before_first_melody_note() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="T",
+        bars=[
+            Bar(
+                time_sig="O",
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
+                ],
+                melody_events=[MelodyEvent("b", 0, note_type=4), MelodyEvent("a", 1, note_type=4)],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["timesigstyle"] = "numeric"
+    lines = _render_lines(kwargs)
+    melody_start = _first_melody_row_idx(lines)
+    melody_block = lines[melody_start : melody_start + melody_row_count()]
+    cue_row = next(line for line in melody_block if "3" in line)
+    note_row = next(
+        line
+        for line in melody_block
+        if any(ch in {MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH} for ch in line)
+    )
+    cue_x = cue_row.index("3")
+    first_note = min(
+        idx for idx, ch in enumerate(note_row) if ch in {MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH}
+    )
+    assert first_note - cue_x >= 2
+
+
 def test_render_cut_time_signature_cue_is_visible_in_first_bar() -> None:
     kwargs = _args("normal")
     kwargs["piece"] = Piece(title="Cut", bars=[Bar(time_sig="C|"), Bar()], strings=6)
@@ -918,6 +1025,31 @@ def test_render_override_first_note_flag_does_not_overlap_time_cue_lane() -> Non
         if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
     )
     assert lines[flag_row_y][cue_x] == " "
+
+
+def test_render_cut_time_first_bar_keeps_four_equal_attacks_visible() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="T",
+        bars=[
+            Bar(
+                time_sig="C|",
+                chords=[
+                    Chord(note_type=5, dotted=False, grid="start", notes=[Note(2, 0, 0)]),
+                    Chord(note_type=5, dotted=False, grid="mid", notes=[Note(2, 1, 0)]),
+                    Chord(note_type=5, dotted=False, grid="mid", notes=[Note(2, 2, 0)]),
+                    Chord(note_type=5, dotted=False, grid="end", notes=[Note(2, 3, 0)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showtuning"] = "off"
+    kwargs["settings"]["barsperline"] = "1"
+    kwargs["stdscr"] = _Screen(h=16, w=50)
+
+    lines = _render_lines(kwargs)
+    assert any(all(ch in line for ch in "abcd") for line in lines)
 
 
 def test_render_repeat_glyphs_visible_on_synthetic_piece() -> None:

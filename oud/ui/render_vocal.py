@@ -6,6 +6,7 @@ from oud.core.model import Bar, LyricEvent, MelodyEvent
 from oud.ui.render_text_lanes import (
     lyric_event_cells,
     melody_staff_rows,
+    text_bar_cells,
 )
 from oud.ui.render_text_lanes import (
     melody_row_count as _melody_row_count,
@@ -185,6 +186,20 @@ def lyric_rows_for_bar(
     left_pad: int,
     lyric_rows_count: int,
 ) -> list[list[str]]:
+    if _raw_vocal_fallback_text_rows(bar):
+        raw_lines = _raw_vocal_fallback_text_rows(bar)[: max(lyric_rows_count, 1)]
+        out: list[list[str]] = []
+        for text in raw_lines:
+            cells = [" "] * max(0, width)
+            payload = text_bar_cells(text, max(0, width - left_pad))
+            for idx, ch in enumerate(payload):
+                dest = left_pad + idx
+                if 0 <= dest < len(cells):
+                    cells[dest] = ch
+            out.append(cells)
+        while len(out) < lyric_rows_count:
+            out.append([" "] * max(0, width))
+        return out
     event_rows = _dedup_lyric_rows(_bar_lyric_rows(bar))
     ordered_rows = sorted(
         event_rows,
@@ -203,6 +218,16 @@ def lyric_rows_for_bar(
             ),
         )
     return out
+
+
+def _raw_vocal_fallback_text_rows(bar: Bar) -> list[str]:
+    for row in getattr(bar, "structured_text_rows", None) or []:
+        if row.kind != "vocal":
+            continue
+        text = (row.text or "").strip()
+        if text and text[0].isdigit():
+            return [line for line in (getattr(bar, "lyrics", None) or []) if line.strip()]
+    return []
 
 
 def _max_onset_index(rows: list[list[LyricEvent]], melody_events: list[MelodyEvent]) -> int:

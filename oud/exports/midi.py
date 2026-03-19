@@ -474,6 +474,10 @@ def _append_vocal_messages(
         gate_percent = max(10, min(100, int(gate_text)))
     gate = gate_percent / 100.0
     for event in vocal_events:
+        if getattr(event, "is_rest", False):
+            continue
+        if event.pitch is None:
+            continue
         if not (0 <= event.chord_index < len(chord_events)):
             continue
         start, duration, _col, _notes = chord_events[event.chord_index]
@@ -490,7 +494,7 @@ def _append_vocal_messages(
 
 
 def _playverse_count(piece: Piece, settings: dict[str, str]) -> int:
-    mode = settings.get("playverses", "all")
+    mode = settings.get("playverses", "once")
     if mode == "once":
         return 1
     count = 1

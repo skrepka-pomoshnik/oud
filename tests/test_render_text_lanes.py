@@ -1,7 +1,8 @@
-from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
+from oud.core.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
 from oud.ui.render_text_lanes import (
     MELODY_FILLED_NOTEHEAD_GLYPH,
     MELODY_NOTEHEAD_GLYPH,
+    draw_melody_key_signature,
     draw_melody_time_signature,
     lyric_event_cells,
     melody_event_cells,
@@ -287,6 +288,32 @@ def test_draw_melody_time_signature_places_numerator_only_left_of_first_stem() -
     assert all(line[6] != "3" for line in text_rows)
 
 
+def test_draw_melody_time_signature_can_leave_a_gap_before_first_onset() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0)],
+        onset_cols=[3],
+        width=12,
+        left_pad=3,
+    )
+    draw_melody_time_signature(rows, time_sig="3/4", left_pad=3)
+    text_rows = ["".join(row) for row in rows]
+    meter_row = next(idx for idx, line in enumerate(text_rows) if "3" in line)
+    assert text_rows[meter_row][0] == "3"
+    assert text_rows[meter_row][1] != "3"
+
+
+def test_draw_melody_key_signature_adds_sharp_for_g_major() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("d", 0)],
+        onset_cols=[6],
+        width=16,
+        left_pad=6,
+    )
+    draw_melody_key_signature(rows, key="GM", left_pad=4)
+    text_rows = ["".join(row) for row in rows]
+    assert any("#" in line[:6] for line in text_rows)
+
+
 def test_melody_staff_rows_draw_full_stems_by_default() -> None:
     rows = melody_staff_rows(
         [MelodyEvent("d", 0)],
@@ -373,3 +400,41 @@ def test_melody_staff_rows_whole_note_has_no_stem_half_note_is_hollow() -> None:
     assert all(text_rows[row][3] != "|" for row in range(whole_row))
     assert any(text_rows[row][9] == "|" for row in range(half_row))
     assert any(text_rows[row][15] == "|" for row in range(quarter_row))
+
+
+def test_melody_staff_rows_draws_explicit_rest_marker() -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+        melody_events=[MelodyEvent("r", 0, note_type=4, is_rest=True)],
+    )
+    rows = melody_staff_rows(
+        bar.melody_events,
+        onset_cols=[4],
+        width=12,
+        left_pad=1,
+        bar=bar,
+        bar_chords=bar.chords,
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert any(line[4] == "r" for line in text_rows)
+    assert all(line[4] not in {MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH} for line in text_rows)
+
+
+def test_melody_staff_rows_raw_fallback_natural_hint_does_not_draw_n() -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+        melody_events=[MelodyEvent("f", 0, note_type=4, accidental_flags=0x2000)],
+        structured_text_rows=[ImportedTextRow(0, "vocal", text="3 raw cue", tokens=["raw"])],
+    )
+    rows = melody_staff_rows(
+        bar.melody_events,
+        onset_cols=[4],
+        width=12,
+        left_pad=1,
+        bar=bar,
+        bar_chords=bar.chords,
+        tuning_pitches=[67, 62, 57, 53, 48, 43],
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert all("n" not in line for line in text_rows)

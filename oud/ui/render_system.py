@@ -20,7 +20,6 @@ from oud.core.tab_policy import (
     tie_notehead_hidden_cols,
     tie_notehead_parenthesize_cols,
     tie_span_chars,
-    time_cue_reserved_width,
     time_cue_side_pad,
     time_sig_inline_rows,
     visual_row_indices,
@@ -60,7 +59,11 @@ from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
-from oud.ui.render_text_lanes import draw_melody_time_signature
+from oud.ui.render_text_lanes import (
+    draw_melody_key_signature,
+    draw_melody_time_signature,
+    melody_key_signature_width,
+)
 from oud.ui.render_vocal import lyric_rows_for_bar, melody_rows_for_bar, vocal_onset_cols_for_bar
 
 PlaybackOverlayCache = dict[tuple[int, int], list[tuple[int, int, str, int]]]
@@ -1121,6 +1124,11 @@ def render_systems(  # noqa: C901, PLR0912
                     prev_time_value=prev_time,
                     sig_label=sig_label,
                 )
+                cue_pad_extra = time_cue_side_pad(show_time_cue=show_cue, scale_bar=True)
+                if show_cue and current_time in {"C|", "c|", "2/2"}:
+                    cue_pad_extra = max(cue_pad_extra, 3)
+                if show_cue and current_time in {"O", "o", "3/4"}:
+                    cue_pad_extra = max(cue_pad_extra, 3)
                 compact_fill = spacing_fill == "compact"
                 auto_event_gap = 1 if compact_fill else 2
                 auto_flag_gap = 0 if compact_fill else (2 if spacing_fill == "smart" else 1)
@@ -1138,10 +1146,7 @@ def render_systems(  # noqa: C901, PLR0912
                         barpad=barpad,
                         flag_gap=auto_flag_gap,
                         event_gap=auto_event_gap,
-                        cue_pad_total=time_cue_reserved_width(
-                            show_time_cue=show_cue,
-                            scale_bar=True,
-                        ),
+                        cue_pad_total=cue_pad_extra * 2,
                     ),
                 )
             bar_widths = [
@@ -1429,7 +1434,33 @@ def render_systems(  # noqa: C901, PLR0912
                     cue_pad_extra,
                     time_cue_side_pad(show_time_cue=True, scale_bar=True),
                 )
+            if show_time_sig_here and time_value in {"C|", "c|", "2/2"}:
+                cue_pad_extra = max(cue_pad_extra, 3)
+            if show_time_sig_here and time_value in {"O", "o", "3/4"}:
+                cue_pad_extra = max(cue_pad_extra, 3)
             draw_pad = pad + cue_pad_extra
+            if bar.chords and not scale_bar and not duet_width_lock:
+                compact_fill = spacing_fill == "compact"
+                fixed_event_gap = 1 if compact_fill else 2
+                fixed_flag_gap = 0 if compact_fill else (2 if spacing_fill == "smart" else 1)
+                display_width = max(
+                    display_width,
+                    _required_auto_display_width_for_bar(
+                        bar,
+                        total_strings=total_strings,
+                        bar_width=bar_width,
+                        default_duration=default_duration,
+                        style=style,
+                        french_c=french_c,
+                        fretlabelmode=fretlabelmode,
+                        show_dur=show_dur and rows["dur"] is not None,
+                        hide_redundant=hide_redundant,
+                        barpad=0,
+                        flag_gap=fixed_flag_gap,
+                        event_gap=fixed_event_gap,
+                        cue_pad_total=draw_pad * 2,
+                    ),
+                )
             text_onset_cols: list[int] = []
             if rows["meta"] is not None:
                 meta_row = row_start + (rows["meta"] or 0)
@@ -1600,11 +1631,77 @@ def render_systems(  # noqa: C901, PLR0912
                                     strict=False,
                                 )
                             }
-                        src_to_dest = _expand_scale_map_from_anchors(
-                            positions,
-                            anchor_src_to_dest,
-                            content_width=content_width,
-                        )
+                        if len({col for col, _denom, _dot in ordered_flags}) < len(
+                            {col for col, _denom, _dot in positions},
+                        ):
+                            # Redundant flag hiding may collapse several note onsets to a single
+                            # visible flag anchor. Keep flag placement reduced, but map note columns
+                            # from the full onset set so equally spaced attacks remain distinct.
+                            if beatsnap_mode == "soft" and beats > 1:
+                                src_to_dest = soft_beat_snap_map(
+                                    positions,
+                                    grid_width=grid_width,
+                                    content_width=content_width,
+                                    beats=beats,
+                                    min_gap=unit_anchor_min_gap,
+                                )
+                                src_to_dest = trim_right_slack_for_onsets(
+                                    src_to_dest,
+                                    all_positions=positions,
+                                    visible_positions=ordered_flags,
+                                    content_width=content_width,
+                                    min_gap=unit_anchor_min_gap,
+                                )
+                            elif spacing_fill == "smart":
+                                src_to_dest = smart_group_map(
+                                    positions,
+                                    ordered_flags,
+                                    content_width,
+                                    min_gap=event_min_gap,
+                                )
+                            else:
+                                _, src_to_dest = _build_chord_scale_map(
+                                    positions,
+                                    grid_width,
+                                    content_width,
+                                    min_gap=event_min_gap,
+                                )
+                            if content_width > 1 and src_to_dest:
+                                anchor_width = max(1, content_width - 1)
+                                seeded_event_positions = [
+                                    (
+                                        _scale_col(
+                                            src_to_dest.get(
+                                                col,
+                                                _scale_col(col, grid_width, content_width),
+                                            ),
+                                            content_width,
+                                            anchor_width,
+                                        ),
+                                        2,
+                                        False,
+                                    )
+                                    for (col, _denom, _dot) in positions
+                                ]
+                                spread_event_positions = spread_flag_positions(
+                                    seeded_event_positions,
+                                    anchor_width,
+                                    min_gap=unit_anchor_min_gap,
+                                )
+                                src_to_dest = {
+                                    raw_col: scaled_col
+                                    for (raw_col, _d1, _dot1), (scaled_col, _d2, _dot2) in zip(
+                                        positions,
+                                        spread_event_positions,
+                                        strict=False,
+                                    )
+                                }
+                        else:
+                            src_to_dest = _expand_scale_map_from_anchors(
+                                positions,
+                                anchor_src_to_dest,
+                                content_width=content_width,
+                            )
                         final_flag_positions = [
                             (
                                 anchor_src_to_dest.get(
@@ -2334,26 +2431,38 @@ def render_systems(  # noqa: C901, PLR0912
                 playback_vocal_onset_cols: list[int] = []
                 melody_row_base: int | None = None
                 rendered_melody_rows: list[str] | None = None
+                vocal_left_pad = draw_pad
+                melody_key_pad = 0
+                if abs_bar == 0 and (bar.time_sig or settings.get("time", "")):
+                    vocal_left_pad += 2
+                if abs_bar == 0:
+                    melody_key_pad = melody_key_signature_width(piece.key)
+                    vocal_left_pad += melody_key_pad
                 if rows.get("melody") is not None:
                     melody_row_base = row_start + (rows["melody"] or 0)
                     playback_vocal_onset_cols = vocal_onset_cols_for_bar(
                         bar,
                         onset_cols=text_onset_cols,
                         width=display_width,
-                        left_pad=draw_pad,
+                        left_pad=vocal_left_pad,
                     )
                     melody_rows = melody_rows_for_bar(
                         bar,
                         onset_cols=playback_vocal_onset_cols,
                         width=display_width,
-                        left_pad=draw_pad,
+                        left_pad=vocal_left_pad,
                         tuning_pitches=tuning_pitches,
                     )
                     if abs_bar == 0 and melody_rows:
                         draw_melody_time_signature(
                             melody_rows,
                             time_sig=bar.time_sig or settings.get("time", ""),
-                            left_pad=draw_pad,
+                            left_pad=max(0, vocal_left_pad - melody_key_pad),
+                        )
+                        draw_melody_key_signature(
+                            melody_rows,
+                            key=piece.key,
+                            left_pad=max(0, vocal_left_pad - melody_key_pad + 2),
                         )
                     rendered_melody_rows = ["".join(row) for row in melody_rows]
                     for melody_row_idx, melody_cells in enumerate(melody_rows[:melody_rows_count]):
@@ -2374,13 +2483,13 @@ def render_systems(  # noqa: C901, PLR0912
                     bar,
                     onset_cols=text_onset_cols,
                     width=display_width,
-                    left_pad=draw_pad,
+                    left_pad=vocal_left_pad,
                 )
                 lyric_rows = lyric_rows_for_bar(
                     bar,
                     onset_cols=vocal_onset_cols,
                     width=display_width,
-                    left_pad=draw_pad,
+                    left_pad=vocal_left_pad,
                     lyric_rows_count=len(lyric_row_offsets),
                 )
                 for lyric_idx, lyric_row in enumerate(lyric_row_offsets):

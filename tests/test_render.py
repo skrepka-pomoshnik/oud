@@ -156,6 +156,7 @@ def test_chord_positions_spread() -> None:
     assert positions[1][0] > positions[0][0]
 
 
+
 def test_flag_row_marks_positions() -> None:
     positions = [(0, 4, False), (3, 8, False)]
     flags = flag_row(positions, bar_width=6)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from oud.core.key_signature import key_signature_count
 from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent
 from oud.core.time_utils import parse_time_signature_value
 from oud.core.vocal_line import chord_top_pitch, infer_vocal_events, token_pitch_value
@@ -298,6 +299,8 @@ def _event_accidental_map(events: list[MelodyEvent] | None) -> dict[int, str]:
     for ev in events or []:
         if ev.onset_index in mapping:
             continue
+        if ev.is_rest:
+            continue
         flags = ev.accidental_flags or 0
         if flags & 0x1000:
             mapping[ev.onset_index] = "b"
@@ -313,6 +316,32 @@ def _event_accidental_map(events: list[MelodyEvent] | None) -> dict[int, str]:
             mapping[ev.onset_index] = "#"
         elif "b" in token[1:]:
             mapping[ev.onset_index] = "b"
+    return mapping
+
+
+def _bar_uses_raw_vocal_fallback(bar: Bar | None) -> bool:
+    if bar is None:
+        return False
+    for row in getattr(bar, "structured_text_rows", None) or []:
+        if row.kind != "vocal":
+            continue
+        text = (row.text or "").strip()
+        if text and text[0].isdigit():
+            return True
+    return False
+
+
+def _event_accidental_map_for_bar(
+    events: list[MelodyEvent] | None,
+    *,
+    bar: Bar | None,
+) -> dict[int, str]:
+    mapping = _event_accidental_map(events)
+    if not _bar_uses_raw_vocal_fallback(bar):
+        return mapping
+    for ev in events or []:
+        if (ev.accidental_flags or 0) & 0x2000:
+            mapping.pop(ev.onset_index, None)
     return mapping
 
 
@@ -371,7 +400,7 @@ def _resampled_onset_cols(
     return out
 
 
-def melody_staff_rows(
+def melody_staff_rows(  # noqa: C901
     events: list[MelodyEvent] | None,
     *,
     onset_cols: list[int],
@@ -416,13 +445,19 @@ def melody_staff_rows(
             width=width,
             left_pad=left_pad,
         )
-    onset_accidental = _event_accidental_map(events)
+    onset_accidental = _event_accidental_map_for_bar(events, bar=bar)
     floor = max(0, left_pad)
     for event in vocal_events:
         onset_idx = event.onset_index
         if onset_idx < 0 or onset_idx >= len(onset_cols):
             continue
         col = max(floor, min(width - 1, onset_cols[onset_idx]))
+        if getattr(event, "is_rest", False):
+            rest_row = min(len(rows) - 1, _TOP_LINE_ROW + 2)
+            rows[rest_row][col] = "r"
+            continue
+        if event.pitch is None:
+            continue
         raw_row, row = _pitch_rows(event.pitch, melody_view)
         _draw_vocal_stem(
             rows,
@@ -451,7 +486,7 @@ def draw_melody_time_signature(
     if parsed is None:
         return
     beats, _unit = parsed
-    col = max(0, left_pad - 1)
+    col = max(0, left_pad - 3)
     if not rows[0] or col >= len(rows[0]):
         return
     numerator = str(beats)
@@ -460,6 +495,36 @@ def draw_melody_time_signature(
         target = col + offset
         if target < len(rows[top_row]):
             rows[top_row][target] = ch
+
+
+_TREBLE_SHARP_PITCHES = (77, 72, 79, 74, 69, 76, 71)  # F5 C5 G5 D5 A4 E5 B4
+_TREBLE_FLAT_PITCHES = (71, 76, 69, 74, 67, 72, 65)   # B4 E5 A4 D5 G4 C5 F4
+
+
+def melody_key_signature_width(key: str | None) -> int:
+    count = key_signature_count(key)
+    if count is None or count == 0:
+        return 0
+    return abs(count) + 1
+
+
+def draw_melody_key_signature(
+    rows: list[list[str]],
+    *,
+    key: str | None,
+    left_pad: int,
+) -> None:
+    count = key_signature_count(key)
+    if not rows or count is None or count == 0:
+        return
+    pitches = _TREBLE_SHARP_PITCHES if count > 0 else _TREBLE_FLAT_PITCHES
+    glyph = "#" if count > 0 else "b"
+    start_col = max(0, left_pad - 1)
+    for idx, pitch in enumerate(pitches[: abs(count)]):
+        _raw_row, row = _pitch_rows(pitch, None)
+        col = start_col + idx
+        if 0 <= row < len(rows) and 0 <= col < len(rows[row]):
+            rows[row][col] = glyph
 
 
 def _stem_glyph_rows(*, last_stem_row: int) -> dict[int, str]:

@@ -126,6 +126,27 @@ def test_export_midi_includes_vocal_channel_for_explicit_melody_bars(tmp_path) -
     assert bytes([0x91]) in track
 
 
+def test_export_midi_skips_explicit_vocal_rest_events(tmp_path) -> None:
+    bar = Bar(
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+        lyric_event_rows=[[LyricEvent("Can", 0)]],
+        melody_events=[MelodyEvent("r", 0, note_type=4, is_rest=True)],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "vocal_rest.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"midivocalpatch": "54"},
+    )
+    track = _track_data(path)
+    assert bytes([0xC1, 54]) in track
+    assert bytes([0x91]) not in track
+
+
 def test_export_midi_skips_inferred_vocal_channel_by_default(tmp_path) -> None:
     bar = Bar(
         chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
@@ -385,6 +406,33 @@ def test_build_playback_timeline_plays_once_when_playverses_disabled() -> None:
         durations={},
         bar_width=8,
         settings={"style": "french", "playverses": "once"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert len(timeline) == 1
+
+
+def test_build_playback_timeline_defaults_to_once_for_multiple_lyric_verses() -> None:
+    piece = Piece(
+        title="Verses",
+        bars=[
+            Bar(
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+                lyric_event_rows=[
+                    [LyricEvent("Can", 0, verse=0)],
+                    [LyricEvent("Was", 0, verse=1)],
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french"},
         bpm=120,
         start_bar=0,
         dotted=None,
