@@ -64,6 +64,7 @@ class EditorState:
         self._hold_start: tuple[int, int] | None = None
         self.help_offset = 0
         self.info_offset = 0
+        self.notes_offset = 0
         self.screen_width = 0
         self.screen_height = 0
         self.midi_proc: subprocess.Popen[bytes] | None = None

@@ -122,6 +122,7 @@ class Piece:
     source: str | None = None
     editor: str | None = None
     comment: str | None = None
+    notes: list[str] = field(default_factory=list)
     publisher: str | None = None
     volume: str | None = None
     page: str | None = None

@@ -78,3 +78,10 @@ def test_apply_command_allows_non_mutating_info_in_read_only_mode() -> None:
     state.read_only = True
     apply_command(state, "info", "config.toml")
     assert state.mode == "info"
+
+
+def test_apply_command_allows_notes_in_read_only_mode() -> None:
+    state = _state()
+    state.read_only = True
+    apply_command(state, "notes", "config.toml")
+    assert state.mode == "notes"

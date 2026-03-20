@@ -557,6 +557,22 @@ def test_load_ft3_parses_footnote_parts_from_annotation(tmp_path) -> None:
     assert piece.source == "source from annotation"
 
 
+def test_load_ft3_extracts_preamble_notes_from_prefix(tmp_path) -> None:
+    payload = (
+        b"Times New Roman\x00\x00- # -@Ayres, v.1 (1597), f. c2v.  "
+        b"Encoded and edited by Sarge Gerbode.2"
+        b"CPiece{\\rtf1\\ansi Demo}\r\n~"
+        b"CBar\x03\x80"
+    )
+    path = tmp_path / "preamble.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.notes == ["Ayres, v.1 (1597), f. c2v. Encoded and edited by Sarge Gerbode."]
+    assert piece.source == "Ayres, v.1 (1597)"
+    assert piece.page == "c2v"
+    assert piece.editor == "Sarge Gerbode"
+
+
 def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
     paths = [
         "examples/example.ft3",

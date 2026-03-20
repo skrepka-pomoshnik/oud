@@ -135,6 +135,37 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
     return ["INFO", "", *fields, "", "q/esc to close"]
 
 
+def notes_lines(piece: Piece) -> list[str]:
+    lines = ["NOTES", ""]
+    for note in piece.notes:
+        text = (note or "").strip()
+        if text:
+            lines.append(text)
+    if piece.footnote:
+        lines.extend(["", f"Footnote: {piece.footnote}"])
+    if piece.source:
+        lines.append(f"Source: {piece.source}")
+    if piece.editor:
+        lines.append(f"Editor: {piece.editor}")
+    if piece.comment:
+        lines.append(f"Comment: {piece.comment}")
+    editorial = [
+        (idx + 1, text)
+        for idx, bar in enumerate(piece.bars)
+        for text in bar.editorial_text
+        if text.strip()
+    ]
+    if editorial:
+        lines.append("")
+        lines.append("Bar Comments")
+        for bar_no, text in editorial:
+            lines.append(f"[{bar_no}] {text}")
+    if lines == ["NOTES", ""]:
+        lines.append("No notes")
+    lines.extend(["", "q/esc to close"])
+    return lines
+
+
 def render_help(
     stdscr: Screen,
     status: str,
@@ -190,6 +221,23 @@ def render_info(
     max_lines = max(0, height - 1)
     max_offset = max(0, len(lines) - max_lines)
     offset = min(max(0, info_offset), max_offset)
+    for idx, line in enumerate(lines[offset : offset + max_lines]):
+        safe_addstr(stdscr, idx, 0, clean_text(line))
+    safe_addstr(stdscr, height - 1, 0, clean_text(status), status_attr)
+
+
+def render_notes(
+    stdscr: Screen,
+    status: str,
+    status_attr: int,
+    notes_offset: int,
+    piece: Piece,
+) -> None:
+    height, _width = stdscr.getmaxyx()
+    lines = notes_lines(piece)
+    max_lines = max(0, height - 1)
+    max_offset = max(0, len(lines) - max_lines)
+    offset = min(max(0, notes_offset), max_offset)
     for idx, line in enumerate(lines[offset : offset + max_lines]):
         safe_addstr(stdscr, idx, 0, clean_text(line))
     safe_addstr(stdscr, height - 1, 0, clean_text(status), status_attr)

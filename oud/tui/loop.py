@@ -169,7 +169,9 @@ def run_loop(
                 [f"{item.title}{'/' if item.is_dir else ''}" for item in state.plugin_items],
                 state.plugin_index,
                 state.plugin_offset,
-                state.help_offset if state.mode != "info" else state.info_offset,
+                state.info_offset
+                if state.mode == "info"
+                else state.notes_offset if state.mode == "notes" else state.help_offset,
                 None if playback_cache is not None else state.playback_bar,
                 None if playback_cache is not None else state.playback_col,
                 playback_cache=playback_cache,

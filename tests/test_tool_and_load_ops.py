@@ -5,7 +5,7 @@ from pathlib import Path
 from oud.core.model import Bar, Piece
 from oud.editor.load_ops import cmd_open, load_piece_data
 from oud.editor.state import EditorState
-from oud.editor.tool_ops import cmd_info, cmd_plugins, cmd_tool
+from oud.editor.tool_ops import cmd_info, cmd_notes, cmd_plugins, cmd_tool
 from oud.editor.undo_ops import undo
 
 
@@ -24,7 +24,7 @@ def _state() -> EditorState:
     return state
 
 
-def test_cmd_info_and_plugins(monkeypatch) -> None:
+def test_cmd_info_and_notes_and_plugins(monkeypatch) -> None:
     state = _state()
     state.insert_prefix = "/"
     state.replace_once = True
@@ -33,6 +33,9 @@ def test_cmd_info_and_plugins(monkeypatch) -> None:
     assert state.info_offset == 0
     assert state.insert_prefix == ""
     assert state.replace_once is False
+    cmd_notes(state)
+    assert state.mode == "notes"
+    assert state.notes_offset == 0
 
     called: dict[str, bool] = {"ok": False}
 

@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from oud.exports.midi import _midi_command
 
@@ -23,7 +22,7 @@ def test_midi_command_fluidsynth_with_soundfont_darwin() -> None:
     ]
 
 
-def test_midi_command_prefers_fluidsynth_darwin() -> None:
+def test_midi_command_prefers_timidity_without_soundfont_on_darwin() -> None:
     cmd = _midi_command(
         path="out.mid",
         soundfont=None,
@@ -32,19 +31,15 @@ def test_midi_command_prefers_fluidsynth_darwin() -> None:
         timidity="/opt/homebrew/bin/timidity",
         opener="/usr/bin/open",
     )
-    assert cmd == [
-        "/opt/homebrew/bin/fluidsynth",
-        "-q",
-        "-a",
-        "coreaudio",
-        "out.mid",
-    ]
+    assert cmd == ["/opt/homebrew/bin/timidity", "out.mid"]
 
 
-def test_midi_command_prefers_fluidsynth_with_soundfont() -> None:
+def test_midi_command_prefers_fluidsynth_with_soundfont(tmp_path) -> None:
+    soundfont = tmp_path / "lute.sf2"
+    soundfont.write_bytes(b"sf2")
     cmd = _midi_command(
         path="out.mid",
-        soundfont="~/sf2/lute.sf2",
+        soundfont=str(soundfont),
         platform="linux",
         fluidsynth="/usr/bin/fluidsynth",
         timidity="/usr/bin/timidity",
@@ -54,9 +49,21 @@ def test_midi_command_prefers_fluidsynth_with_soundfont() -> None:
         "/usr/bin/fluidsynth",
         "-q",
         "-ni",
-        str(Path("~/sf2/lute.sf2").expanduser()),
+        str(soundfont),
         "out.mid",
     ]
+
+
+def test_midi_command_missing_soundfont_falls_back_to_timidity() -> None:
+    cmd = _midi_command(
+        path="out.mid",
+        soundfont="~/sf2/missing.sf2",
+        platform="darwin",
+        fluidsynth="/opt/homebrew/bin/fluidsynth",
+        timidity="/opt/homebrew/bin/timidity",
+        opener="/usr/bin/open",
+    )
+    assert cmd == ["/opt/homebrew/bin/timidity", "out.mid"]
 
 
 def test_midi_command_fluidsynth_when_only_player() -> None:

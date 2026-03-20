@@ -248,6 +248,17 @@ def test_melody_staff_rows_keeps_explicit_onsets_in_tab_columns() -> None:
     assert all(line[23] != MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
 
 
+def test_melody_staff_rows_clamps_left_pad_when_bar_is_narrow() -> None:
+    rows = melody_staff_rows(
+        [MelodyEvent("g", 0, note_type=4)],
+        onset_cols=[9],
+        width=4,
+        left_pad=9,
+    )
+    text_rows = ["".join(row) for row in rows]
+    assert any(line[-1] == MELODY_FILLED_NOTEHEAD_GLYPH for line in text_rows)
+
+
 def test_melody_staff_rows_draws_ledger_cue_for_note_below_visible_staff() -> None:
     rows = melody_staff_rows(
         [MelodyEvent("c", 0)],

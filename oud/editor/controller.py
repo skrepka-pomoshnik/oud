@@ -19,7 +19,7 @@ def handle_key(  # noqa: C901, PLR0911, PLR0912
 ) -> bool:
     if state.pending_quit and key not in normal_bindings(state).quit:
         state.pending_quit = False
-    if state.mode in ("help", "info"):
+    if state.mode in ("help", "info", "notes"):
         keycodes = state.keycodes
         bindings = help_bindings()
         exit_keys = (*bindings.exit, keycodes.exit)
@@ -31,14 +31,18 @@ def handle_key(  # noqa: C901, PLR0911, PLR0912
         if key in down_keys:
             if state.mode == "help":
                 state.help_offset = menu_scroll_offset(state.help_offset, 1)
-            else:
+            elif state.mode == "info":
                 state.info_offset = menu_scroll_offset(state.info_offset, 1)
+            else:
+                state.notes_offset = menu_scroll_offset(state.notes_offset, 1)
             return True
         if key in up_keys:
             if state.mode == "help":
                 state.help_offset = menu_scroll_offset(state.help_offset, -1)
-            else:
+            elif state.mode == "info":
                 state.info_offset = menu_scroll_offset(state.info_offset, -1)
+            else:
+                state.notes_offset = menu_scroll_offset(state.notes_offset, -1)
             return True
         return True
     if state.mode == "plugin":

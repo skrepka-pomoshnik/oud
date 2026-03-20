@@ -33,6 +33,9 @@ from oud.ui.render_helpers import (
     render_info as _render_info,
 )
 from oud.ui.render_helpers import (
+    render_notes as _render_notes,
+)
+from oud.ui.render_helpers import (
     render_plugin as _render_plugin,
 )
 from oud.ui.render_helpers import (
@@ -569,6 +572,10 @@ def render_piece(  # noqa: C901, PLR0912
         info_settings = dict(settings)
         info_settings["terminal"] = f"{width}x{height}"
         _render_info(stdscr, status_line, status_attr, help_offset, piece, info_settings)
+        stdscr.refresh()
+        return
+    if mode == "notes":
+        _render_notes(stdscr, status_line, status_attr, help_offset, piece)
         stdscr.refresh()
         return
     if mode == "plugin":

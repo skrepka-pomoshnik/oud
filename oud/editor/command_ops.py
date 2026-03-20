@@ -54,6 +54,7 @@ from oud.editor.settings_ops import apply_set_command as _apply_set_command
 from oud.editor.settings_ops import convert_overrides as _convert_overrides
 from oud.editor.state import EditorState
 from oud.editor.tool_ops import cmd_info as _cmd_info
+from oud.editor.tool_ops import cmd_notes as _cmd_notes
 from oud.editor.tool_ops import cmd_plugins as _cmd_plugins
 from oud.editor.tool_ops import cmd_tool as _cmd_tool
 from oud.editor.transform_ops import cmd_courseshift as _cmd_courseshift
@@ -103,6 +104,10 @@ def cmd_open(state: EditorState, args: str) -> None:
         load_ft3_fn=load_ft3,
         build_durations_fn=build_durations,
     )
+
+
+def cmd_notes(state: EditorState, _args: str = "") -> None:
+    _cmd_notes(state)
 
 
 def cmd_convert(state: EditorState, args: str, config_path: str) -> None:

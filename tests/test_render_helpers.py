@@ -8,9 +8,11 @@ from oud.ui.render_helpers import (
     clean_text,
     flag_symbols,
     info_lines,
+    notes_lines,
     pad_row,
     render_help,
     render_info,
+    render_notes,
     render_plugin,
     safe_addstr,
 )
@@ -82,6 +84,7 @@ def test_info_help_plugin_and_info_render() -> None:
         composer="C",
         arranger="A",
         subtitle="S",
+        notes=["Ayres, v.1 (1597), f. c2v. Encoded and edited by Sarge Gerbode."],
         footnote="F",
         footnote_source="Src",
         footnote_editor="Ed",
@@ -103,6 +106,9 @@ def test_info_help_plugin_and_info_render() -> None:
     assert any(line.startswith("Comment:") and line.endswith("Commentary") for line in lines)
     assert any(line.startswith("LyricBars:") and line.endswith("1") for line in lines)
     assert any(line.startswith("MelodyBars:") and line.endswith("1") for line in lines)
+    notes = notes_lines(piece)
+    assert notes[0] == "NOTES"
+    assert any("Sarge Gerbode" in line for line in notes)
     s = _Screen(h=6, w=30)
     render_help(s, "help", 1, 0)
     render_plugin(s, "plugin", 1, "Plugins", ["a", "b"], 1, 0, "msg")
@@ -114,6 +120,7 @@ def test_info_help_plugin_and_info_render() -> None:
         piece,
         {"style": "french", "time": "C", "filepath": "examples/x.ft3"},
     )
+    render_notes(s, "notes", 1, 0, piece)
     assert s.calls
 
 

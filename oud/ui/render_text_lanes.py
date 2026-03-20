@@ -437,16 +437,17 @@ def melody_staff_rows(  # noqa: C901
         ]
     if not vocal_events:
         return rows
+    effective_left_pad = max(0, min(width - 1, left_pad))
     required_onsets = max((event.onset_index for event in vocal_events), default=-1) + 1
     if len(onset_cols) < required_onsets:
         onset_cols = _resampled_onset_cols(
             onset_cols=onset_cols,
             event_count=required_onsets,
             width=width,
-            left_pad=left_pad,
+            left_pad=effective_left_pad,
         )
     onset_accidental = _event_accidental_map_for_bar(events, bar=bar)
-    floor = max(0, left_pad)
+    floor = effective_left_pad
     for event in vocal_events:
         onset_idx = event.onset_index
         if onset_idx < 0 or onset_idx >= len(onset_cols):

@@ -39,6 +39,9 @@ from oud.editor.command_ops import (
     cmd_info as _cmd_info,
 )
 from oud.editor.command_ops import (
+    cmd_notes as _cmd_notes,
+)
+from oud.editor.command_ops import (
     cmd_open as _cmd_open,
 )
 from oud.editor.command_ops import (
@@ -172,6 +175,10 @@ def cmd_source(state: EditorState, args: str) -> None:
 
 def cmd_info(state: EditorState, _args: str) -> None:
     _cmd_info(state)
+
+
+def cmd_notes(state: EditorState, _args: str) -> None:
+    _cmd_notes(state)
 
 
 def cmd_plugins(state: EditorState, _args: str) -> None:
@@ -440,6 +447,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("midicmd", _no_config(cmd_midicmd)),
         CommandSpec("source", _no_config(cmd_source)),
         CommandSpec("info", _no_config(cmd_info)),
+        CommandSpec("notes", _no_config(cmd_notes)),
         CommandSpec("plugins", _no_config(cmd_plugins)),
         CommandSpec("bar", _no_config(cmd_bar)),
         CommandSpec("cursor", _no_config(cmd_cursor)),

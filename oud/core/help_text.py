@@ -36,7 +36,7 @@ HELP_LINES = [
     ":wq/:x           write + quit     :q!               quit without save",
     ":e <path>        open             :source [path]    view file with less",
     ":time <sig>      set time sig     :verify           check measure length",
-    ":info             show info page",
+    ":info             show info page  :notes            show notes page",
     ":undo             undo             :redo             redo",
     ":title <text>     set title        :author <text>     set author",
     ":subtitle <text>  set subtitle     :composer <text>   set composer",

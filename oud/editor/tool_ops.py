@@ -14,6 +14,11 @@ def cmd_info(state: EditorState) -> None:
     state.info_offset = 0
 
 
+def cmd_notes(state: EditorState) -> None:
+    set_mode(state, "notes")
+    state.notes_offset = 0
+
+
 def cmd_plugins(state: EditorState) -> None:
     from oud.editor.plugin_ops import enter_plugin_mode  # noqa: PLC0415
 

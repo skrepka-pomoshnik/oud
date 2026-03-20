@@ -909,14 +909,19 @@ def _midi_command(
 ) -> list[str] | None:
     soundfont_path = None
     if soundfont:
-        soundfont_path = str(Path(soundfont).expanduser())
-    if fluidsynth and (soundfont_path or platform == "darwin"):
+        candidate = Path(soundfont).expanduser()
+        if candidate.exists():
+            soundfont_path = str(candidate)
+    player = None
+    if soundfont_path and fluidsynth:
         player = fluidsynth
+    elif timidity:
+        player = timidity
+    elif platform == "darwin" and opener:
+        return [opener, path]
     else:
-        player = timidity or fluidsynth
+        player = fluidsynth
     if player is None:
-        if platform == "darwin" and opener:
-            return [opener, path]
         return None
     if player.endswith("fluidsynth"):
         cmd = [player]

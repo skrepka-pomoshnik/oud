@@ -2404,11 +2404,14 @@ def render_systems(  # noqa: C901, PLR0912
                     else:
                         scaled_cursor_col = grid_map[cursor_col]
                     cell_x = bar_x + draw_pad + scaled_cursor_col
+                    cell_idx = draw_pad + scaled_cursor_col
+                    if not (0 <= cell_idx < len(row_text)):
+                        continue
                     safe_addstr(
                         stdscr,
                         y,
                         cell_x,
-                        row_text[draw_pad + scaled_cursor_col],
+                        row_text[cell_idx],
                         A_REVERSE,
                     )
                 for col in range(bar_width):

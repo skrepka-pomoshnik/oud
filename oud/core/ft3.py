@@ -155,6 +155,30 @@ def _extract_cpiece_blocks(data: bytes) -> tuple[list[str], str]:
     return blocks, metadata_blob
 
 
+def _extract_ft3_preamble_notes(data: bytes) -> list[str]:
+    cpiece = data.find(b"CPiece")
+    if cpiece <= 0:
+        return []
+    preamble = data[:cpiece]
+    printable = "".join(chr(byte) if 32 <= byte <= 126 else " " for byte in preamble)
+    printable = re.sub(r"\s+", " ", printable)
+    pattern = re.compile(
+        r"([A-Z][A-Za-z][A-Za-z0-9 ,.'()/-]{8,}?"
+        r"Encoded and edited by [A-Z][A-Za-z .'-]{1,80}\.)",
+    )
+    matches = [match.group(1).strip() for match in pattern.finditer(printable)]
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for text in matches:
+        cleaned = re.sub(r"^[^A-Za-z]+", "", text).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        deduped.append(cleaned)
+    return deduped
+
+
 def _parse_section_annotations(text: str) -> dict[str, str]:
     annotations: dict[str, str] = {}
     for raw_line in text.replace("\x00", "\n").splitlines():
@@ -259,6 +283,26 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
     piece.page = page_value
     piece.section_annotations = annotations
     piece.raw_metadata = annotations
+
+
+def _apply_preamble_notes(piece: Piece, notes: list[str]) -> None:
+    if not notes:
+        return
+    piece.notes = list(notes)
+    primary = notes[0]
+    match = re.match(
+        r"(?P<source>.+?),\s*f\.\s*(?P<page>[A-Za-z0-9]+)\.\s*"
+        r"Encoded and edited by (?P<editor>.+?)\.$",
+        primary,
+    )
+    if match is None:
+        return
+    if piece.source is None:
+        piece.source = match.group("source").strip()
+    if piece.page is None:
+        piece.page = match.group("page").strip()
+    if piece.editor is None:
+        piece.editor = match.group("editor").strip()
 
 
 def at_next_note(s: int, f: int) -> bool:
@@ -763,6 +807,7 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     data = read_ft3(path)
 
     blocks, metadata_blob = _extract_cpiece_blocks(data)
+    preamble_notes = _extract_ft3_preamble_notes(data)
     title = blocks[0] if len(blocks) >= 1 else None
     subtitle = blocks[1] if len(blocks) >= 2 else None
     composer = blocks[2] if len(blocks) >= 3 else None
@@ -906,6 +951,7 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
         )
     annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
+    _apply_preamble_notes(piece, preamble_notes)
     for bar in piece.bars:
         _normalize_vocal_event_accidentals(
             bar,
