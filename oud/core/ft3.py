@@ -239,6 +239,8 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
     normalized = _canonicalize_metadata_fields(annotations)
     key_value = _annotation_lookup(annotations, "key")
     type_value = _annotation_lookup(annotations, "type")
+    style_value = _annotation_lookup(annotations, "style")
+    tuning_value = _annotation_lookup(annotations, "tuning")
     difficulty_value = _annotation_lookup(annotations, "difficulty")
     ensemble_value = _annotation_lookup(annotations, "ensemble")
     instrumentation_value = _annotation_lookup(annotations, "instrumentation")
@@ -246,7 +248,10 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
     source_value = _annotation_lookup(normalized, "source")
     editor_value = _annotation_lookup(annotations, "editor")
     comment_value = _annotation_lookup(annotations, "comment")
-    publisher_value = _annotation_lookup(annotations, "publisher/library")
+    publisher_value = (
+        _annotation_lookup(annotations, "publisher/library")
+        or _annotation_lookup(annotations, "library")
+    )
     volume_value = _annotation_lookup(annotations, "volume")
     page_value = _annotation_lookup(annotations, "page")
     piece_value = _annotation_lookup(annotations, "piece")
@@ -271,6 +276,8 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
 
     piece.key = key_value
     piece.piece_type = type_value
+    piece.style = style_value
+    piece.tuning = tuning_value
     piece.difficulty = difficulty_value
     piece.ensemble = ensemble_value
     piece.instrumentation = instrumentation_value
@@ -377,6 +384,7 @@ def parse_bar(bar_data: bytes) -> Bar:
                     string=string,
                     fret=fret,
                     raw_pos=ptr,
+                    barre=decoded.barre,
                     right_fingering=decoded.right_fingering,
                     left_fingering=decoded.left_fingering,
                     right_ornament=decoded.right_ornament,
@@ -662,6 +670,7 @@ def _imported_bar_base(bar_index: int, bar: Bar) -> ImportedBarContent:
         time_sig=bar.time_sig,
         barline=bar.barline,
         repeat=bar.repeat,
+        ending_numbers=bar.ending_numbers,
         system_break=bar.system_break,
     )
 
@@ -909,6 +918,8 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
                 target.barline = meta_bar.barline
             if target.repeat is None:
                 target.repeat = meta_bar.repeat
+            if not target.ending_numbers:
+                target.ending_numbers = meta_bar.ending_numbers
             target.system_break = target.system_break or meta_bar.system_break
     bars = parsed_bars
     _apply_legacy_duration_fix(bars)

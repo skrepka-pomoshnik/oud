@@ -36,6 +36,9 @@ from oud.editor.command_ops import (
     cmd_cursor as _cmd_cursor,
 )
 from oud.editor.command_ops import (
+    cmd_ending as _cmd_ending,
+)
+from oud.editor.command_ops import (
     cmd_info as _cmd_info,
 )
 from oud.editor.command_ops import (
@@ -115,6 +118,7 @@ READ_ONLY_BLOCKED_COMMANDS = frozenset(
         "hold",
         "barline",
         "repeat",
+        "ending",
         "dynamic",
         "fermata",
         "arpeggio",
@@ -219,6 +223,10 @@ def cmd_barline(state: EditorState, args: str) -> None:
 
 def cmd_repeat(state: EditorState, args: str) -> None:
     _cmd_repeat(state, args.strip())
+
+
+def cmd_ending(state: EditorState, args: str) -> None:
+    _cmd_ending(state, args.strip())
 
 
 def cmd_dynamic(state: EditorState, args: str) -> None:
@@ -459,6 +467,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("hold", _no_config(cmd_hold)),
         CommandSpec("barline", _no_config(cmd_barline)),
         CommandSpec("repeat", _no_config(cmd_repeat)),
+        CommandSpec("ending", _no_config(cmd_ending)),
         CommandSpec("dynamic", _no_config(cmd_dynamic)),
         CommandSpec("fermata", _no_config(cmd_fermata)),
         CommandSpec("arpeggio", _no_config(cmd_arpeggio)),

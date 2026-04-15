@@ -130,6 +130,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     stave_breaks: set[int],
     playback_bar: int | None,
     playback_col: int | None,
+    playback_markers: list[tuple[int, int]] | None,
     include_meta: bool,
     show_dur: bool,
     show_extras: bool,
@@ -151,6 +152,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     _ = lyric_rows_count
     if not is_duet_score_piece(piece):
         return False
+    _offset_staff, duet_logical_offset = duet_bar_mapping(max(0, bar_offset), piece=piece)
     mode = duet_view_mode(settings)
     if mode == "auto":
         mode = "both"
@@ -222,11 +224,15 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             if cur_staff == selected_staff:
                 mapped_cursor_bar = cur_logical
         mapped_playback_bar = None
+        mapped_playback_markers: list[tuple[int, int]] = []
         if playback_bar is not None:
             # Single-staff duet view should still show the paired logical playback
             # position even when the active MIDI event belongs to the hidden staff.
             _play_staff, play_logical = duet_bar_mapping(playback_bar, piece=piece)
             mapped_playback_bar = play_logical
+        for marker_bar, marker_col in playback_markers or []:
+            _marker_staff, marker_logical = duet_bar_mapping(marker_bar, piece=piece)
+            mapped_playback_markers.append((marker_logical, marker_col))
         logical_breaks = _duet_logical_stave_breaks(piece, stave_breaks)
         render_systems(
             stdscr,
@@ -239,7 +245,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             total_strings=total_strings,
             display_indices=[],
             display_strings=0,
-            bar_offset=bar_offset // 2,
+            bar_offset=duet_logical_offset,
             cursor_bar=mapped_cursor_bar,
             cursor_string=cursor_string,
             cursor_col=cursor_col,
@@ -258,6 +264,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             stave_breaks=logical_breaks,
             playback_bar=mapped_playback_bar,
             playback_col=playback_col,
+            playback_markers=mapped_playback_markers,
             include_meta=include_meta,
             show_dur=show_dur,
             show_extras=show_extras,
@@ -302,7 +309,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     base_header = header_row + 1  # keep the global title/header row intact
     available = max(0, height - 2 - base_header)
     pair_systems = max(1, available // max(1, pair_block_h))
-    current_logical = max(0, bar_offset // 2)
+    current_logical = max(0, duet_logical_offset)
     total_logical = max(len(top_piece.bars), len(bottom_piece.bars))
     logical_breaks = _duet_logical_stave_breaks(piece, stave_breaks)
     logical_bars = (
@@ -335,11 +342,16 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 if cur_staff == staff_index:
                     mapped_cursor_bar = cur_logical
             mapped_playback_bar = None
+            mapped_playback_markers: list[tuple[int, int]] = []
             if playback_bar is not None:
                 _play_staff, play_logical = duet_bar_mapping(playback_bar, piece=piece)
                 # Playback state is a single cursor; mirror the logical position on
                 # both staves so duet playback remains visually synchronized.
                 mapped_playback_bar = play_logical
+            for marker_bar, marker_col in playback_markers or []:
+                marker_staff, marker_logical = duet_bar_mapping(marker_bar, piece=piece)
+                if marker_staff == staff_index:
+                    mapped_playback_markers.append((marker_logical, marker_col))
             render_systems(
                 stdscr,
                 piece=subpiece,
@@ -370,6 +382,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 stave_breaks=logical_breaks,
                 playback_bar=mapped_playback_bar,
                 playback_col=playback_col,
+                playback_markers=mapped_playback_markers,
                 include_meta=include_meta,
                 show_dur=show_dur,
                 show_extras=show_extras,
@@ -562,6 +575,7 @@ def render_piece(  # noqa: C901, PLR0912
     playback_col: int | None = None,
     glisses: list[tuple[int, int, int]] | None = None,
     playback_cache=None,
+    playback_markers: list[tuple[int, int]] | None = None,
 ) -> None:
     stdscr.erase()
     height, width = stdscr.getmaxyx()
@@ -742,6 +756,7 @@ def render_piece(  # noqa: C901, PLR0912
         stave_breaks=stave_breaks,
         playback_bar=playback_bar,
         playback_col=playback_col,
+        playback_markers=playback_markers,
         include_meta=include_meta,
         show_dur=show_dur,
         show_extras=show_extras,
@@ -791,6 +806,7 @@ def render_piece(  # noqa: C901, PLR0912
             stave_breaks=stave_breaks,
             playback_bar=playback_bar,
             playback_col=playback_col,
+            playback_markers=playback_markers,
             include_meta=include_meta,
             show_dur=show_dur,
             show_extras=show_extras,

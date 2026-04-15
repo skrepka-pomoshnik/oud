@@ -9,6 +9,7 @@ class Note:
     fret: int
     raw_pos: int
     duration: int | None = None
+    barre: bool = False
     right_fingering: str | None = None
     left_fingering: str | None = None
     right_ornament: str | None = None
@@ -32,6 +33,7 @@ class ImportedBarContent:
     time_sig: str | None = None
     barline: str | None = None
     repeat: str | None = None
+    ending_numbers: tuple[int, ...] = ()
     system_break: bool = False
     lyrics: list[str] = field(default_factory=list)
     melody_events: list[MelodyEvent] = field(default_factory=list)
@@ -81,6 +83,7 @@ class Bar:
     notes: list[Note] = field(default_factory=list)
     barline: str | None = None
     repeat: str | None = None
+    ending_numbers: tuple[int, ...] = ()
     time_sig: str | None = None
     system_break: bool = False
     dynamic: str | None = None

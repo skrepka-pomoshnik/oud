@@ -112,7 +112,7 @@ def test_ensure_cursor_visible_maps_duet_halves_playback_to_logical_rows() -> No
     state.cursor_bar = 0
     state.playback_bar = 14  # bottom staff, logical bar 4 in halves storage
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
-    assert state.bar_offset == 8
+    assert state.bar_offset == 4
 
 
 def test_ensure_cursor_visible_duet_single_staff_follows_hidden_staff_playback_logically() -> None:
@@ -122,7 +122,28 @@ def test_ensure_cursor_visible_duet_single_staff_follows_hidden_staff_playback_l
     state.cursor_bar = 0
     state.playback_bar = 16  # hidden bottom staff, logical bar 6
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
-    assert state.bar_offset == 12
+    assert state.bar_offset == 6
+
+
+def test_ensure_cursor_visible_maps_halves_duet_top_staff_without_raw_div2_shortcut() -> None:
+    state = _duet_halves_state(logical_bars=20)
+    state.bar_offset = 0
+    state.cursor_bar = 0
+    state.playback_bar = 16
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 16
+
+
+def test_ensure_cursor_visible_duet_uses_earliest_active_logical_marker() -> None:
+    state = _duet_halves_state(logical_bars=20)
+    state.bar_offset = 16
+    state.cursor_bar = 0
+    state.playback_bar = 16
+    # Simultaneous playback can span adjacent logical bars across the paired staves.
+    # The viewport should keep the earliest logical bar visible so neither note vanishes.
+    state.playback.markers = [(16, 0), (23, 3)]  # top logical 16, bottom logical 3
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+    assert state.bar_offset == 2
 
 
 def test_ensure_cursor_visible_follows_vocal_playback_with_text_lanes_visible() -> None:

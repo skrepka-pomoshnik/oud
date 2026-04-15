@@ -111,6 +111,13 @@ def test_apply_action_structural(tmp_path: Path) -> None:
     assert state.piece.bars[0].repeat == "start"
     apply_action(
         state,
+        UndoAction(kind="ending", data={"bar": 0, "prev": (), "new": (1, 2)}),
+        redo=True,
+        config_path=config_path,
+    )
+    assert state.piece.bars[0].ending_numbers == (1, 2)
+    apply_action(
+        state,
         UndoAction(
             kind="timesig",
             data={

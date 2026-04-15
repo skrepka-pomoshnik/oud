@@ -779,7 +779,6 @@ def _ft3_fingering_glyph(value: str | None) -> str | None:
 def _ft3_display_fingering_for_note(note: Note, *, fingering_mode: str) -> str | None:
     left_value = note.left_fingering
     # Sanity rule: LH 1-4 on an open string is usually not a usable fingering cue.
-    # Keep RH markers / thumb, but suppress LH digit clutter until barre semantics exist.
     if note.fret == 0 and left_value in {"1", "2", "3", "4"}:
         left_value = None
     right_value = note.right_fingering
@@ -881,6 +880,8 @@ def _bar_imported_ft3_annotations(
             glyph = _ft3_display_fingering_for_note(note, fingering_mode=fingering_mode)
             if glyph:
                 break
+        if glyph is None and any(getattr(note, "barre", False) for note in chord.notes):
+            glyph = "["
         if glyph and row[col] == " ":
             row[col] = glyph
     return row

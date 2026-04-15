@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import time
 
-from oud.core.playback_timeline import cursor_at_time
+from oud.core.playback_timeline import cursors_at_time
 from oud.editor.state import EditorState
 
 
 def clear_playback_cursor(state: EditorState) -> None:
     state.playback.bar = None
     state.playback.col = None
+    state.playback.markers = []
 
 
 def prime_playback_animation(state: EditorState, timeline) -> None:
@@ -27,17 +28,19 @@ def advance_playback_cursor(state: EditorState, elapsed: float) -> None:
         clear_playback_cursor(state)
         state.playback.index = 0
         return
-    idx, cursor = cursor_at_time(
+    idx, cursors = cursors_at_time(
         state.playback.timeline,
         elapsed,
         start_index=state.playback.index,
     )
     state.playback.index = idx
-    if cursor is None:
+    if not cursors:
         clear_playback_cursor(state)
         return
+    cursor = cursors[0]
     state.playback.bar = cursor.bar
     state.playback.col = cursor.col
+    state.playback.markers = [(item.bar, item.col) for item in cursors]
 
 
 def reset_playback_animation(state: EditorState) -> None:

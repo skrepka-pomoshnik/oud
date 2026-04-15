@@ -312,6 +312,7 @@ class PlaybackState:
     index: int = 0
     bar: int | None = None
     col: int | None = None
+    markers: list[tuple[int, int]] = field(default_factory=list)
 
 
 @dataclass

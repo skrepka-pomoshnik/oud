@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 import pytest
 
@@ -149,6 +150,10 @@ def _first_lyric_row(lines: list[str]) -> str:
     )
 
 
+def _strip_combining(text: str) -> str:
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+
 def test_apply_overrides_wrapper() -> None:
     cells = [list("----") for _ in range(6)]
     _apply_overrides(cells, {(0, 0, 1): "r", (0, 1, 2): "a"}, 0, 6, 4)
@@ -220,6 +225,99 @@ def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
     kwargs["settings"]["maxbars"] = "0"
     render_piece(**kwargs)
     assert called["bars_limit"] == 0
+
+
+def test_render_piece_duet_passes_staff_specific_playback_markers(monkeypatch) -> None:
+    piece = Piece(
+        title="Duet",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 0, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    calls: list[list[tuple[int, int]]] = []
+
+    def _fake_render_systems(*_args, **kwargs):
+        calls.append(list(kwargs["playback_markers"]))
+
+    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    kwargs = _args("normal")
+    kwargs["piece"] = piece
+    kwargs["settings"]["duetscoreview"] = "both"
+    kwargs["playback_markers"] = [(0, 1), (1, 3)]
+    render_piece(**kwargs)
+    assert calls == [[(0, 1)], [(0, 3)]]
+
+
+def test_render_piece_duet_uses_piece_mapping_for_raw_bar_offset(monkeypatch) -> None:
+    logical_bars = 20
+    piece = Piece(
+        title="Duet",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, idx % 3, 0)])])
+            for idx in range(logical_bars)
+        ]
+        + [
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, idx % 4, 0)])])
+            for idx in range(logical_bars)
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    bar_offsets: list[int] = []
+
+    def _fake_render_systems(*_args, **kwargs):
+        bar_offsets.append(kwargs["bar_offset"])
+
+    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    kwargs = _args("normal")
+    kwargs["piece"] = piece
+    kwargs["settings"]["duetscoreview"] = "both"
+    kwargs["bar_offset"] = 16
+    render_piece(**kwargs)
+    assert bar_offsets[:2] == [16, 16]
+
+
+def test_playback_highlight_prefers_nearest_note_glyph_not_dash() -> None:
+    piece = Piece(
+        title="PlaybackNearest",
+        strings=6,
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 3, 0), Note(3, 5, 0), Note(4, 0, 0)]),
+                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 1, 0), Note(3, 3, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, 0, 0), Note(3, 3, 0), Note(4, 2, 0)]),
+                    Chord(note_type=5, dotted=False, grid=None, notes=[Note(3, 2, 0)]),
+                ],
+            ),
+        ],
+        style="french",
+    )
+    kwargs = _args("normal")
+    kwargs["piece"] = piece
+    kwargs["stdscr"] = _Screen(h=18, w=80)
+    kwargs["bar_width"] = 12
+    kwargs["playback_bar"] = 0
+    kwargs["playback_col"] = 3
+    fb = FrameBuffer(kwargs["stdscr"].h, kwargs["stdscr"].w)
+    kwargs["stdscr"] = fb
+    render_piece(**kwargs)
+    snap = fb.snapshot()
+    highlighted = [
+        (y, x, ch)
+        for y, (line, attrs) in enumerate(zip(snap.lines, snap.attrs, strict=False))
+        for x, (ch, attr) in enumerate(zip(line, attrs, strict=False))
+        if attr != 0 and ch not in {"^", "v", " ", "|", "-"}
+    ]
+    assert highlighted
+    assert any(ch == "c" for _y, _x, ch in highlighted)
 
 
 def test_cut_time_cue_keeps_four_equal_eighth_onsets_visibly_separate() -> None:
@@ -472,8 +570,9 @@ def test_playback_marker_does_not_mutate_staff_cells_with_combining_marks() -> N
     kwargs["playback_bar"] = 0
     kwargs["playback_col"] = 0
     with_playback = _render_lines(kwargs)
-    normalized_playback = [line.replace("^", " ") for line in with_playback]
-    assert normalized_playback == baseline
+    normalized_playback = [_strip_combining(line.replace("^", " ")) for line in with_playback]
+    normalized_baseline = [_strip_combining(line) for line in baseline]
+    assert normalized_playback == normalized_baseline
 
 
 def test_playback_highlights_active_note_cell_with_attribute() -> None:
@@ -1073,6 +1172,24 @@ def test_render_repeat_words_visible_on_synthetic_piece() -> None:
     assert any("DC al Fine" in text for text in texts)
 
 
+def test_render_ending_cue_visible_on_synthetic_piece() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=24, w=100)
+    kwargs["piece"] = Piece(
+        title="T",
+        bars=[
+            Bar(
+                ending_numbers=(1, 2),
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    render_piece(**kwargs)
+    texts = [text for (_y, _x, text, _a) in kwargs["stdscr"].calls]
+    assert any("[1,2.]" in text for text in texts)
+
+
 def test_render_shows_duet_score_hint_from_metadata() -> None:
     kwargs = _args("normal")
     kwargs["piece"] = Piece(
@@ -1282,6 +1399,25 @@ def test_imported_left_hand_plus_ornament_renders_inline(
     kwargs["settings"]["showornaments"] = "on"
     text = "\n".join(_render_lines(kwargs))
     assert f"{base}+" in text
+
+
+def test_imported_barre_semantics_renders_as_left_hand_cue() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Barre",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0, barre=True)]),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showfingerings"] = "on"
+    kwargs["settings"]["showornaments"] = "off"
+    text = "\n".join(_render_lines(kwargs))
+    assert "[" in text
 
 
 @pytest.mark.parametrize(

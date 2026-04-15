@@ -440,6 +440,134 @@ def test_build_playback_timeline_defaults_to_once_for_multiple_lyric_verses() ->
     assert len(timeline) == 1
 
 
+def test_build_playback_timeline_unfolds_structural_repeats() -> None:
+    piece = Piece(
+        title="Repeats",
+        bars=[
+            Bar(
+                repeat=".:",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+            Bar(
+                repeat=":.",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)])]),
+        ],
+        strings=6,
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert [cursor.bar for cursor in timeline] == [0, 1, 2, 0, 1, 2, 3]
+
+
+def test_export_midi_repeats_structural_section_once(tmp_path) -> None:
+    piece = Piece(
+        title="Repeats",
+        bars=[
+            Bar(
+                repeat=".:",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+            Bar(
+                repeat=":.",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)])]),
+        ],
+        strings=6,
+    )
+    path = tmp_path / "repeat.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={},
+    )
+    track = _track_data(path)
+    assert track.count(bytes([0x90])) == 7
+
+
+def test_build_playback_timeline_skips_first_ending_on_second_pass() -> None:
+    piece = Piece(
+        title="Volta",
+        bars=[
+            Bar(
+                repeat=".:",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+            Bar(
+                ending_numbers=(1,),
+                repeat=":.",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])],
+            ),
+            Bar(
+                ending_numbers=(2,),
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)])]),
+        ],
+        strings=6,
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"style": "french"},
+        bpm=120,
+        start_bar=0,
+        dotted=None,
+    )
+    assert [cursor.bar for cursor in timeline] == [0, 1, 0, 2, 3]
+
+
+def test_export_midi_respects_first_and_second_endings(tmp_path) -> None:
+    piece = Piece(
+        title="Volta",
+        bars=[
+            Bar(
+                repeat=".:",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+            ),
+            Bar(
+                ending_numbers=(1,),
+                repeat=":.",
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])],
+            ),
+            Bar(
+                ending_numbers=(2,),
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])],
+            ),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 3, 0)])]),
+        ],
+        strings=6,
+    )
+    path = tmp_path / "volta.mid"
+    export_midi(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={},
+    )
+    track = _track_data(path)
+    assert track.count(bytes([0x90])) == 5
+
+
 def test_midi_chord_positions_match_render_positions() -> None:
     bar = Bar(
         chords=[

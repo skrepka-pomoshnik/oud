@@ -49,9 +49,10 @@ HELP_LINES = [
     ":vocal clear      remove imported melody/lyrics layer",
     (
         ":repeat none|start|end|dots|both|dc|ds|fine|coda|tocoda|"
-        "dcalfine|dcalcoda|dsalfine|dsalcoda   :orn <char>|clear"
+        "dcalfine|dcalcoda|dsalfine|dsalcoda   :ending clear|1|1,2"
     ),
-    ":annot <text>|clear               :highlight on/off",
+    ":orn <char>|clear               :highlight on/off",
+    ":annot <text>|clear",
     ":slur start/end/clear             :tie start/end/clear",
     ":hold start/end/clear             :tuplet 2..9|clear",
     ":arpeggio on/off/toggle           :separee on/off/toggle",

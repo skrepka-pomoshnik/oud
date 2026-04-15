@@ -4,7 +4,17 @@ from pathlib import Path
 import pytest
 
 from oud.core.ft3 import build_durations, load_ft3
-from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from oud.core.model import (
+    Bar,
+    Chord,
+    ImportedBarContent,
+    ImportedScore,
+    ImportedStaff,
+    LyricEvent,
+    MelodyEvent,
+    Note,
+    Piece,
+)
 from oud.exports import lilypond as lp
 from oud.exports.lilypond import export_lilypond
 
@@ -370,6 +380,37 @@ def test_export_lilypond_ft3_extras_collects_multiple_notes_and_suppresses_open_
     assert '"t"' in text
 
 
+def test_export_lilypond_ft3_barre_semantics_emit_named_markup(tmp_path) -> None:
+    bar = Bar(
+        chords=[
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[Note(1, 2, 0, barre=True)],
+            ),
+        ],
+    )
+    piece = Piece(title="T", bars=[bar], strings=6)
+    path = tmp_path / "barre.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g4d4a3f3c3g2",
+            "tabnotation": "full",
+            "showfingerings": "on",
+            "showornaments": "off",
+            "ft3fingering": "left",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert '"barre"' in text
+
+
 def test_export_lilypond_repeat_both_and_ds_coda(tmp_path) -> None:
     bar1 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
     bar1.repeat = ":|:"
@@ -522,6 +563,22 @@ def test_export_lilypond_parses_spaced_key_names_and_skips_invalid_key(tmp_path)
     assert "\\key " not in text
 
 
+def test_export_lilypond_uses_piece_key_when_settings_key_missing(tmp_path) -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    piece = Piece(title="T", bars=[bar], strings=6, key="GM")
+    path = tmp_path / "piece_key.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g4d4a3f3c3g2"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\key g \\major" in text
+
+
 def test_export_lilypond_respects_timesigstyle_display_intent(tmp_path) -> None:
     bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])], time_sig="C")
     piece = Piece(title="T", bars=[bar], strings=6)
@@ -594,6 +651,115 @@ def test_export_lilypond_emits_vocal_staff_and_lyrics_when_enabled(tmp_path) -> 
     assert '"Can" "she" "ex-" --' in text
     assert "\\new TabStaff" in text
     assert "\\time 3/4" in text
+
+
+def test_export_lilypond_emits_imported_vocal_only_staffgroup(tmp_path) -> None:
+    piece = Piece(
+        title="Now O now",
+        key="GM",
+        imported_score=ImportedScore(
+            source_format="ft3",
+            staffs=[
+                ImportedStaff(
+                    kind="note",
+                    bars=[
+                        ImportedBarContent(
+                            source_bar_index=0,
+                            time_sig="3/4",
+                            melody_events=[
+                                MelodyEvent("b", 0, note_type=3),
+                                MelodyEvent("a", 1, note_type=4),
+                            ],
+                        ),
+                        ImportedBarContent(
+                            source_bar_index=1,
+                            melody_events=[
+                                MelodyEvent("g", 0, note_type=3),
+                                MelodyEvent("f#", 1, note_type=4),
+                            ],
+                            system_break=True,
+                        ),
+                    ],
+                ),
+                ImportedStaff(
+                    kind="lyrics",
+                    bars=[
+                        ImportedBarContent(
+                            source_bar_index=0,
+                            lyric_event_rows=[[LyricEvent("Now", 0), LyricEvent("O", 1)]],
+                        ),
+                        ImportedBarContent(
+                            source_bar_index=1,
+                            lyric_event_rows=[[LyricEvent("now", 0), LyricEvent("I", 1)]],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
+    path = tmp_path / "imported_vocal_only.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showmelody": "on", "showlyrics": "on", "vocalpos": "top"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\new TabStaff" not in text
+    assert '\\new Staff = "melodyStaff"' in text
+    assert '"Now" "O"' in text
+    assert "\\key g \\major" in text
+    assert "\\break" in text
+
+
+def test_export_lilypond_uses_imported_vocal_staff_over_bar_fallback_when_present(tmp_path) -> None:
+    piece = Piece(
+        title="Mixed",
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])],
+        strings=6,
+        imported_score=ImportedScore(
+            source_format="ft3",
+            staffs=[
+                ImportedStaff(
+                    kind="note",
+                    bars=[
+                        ImportedBarContent(
+                            source_bar_index=0,
+                            melody_events=[
+                                MelodyEvent("r", 0, note_type=4, is_rest=True),
+                                MelodyEvent("f#", 1, note_type=4),
+                            ],
+                        ),
+                    ],
+                ),
+                ImportedStaff(
+                    kind="lyrics",
+                    bars=[ImportedBarContent(source_bar_index=0, lyrics=["Rest sharp"])],
+                ),
+            ],
+        ),
+    )
+    path = tmp_path / "mixed_imported.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={
+            "tuning": "g2c3f3a3d4g4",
+            "showmelody": "on",
+            "showlyrics": "on",
+            "vocalpos": "bottom",
+        },
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\new TabStaff" in text
+    assert "  r4" in text
+    assert "fis4" in text
+    assert '"Rest" "sharp"' in text
 
 
 def test_export_lilypond_respects_vocalpos_bottom_order(tmp_path) -> None:

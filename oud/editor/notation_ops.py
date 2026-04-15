@@ -74,6 +74,27 @@ def cmd_repeat(state: EditorState, value: str) -> None:
     set_repeat(state, normalized)
 
 
+def cmd_ending(state: EditorState, value: str) -> None:
+    normalized = value.strip().lower()
+    if not normalized:
+        state.message = "Ending must be clear or 1,2,..."
+        return
+    if normalized == "clear":
+        set_ending(state, ())
+        return
+    values: list[int] = []
+    for part in normalized.replace(" ", "").split(","):
+        if not part.isdigit():
+            state.message = "Ending must be clear or 1,2,..."
+            return
+        number = int(part)
+        if number <= 0:
+            state.message = "Ending numbers must be positive"
+            return
+        values.append(number)
+    set_ending(state, tuple(sorted(set(values))))
+
+
 def cmd_dynamic(state: EditorState, value: str) -> None:
     normalized = value.strip().lower()
     if not normalized:
@@ -277,6 +298,29 @@ def set_repeat(state: EditorState, value: str) -> None:
     bar.repeat = new
     state.modified = True
     state.message = f"Repeat {normalized}"
+
+
+def set_ending(state: EditorState, numbers: tuple[int, ...]) -> None:
+    if not state.piece.bars:
+        state.message = NO_BARS
+        return
+    bar = state.piece.bars[state.cursor_bar]
+    prev = bar.ending_numbers
+    new = tuple(sorted(set(numbers)))
+    record_action(
+        state,
+        UndoAction(
+            kind="ending",
+            data={"bar": state.cursor_bar, "prev": prev, "new": new},
+        ),
+    )
+    bar.ending_numbers = new
+    state.modified = True
+    if not new:
+        state.message = "Ending cleared"
+        return
+    joined = ",".join(str(num) for num in new)
+    state.message = f"Ending {joined}"
 
 
 def set_dynamic(state: EditorState, value: str) -> None:

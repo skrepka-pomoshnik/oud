@@ -13,6 +13,7 @@ from oud.tui.input import handle_command as handle_command_input
 from oud.tui.input import handle_search as handle_search_input
 from oud.tui.input import history_next, history_prev, parse_search
 from oud.tui.loop import run_loop
+from oud.ui.framebuffer import Frame
 
 
 def _state() -> EditorState:
@@ -380,3 +381,90 @@ def test_app_main_smoke_interactions(monkeypatch) -> None:
         apply_command=apply_command,
     ) == 0
     assert window.added > 0
+
+
+class _PlaybackScrollFakeWindow:
+    def __init__(self) -> None:
+        self._calls = 0
+
+    def getmaxyx(self):
+        return (12, 40)
+
+    def keypad(self, _flag):
+        return None
+
+    def timeout(self, _delay):
+        return None
+
+    def erase(self):
+        return None
+
+    def refresh(self):
+        return None
+
+    def addstr(self, *_args, **_kwargs):
+        return None
+
+    def getch(self):
+        if self._calls == 0:
+            self._calls += 1
+            return -1
+        return ord("q")
+
+
+def _playback_scroll_state() -> EditorState:
+    piece = Piece(title="T", bars=[Bar() for _ in range(20)], strings=6)
+    state = EditorState(
+        piece,
+        {
+            "style": "french",
+            "layout": "packed",
+            "barsperline": "2",
+            "bargap": "1",
+            "showdur": "off",
+            "showextras": "off",
+            "showtactus": "off",
+            "flagstems": "single",
+            "playbackscroll": "on",
+        },
+    )
+    state.bar_width = 8
+    state.playback_bar = 8
+    state.playback_col = 0
+    state.last_frame_size = (12, 40)
+    blank = Frame(lines=[" " * 40 for _ in range(12)], attrs=[tuple([0] * 40) for _ in range(12)])
+    state.last_base_frame = blank
+    state.last_frame = blank
+    state.playback_overlay_cache = {}
+    state.playback_overlay_key = (-1, -1)
+    return state
+
+
+def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monkeypatch) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    state = _playback_scroll_state()
+    render_bar_offsets: list[int] = []
+
+    def _fake_init_state(*_args, **_kwargs):
+        return state
+
+    def _fake_update_playback_animation(_state: EditorState) -> bool:
+        return True
+
+    def _fake_render_piece(*args, **_kwargs):
+        render_bar_offsets.append(args[2])
+
+    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
+    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+
+    assert run_loop(
+        cast(curses.window, _PlaybackScrollFakeWindow()),
+        None,
+        config_path="config.toml",
+        handle_insert=handle_insert,
+        handle_normal=handle_normal,
+        apply_command=apply_command,
+    ) == 0
+    assert render_bar_offsets
+    assert render_bar_offsets[0] > 0

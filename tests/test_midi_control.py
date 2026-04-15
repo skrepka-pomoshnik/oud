@@ -82,6 +82,7 @@ def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
     assert update_playback_animation(state) is True
     assert state.playback_bar == 0
     assert state.playback_col == 1
+    assert state.playback.markers == [(0, 1)]
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.3)
     assert update_playback_animation(state) is False
     monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.75)
@@ -119,12 +120,28 @@ def test_playback_reducers_prime_start_advance_reset() -> None:
     advance_playback_cursor(state, 0.25)
     assert state.playback.bar == 2
     assert state.playback.col == 3
+    assert state.playback.markers == [(2, 3)]
 
     advance_playback_cursor(state, 0.75)
     assert state.playback.bar is None
     assert state.playback.col is None
+    assert state.playback.markers == []
 
     reset_playback_animation(state)
     assert state.playback.timeline == []
     assert state.playback.started_at is None
     assert state.playback.index == 0
+
+
+def test_update_playback_animation_tracks_simultaneous_markers(monkeypatch) -> None:
+    state = _state()
+    state.playback_timeline = [
+        PlaybackCursor(start=0.0, end=0.5, bar=0, col=1),
+        PlaybackCursor(start=0.0, end=0.5, bar=2, col=3),
+    ]
+    state.playback_started_at = 10.0
+    state.playback_index = 0
+    state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
+    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 10.25)
+    assert update_playback_animation(state) is True
+    assert state.playback.markers == [(0, 1), (2, 3)]

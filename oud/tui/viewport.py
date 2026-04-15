@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from oud.core.duet_score import duet_bar_mapping, duet_logical_bar_count, is_duet_score_piece
+from oud.core.duet_score import (
+    duet_bar_mapping,
+    duet_logical_bar_count,
+    duet_raw_bar_index,
+    is_duet_score_piece,
+)
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import bars_per_line, dynamic_system_starts, system_index, system_start_index
 from oud.editor.state import EditorState
@@ -100,7 +105,7 @@ def _duet_viewport_row_mapping(state: EditorState, width: int, height: int):
         idx = limit
 
     def row_for_bar(bar_index: int) -> int:
-        logical = max(0, bar_index // 2)
+        _staff, logical = duet_bar_mapping(max(0, bar_index), piece=state.piece)
         for idx, _start in enumerate(starts):
             if idx + 1 < len(starts) and logical >= starts[idx + 1]:
                 continue
@@ -108,11 +113,14 @@ def _duet_viewport_row_mapping(state: EditorState, width: int, height: int):
         return max(0, len(starts) - 1)
 
     def start_for_row(row_index: int) -> int:
+        logical_start = 0
         if row_index <= 0:
-            return (starts[0] if starts else 0) * 2
-        if row_index >= len(starts):
-            return (starts[-1] if starts else 0) * 2
-        return starts[row_index] * 2
+            logical_start = starts[0] if starts else 0
+        elif row_index >= len(starts):
+            logical_start = starts[-1] if starts else 0
+        else:
+            logical_start = starts[row_index]
+        return duet_raw_bar_index(0, logical_start, piece=state.piece)
 
     return rows, row_for_bar, start_for_row
 
@@ -147,6 +155,22 @@ def _viewport_row_mapping(state: EditorState, width: int, height: int):
     return rows, row_for_bar, start_for_row
 
 
+def _playback_target_bar(state: EditorState) -> int | None:
+    if state.settings.get("playbackscroll", "off") != "on":
+        return None
+    if state.playback_bar is None:
+        return None
+    if state.playback.markers:
+        if is_duet_score_piece(state.piece):
+            logical = min(
+                duet_bar_mapping(marker_bar, piece=state.piece)[1]
+                for marker_bar, _marker_col in state.playback.markers
+            )
+            return duet_raw_bar_index(0, logical, piece=state.piece)
+        return min(marker_bar for marker_bar, _marker_col in state.playback.markers)
+    return max(0, state.playback_bar)
+
+
 def scroll_viewport_page(state: EditorState, width: int, height: int, delta_pages: int) -> None:
     rows, row_for_bar, start_for_row = _viewport_row_mapping(state, width, height)
     current_row = row_for_bar(state.bar_offset)
@@ -162,11 +186,12 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
         return
     rows, _row_for_bar, _start_for_row = _viewport_row_mapping(state, width, height)
     target_bar = state.cursor_bar
-    if state.settings.get("playbackscroll", "off") == "on" and state.playback_bar is not None:
-        target_bar = max(0, state.playback_bar)
+    playback_target_bar = _playback_target_bar(state)
+    if playback_target_bar is not None:
+        target_bar = playback_target_bar
     if is_duet_score_piece(state.piece):
         _staff, logical = duet_bar_mapping(target_bar, piece=state.piece)
-        target_bar = logical * 2
+        target_bar = duet_raw_bar_index(0, logical, piece=state.piece)
     cursor_row = _row_for_bar(target_bar)
     first_row = _row_for_bar(state.bar_offset)
     scroll_mode = state.settings.get("scrollmode", "smooth")

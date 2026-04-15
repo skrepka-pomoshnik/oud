@@ -93,10 +93,12 @@ def run_loop(
             and state.playback_overlay_cache is not None
         )
         if needs_render or message_changed or playback_changed or resized or state.dirty_rows:
+            prev_bar_offset = state.bar_offset
             ensure_cursor_visible(state, width, height)
+            viewport_changed = state.bar_offset != prev_bar_offset
             base_attr = contrast_attr(state.settings.get("contrast", "normal"))
             screen = CursesScreen(stdscr, base_attr=base_attr)
-            if can_overlay_playback:
+            if can_overlay_playback and not viewport_changed:
                 prev_key = state.playback_overlay_key or (-1, -1)
                 playback_key = (
                     state.playback_bar if state.playback_bar is not None else -1,
@@ -174,6 +176,7 @@ def run_loop(
                 else state.notes_offset if state.mode == "notes" else state.help_offset,
                 None if playback_cache is not None else state.playback_bar,
                 None if playback_cache is not None else state.playback_col,
+                playback_markers=state.playback.markers,
                 playback_cache=playback_cache,
             )
             base_frame = frame_buffer.snapshot()

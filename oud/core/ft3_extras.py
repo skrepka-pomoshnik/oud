@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class DecodedFT3Extras:
     raw: int
+    barre: bool = False
     right_fingering: str | None = None
     left_fingering: str | None = None
     right_ornament: str | None = None
@@ -35,7 +36,6 @@ _RIGHT_ORNAMENT_HIGH_BYTE_BITS: tuple[tuple[int, str], ...] = (
 )
 _LEFT_ORNAMENT_EXACT_PATTERNS: tuple[tuple[int, str], ...] = (
     (0x4A00, "dot-left"),
-    (0x3400, "brackets"),
 )
 
 
@@ -51,6 +51,9 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         return DecodedFT3Extras(raw=extras)
 
     consumed = 0
+    barre = extras == 0x3400
+    if barre:
+        consumed |= 0x3400
     right_fingering, used = _pick_single_flag(extras, _RIGHT_FINGERING_BITS)
     consumed |= used
     left_fingering, used = _pick_single_flag(extras, _LEFT_FINGERING_BITS)
@@ -79,6 +82,7 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
     residual = extras & ~consumed
     return DecodedFT3Extras(
         raw=extras,
+        barre=barre,
         right_fingering=right_fingering,
         left_fingering=left_fingering,
         right_ornament=right_ornament,

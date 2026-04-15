@@ -5,7 +5,7 @@ Recreate a curses TUI lute tab editor with vim-like controls, FT3/TAB read/write
 Keep a running `DONE.md` log of completed work.
 
 Constraints
-- Python 3.10 only
+- Python 3.10+
 - macOS/Linux
 - pure curses, minimal deps
 
@@ -26,10 +26,10 @@ P2 (Notation + formats)
 - [ ] Add Spanish tab support.
 - [ ] Vocal/lyric FT3 parity: finish duet/vocal integration with shared system breaks and shared playback mapping.
 - [ ] Normalize remaining multi-verse raw FT3 vocal-text variants (`now_o_now`/`felice`-like cases) beyond current row-preserving decode.
-- [ ] Decode remaining FT3 bar-record semantics: ties/slurs/holds and still-unclassified header bits beyond repeats/double bars/system breaks.
-- [ ] Decode/verify FT3 instrument/style/tuning fields outside current header extraction.
-- [ ] Add explicit barre semantics import/rendering.
-- [ ] Add FT3 binary feature matrix docs/tests for decoded vs ignored fields.
+- [ ] Decode remaining FT3 bar-record semantics: ties/slurs/holds and still-unclassified header bits beyond repeats/double bars/system breaks, including volta/endings if FT3 encodes them.
+- [ ] Continue corpus verification for FT3 metadata aliases if new files expose instrument/style/tuning outside current header extraction.
+- [ ] LilyPond output parity: export imported non-tab staves (vocal-only, mixed vocal+lute, raw note-staff cases) instead of warning-only fallback.
+- [ ] LilyPond output parity: improve native handling of vocal rests/accidentals, FT3 extras, and page/system layout controls.
 
 P3 (Maintainability + advanced parity)
 - [ ] Split `command_ops.py` into small domain modules with thin router.

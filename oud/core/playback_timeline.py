@@ -62,3 +62,33 @@ def cursor_at_time(
     if cursor.contains(elapsed):
         return idx, cursor
     return idx, None
+
+
+def cursors_at_time(
+    timeline: Sequence[TimelineEntry],
+    elapsed: float,
+    *,
+    start_index: int = 0,
+) -> tuple[int, list[PlaybackCursor]]:
+    idx, cursor = cursor_at_time(timeline, elapsed, start_index=start_index)
+    if cursor is None:
+        return idx, []
+    cursors = [cursor]
+    left = idx - 1
+    while left >= 0:
+        prev = cursor_from_entry(timeline[left])
+        if prev.end < elapsed:
+            break
+        if prev.contains(elapsed):
+            cursors.append(prev)
+        left -= 1
+    right = idx + 1
+    while right < len(timeline):
+        nxt = cursor_from_entry(timeline[right])
+        if nxt.start > elapsed:
+            break
+        if nxt.contains(elapsed):
+            cursors.append(nxt)
+        right += 1
+    cursors.sort(key=lambda item: (item.bar, item.col, item.start, item.end))
+    return idx, cursors

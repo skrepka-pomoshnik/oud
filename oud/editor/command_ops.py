@@ -16,6 +16,7 @@ from oud.editor.command_misc_ops import tuning_preset_value as _tuning_preset_va
 from oud.editor.command_notation_ops import cmd_arpeggio as _cmd_arpeggio
 from oud.editor.command_notation_ops import cmd_barline as _cmd_barline
 from oud.editor.command_notation_ops import cmd_dynamic as _cmd_dynamic
+from oud.editor.command_notation_ops import cmd_ending as _cmd_ending
 from oud.editor.command_notation_ops import cmd_fermata as _cmd_fermata
 from oud.editor.command_notation_ops import cmd_repeat as _cmd_repeat
 from oud.editor.command_notation_ops import cmd_separee as _cmd_separee
@@ -24,6 +25,7 @@ from oud.editor.command_notation_ops import cmd_tuplet as _cmd_tuplet
 from oud.editor.command_notation_ops import set_annotation as _set_annotation
 from oud.editor.command_notation_ops import set_barline as _set_barline
 from oud.editor.command_notation_ops import set_dynamic as _set_dynamic
+from oud.editor.command_notation_ops import set_ending as _set_ending
 from oud.editor.command_notation_ops import set_fermata as _set_fermata
 from oud.editor.command_notation_ops import set_highlight as _set_highlight
 from oud.editor.command_notation_ops import set_hold as _set_hold
@@ -294,6 +296,10 @@ def cmd_dynamic(state: EditorState, value: str) -> None:
     _cmd_dynamic(state, value)
 
 
+def cmd_ending(state: EditorState, value: str) -> None:
+    _cmd_ending(state, value)
+
+
 def cmd_fermata(state: EditorState, value: str) -> None:
     _cmd_fermata(state, value)
 
@@ -332,6 +338,10 @@ def set_repeat(state: EditorState, value: str) -> None:
 
 def set_dynamic(state: EditorState, value: str) -> None:
     _set_dynamic(state, value)
+
+
+def set_ending(state: EditorState, value: tuple[int, ...]) -> None:
+    _set_ending(state, value)
 
 
 def set_fermata(state: EditorState, value: str) -> None:

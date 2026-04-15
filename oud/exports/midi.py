@@ -305,11 +305,29 @@ def _bar_chord_events(
     return events
 
 
-def _duet_pair_bar_indices(piece: Piece, start_bar: int) -> list[tuple[int | None, int | None]]:
+def _repeat_hop_limit(count: int, settings: dict[str, str]) -> int:
+    text = (settings.get("maxrepeats", "30") or "30").strip()
+    limit = int(text) if text.isdigit() else 30
+    return max(count * 2, limit)
+
+
+def _duet_pair_bar_indices(
+    piece: Piece,
+    start_bar: int,
+    *,
+    max_repeat_hops: int,
+) -> list[tuple[int | None, int | None]]:
     start_pair = max(0, start_bar // 2)
     total_pairs = duet_logical_bar_count(piece)
+    pair_order = _repeat_play_order(
+        total_pairs,
+        start_pair,
+        get_repeat=lambda pair_idx: _duet_pair_repeat(piece, pair_idx),
+        get_endings=lambda pair_idx: _duet_pair_endings(piece, pair_idx),
+        max_repeat_hops=max_repeat_hops,
+    )
     pairs: list[tuple[int | None, int | None]] = []
-    for pair_idx in range(start_pair, total_pairs):
+    for pair_idx in pair_order:
         first = duet_raw_bar_index(0, pair_idx, piece=piece)
         second = duet_raw_bar_index(1, pair_idx, piece=piece)
         pairs.append(
@@ -319,6 +337,66 @@ def _duet_pair_bar_indices(piece: Piece, start_bar: int) -> list[tuple[int | Non
             ),
         )
     return pairs
+
+
+def _repeat_play_order(
+    count: int,
+    start_index: int,
+    *,
+    get_repeat,
+    get_endings=None,
+    max_repeat_hops: int,
+) -> list[int]:
+    if count <= 0 or start_index >= count:
+        return []
+    order: list[int] = []
+    idx = max(0, start_index)
+    section_start = idx
+    section_pass = 1
+    jumped_back = False
+    repeated_endings: set[int] = set()
+    limit = max(count, max_repeat_hops)
+    steps = 0
+    while 0 <= idx < count and steps < limit:
+        steps += 1
+        endings = tuple(sorted(set(get_endings(idx) or ()))) if get_endings else ()
+        if not endings or section_pass in endings:
+            order.append(idx)
+        repeat = (get_repeat(idx) or "").strip()
+        if repeat in {":.", ":|:", "."} and idx not in repeated_endings:
+            repeated_endings.add(idx)
+            section_pass += 1
+            idx = section_start
+            jumped_back = True
+            continue
+        if repeat == ".:" and not jumped_back:
+            section_start = idx
+            section_pass = 1
+        elif repeat in {":|:", "."} and not jumped_back:
+            section_start = min(idx + 1, count - 1)
+            section_pass = 1
+        jumped_back = False
+        idx += 1
+    return order
+
+
+def _duet_pair_repeat(piece: Piece, pair_idx: int) -> str:
+    for staff_idx in (0, 1):
+        raw = duet_raw_bar_index(staff_idx, pair_idx, piece=piece)
+        if 0 <= raw < len(piece.bars):
+            repeat = (piece.bars[raw].repeat or "").strip()
+            if repeat:
+                return repeat
+    return ""
+
+
+def _duet_pair_endings(piece: Piece, pair_idx: int) -> tuple[int, ...]:
+    values: set[int] = set()
+    for staff_idx in (0, 1):
+        raw = duet_raw_bar_index(staff_idx, pair_idx, piece=piece)
+        if 0 <= raw < len(piece.bars):
+            values.update(piece.bars[raw].ending_numbers)
+    return tuple(sorted(values))
 
 
 def _duet_timeline_events(
@@ -331,10 +409,15 @@ def _duet_timeline_events(
     default_duration: int,
     start_bar: int,
     dotted: set[tuple[int, int]] | None,
+    max_repeat_hops: int,
 ) -> list[tuple[int, int, int, int]]:
     timeline_events: list[tuple[int, int, int, int]] = []
     current_time = 0
-    for first_idx, second_idx in _duet_pair_bar_indices(piece, start_bar):
+    for first_idx, second_idx in _duet_pair_bar_indices(
+        piece,
+        start_bar,
+        max_repeat_hops=max_repeat_hops,
+    ):
         pair_base_time = current_time
         pair_max_end = 0
         for b_idx in (first_idx, second_idx):
@@ -380,12 +463,17 @@ def _duet_note_events(
     gate: float,
     pitches: list[int],
     ornaments: dict[tuple[int, int], str] | None = None,
+    max_repeat_hops: int,
 ) -> list[tuple[int, bytes]]:
     events: list[tuple[int, bytes]] = []
     current_time = 0
     show_ornaments = _show_ornaments(settings)
     ornament_mode = settings.get("ft3ornaments", "both")
-    for first_idx, second_idx in _duet_pair_bar_indices(piece, start_bar):
+    for first_idx, second_idx in _duet_pair_bar_indices(
+        piece,
+        start_bar,
+        max_repeat_hops=max_repeat_hops,
+    ):
         pair_base_time = current_time
         pair_max_end = 0
         for b_idx in (first_idx, second_idx):
@@ -553,6 +641,7 @@ def build_playback_timeline(
     default_duration = 4
     timeline_events: list[tuple[int, int, int, int]] = []
     sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
+    max_repeat_hops = _repeat_hop_limit(len(piece.bars), settings)
     if is_duet_score_piece(piece):
         base_events = _duet_timeline_events(
             piece,
@@ -563,6 +652,7 @@ def build_playback_timeline(
             default_duration=default_duration,
             start_bar=start_bar,
             dotted=dotted,
+            max_repeat_hops=max_repeat_hops,
         )
         pass_count = _playverse_count(piece, settings)
         pass_ticks = _timeline_total_ticks(base_events)
@@ -572,9 +662,15 @@ def build_playback_timeline(
             )
         return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
     current_time = 0
-    for b_idx, bar in enumerate(piece.bars):
-        if b_idx < start_bar:
-            continue
+    bar_order = _repeat_play_order(
+        len(piece.bars),
+        start_bar,
+        get_repeat=lambda idx: piece.bars[idx].repeat,
+        get_endings=lambda idx: piece.bars[idx].ending_numbers,
+        max_repeat_hops=max_repeat_hops,
+    )
+    for b_idx in bar_order:
+        bar = piece.bars[b_idx]
         chord_events = _bar_chord_events(
             bar,
             b_idx,
@@ -739,6 +835,7 @@ def _duet_midi_note_events(
     gate: float,
     pitches: list[int],
     ornaments: dict[tuple[int, int], str] | None,
+    max_repeat_hops: int,
 ) -> list[tuple[int, bytes]]:
     base_note_events = _duet_note_events(
         piece,
@@ -753,6 +850,7 @@ def _duet_midi_note_events(
         gate=gate,
         pitches=pitches,
         ornaments=ornaments,
+        max_repeat_hops=max_repeat_hops,
     )
     return _repeated_midi_note_events(base_note_events, piece=piece, settings=settings)
 
@@ -776,9 +874,16 @@ def _single_score_midi_note_events(
     show_ornaments = _show_ornaments(settings)
     ornament_mode = settings.get("ft3ornaments", "both")
     current_time = 0
-    for b_idx, bar in enumerate(piece.bars):
-        if b_idx < start_bar:
-            continue
+    max_repeat_hops = _repeat_hop_limit(len(piece.bars), settings)
+    bar_order = _repeat_play_order(
+        len(piece.bars),
+        start_bar,
+        get_repeat=lambda idx: piece.bars[idx].repeat,
+        get_endings=lambda idx: piece.bars[idx].ending_numbers,
+        max_repeat_hops=max_repeat_hops,
+    )
+    for b_idx in bar_order:
+        bar = piece.bars[b_idx]
         beats, unit = _meter_for_bar(bar, settings)
         chord_events = _bar_chord_events(
             bar,
@@ -861,6 +966,7 @@ def export_midi(
 
     default_duration = 4
     if is_duet_score_piece(piece):
+        max_repeat_hops = _repeat_hop_limit(len(piece.bars), settings)
         note_events = _duet_midi_note_events(
             piece,
             overrides=overrides,
@@ -874,6 +980,7 @@ def export_midi(
             gate=gate,
             pitches=pitches,
             ornaments=ornaments,
+            max_repeat_hops=max_repeat_hops,
         )
     else:
         note_events = _single_score_midi_note_events(

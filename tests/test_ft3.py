@@ -148,7 +148,8 @@ def test_parse_bar_decodes_ft3_confirmed_exact_extras_subset() -> None:
 def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
     note = bar.notes[0]
-    assert note.left_ornament == "brackets"
+    assert note.barre is True
+    assert note.left_ornament is None
 
 
 def test_parse_bar_decodes_ft3_extras_compositionally_with_residual_bits() -> None:
@@ -157,6 +158,20 @@ def test_parse_bar_decodes_ft3_extras_compositionally_with_residual_bits() -> No
     assert note.left_fingering == "2"
     assert note.left_ornament is None
     assert note.ft3_extra_residual == 0x3401
+
+
+def test_parse_bar_feature_matrix_decodes_known_header_bits_and_ignores_unknown_marker() -> None:
+    bar = parse_bar(bytes([0xE0, 0x13]) + bytes(30))
+    assert bar.barline == "||"
+    assert bar.repeat == ":|:"
+    assert bar.system_break is True
+
+
+def test_parse_bar_feature_matrix_keeps_unknown_header_marker_out_of_bar_state() -> None:
+    bar = parse_bar(bytes([0x20, 0x00]) + bytes(30))
+    assert bar.barline is None
+    assert bar.repeat is None
+    assert bar.system_break is False
 
 
 def test_decode_ft3_note_position_uses_confirmed_bass_discriminator_masks() -> None:
@@ -555,6 +570,58 @@ def test_load_ft3_parses_footnote_parts_from_annotation(tmp_path) -> None:
     assert piece.footnote_editor == "editor name"
     assert piece.footnote_comment == "commentary here"
     assert piece.source == "source from annotation"
+
+
+def test_load_ft3_maps_metadata_alias_matrix_and_style_tuning_fields(tmp_path) -> None:
+    payload = (
+        b"CPiece{\\rtf1\\ansi Demo}\r\n~"
+        b"\x00\x00hkey: Gm\r\n"
+        b"typ: fantasy\r\n"
+        b"ens: 7-course\r\n"
+        b"part: score\r\n"
+        b"style: french\r\n"
+        b"tuning: g2c3f3a3d4g4\r\n"
+        b"library: Folger\r\n"
+        b"CBar\x03\x80"
+    )
+    path = tmp_path / "meta_alias_matrix.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.key == "Gm"
+    assert piece.piece_type == "fantasy"
+    assert piece.ensemble == "7-course"
+    assert piece.part == "score"
+    assert piece.style == "french"
+    assert piece.tuning == "g2c3f3a3d4g4"
+    assert piece.publisher == "Folger"
+    assert piece.raw_metadata["library"] == "Folger"
+
+
+def test_load_ft3_maps_extended_metadata_aliases_for_instrument_style_and_tuning(tmp_path) -> None:
+    payload = (
+        b"CPiece\x03Raw\x03\x80"
+        b"piece: Prelude\r\n"
+        b"instrument: voice and lute\r\n"
+        b"styl: italian\r\n"
+        b"tun: a2d3g3b3e4a4\r\n"
+        b"dif: Medium\r\n"
+        b"ens: 6-course, soprano\r\n"
+        b"publisher/library: KHM\r\n"
+        b"page: 12r\r\n"
+        b"CBar"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+    )
+    path = tmp_path / "meta_extra.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.instrumentation == "voice and lute"
+    assert piece.style == "italian"
+    assert piece.tuning == "a2d3g3b3e4a4"
+    assert piece.difficulty == "Medium"
+    assert piece.ensemble == "6-course, soprano"
+    assert piece.publisher == "KHM"
+    assert piece.page == "12r"
 
 
 def test_load_ft3_extracts_preamble_notes_from_prefix(tmp_path) -> None:

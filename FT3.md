@@ -710,6 +710,21 @@ These are not yet decoded well enough to call specified.
 
 - byte0 bit `0x20`
 - any still-unclassified combinations beyond repeats/double bars/system breaks
+- possible volta / first-ending / second-ending markers, if FT3 stores them in
+  the same 32-byte bar header region
+
+`oud` now has manual bar-level ending semantics (`ending_numbers`) for
+playback/rendering, but FT3 import does not yet fill them automatically.
+
+Current corpus evidence suggests `byte0 & 0x20` is not a simple standalone
+repeat/volta flag:
+
+- it often appears on otherwise empty bars
+- it often appears immediately before a bar that already carries the explicit
+  closing/repeat markers we do decode
+
+So far it looks more like a boundary/meta marker class than a directly playable
+repeat instruction.
 
 ### 14.2 Ties / slurs / holds in binary FT3
 

@@ -878,6 +878,10 @@ def test_cmd_pdf_forces_full_tabnotation_only_for_pdf_export(
         "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
         "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
     )
+    cmd.apply_command(state, "ending 1,2", str(tmp_path / "cfg.toml"))
+    assert state.piece.bars[state.cursor_bar].ending_numbers == (1, 2)
+    cmd.apply_command(state, "ending clear", str(tmp_path / "cfg.toml"))
+    assert state.piece.bars[state.cursor_bar].ending_numbers == ()
     cmd.cmd_dynamic(state, "mf")
     assert state.piece.bars[state.cursor_bar].dynamic == "mf"
     cmd.cmd_dynamic(state, "clear")
@@ -959,10 +963,11 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_stave",
         "cmd_slur",
         "cmd_tie",
-        "cmd_hold",
-        "cmd_barline",
-        "cmd_repeat",
-        "cmd_dynamic",
+            "cmd_hold",
+            "cmd_barline",
+            "cmd_repeat",
+            "cmd_ending",
+            "cmd_dynamic",
         "cmd_fermata",
         "cmd_arpeggio",
         "cmd_separee",
@@ -1041,6 +1046,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "hold": "0 0 0",
         "barline": "thin",
         "repeat": "start",
+        "ending": "1,2",
         "dynamic": "mf",
         "fermata": "on",
         "arpeggio": "on",

@@ -81,7 +81,7 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
         else:
             state.highlights.discard(key)
         return
-    if kind in ("barline", "repeat", "timesig", "dynamic", "fermata"):
+    if kind in ("barline", "repeat", "ending", "timesig", "dynamic", "fermata"):
         bar_index = cast(int, data["bar"])
         if 0 <= bar_index < len(state.piece.bars):
             bar = state.piece.bars[bar_index]
@@ -91,6 +91,9 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
             elif kind == "repeat":
                 value = cast(str | None, data["new"] if redo else data["prev"])
                 bar.repeat = value if isinstance(value, str) else None
+            elif kind == "ending":
+                value = cast(tuple[int, ...], data["new"] if redo else data["prev"])
+                bar.ending_numbers = tuple(value)
             elif kind == "dynamic":
                 value = cast(str | None, data["new"] if redo else data["prev"])
                 bar.dynamic = value if isinstance(value, str) else None

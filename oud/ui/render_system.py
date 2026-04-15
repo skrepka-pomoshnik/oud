@@ -56,6 +56,7 @@ from oud.core.view_model import (
 )
 from oud.core.vocal_line import infer_vocal_events
 from oud.ui.adapter import A_BOLD, A_REVERSE, Screen
+from oud.ui.framebuffer import _split_display_clusters
 from oud.ui.layout_map import layout_block_rows as _layout_block_rows
 from oud.ui.render_bar import build_flag_rows
 from oud.ui.render_helpers import apply_overrides, pad_row, safe_addstr
@@ -179,6 +180,31 @@ def _merge_nonspace_rows(*rows: list[str]) -> list[str]:
             if ch != " ":
                 out[idx] = ch
     return out
+
+
+def _nearest_note_cell_idx(row_text: str, target_idx: int) -> int | None:
+    clusters = _split_display_clusters(row_text)
+    if not clusters:
+        return None
+    max_idx = len(clusters) - 1
+    target_idx = max(0, min(max_idx, target_idx))
+    for distance in range(5):
+        right = target_idx + distance
+        if 0 <= right <= max_idx and clusters[right] not in {" ", "-", "|"}:
+            return right
+        if distance == 0:
+            continue
+        left = target_idx - distance
+        if 0 <= left <= max_idx and clusters[left] not in {" ", "-", "|"}:
+            return left
+    return None
+
+
+def _playback_note_strings(bar, playback_col: int) -> set[int]:
+    if not bar.chords or not (0 <= playback_col < len(bar.chords)):
+        return set()
+    chord = bar.chords[playback_col]
+    return {note.string - 1 for note in chord.notes}
 
 
 def _inline_fingering_glyph(ch: str, *, style: str = "french") -> str:
@@ -853,13 +879,10 @@ def _tab_playback_highlight_ops(
         )
     else:
         scaled_play_col = _scale_col(playback_col, bar_width, content_width)
-    if bar.chords and 0 <= playback_col < len(bar.chords):
-        chord = bar.chords[playback_col]
-        note_strings = {note.string - 1 for note in chord.notes}
-    else:
-        note_strings = set()
+    note_strings = _playback_note_strings(bar, playback_col)
     playback_cell_idx = draw_pad + scaled_play_col
     ops: list[tuple[int, int, str, int]] = []
+
     for display_idx in range(system_display_strings):
         actual = system_visual_indices[display_idx]
         y = row_start + (rows["staff"] or 0) + display_idx
@@ -868,15 +891,21 @@ def _tab_playback_highlight_ops(
             if display_idx < len(rendered_staff_rows)
             else ""
         )
-        if not (0 <= playback_cell_idx < len(row_text)):
+        row_clusters = _split_display_clusters(row_text)
+        if not (0 <= playback_cell_idx < len(row_clusters)):
             continue
-        ch = row_text[playback_cell_idx]
+        target_idx = playback_cell_idx
         if bar.chords:
-            if actual not in note_strings or ch in {" ", "-", "|"}:
+            if actual not in note_strings:
                 continue
-        elif ch in {" ", "-", "|"}:
+            nearest = _nearest_note_cell_idx(row_text, playback_cell_idx)
+            if nearest is None:
+                continue
+            target_idx = nearest
+        ch = row_clusters[target_idx]
+        if ch in {" ", "-", "|"}:
             continue
-        ops.append((y, bar_x + playback_cell_idx, ch, A_REVERSE))
+        ops.append((y, bar_x + target_idx, ch, A_REVERSE))
     return ops, scaled_play_col
 
 
@@ -1029,6 +1058,7 @@ def render_systems(  # noqa: C901, PLR0912
     stave_breaks: set[int],
     playback_bar: int | None,
     playback_col: int | None,
+    playback_markers: list[tuple[int, int]] | None,
     include_meta: bool,
     show_dur: bool,
     show_extras: bool,
@@ -1057,6 +1087,13 @@ def render_systems(  # noqa: C901, PLR0912
 ) -> None:
     if glisses is None:
         glisses = []
+    effective_playback_markers = list(playback_markers or [])
+    if (
+        not effective_playback_markers
+        and playback_bar is not None
+        and playback_col is not None
+    ):
+        effective_playback_markers = [(playback_bar, playback_col)]
     style_policy = resolve_tab_style_policy(settings)
     total_bars = len(piece.bars)
     melody_rows_count = max(1, melody_rows_count) if show_melody else 0
@@ -1278,6 +1315,11 @@ def render_systems(  # noqa: C901, PLR0912
             repeat = bar.repeat or ""
             repeat_glyph = repeat if repeat in {".:", ":.", "."} else ""
             repeat_cue = repeat if not repeat_glyph else ""
+            ending_numbers = tuple(sorted(set(bar.ending_numbers)))
+            ending_cue = ""
+            if ending_numbers:
+                joined = ",".join(str(num) for num in ending_numbers)
+                ending_cue = f"[{joined}.]"
             repeat_rows = _repeat_dot_display_rows(system_display_strings)
             repeat_left = repeat in {".:", ":|:", "."}
             repeat_right = repeat in {":.", ":|:", "."}
@@ -1470,6 +1512,8 @@ def render_systems(  # noqa: C901, PLR0912
                 if number is not None:
                     safe_addstr(stdscr, meta_row, meta_x, number)
                 cue_parts: list[str] = []
+                if ending_cue:
+                    cue_parts.append(ending_cue)
                 if repeat_cue:
                     cue_parts.append(repeat_cue)
                 cue_parts.extend(sign_cues)
@@ -2533,14 +2577,15 @@ def render_systems(  # noqa: C901, PLR0912
                         vocal_onset_cols=playback_vocal_onset_cols,
                         rendered_melody_rows=rendered_melody_rows,
                     )
-            if (
-                playback_bar is not None
-                and playback_col is not None
-                and abs_bar == playback_bar
-            ):
+            playback_cols = [
+                marker_col
+                for marker_bar, marker_col in effective_playback_markers
+                if marker_bar == abs_bar
+            ]
+            for marker_col in playback_cols:
                 playback_ops = _playback_overlay_ops_for_bar(
                     bar=bar,
-                    playback_col=playback_col,
+                    playback_col=marker_col,
                     bar_width=bar_width,
                     grid_width=grid_width,
                     positions=positions,
