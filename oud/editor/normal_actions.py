@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from oud.editor.controller_utils import consume_count, string_index
 from oud.editor.edit_ops import clear_cell, undo_group
+from oud.editor.edit_range import bar_range_from_cursor, deletable_bar_range_from_cursor
 from oud.editor.find_ops import perform_find, repeat_find
 from oud.editor.insert_session import enter_insert_mode, enter_replace_mode, set_mode
 from oud.editor.keymap import (
@@ -17,20 +18,21 @@ from oud.editor.keymap import (
 )
 from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
-from oud.editor.motions import CursorMotionTarget, apply_motion_target, target_home_bar
-from oud.editor.navigation import (
-    bar_end,
-    bar_next,
-    bar_prev,
-    bar_start,
-    jump_first_bar,
-    jump_last_bar,
-    jump_row_visual,
-    move_left_note,
-    move_left_visual,
-    move_right,
-    move_right_note,
-    move_right_visual,
+from oud.editor.motions import (
+    CursorMotionTarget,
+    apply_motion_target,
+    target_bar_end,
+    target_bar_next,
+    target_bar_prev,
+    target_bar_start,
+    target_home_bar,
+    target_jump_first_bar,
+    target_jump_last_bar,
+    target_jump_row_visual,
+    target_move_left_note,
+    target_move_left_visual,
+    target_move_right_note,
+    target_move_right_visual,
 )
 from oud.editor.search_ops import (
     jump_mark,
@@ -40,7 +42,13 @@ from oud.editor.search_ops import (
     set_mark,
 )
 from oud.editor.state import EditorState
-from oud.editor.visual_ops import clear_visual_mode, enter_visual_mode, yank_visual_rows
+from oud.editor.visual_ops import (
+    clear_visual_mode,
+    delete_visual_rows,
+    enter_visual_mode,
+    visual_bar_range,
+    yank_visual_rows,
+)
 from oud.tui.viewport import scroll_viewport_page
 
 
@@ -74,6 +82,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
 
     if state.pending_mark:
         if 32 <= key <= 126:
+            state.count_prefix = ""
             name = chr(key)
             if state.pending_mark == "set":
                 set_mark(state, name)
@@ -94,7 +103,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         if not state.pending_key:
             return False
         if state.pending_key == "g" and key in pending_keys.gg:
-            jump_first_bar(state)
+            apply_motion_target(state, target_jump_first_bar(state))
             state.pending_key = ""
             return True
         if state.pending_key == "g" and key in pending_keys.gj:
@@ -161,22 +170,25 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
             if state.read_only:
                 block_read_only()
                 state.pending_key = ""
+                state.count_prefix = ""
                 return True
-            from oud.editor.command_ops import cmd_bar, yank_bar  # noqa: PLC0415
+            from oud.editor.score_ops import delete_bar_range, yank_bar_range  # noqa: PLC0415
 
-            yank_bar(state, state.cursor_bar)
-            cmd_bar(state, "del")
+            count = consume_count(state)
+            bar_range = deletable_bar_range_from_cursor(state, count)
+            if yank_bar_range(state, bar_range):
+                delete_bar_range(state, bar_range)
             state.pending_key = ""
             return True
         if state.pending_key == "y" and key in pending_keys.yy:
-            from oud.editor.command_ops import yank_bar  # noqa: PLC0415
+            from oud.editor.score_ops import yank_bar_range  # noqa: PLC0415
 
             count = consume_count(state)
-            yank_bar(state, state.cursor_bar, count=count)
-            state.message = "Bar yanked" if count == 1 else f"Bars yanked: {count}"
+            yank_bar_range(state, bar_range_from_cursor(state, count))
             state.pending_key = ""
             return True
         state.pending_key = ""
+        state.count_prefix = ""
         return True
 
     if key in count_keys.digits:
@@ -348,31 +360,38 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
                     state.cursor_col,
                 )
                 if count > 1:
-                    move_right(state)
+                    apply_motion_target(state, target_move_right_note(state))
         state.pending_key = ""
         return True
     if key in action_keys.pending:
         state.pending_key = chr(key)
         return True
     if key in action_keys.word_search_forward:
+        state.count_prefix = ""
         search_word_under_cursor(state, 1)
         return True
     if key in action_keys.word_search_backward:
+        state.count_prefix = ""
         search_word_under_cursor(state, -1)
         return True
     if key in action_keys.word_search_next:
+        state.count_prefix = ""
         repeat_word_search(state, reverse=False)
         return True
     if key in action_keys.word_search_prev:
+        state.count_prefix = ""
         repeat_word_search(state, reverse=True)
         return True
     if key in action_keys.match_jump:
+        state.count_prefix = ""
         jump_match(state)
         return True
     if key in action_keys.mark_set:
+        state.count_prefix = ""
         state.pending_mark = "set"
         return True
     if key in action_keys.mark_jump_line or key in action_keys.mark_jump_exact:
+        state.count_prefix = ""
         state.pending_mark = "jump"
         return True
     if key in action_keys.find_forward:
@@ -400,7 +419,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
     return True
 
 
-def _handle_visual_mode(state: EditorState, key: int) -> bool:  # noqa: PLR0911
+def _handle_visual_mode(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
     bindings = normal_bindings(state)
     action_keys = normal_action_bindings(state)
     keycodes = state.keycodes
@@ -422,6 +441,27 @@ def _handle_visual_mode(state: EditorState, key: int) -> bool:  # noqa: PLR0911
     if key in (ord("y"), ord("Y")):
         yank_visual_rows(state)
         return True
+    if key in bindings.play:
+        bar_range = visual_bar_range(state)
+        start_midi(
+            state,
+            start_bar=bar_range.start,
+            end_bar=bar_range.end - 1,
+            loop_count=2,
+        )
+        return True
+    if key in (ord("d"), ord("D"), ord("x"), ord("X")):
+        if state.read_only:
+            state.message = READ_ONLY_VIEWER
+            return True
+        delete_visual_rows(state)
+        return True
+    if key in (ord("c"), ord("C")):
+        if state.read_only:
+            state.message = READ_ONLY_VIEWER
+            return True
+        delete_visual_rows(state, change=True)
+        return True
     if _handle_normal_movement(state, key, action_keys):
         return True
     return True
@@ -438,16 +478,18 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
     if key in keys.left:
         for _ in range(count):
             if move_mode == "note":
-                move_left_note(state)
+                target = target_move_left_note(state)
             else:
-                move_left_visual(state)
+                target = target_move_left_visual(state)
+            apply_motion_target(state, target)
         return True
     if key in keys.right:
         for _ in range(count):
             if move_mode == "note":
-                move_right_note(state)
+                target = target_move_right_note(state)
             else:
-                move_right_visual(state)
+                target = target_move_right_visual(state)
+            apply_motion_target(state, target)
         return True
     if key in keys.up:
         state.cursor_string -= count
@@ -467,25 +509,25 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
         return True
     if key in action_keys.page_up:
         for _ in range(count):
-            jump_row_visual(state, -1)
+            apply_motion_target(state, target_jump_row_visual(state, -1))
         return True
     if key in action_keys.page_down:
         for _ in range(count):
-            jump_row_visual(state, 1)
+            apply_motion_target(state, target_jump_row_visual(state, 1))
         return True
     if key in action_keys.bar_next:
-        bar_next(state, count)
+        apply_motion_target(state, target_bar_next(state, count))
         return True
     if key in action_keys.bar_prev:
-        bar_prev(state, count)
+        apply_motion_target(state, target_bar_prev(state, count))
         return True
     if key in action_keys.col_start:
-        bar_start(state)
+        apply_motion_target(state, target_bar_start(state))
         return True
     if key in action_keys.col_end:
-        bar_end(state)
+        apply_motion_target(state, target_bar_end(state))
         return True
     if key in action_keys.jump_bottom:
-        jump_last_bar(state)
+        apply_motion_target(state, target_jump_last_bar(state))
         return True
     return False

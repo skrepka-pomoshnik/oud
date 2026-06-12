@@ -72,11 +72,11 @@ def test_note_movement_uses_chord_positions() -> None:
     state.cursor_bar = 0
     state.cursor_col = 5
     move_left_note(state)
-    assert state.cursor_col == 3
+    assert state.cursor_col == 4
     move_left_note(state)
     assert state.cursor_col == 0
     move_right_note(state)
-    assert state.cursor_col == 3
+    assert state.cursor_col == 4
 
 
 def test_note_movement_uses_grid_onset_columns() -> None:
@@ -122,7 +122,7 @@ def test_note_movement_prefers_notes_on_current_string() -> None:
     state.cursor_string = 0
     state.cursor_col = 0
     move_right_note(state)
-    assert state.cursor_col == 6
+    assert state.cursor_col == 4
 
 
 def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:

@@ -43,19 +43,26 @@ def test_yank_and_paste_bar() -> None:
     state.slurs.append((0, 0, 1))
     state.ties.append((0, 0, 1))
     state.holds.append((0, 0, 1))
+    state.glisses.append((0, 0, 1))
+    state.marks["a"] = (0, 0, 0)
     yank_bar(state, 0)
     assert state.yanked_bar is not None
     paste_bar(state, 1)
     assert len(state.piece.bars) == 3
     assert state.overrides[(1, 0, 0)] == "a"
+    assert (1, 0, 1) in state.glisses
+    assert state.marks["a"] == (1, 0, 0)
     assert state.message == "Bar pasted"
     assert state.undo_stack[-1].kind == "bars-insert"
     undo(state, config_path=state.config_path)
     assert len(state.piece.bars) == 2
     assert (1, 0, 0) not in state.overrides
+    assert (1, 0, 1) not in state.glisses
     redo(state, config_path=state.config_path)
     assert len(state.piece.bars) == 3
     assert state.overrides[(1, 0, 0)] == "a"
+    assert (1, 0, 1) in state.glisses
+    assert state.marks["a"] == (1, 0, 0)
 
 
 def test_yank_and_paste_multiple_bars() -> None:
@@ -107,6 +114,31 @@ def test_cmd_bar_and_stave() -> None:
     assert state.message == "Stave action: break/join/new/del"
     cmd_bar(state, "other")
     assert state.message == "Bar action: add/after/before/insert/del/yank/paste [count]"
+
+
+def test_multi_bar_delete_does_not_double_shift_stave_breaks() -> None:
+    state = _state(bars=8)
+    state.stave_breaks = {6}
+    state.cursor_bar = 2
+    cmd_bar(state, "del 2")
+    assert state.stave_breaks == {4}
+
+
+def test_bar_insert_delete_reindexes_glisses_and_marks() -> None:
+    state = _state(bars=3)
+    state.glisses = [(2, 0, 1)]
+    state.marks["a"] = (2, 0, 1)
+    cmd_bar(state, "add")
+    assert state.glisses == [(3, 0, 1)]
+    assert state.marks["a"] == (3, 0, 1)
+    state.cursor_bar = 1
+    cmd_bar(state, "del")
+    assert state.glisses == [(2, 0, 1)]
+    assert state.marks["a"] == (2, 0, 1)
+    state.cursor_bar = 2
+    cmd_bar(state, "del")
+    assert state.glisses == []
+    assert "a" not in state.marks
 
 
 def test_cmd_chord() -> None:

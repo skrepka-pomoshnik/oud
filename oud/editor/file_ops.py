@@ -28,6 +28,7 @@ def cmd_write(state: EditorState, path: str) -> None:
         holds=state.holds,
     )
     state.modified = False
+    state.clean_undo_depth = len(state.undo_stack)
     state.pending_quit = False
     state.message = f"Wrote {path}"
 
@@ -47,6 +48,7 @@ def cmd_write_ascii(state: EditorState, path: str) -> None:
     with Path(path).open("w", encoding="utf-8") as handle:
         handle.write(content)
     state.modified = False
+    state.clean_undo_depth = len(state.undo_stack)
     state.pending_quit = False
     state.message = f"Wrote {path}"
 

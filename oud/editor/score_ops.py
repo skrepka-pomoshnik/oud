@@ -5,7 +5,13 @@ import copy
 from oud.core.model import Bar
 from oud.editor.bar_ops import clear_bar_contents, delete_bar, insert_bar, snapshot_bar
 from oud.editor.edit_ops import record_action
-from oud.editor.edit_range import BarRange, ChordRange, chord_range_at_col_count
+from oud.editor.edit_range import (
+    BarRange,
+    ChordRange,
+    bar_range_from_cursor,
+    chord_range_at_col_count,
+    deletable_bar_range_from_cursor,
+)
 from oud.editor.layout import bars_per_line, system_range
 from oud.editor.messages import NO_BARS
 from oud.editor.motions import apply_motion_target, target_home_bar
@@ -168,6 +174,12 @@ def _capture_yanked_bar(state: EditorState, index: int) -> YankedBar | None:
     slurs = [(0, start, end) for (b, start, end) in state.slurs if b == index]
     ties = [(0, start, end) for (b, start, end) in state.ties if b == index]
     holds = [(0, start, end) for (b, start, end) in state.holds if b == index]
+    glisses = [(0, start, end) for (b, start, end) in state.glisses if b == index]
+    marks = {
+        name: (0, string, col)
+        for name, (b, string, col) in state.marks.items()
+        if b == index
+    }
     return YankedBar(
         bar=bar_copy,
         overrides=overrides,
@@ -178,6 +190,8 @@ def _capture_yanked_bar(state: EditorState, index: int) -> YankedBar | None:
         slurs=slurs,
         ties=ties,
         holds=holds,
+        glisses=glisses,
+        marks=marks,
     )
 
 
@@ -196,7 +210,17 @@ def yank_bar(state: EditorState, index: int, *, count: int = 1) -> None:
     state.yanked_bars = copy.deepcopy(captured)
 
 
-def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> None:
+def yank_bar_range(state: EditorState, bar_range: BarRange) -> int:
+    bar_range = bar_range.clamp(len(state.piece.bars))
+    if bar_range.is_empty:
+        state.message = NO_BARS
+        return 0
+    yank_bar(state, bar_range.start, count=bar_range.count)
+    state.message = "Bar yanked" if bar_range.count == 1 else f"Bars yanked: {bar_range.count}"
+    return bar_range.count
+
+
+def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> None:  # noqa: C901
     insert_bar(state, index)
     bar_copy = copy.deepcopy(yanked.bar)
     state.piece.bars[index] = bar_copy
@@ -216,6 +240,10 @@ def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> 
         state.ties.append((index + b, start, end))
     for b, start, end in yanked.holds:
         state.holds.append((index + b, start, end))
+    for b, start, end in yanked.glisses:
+        state.glisses.append((index + b, start, end))
+    for name, (b, string, col) in yanked.marks.items():
+        state.marks[name] = (index + b, string, col)
     state.modified = True
 
 
@@ -289,39 +317,18 @@ def _cmd_bar_insert_before(state: EditorState) -> None:
     state.message = "Bar inserted"
 
 
-def _cmd_bar_yank(state: EditorState, count: int) -> None:
-    if not state.piece.bars:
-        state.message = NO_BARS
-        return
-    bar_range = BarRange.from_start_count(state.cursor_bar, count).clamp(len(state.piece.bars))
-    if bar_range.is_empty:
-        state.message = NO_BARS
-        return
-    yank_bar(state, bar_range.start, count=bar_range.count)
-    state.message = "Bar yanked" if bar_range.count == 1 else f"Bars yanked: {bar_range.count}"
-
-
 def _cmd_bar_paste(state: EditorState, count: int) -> None:
     paste_bar(state, state.cursor_bar + 1, count=count)
 
 
-def _normalized_bar_delete_range(state: EditorState, count: int) -> BarRange:
-    bar_range = BarRange.from_start_count(state.cursor_bar, count).clamp(len(state.piece.bars))
-    if bar_range.count >= len(state.piece.bars) and len(state.piece.bars) > 1:
-        return BarRange.from_start_count(bar_range.start, len(state.piece.bars) - 1).clamp(
-            len(state.piece.bars),
-        )
-    return bar_range
-
-
-def _cmd_bar_delete(state: EditorState, count: int) -> None:
+def delete_bar_range(state: EditorState, bar_range: BarRange) -> int:
     if not state.piece.bars:
         state.message = NO_BARS
-        return
-    bar_range = _normalized_bar_delete_range(state, count)
+        return 0
+    bar_range = bar_range.clamp(len(state.piece.bars))
     if bar_range.is_empty:
         state.message = NO_BARS
-        return
+        return 0
     index = bar_range.start
     if len(state.piece.bars) == 1:
         snapshot = snapshot_bar(state, index)
@@ -332,11 +339,11 @@ def _cmd_bar_delete(state: EditorState, count: int) -> None:
         )
         apply_motion_target(state, target_home_bar(state, state.cursor_bar))
         state.message = "Bar deleted"
-        return
+        return 1
     if bar_range.count == 1:
         snapshot = snapshot_bar(state, index)
         prev_breaks = set(state.stave_breaks)
-        delete_bar(state, state.cursor_bar)
+        delete_bar(state, index)
         new_breaks = set(state.stave_breaks)
         record_action(
             state,
@@ -350,18 +357,13 @@ def _cmd_bar_delete(state: EditorState, count: int) -> None:
                 },
             ),
         )
-        apply_motion_target(state, target_home_bar(state, state.cursor_bar))
+        apply_motion_target(state, target_home_bar(state, index))
         state.message = "Bar deleted"
-        return
+        return 1
     snapshots = [snapshot_bar(state, idx) for idx in bar_range.indices()]
     prev_breaks = set(state.stave_breaks)
     for _ in range(bar_range.count):
         delete_bar(state, bar_range.start)
-    state.stave_breaks = {
-        b - bar_range.count if b >= bar_range.end else b
-        for b in state.stave_breaks
-        if b < bar_range.start or b >= bar_range.end
-    }
     record_action(
         state,
         UndoAction(
@@ -377,6 +379,15 @@ def _cmd_bar_delete(state: EditorState, count: int) -> None:
     )
     apply_motion_target(state, target_home_bar(state, bar_range.start))
     state.message = f"Bars deleted: {bar_range.count}"
+    return bar_range.count
+
+
+def _cmd_bar_yank(state: EditorState, count: int) -> None:
+    yank_bar_range(state, bar_range_from_cursor(state, count))
+
+
+def _cmd_bar_delete(state: EditorState, count: int) -> None:
+    delete_bar_range(state, deletable_bar_range_from_cursor(state, count))
 
 
 def cmd_bar(state: EditorState, args: str) -> None:
@@ -462,11 +473,6 @@ def cmd_stave(state: EditorState, args: str) -> None:
         prev_breaks = set(state.stave_breaks)
         for _ in range(bar_range.count):
             delete_bar(state, bar_range.start)
-        state.stave_breaks = {
-            b - bar_range.count if b >= bar_range.end else b
-            for b in state.stave_breaks
-            if b < bar_range.start or b >= bar_range.end
-        }
         record_action(
             state,
             UndoAction(

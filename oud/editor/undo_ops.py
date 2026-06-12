@@ -8,6 +8,24 @@ from oud.editor.state import BarSnapshot, EditorState, UndoAction
 from oud.settings import save_settings
 
 
+def _restore_action_cursor(state: EditorState, action: UndoAction, *, redo: bool) -> None:
+    key = "cursor_after" if redo else "cursor_before"
+    cursor = action.data.get(key)
+    if not isinstance(cursor, tuple) or len(cursor) != 3:
+        return
+    bar, cursor_string, col = cursor
+    if not all(isinstance(value, int) for value in cursor):
+        return
+    state.cursor_bar = bar
+    state.cursor_string = cursor_string
+    state.cursor_col = col
+    state.clamp()
+
+
+def _refresh_modified_from_clean_depth(state: EditorState) -> None:
+    state.modified = len(state.undo_stack) != state.clean_undo_depth
+
+
 def apply_action(  # noqa: C901, PLR0911, PLR0912
     state: EditorState,
     action: UndoAction,
@@ -116,7 +134,12 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
         bar_index = cast(int, data["bar"])
         value = cast(list | None, data["new"] if redo else data["prev"])
         if 0 <= bar_index < len(state.piece.bars):
-            state.piece.bars[bar_index].chords = copy.deepcopy(value) if value else []
+            bar = state.piece.bars[bar_index]
+            bar.chords = copy.deepcopy(value) if value else []
+            notes_key = "new_notes" if redo else "prev_notes"
+            if notes_key in data:
+                notes = cast(list | None, data[notes_key])
+                bar.notes = copy.deepcopy(notes) if notes else []
         return
     if kind == "bar-insert":
         index = cast(int, data["index"])
@@ -217,7 +240,8 @@ def undo(state: EditorState, *, config_path: str) -> None:
     action = state.undo_stack.pop()
     apply_action(state, action, redo=False, config_path=config_path)
     state.redo_stack.append(action)
-    state.modified = True
+    _restore_action_cursor(state, action, redo=False)
+    _refresh_modified_from_clean_depth(state)
     state.message = "Undone"
 
 
@@ -228,5 +252,6 @@ def redo(state: EditorState, *, config_path: str) -> None:
     action = state.redo_stack.pop()
     apply_action(state, action, redo=True, config_path=config_path)
     state.undo_stack.append(action)
-    state.modified = True
+    _restore_action_cursor(state, action, redo=True)
+    _refresh_modified_from_clean_depth(state)
     state.message = "Redone"

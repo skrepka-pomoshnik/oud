@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from oud.core.model import Bar, Chord, Note
-from oud.core.render_utils import chord_positions
+from oud.core.render_utils import chord_slot_positions
 
 
 def duration_value(key: int, style: str) -> int | None:
@@ -23,23 +23,9 @@ def duration_value(key: int, style: str) -> int | None:
         ord("6"): 32,
         ord("7"): 64,
     }
-    letter_map = {
-        ord("w"): 1,
-        ord("h"): 2,
-        ord("q"): 4,
-        ord("e"): 8,
-        ord("s"): 16,
-        ord("t"): 32,
-        ord("W"): 1,
-        ord("H"): 2,
-        ord("Q"): 4,
-        ord("E"): 8,
-        ord("S"): 16,
-        ord("T"): 32,
-    }
     if style == "italian":
         return ctrl_map.get(key)
-    return french_map.get(key) or letter_map.get(key)
+    return french_map.get(key)
 
 
 def denom_to_note_type(denom: int) -> int | None:
@@ -95,15 +81,23 @@ def fret_to_italian(fret: int) -> str | None:
     return None
 
 
-def chord_index_at_col(bar: Bar, bar_width: int, col: int) -> int | None:
+def chord_index_at_col(
+    bar: Bar,
+    bar_width: int,
+    col: int,
+    *,
+    exact: bool = False,
+) -> int | None:
     if not bar.chords:
         return None
     default_duration = 4
-    positions = chord_positions(bar, bar_width, default_duration)
+    positions = chord_slot_positions(bar, bar_width, default_duration)
     for idx, (pos, _denom, _dot) in enumerate(positions):
         if pos == col:
             return idx
     if positions:
+        if exact:
+            return None
         nearest = min(
             enumerate(positions),
             key=lambda item: abs(item[1][0] - col),
@@ -123,7 +117,7 @@ def set_chord_note(
     string: int,
     fret: int | None,
 ) -> bool:
-    idx = chord_index_at_col(bar, bar_width, col)
+    idx = chord_index_at_col(bar, bar_width, col, exact=fret is None)
     if idx is None:
         return False
     chord = bar.chords[idx]
@@ -156,7 +150,7 @@ def insert_chord(bar: Bar, bar_width: int, col: int) -> None:
 def delete_chord(bar: Bar, bar_width: int, col: int) -> bool:
     if col < 0 or col >= bar_width:
         return False
-    idx = chord_index_at_col(bar, bar_width, col)
+    idx = chord_index_at_col(bar, bar_width, col, exact=True)
     if idx is None:
         return False
     bar.chords.pop(idx)

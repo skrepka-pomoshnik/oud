@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from oud.editor.edit_range import BarRange
 from oud.editor.state import EditorState
+from oud.editor.visual_ops import visual_bar_range
 
 SaveFn = Callable[[str, dict[str, str]], None]
 ExportMidiFn = Callable[..., str]
@@ -128,12 +130,51 @@ def cmd_play(
     save_fn: SaveFn,
 ) -> None:
     parts = args.split()
+    if parts and parts[0] in {"loop", "range", "selection"}:
+        _cmd_play_range(state, parts, config_path, start_midi_fn=start_midi_fn, save_fn=save_fn)
+        return
     start = int(parts[0]) - 1 if parts and parts[0].isdigit() else None
     tempo = parts[1] if len(parts) > 1 else None
     if tempo:
         state.settings["tempo"] = tempo
     start_midi_fn(state, start_bar=start)
     save_fn(config_path, state.settings)
+
+
+def _cmd_play_range(
+    state: EditorState,
+    parts: list[str],
+    config_path: str,
+    *,
+    start_midi_fn: StartMidiFn,
+    save_fn: SaveFn,
+) -> None:
+    bar_range = _playback_bar_range(state)
+    if bar_range.is_empty:
+        state.message = "No range to play"
+        return
+    loops = 2
+    tempo: str | None = None
+    for token in parts[1:]:
+        if token.isdigit() and loops == 2:
+            loops = max(1, int(token))
+        elif token.isdigit():
+            tempo = token
+    if tempo:
+        state.settings["tempo"] = tempo
+    start_midi_fn(
+        state,
+        start_bar=bar_range.start,
+        end_bar=bar_range.end - 1,
+        loop_count=loops,
+    )
+    save_fn(config_path, state.settings)
+
+
+def _playback_bar_range(state: EditorState) -> BarRange:
+    if state.visual_anchor is not None:
+        return visual_bar_range(state)
+    return BarRange.single(state.cursor_bar).clamp(len(state.piece.bars))
 
 
 def cmd_midicmd(

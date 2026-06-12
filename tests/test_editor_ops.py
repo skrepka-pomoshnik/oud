@@ -25,6 +25,11 @@ def test_duration_value_maps_french_keys() -> None:
     assert duration_value(ord("7"), "french") == 64
 
 
+def test_duration_value_does_not_map_french_fret_letters() -> None:
+    for ch in "ehqstw":
+        assert duration_value(ord(ch), "french") is None
+
+
 def test_duration_value_italian_ctrl_keys() -> None:
     assert duration_value(1, "italian") == 1
     assert duration_value(4, "italian") == 8
@@ -69,6 +74,16 @@ def test_chord_helpers() -> None:
     assert bar.chords[0].notes[0].fret == 2
     assert set_chord_note(bar, 12, 0, 1, None) is True
     assert bar.chords == []
+
+
+def test_destructive_chord_helpers_require_exact_slot() -> None:
+    bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
+    assert chord_index_at_col(bar, 12, 1) == 0
+    assert chord_index_at_col(bar, 12, 1, exact=True) is None
+    assert set_chord_note(bar, 12, 1, 1, None) is False
+    assert bar.chords
+    assert delete_chord(bar, 12, 1) is False
+    assert bar.chords
 
 
 def test_insert_delete_chord() -> None:

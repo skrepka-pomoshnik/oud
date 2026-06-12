@@ -4,7 +4,7 @@ from pathlib import Path
 
 from oud.core.model import Bar, Piece
 from oud.editor.load_ops import cmd_open, load_piece_data
-from oud.editor.state import EditorState
+from oud.editor.state import EditorState, UndoAction
 from oud.editor.tool_ops import cmd_info, cmd_notes, cmd_plugins, cmd_tool
 from oud.editor.undo_ops import undo
 
@@ -101,6 +101,44 @@ def test_cmd_open_appends_import_warning_to_message(tmp_path: Path) -> None:
     assert "lyric/melody text records" in state.message
     assert state.insert_prefix == ""
     assert state.replace_once is False
+
+
+def test_cmd_open_resets_previous_file_state(tmp_path: Path) -> None:
+    state = _state()
+    target = tmp_path / "fresh.ft3"
+    target.write_bytes(b"")
+    old_action = UndoAction(kind="noop", data={})
+    state.undo_stack.append(old_action)
+    state.redo_stack.append(old_action)
+    state.annotations[(0, 0)] = "ann"
+    state.ornaments[(0, 0)] = "orn"
+    state.highlights.add((0, 0, 0))
+    state.slurs.append((0, 0, 1))
+    state.ties.append((0, 0, 1))
+    state.holds.append((0, 0, 1))
+    state.glisses.append((0, 0, 1))
+    state.stave_breaks.add(1)
+    state.marks["a"] = (0, 0, 0)
+    state.modified = True
+    cmd_open(
+        state,
+        str(target),
+        no_path_msg="No path",
+        load_ft3_fn=lambda _p: Piece(title="Fresh", bars=[Bar()], strings=6),
+        build_durations_fn=None,
+    )
+    assert state.undo_stack == []
+    assert state.redo_stack == []
+    assert state.annotations == {}
+    assert state.ornaments == {}
+    assert state.highlights == set()
+    assert state.slurs == []
+    assert state.ties == []
+    assert state.holds == []
+    assert state.glisses == []
+    assert state.stave_breaks == set()
+    assert state.marks == {}
+    assert state.modified is False
 
 
 def test_load_piece_data_returns_warning_piece_when_loader_raises(

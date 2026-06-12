@@ -1,10 +1,13 @@
-from oud.core.model import Bar, Chord, Note
+from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.edit_range import (
     BarRange,
     ChordRange,
+    bar_range_from_cursor,
     chord_range_at_col,
     chord_range_at_col_count,
+    deletable_bar_range_from_cursor,
 )
+from oud.editor.state import EditorState
 
 
 def test_bar_range_single_count_and_indices() -> None:
@@ -38,6 +41,20 @@ def test_bar_range_clamp_empty_piece() -> None:
     assert (r.start, r.end) == (0, 0)
     assert r.is_empty is True
     assert list(r.indices()) == []
+
+
+def test_bar_range_from_cursor_clamps_count_to_piece() -> None:
+    state = EditorState(Piece(title="T", bars=[Bar(), Bar(), Bar()], strings=6), {})
+    state.cursor_bar = 1
+    r = bar_range_from_cursor(state, 5)
+    assert (r.start, r.end, r.count) == (1, 3, 2)
+
+
+def test_deletable_bar_range_from_cursor_keeps_one_bar() -> None:
+    state = EditorState(Piece(title="T", bars=[Bar(), Bar(), Bar()], strings=6), {})
+    state.cursor_bar = 0
+    r = deletable_bar_range_from_cursor(state, 99)
+    assert (r.start, r.end, r.count) == (0, 2, 2)
 
 
 def test_chord_range_clamp_and_indices() -> None:

@@ -94,6 +94,23 @@ def _shift_spans(
     return updated
 
 
+def _shift_marks(
+    marks: dict[str, tuple[int, int, int]],
+    start: int,
+    delta: int,
+    remove_index: int | None = None,
+) -> dict[str, tuple[int, int, int]]:
+    updated: dict[str, tuple[int, int, int]] = {}
+    for name, (bar, string, col) in marks.items():
+        if remove_index is not None and bar == remove_index:
+            continue
+        if bar >= start:
+            updated[name] = (bar + delta, string, col)
+        else:
+            updated[name] = (bar, string, col)
+    return updated
+
+
 def snapshot_bar(state: EditorState, index: int) -> BarSnapshot:
     bar = copy.deepcopy(state.piece.bars[index])
     overrides = {k: v for k, v in state.overrides.items() if k[0] == index}
@@ -105,6 +122,12 @@ def snapshot_bar(state: EditorState, index: int) -> BarSnapshot:
     slurs = [s for s in state.slurs if s[0] == index]
     ties = [s for s in state.ties if s[0] == index]
     holds = [s for s in state.holds if s[0] == index]
+    glisses = [s for s in state.glisses if s[0] == index]
+    marks = {
+        name: (0, string, col)
+        for name, (bar_idx, string, col) in state.marks.items()
+        if bar_idx == index
+    }
     return {
         "bar": bar,
         "overrides": overrides,
@@ -116,6 +139,8 @@ def snapshot_bar(state: EditorState, index: int) -> BarSnapshot:
         "slurs": slurs,
         "ties": ties,
         "holds": holds,
+        "glisses": glisses,
+        "marks": marks,
     }
 
 
@@ -129,6 +154,10 @@ def _remove_bar_entries(state: EditorState, index: int) -> None:
     state.slurs = [s for s in state.slurs if s[0] != index]
     state.ties = [s for s in state.ties if s[0] != index]
     state.holds = [s for s in state.holds if s[0] != index]
+    state.glisses = [s for s in state.glisses if s[0] != index]
+    state.marks = {
+        name: value for name, value in state.marks.items() if value[0] != index
+    }
 
 
 def clear_bar_contents(state: EditorState, index: int) -> None:
@@ -149,6 +178,9 @@ def restore_bar_snapshot(state: EditorState, index: int, snapshot: BarSnapshot) 
     state.slurs.extend(snapshot["slurs"])
     state.ties.extend(snapshot["ties"])
     state.holds.extend(snapshot["holds"])
+    state.glisses.extend(snapshot["glisses"])
+    for name, (bar, string, col) in snapshot["marks"].items():
+        state.marks[name] = (index + bar, string, col)
 
 
 def insert_bar(state: EditorState, index: int) -> None:
@@ -163,6 +195,8 @@ def insert_bar(state: EditorState, index: int) -> None:
     state.slurs = _shift_spans(state.slurs, index, 1)
     state.ties = _shift_spans(state.ties, index, 1)
     state.holds = _shift_spans(state.holds, index, 1)
+    state.glisses = _shift_spans(state.glisses, index, 1)
+    state.marks = _shift_marks(state.marks, index, 1)
     state.stave_breaks = {b + 1 if b >= index else b for b in state.stave_breaks}
     state.modified = True
 
@@ -182,6 +216,8 @@ def delete_bar(state: EditorState, index: int) -> None:
         state.slurs.clear()
         state.ties.clear()
         state.holds.clear()
+        state.glisses.clear()
+        state.marks.clear()
         state.modified = True
         return
     index = max(0, min(index, len(state.piece.bars) - 1))
@@ -195,5 +231,7 @@ def delete_bar(state: EditorState, index: int) -> None:
     state.slurs = _shift_spans(state.slurs, index + 1, -1, remove_index=index)
     state.ties = _shift_spans(state.ties, index + 1, -1, remove_index=index)
     state.holds = _shift_spans(state.holds, index + 1, -1, remove_index=index)
+    state.glisses = _shift_spans(state.glisses, index + 1, -1, remove_index=index)
+    state.marks = _shift_marks(state.marks, index + 1, -1, remove_index=index)
     state.stave_breaks = {b - 1 if b > index else b for b in state.stave_breaks if b != index}
     state.modified = True

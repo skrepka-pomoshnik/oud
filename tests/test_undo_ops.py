@@ -4,7 +4,7 @@ from pathlib import Path
 
 from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.bar_ops import snapshot_bar
-from oud.editor.edit_ops import begin_undo_group, end_undo_group, record_action
+from oud.editor.edit_ops import apply_override, begin_undo_group, end_undo_group, record_action
 from oud.editor.state import EditorState, UndoAction
 from oud.editor.undo_ops import apply_action, redo, undo
 
@@ -244,3 +244,27 @@ def test_begin_end_undo_group_records_single_stack_entry() -> None:
     assert end_undo_group(state) is True
     assert len(state.undo_stack) == 1
     assert state.undo_stack[0].kind == "group"
+
+
+def test_undo_redo_restore_cursor_position_and_clean_modified_state() -> None:
+    state = _state()
+    state.cursor_bar = 1
+    state.cursor_string = 2
+    state.cursor_col = 3
+    apply_override(state, (1, 2, 3), "a")
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 0
+    assert state.modified is True
+
+    undo(state, config_path="config.toml")
+
+    assert state.modified is False
+    assert (state.cursor_bar, state.cursor_string, state.cursor_col) == (1, 2, 3)
+    assert (1, 2, 3) not in state.overrides
+
+    redo(state, config_path="config.toml")
+
+    assert state.modified is True
+    assert (state.cursor_bar, state.cursor_string, state.cursor_col) == (1, 2, 3)
+    assert state.overrides[(1, 2, 3)] == "a"

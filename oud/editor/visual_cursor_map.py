@@ -182,4 +182,3 @@ def system_display_indices_for_bar(state: EditorState, bar_index: int) -> list[i
         state.piece.bars[start:end],
         total_strings=total_strings,
     )
-

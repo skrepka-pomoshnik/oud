@@ -111,6 +111,17 @@ def chord_positions(
     return positions
 
 
+def chord_slot_positions(
+    bar: Bar,
+    bar_width: int,
+    default_duration: int,
+    *,
+    min_gap: int = 1,
+) -> list[tuple[int, int, bool]]:
+    _ = min_gap
+    return chord_positions(bar, bar_width, default_duration)
+
+
 def bar_cells_from_chords(
     bar: Bar,
     strings: int,

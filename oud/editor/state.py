@@ -43,6 +43,7 @@ class EditorState:
         self.message = ""
         self.path: str | None = None
         self.modified = False
+        self.clean_undo_depth = 0
         self.undo_stack: list[UndoAction] = []
         self.redo_stack: list[UndoAction] = []
         self.undo_group_stack: list[UndoGroupFrame] = []
@@ -270,6 +271,8 @@ class YankedBar:
     slurs: list[tuple[int, int, int]]
     ties: list[tuple[int, int, int]]
     holds: list[tuple[int, int, int]]
+    glisses: list[tuple[int, int, int]]
+    marks: dict[str, tuple[int, int, int]]
 
 
 @dataclass
@@ -281,6 +284,7 @@ class UndoAction:
 @dataclass
 class UndoGroupFrame:
     label: str | None = None
+    cursor_before: tuple[int, int, int] | None = None
     actions: list[UndoAction] = field(default_factory=list)
 
 
@@ -295,6 +299,8 @@ class BarSnapshot(TypedDict):
     slurs: list[tuple[int, int, int]]
     ties: list[tuple[int, int, int]]
     holds: list[tuple[int, int, int]]
+    glisses: list[tuple[int, int, int]]
+    marks: dict[str, tuple[int, int, int]]
 
 
 @dataclass

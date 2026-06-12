@@ -754,3 +754,16 @@ def test_tab_snippet_slur_gliss_parenthesize_collision_regression_with_system_br
     assert any("[" in line and "]" in line for line in lines)
     assert any("(" in line for line in lines)
     assert any("/" in line or "\\" in line for line in lines)
+
+
+def test_tab_snippet_gridflags_after_comment_clear_keeps_dense_staff_alignment() -> None:
+    state = regression_state(dense_flag_alignment_piece(), justify="smart", width=92, bar_width=12)
+    apply_tabnotation_preset(state.settings, "full")
+    state.settings["flagstyle"] = "board"
+    state.annotations = {}
+    lines = _render_state_lines(state, height=22)
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
+    assert staff_rows
+    assert all(row.rfind("|") == state.screen_width - 2 for row in staff_rows)
+    assert any("=" in line for line in lines[:12])
+    assert not any("comment" in line.lower() for line in lines)

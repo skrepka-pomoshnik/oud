@@ -61,6 +61,32 @@ def load_piece(path: str | None) -> Piece:
     return piece
 
 
+def reset_loaded_file_state(state: EditorState) -> None:
+    state.undo_stack.clear()
+    state.redo_stack.clear()
+    state.undo_group_stack.clear()
+    state.annotations.clear()
+    state.ornaments.clear()
+    state.highlights.clear()
+    state.slurs.clear()
+    state.ties.clear()
+    state.holds.clear()
+    state.glisses.clear()
+    state._slur_start = None
+    state._tie_start = None
+    state._hold_start = None
+    state.stave_breaks.clear()
+    state.marks.clear()
+    state.pending_mark = ""
+    state.pending_key = ""
+    state.pending_find = ""
+    state.count_prefix = ""
+    state.visual_anchor = None
+    state.modified = False
+    state.clean_undo_depth = len(state.undo_stack)
+    state.pending_quit = False
+
+
 def cmd_open(
     state: EditorState,
     args: str,
@@ -110,6 +136,7 @@ def cmd_open(
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
+    reset_loaded_file_state(state)
     if bar_width:
         state.bar_width = max(4, bar_width)
     state.cursor_bar = 0

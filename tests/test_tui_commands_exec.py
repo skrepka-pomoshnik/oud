@@ -804,6 +804,60 @@ def test_cmd_midi_lilypond_pdf_play_source(
     cmd.cmd_tool(state, "reflow", str(tmp_path / "cfg.toml"))
 
 
+def test_cmd_tool_comments_gridflags_and_reflow(tmp_path: Path) -> None:
+    state = _state(bars=3)
+    state.annotations[(0, 1)] = "comment"
+    state.stave_breaks = {1, 2}
+
+    cmd.cmd_tool(state, "comments", str(tmp_path / "cfg.toml"))
+    assert state.annotations == {}
+    assert state.message == "Annotations cleared"
+
+    cmd.cmd_tool(state, "gridflags", str(tmp_path / "cfg.toml"))
+    assert state.settings["flagstyle"] == "board"
+    assert state.message == "Flagstyle board"
+
+    cmd.cmd_tool(state, "reflow", str(tmp_path / "cfg.toml"))
+    assert state.stave_breaks == set()
+    assert state.message == "Reflowed (breaks cleared)"
+
+
+def test_cmd_play_loop_uses_visual_or_cursor_range(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = _state(bars=4)
+    calls: list[dict[str, int | None]] = []
+
+    def _start_midi(
+        state: EditorState,
+        start_bar: int | None = None,
+        path: str | None = None,
+        bpm: int | None = None,
+        end_bar: int | None = None,
+        loop_count: int = 1,
+    ) -> None:
+        _ = (state, path, bpm)
+        calls.append(
+            {
+                "start_bar": start_bar,
+                "end_bar": end_bar,
+                "loop_count": loop_count,
+            },
+        )
+
+    monkeypatch.setattr("oud.editor.midi_control.start_midi", _start_midi)
+
+    state.cursor_bar = 2
+    cmd.cmd_play(state, "loop", str(tmp_path / "cfg.toml"))
+    assert calls[-1] == {"start_bar": 2, "end_bar": 2, "loop_count": 2}
+
+    state.visual_anchor = (1, 0, 0)
+    state.cursor_bar = 3
+    cmd.cmd_play(state, "loop 3", str(tmp_path / "cfg.toml"))
+    assert calls[-1] == {"start_bar": 1, "end_bar": 3, "loop_count": 3}
+
+
 def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

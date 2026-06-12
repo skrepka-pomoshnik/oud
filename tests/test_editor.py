@@ -135,6 +135,23 @@ def test_insert_duration_digits_map_in_french() -> None:
     assert state.current_duration == 64
 
 
+def test_insert_french_duration_alias_letters_insert_frets() -> None:
+    for ch in "ehst":
+        state = _state()
+        state.mode = "insert"
+        actions.handle_insert(state, ord(ch))
+        assert state.overrides[(0, 0, 0)] == ch
+        assert state.current_duration == 4
+
+
+def test_insert_q_quits_unmodified_buffer() -> None:
+    state = _state()
+    state.mode = "insert"
+    assert _press(state, ord("q")) is False
+    assert state.message != "Duration 4"
+    assert state.current_duration == 4
+
+
 def test_insert_fret_snaps_to_chord_slot_when_cursor_in_gap() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
@@ -154,6 +171,38 @@ def test_insert_flattens_chords_to_grid() -> None:
     actions.handle_insert(state, ord("a"))
     assert state.piece.bars[0].chords == []
     assert state.overrides[(0, 0, 0)] == "a"
+
+
+def test_insert_note_records_single_grouped_undo() -> None:
+    state = _state()
+    state.mode = "insert"
+    actions.handle_insert(state, ord("a"))
+    assert len(state.undo_stack) == 1
+    assert state.undo_stack[-1].kind == "group"
+    undo_ops.undo(state, config_path="config.toml")
+    assert state.overrides == {}
+    assert state.durations == {}
+
+
+def test_insert_flattened_chord_bar_undo_restores_structured_chords() -> None:
+    state = _state()
+    chord = Chord(note_type=4, dotted=True, grid=None, notes=[Note(1, 0, 0)])
+    state.piece.bars[0].chords = [chord]
+    state.piece.bars[0].notes = [Note(1, 0, 0)]
+    state.mode = "insert"
+    actions.handle_insert(state, ord("b"))
+    assert state.piece.bars[0].chords == []
+    assert state.overrides
+    assert state.durations
+    assert state.dotted
+
+    undo_ops.undo(state, config_path="config.toml")
+
+    assert state.piece.bars[0].chords == [chord]
+    assert state.piece.bars[0].notes == [Note(1, 0, 0)]
+    assert state.overrides == {}
+    assert state.durations == {}
+    assert state.dotted == set()
 
 
 def test_insert_note_snaps_to_nearest_chord_slot_left_tie() -> None:
@@ -238,6 +287,16 @@ def test_clear_cell_removes_duration_column() -> None:
     state.durations[(0, 1, 0)] = 8
     edit_ops.clear_cell(state, 0, 1, 0)
     assert (0, 1, 0) not in state.durations
+
+
+def test_clear_cell_empty_gap_does_not_delete_nearest_chord_note() -> None:
+    state = _state()
+    state.piece.bars[0].chords = [
+        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
+    ]
+    edit_ops.clear_cell(state, 0, 0, 1)
+    assert state.piece.bars[0].chords[0].notes == [Note(1, 0, 0)]
+    assert state.undo_stack == []
 
 
 def test_clear_cell_note_records_single_grouped_undo() -> None:

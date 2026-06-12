@@ -4,12 +4,18 @@ import copy
 from collections.abc import Callable
 
 from oud.core.render_utils import (
-    chord_positions,
+    chord_slot_positions,
     format_fret,
     note_type_to_denom,
 )
 from oud.editor.controller_utils import cursor_key, string_index
-from oud.editor.edit_ops import apply_duration, apply_override, clear_cell_note, record_action
+from oud.editor.edit_ops import (
+    apply_duration,
+    apply_override,
+    clear_cell_note,
+    record_action,
+    undo_group,
+)
 from oud.editor.insert_session import (
     clear_insert_transient,
     exit_insert_mode,
@@ -27,13 +33,10 @@ from oud.editor.motions import (
 from oud.editor.navigation import move_left, move_right
 from oud.editor.ops import (
     chord_index_at_col,
-    denom_to_note_type,
     duration_value,
     french_to_fret,
     is_french_fret,
     is_italian_fret,
-    italian_to_fret,
-    set_chord_note,
 )
 from oud.editor.rhythm import advance_if_overflow, cell_has_duration
 from oud.editor.state import EditorState, UndoAction
@@ -85,6 +88,12 @@ def _snap_to_previous_time_slot_if_needed(state: EditorState) -> None:
     apply_motion_target(state, target_snap_previous_time_slot_if_needed(state))
 
 
+def _snap_to_previous_time_slot(state: EditorState) -> bool:
+    before = (state.cursor_bar, state.cursor_col)
+    _snap_to_previous_time_slot_if_needed(state)
+    return (state.cursor_bar, state.cursor_col) != before
+
+
 def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return
@@ -93,59 +102,78 @@ def _flatten_chords_to_grid(state: EditorState, bar_index: int) -> None:
         return
     style = state.settings.get("style", "french")
     french_c = state.settings.get("frenchc", "normal")
-    positions = chord_positions(bar, state.bar_width, default_duration=4)
+    positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
+    prev_chords = copy.deepcopy(bar.chords)
+    prev_notes = copy.deepcopy(bar.notes)
     for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
         for note in chord.notes:
             s_idx = note.string - 1
             if s_idx < 0 or s_idx >= state.piece.strings:
                 continue
             key = (bar_index, s_idx, col)
-            state.overrides[key] = format_fret(
-                style,
-                note.fret,
-                french_c=french_c,
+            apply_override(
+                state,
+                key,
+                format_fret(
+                    style,
+                    note.fret,
+                    french_c=french_c,
+                ),
             )
         denom = note_type_to_denom(chord.note_type) or 4
-        state.durations[(bar_index, 0, col)] = denom
+        apply_duration(state, (bar_index, 0, col), denom)
         if chord.dotted:
+            prev_dotted = (bar_index, col) in state.dotted
+            record_action(
+                state,
+                UndoAction(
+                    kind="dotted",
+                    data={"key": (bar_index, col), "prev": prev_dotted, "new": True},
+                ),
+            )
             state.dotted.add((bar_index, col))
     bar.chords = []
     bar.notes = []
-    state.modified = True
+    record_action(
+        state,
+        UndoAction(
+            kind="chords",
+            data={
+                "bar": bar_index,
+                "prev": prev_chords,
+                "new": [],
+                "prev_notes": prev_notes,
+                "new_notes": [],
+            },
+        ),
+    )
 
 
 def _snap_cursor_to_chord_slot(state: EditorState) -> None:
     apply_motion_target(state, target_snap_to_chord_slot(state))
 
 
+def _advance_after_insert(state: EditorState) -> None:
+    if finish_replace_once(state):
+        return
+    if _replace_mode_active(state):
+        return
+    steps = 2 if state.settings.get("grid") == "on" else 1
+    for _ in range(steps):
+        move_right(state)
+
+
 def _apply_duration_key(state: EditorState, dur: int) -> bool:
     if not _ensure_replace_target(state):
         return True
-    _snap_to_previous_time_slot_if_needed(state)
-    state.current_duration = dur
-    advance_if_overflow(state, dur, string_index(state, state.cursor_string))
-    _snap_cursor_to_chord_slot(state)
-    if 0 <= state.cursor_bar < len(state.piece.bars):
-        _flatten_chords_to_grid(state, state.cursor_bar)
-    bar = state.cursor_bar
-    if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
-        bar_obj = state.piece.bars[bar]
-        idx = chord_index_at_col(bar_obj, state.bar_width, state.cursor_col)
-        note_type = denom_to_note_type(dur)
-        if idx is not None and note_type is not None:
-            prev_chords = copy.deepcopy(bar_obj.chords)
-            bar_obj.chords[idx].note_type = note_type
-            record_action(
-                state,
-                UndoAction(
-                    kind="chords",
-                    data={"bar": bar, "prev": prev_chords, "new": bar_obj.chords},
-                ),
-            )
-            state.modified = True
-        else:
-            apply_duration(state, cursor_key(state), dur)
-    else:
+    with undo_group(state, label="insert-duration"):
+        snapped_previous = _snap_to_previous_time_slot(state)
+        state.current_duration = dur
+        advance_if_overflow(state, dur, string_index(state, state.cursor_string))
+        if not snapped_previous:
+            _snap_cursor_to_chord_slot(state)
+        if 0 <= state.cursor_bar < len(state.piece.bars):
+            _flatten_chords_to_grid(state, state.cursor_bar)
         apply_duration(state, cursor_key(state), dur)
     state.message = f"Duration {dur}"
     return True
@@ -154,177 +182,103 @@ def _apply_duration_key(state: EditorState, dur: int) -> bool:
 def _handle_insert_dot(state: EditorState) -> bool:
     if not _ensure_replace_target(state):
         return True
-    bar_col = (state.cursor_bar, state.cursor_col)
-    _snap_cursor_to_chord_slot(state)
-    bar_col = (state.cursor_bar, state.cursor_col)
-    if 0 <= state.cursor_bar < len(state.piece.bars):
-        _flatten_chords_to_grid(state, state.cursor_bar)
-    bar = state.cursor_bar
-    if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
-        bar_obj = state.piece.bars[bar]
-        idx = chord_index_at_col(bar_obj, state.bar_width, state.cursor_col)
-        if idx is not None:
-            prev_chords = copy.deepcopy(bar_obj.chords)
-            bar_obj.chords[idx].dotted = not bar_obj.chords[idx].dotted
+    with undo_group(state, label="insert-dot"):
+        bar_col = (state.cursor_bar, state.cursor_col)
+        _snap_cursor_to_chord_slot(state)
+        bar_col = (state.cursor_bar, state.cursor_col)
+        if 0 <= state.cursor_bar < len(state.piece.bars):
+            _flatten_chords_to_grid(state, state.cursor_bar)
+        if bar_col in state.dotted:
             record_action(
                 state,
                 UndoAction(
-                    kind="chords",
-                    data={"bar": bar, "prev": prev_chords, "new": bar_obj.chords},
+                    kind="dotted",
+                    data={"key": bar_col, "prev": True, "new": False},
                 ),
             )
-            state.modified = True
-            state.message = "Dot on" if bar_obj.chords[idx].dotted else "Dot off"
-            return True
-    if bar_col in state.dotted:
-        record_action(
-            state,
-            UndoAction(kind="dotted", data={"key": bar_col, "prev": True, "new": False}),
-        )
-        state.dotted.discard(bar_col)
-        state.message = "Dot off"
-    else:
-        record_action(
-            state,
-            UndoAction(kind="dotted", data={"key": bar_col, "prev": False, "new": True}),
-        )
-        state.dotted.add(bar_col)
-        state.message = "Dot on"
-    state.modified = True
+            state.dotted.discard(bar_col)
+            state.message = "Dot off"
+        else:
+            record_action(
+                state,
+                UndoAction(kind="dotted", data={"key": bar_col, "prev": False, "new": True}),
+            )
+            state.dotted.add(bar_col)
+            state.message = "Dot on"
+        state.modified = True
     return True
 
 
 def _handle_insert_rest(state: EditorState) -> bool:
     if not _ensure_replace_target(state):
         return True
-    advance_if_overflow(
-        state,
-        state.current_duration,
-        string_index(state, state.cursor_string),
-    )
-    _snap_cursor_to_chord_slot(state)
-    if 0 <= state.cursor_bar < len(state.piece.bars):
-        _flatten_chords_to_grid(state, state.cursor_bar)
-    apply_override(state, cursor_key(state), "r")
-    if not cell_has_duration(
-        state,
-        state.cursor_bar,
-        string_index(state, state.cursor_string),
-        state.cursor_col,
-    ):
-        apply_duration(state, cursor_key(state), state.current_duration)
-    if finish_replace_once(state):
-        return True
-    if _replace_mode_active(state):
-        return True
-    steps = 2 if state.settings.get("grid") == "on" else 1
-    for _ in range(steps):
-        move_right(state)
+    with undo_group(state, label="insert-rest"):
+        advance_if_overflow(
+            state,
+            state.current_duration,
+            string_index(state, state.cursor_string),
+        )
+        _snap_cursor_to_chord_slot(state)
+        if 0 <= state.cursor_bar < len(state.piece.bars):
+            _flatten_chords_to_grid(state, state.cursor_bar)
+        apply_override(state, cursor_key(state), "r")
+        if not cell_has_duration(
+            state,
+            state.cursor_bar,
+            string_index(state, state.cursor_string),
+            state.cursor_col,
+        ):
+            apply_duration(state, cursor_key(state), state.current_duration)
+    _advance_after_insert(state)
     return True
 
 
-def _handle_insert_note(state: EditorState, ch: str, style: str) -> bool:
+def _handle_insert_note(state: EditorState, ch: str) -> bool:
     if not _ensure_replace_target(state):
         return True
-    advance_if_overflow(
-        state,
-        state.current_duration,
-        string_index(state, state.cursor_string),
-    )
-    _snap_cursor_to_chord_slot(state)
-    if 0 <= state.cursor_bar < len(state.piece.bars):
-        _flatten_chords_to_grid(state, state.cursor_bar)
-    bar = state.cursor_bar
-    string = string_index(state, state.cursor_string)
-    fret = french_to_fret(ch) if style == "french" else italian_to_fret(ch)
-    if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
-        if fret is not None:
-            prev_chords = copy.deepcopy(state.piece.bars[bar].chords)
-            if state.current_duration:
-                idx = chord_index_at_col(
-                    state.piece.bars[bar], state.bar_width, state.cursor_col,
-                )
-                note_type = denom_to_note_type(state.current_duration)
-                if idx is not None and note_type is not None:
-                    state.piece.bars[bar].chords[idx].note_type = note_type
-            if set_chord_note(
-                state.piece.bars[bar],
-                state.bar_width,
-                state.cursor_col,
-                string + 1,
-                fret,
-            ):
-                new_chords = copy.deepcopy(state.piece.bars[bar].chords)
-                record_action(
-                    state,
-                    UndoAction(
-                        kind="chords",
-                        data={"bar": bar, "prev": prev_chords, "new": new_chords},
-                    ),
-                )
-                state.modified = True
-            else:
-                apply_override(state, cursor_key(state), ch)
-        else:
-            apply_override(state, cursor_key(state), ch)
-    else:
+    with undo_group(state, label="insert-note"):
+        advance_if_overflow(
+            state,
+            state.current_duration,
+            string_index(state, state.cursor_string),
+        )
+        _snap_cursor_to_chord_slot(state)
+        if 0 <= state.cursor_bar < len(state.piece.bars):
+            _flatten_chords_to_grid(state, state.cursor_bar)
+        bar = state.cursor_bar
+        string = string_index(state, state.cursor_string)
         apply_override(state, cursor_key(state), ch)
-    if not cell_has_duration(state, bar, string, state.cursor_col):
-        apply_duration(state, cursor_key(state), state.current_duration)
+        if not cell_has_duration(state, bar, string, state.cursor_col):
+            apply_duration(state, cursor_key(state), state.current_duration)
     return True
 
 
 def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
     if not _ensure_replace_target(state):
         return True
-    advance_if_overflow(
-        state,
-        state.current_duration,
-        string_index(state, state.cursor_string),
-    )
-    _snap_cursor_to_chord_slot(state)
-    if 0 <= state.cursor_bar < len(state.piece.bars):
-        _flatten_chords_to_grid(state, state.cursor_bar)
-    bar = state.cursor_bar
-    string = string_index(state, state.cursor_string)
-    if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
-        prev_chords = copy.deepcopy(state.piece.bars[bar].chords)
-        if state.current_duration:
-            idx = chord_index_at_col(
-                state.piece.bars[bar], state.bar_width, state.cursor_col,
-            )
-            note_type = denom_to_note_type(state.current_duration)
-            if idx is not None and note_type is not None:
-                state.piece.bars[bar].chords[idx].note_type = note_type
-        if set_chord_note(
-            state.piece.bars[bar],
-            state.bar_width,
-            state.cursor_col,
-            string + 1,
-            fret,
-        ):
-            new_chords = copy.deepcopy(state.piece.bars[bar].chords)
-            record_action(
-                state,
-                UndoAction(
-                    kind="chords",
-                    data={"bar": bar, "prev": prev_chords, "new": new_chords},
-                ),
-            )
-            state.modified = True
-    else:
+    with undo_group(state, label="insert-fret"):
+        advance_if_overflow(
+            state,
+            state.current_duration,
+            string_index(state, state.cursor_string),
+        )
+        _snap_cursor_to_chord_slot(state)
+        if 0 <= state.cursor_bar < len(state.piece.bars):
+            _flatten_chords_to_grid(state, state.cursor_bar)
+        bar = state.cursor_bar
+        string = string_index(state, state.cursor_string)
         text = str(fret)
         for offset, ch in enumerate(text[:2]):
             col = state.cursor_col + offset
             if col >= state.bar_width:
                 break
             apply_override(state, (bar, string, col), ch)
-    if not cell_has_duration(state, bar, string, state.cursor_col):
-        apply_duration(state, cursor_key(state), state.current_duration)
+        if not cell_has_duration(state, bar, string, state.cursor_col):
+            apply_duration(state, cursor_key(state), state.current_duration)
     return True
 
 
-def _handle_insert_bass_slash(  # noqa: C901, PLR0911, PLR0912
+def _handle_insert_bass_slash(  # noqa: PLR0911
     state: EditorState,
     key: int,
     style: str,
@@ -346,48 +300,18 @@ def _handle_insert_bass_slash(  # noqa: C901, PLR0911, PLR0912
                 state.message = "Bass string not available"
                 state.insert_prefix = ""
                 return True
-            bar = state.cursor_bar
-            col = state.cursor_col
-            advance_if_overflow(state, state.current_duration, target)
-            if 0 <= bar < len(state.piece.bars) and state.piece.bars[bar].chords:
-                prev_chords = copy.deepcopy(state.piece.bars[bar].chords)
-                if state.current_duration:
-                    idx = chord_index_at_col(
-                        state.piece.bars[bar], state.bar_width, state.cursor_col,
-                    )
-                    note_type = denom_to_note_type(state.current_duration)
-                    if idx is not None and note_type is not None:
-                        state.piece.bars[bar].chords[idx].note_type = note_type
-                if set_chord_note(
-                    state.piece.bars[bar],
-                    state.bar_width,
-                    col,
-                    target + 1,
-                    fret,
-                ):
-                    new_chords = copy.deepcopy(state.piece.bars[bar].chords)
-                    record_action(
-                        state,
-                        UndoAction(
-                            kind="chords",
-                            data={"bar": bar, "prev": prev_chords, "new": new_chords},
-                        ),
-                    )
-                    state.modified = True
-                else:
-                    apply_override(state, (bar, target, col), ch)
-            else:
+            with undo_group(state, label="insert-bass-note"):
+                advance_if_overflow(state, state.current_duration, target)
+                _snap_cursor_to_chord_slot(state)
+                if 0 <= state.cursor_bar < len(state.piece.bars):
+                    _flatten_chords_to_grid(state, state.cursor_bar)
+                bar = state.cursor_bar
+                col = state.cursor_col
                 apply_override(state, (bar, target, col), ch)
-            if not cell_has_duration(state, bar, target, col):
-                apply_duration(state, (bar, target, col), state.current_duration)
+                if not cell_has_duration(state, bar, target, col):
+                    apply_duration(state, (bar, target, col), state.current_duration)
             clear_insert_transient(state)
-            if finish_replace_once(state):
-                return True
-            if _replace_mode_active(state):
-                return True
-            steps = 2 if state.settings.get("grid") == "on" else 1
-            for _ in range(steps):
-                move_right(state)
+            _advance_after_insert(state)
             return True
         clear_insert_transient(state)
         return False
@@ -411,7 +335,7 @@ def _handle_insert_duration_key(state: EditorState, key: int, style: str) -> boo
     return False
 
 
-def _handle_insert_italian_multifret(  # noqa: PLR0911
+def _handle_insert_italian_multifret(
     state: EditorState,
     key: int,
     style: str,
@@ -434,15 +358,7 @@ def _handle_insert_italian_multifret(  # noqa: PLR0911
     if len(digits) >= 2:
         fret = int(digits)
         if _handle_insert_fret_value(state, fret):
-            if finish_replace_once(state):
-                clear_insert_transient(state)
-                return True
-            if _replace_mode_active(state):
-                clear_insert_transient(state)
-                return True
-            steps = 2 if state.settings.get("grid") == "on" else 1
-            for _ in range(steps):
-                move_right(state)
+            _advance_after_insert(state)
         clear_insert_transient(state)
     return True
 
@@ -454,14 +370,8 @@ def _handle_insert_char(state: EditorState, key: int, style: str) -> bool:
         ch = chr(key).lower()
         valid = is_french_fret(ch) if style == "french" else is_italian_fret(ch)
         if valid:
-            _handle_insert_note(state, ch, style)
-            if finish_replace_once(state):
-                return True
-            if _replace_mode_active(state):
-                return True
-            steps = 2 if state.settings.get("grid") == "on" else 1
-            for _ in range(steps):
-                move_right(state)
+            _handle_insert_note(state, ch)
+            _advance_after_insert(state)
         else:
             state.message = "Invalid fret for current style"
         return True
@@ -475,11 +385,11 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
         exit_insert_mode(state)
         return True
 
-    def dispatch_actions(actions: list[tuple[tuple[int, ...], Callable[[], bool]]]) -> bool:
+    def dispatch_actions(actions: list[tuple[tuple[int, ...], Callable[[], bool]]]) -> bool | None:
         for keys, handler in actions:
             if key in keys:
                 return handler()
-        return False
+        return None
 
     def _handle_clear() -> bool:
         _commit_pending_insert_edit(state)
@@ -567,7 +477,7 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
             clear_insert_transient(state)
         return True
 
-    if dispatch_actions(
+    handled = dispatch_actions(
         [
             (bindings.clear, _handle_clear),
             ((keycodes.backspace, 127, 8), _handle_backspace),
@@ -582,8 +492,9 @@ def handle_insert(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
             ((keycodes.down,), _handle_down),
             (bindings.prefix, _handle_prefix),
         ],
-    ):
-        return True
+    )
+    if handled is not None:
+        return handled
 
     if _replace_mode_active(state):
         move = movement_keys(state, include_arrows=False)

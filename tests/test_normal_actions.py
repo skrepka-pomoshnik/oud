@@ -158,6 +158,18 @@ def test_counted_yy_and_p_pastes_multiple_bars() -> None:
     assert state.overrides[(3, 0, 2)] == "c"
 
 
+def test_counted_dd_deletes_multiple_bars_and_clears_count() -> None:
+    state = _state()
+    handle_normal(state, ord("2"))
+    handle_normal(state, ord("d"))
+    handle_normal(state, ord("d"))
+    assert len(state.piece.bars) == 6
+    assert state.message == "Bars deleted: 2"
+    assert state.count_prefix == ""
+    handle_normal(state, ord("l"))
+    assert state.cursor_col == 1
+
+
 def test_counted_x_is_single_grouped_undo() -> None:
     state = _state()
     state.overrides[(0, 0, 0)] = "a"
@@ -177,6 +189,31 @@ def test_counted_x_is_single_grouped_undo() -> None:
     assert state.overrides[(0, 0, 0)] == "a"
     assert state.overrides[(0, 0, 1)] == "b"
     assert state.overrides[(0, 0, 2)] == "c"
+
+
+def test_counted_x_advances_by_note_slots() -> None:
+    state = _state()
+    state.overrides[(0, 0, 0)] = "a"
+    state.overrides[(0, 0, 3)] = "b"
+    state.overrides[(0, 0, 6)] = "c"
+    state.durations[(0, 0, 0)] = 4
+    state.durations[(0, 0, 3)] = 4
+    state.durations[(0, 0, 6)] = 4
+    handle_normal(state, ord("3"))
+    handle_normal(state, ord("x"))
+    assert state.overrides == {}
+
+
+def test_word_search_and_mark_handlers_clear_stale_count() -> None:
+    state = _state()
+    handle_normal(state, ord("2"))
+    handle_normal(state, ord("*"))
+    assert state.count_prefix == ""
+    handle_normal(state, ord("3"))
+    handle_normal(state, ord("m"))
+    assert state.count_prefix == ""
+    handle_normal(state, ord("a"))
+    assert state.count_prefix == ""
 
 
 def test_read_only_blocks_insert_and_delete() -> None:
@@ -233,3 +270,70 @@ def test_visual_line_mode_yanks_full_row_block_with_v() -> None:
     assert state.yanked_rows is not None
     assert len(state.yanked_rows) == 3
     assert all(len(snippet) == state.bar_width for (_bar, _row, snippet) in state.yanked_rows)
+
+
+def test_visual_mode_deletes_selected_cells_and_yanks() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 0, 2)] = "b"
+    state.overrides[(0, 0, 3)] = "c"
+    state.durations[(0, 0, 1)] = 4
+    state.durations[(0, 0, 2)] = 4
+    state.durations[(0, 0, 3)] = 4
+    state.cursor_col = 1
+    handle_normal(state, ord("v"))
+    handle_normal(state, ord("l"))
+    handle_normal(state, ord("d"))
+    assert state.mode == "normal"
+    assert (0, 0, 1) not in state.overrides
+    assert (0, 0, 2) not in state.overrides
+    assert state.overrides[(0, 0, 3)] == "c"
+    assert state.yanked_rows is not None
+    assert state.yanked_rows[0][2] == "ab"
+
+
+def test_visual_change_deletes_and_enters_insert() -> None:
+    state = _state()
+    state.bar_width = 8
+    state.overrides[(0, 0, 1)] = "a"
+    state.overrides[(0, 0, 2)] = "b"
+    state.cursor_col = 1
+    handle_normal(state, ord("v"))
+    handle_normal(state, ord("l"))
+    handle_normal(state, ord("c"))
+    assert state.mode == "insert"
+    assert (0, 0, 1) not in state.overrides
+    assert (0, 0, 2) not in state.overrides
+    assert state.cursor_col == 1
+
+
+def test_visual_mode_play_loops_selected_bar_range(monkeypatch) -> None:
+    state = _state()
+    calls: list[dict[str, int | None]] = []
+
+    def _start_midi(
+        state: EditorState,
+        start_bar: int | None = None,
+        path: str | None = None,
+        bpm: int | None = None,
+        end_bar: int | None = None,
+        loop_count: int = 1,
+    ) -> None:
+        _ = (state, path, bpm)
+        calls.append(
+            {
+                "start_bar": start_bar,
+                "end_bar": end_bar,
+                "loop_count": loop_count,
+            },
+        )
+
+    monkeypatch.setattr("oud.editor.normal_actions.start_midi", _start_midi)
+
+    state.cursor_bar = 1
+    handle_normal(state, ord("v"))
+    state.cursor_bar = 3
+    handle_normal(state, ord("M"))
+
+    assert calls == [{"start_bar": 1, "end_bar": 3, "loop_count": 2}]

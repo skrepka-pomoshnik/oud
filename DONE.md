@@ -2,6 +2,13 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-06-12
+- Completed easy TODO cleanup: slimmed the `command_ops.py` compatibility facade, added loop playback for visual/current ranges, covered comment/gridflag/reflow tools, and added a dense synthetic snippet regression.
+- Completed P1 edit foundation work: added cursor/deletable bar range helpers, routed normal-mode bar yank/delete through explicit range operations, and switched normal-mode movement to pure motion targets.
+- Finished remaining P0 edit-mode cleanup: unified edit chord slots on raw chord positions, removed dead insert chord branches, made insert cursor snapping predictable, centralized post-insert advance, added visual delete/change, and recorded the short-term dual-representation decision.
+- Fixed additional P0 edit-mode bugs: exact destructive chord targeting, file-open state reset, stave-break delete shifting, gliss/mark bar reindexing, count handling, and undo/redo cursor + clean modified-state restoration.
+- Fixed first P0 edit-mode bugs: removed French lowercase duration-letter aliases, preserved insert-mode quit fallthrough, recorded chord flattening in undo, and grouped insert keystroke mutations into single undo steps.
+
 ## 2026-03-13
 - Decoded `note-staff-raw` FT3 bars into imported `note` staffs instead of leaving them in generic unknown import buckets.
 - Decoded `note-lyric-raw` FT3 bars into imported `note` + `lyrics` staffs.

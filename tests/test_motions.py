@@ -294,7 +294,7 @@ def test_target_snap_previous_time_slot_if_needed_moves_left_only_for_layering()
     assert (target_same_string.bar, target_same_string.col) == (0, 3)
 
 
-def test_target_snap_to_chord_slot_chooses_nearest_spread_slot() -> None:
+def test_target_snap_to_chord_slot_chooses_nearest_chord_position() -> None:
     state = _state()
     state.bar_width = 8
     bar = Bar()
@@ -307,16 +307,9 @@ def test_target_snap_to_chord_slot_chooses_nearest_spread_slot() -> None:
         Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=2)]),
     ]
     state.piece.bars[0] = bar
-    from oud.core.render_utils import chord_positions, spread_flag_positions  # noqa: PLC0415
+    from oud.core.render_utils import chord_positions  # noqa: PLC0415
 
-    slots = [
-        col
-        for (col, _denom, _dot) in spread_flag_positions(
-            chord_positions(bar, state.bar_width, default_duration=4),
-            state.bar_width,
-            min_gap=1,
-        )
-    ]
+    slots = [col for (col, _denom, _dot) in chord_positions(bar, state.bar_width, default_duration=4)]
     between = next((c for c in range(state.bar_width) if c not in slots), None)
     assert between is not None
     state.cursor_bar = 0

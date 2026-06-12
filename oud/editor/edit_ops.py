@@ -7,18 +7,41 @@ from oud.editor.ops import chord_index_at_col, set_chord_note
 from oud.editor.state import EditorState, UndoAction, UndoGroupFrame
 
 
+def _cursor_snapshot(state: EditorState) -> tuple[int, int, int]:
+    return (state.cursor_bar, state.cursor_string, state.cursor_col)
+
+
+def _mark_modified_from_clean_depth(state: EditorState) -> None:
+    state.modified = len(state.undo_stack) != state.clean_undo_depth
+
+
+def _annotate_action_cursor(
+    state: EditorState,
+    action: UndoAction,
+    *,
+    cursor_before: tuple[int, int, int] | None = None,
+) -> None:
+    cursor = _cursor_snapshot(state)
+    action.data.setdefault("cursor_before", cursor_before or cursor)
+    action.data.setdefault("cursor_after", cursor)
+
+
 def record_action(state: EditorState, action: UndoAction) -> None:
     if state.undo_group_stack:
+        _annotate_action_cursor(state, action)
         state.undo_group_stack[-1].actions.append(action)
         state.modified = True
         return
+    _annotate_action_cursor(state, action)
     state.undo_stack.append(action)
     state.redo_stack.clear()
-    state.modified = True
+    _mark_modified_from_clean_depth(state)
 
 
 def begin_undo_group(state: EditorState, *, label: str | None = None) -> None:
-    state.undo_group_stack.append(UndoGroupFrame(label=label))
+    state.undo_group_stack.append(
+        UndoGroupFrame(label=label, cursor_before=_cursor_snapshot(state)),
+    )
 
 
 def end_undo_group(state: EditorState) -> bool:
@@ -29,7 +52,12 @@ def end_undo_group(state: EditorState) -> bool:
         return False
     group_action = UndoAction(
         kind="group",
-        data={"label": frame.label, "actions": frame.actions},
+        data={
+            "label": frame.label,
+            "actions": frame.actions,
+            "cursor_before": frame.cursor_before,
+            "cursor_after": _cursor_snapshot(state),
+        },
     )
     if state.undo_group_stack:
         state.undo_group_stack[-1].actions.append(group_action)
@@ -37,7 +65,7 @@ def end_undo_group(state: EditorState) -> bool:
         return True
     state.undo_stack.append(group_action)
     state.redo_stack.clear()
-    state.modified = True
+    _mark_modified_from_clean_depth(state)
     return True
 
 

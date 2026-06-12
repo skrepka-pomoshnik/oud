@@ -1,7 +1,12 @@
 
+import sys
+
+import pytest
+
 from oud.exports.midi import _midi_command
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="uses a macOS user SoundFont path")
 def test_midi_command_fluidsynth_with_soundfont_darwin() -> None:
     cmd = _midi_command(
         path="out.mid",

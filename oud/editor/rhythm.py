@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oud.core.render_utils import chord_positions, note_type_to_denom
+from oud.core.render_utils import chord_slot_positions, note_type_to_denom
 from oud.editor.motions import apply_motion_target, target_advance_next_bar_home
 from oud.editor.state import EditorState
 
@@ -75,7 +75,7 @@ def _row_has_note(state: EditorState, bar_index: int, string: int, col: int) -> 
     bar = state.piece.bars[bar_index]
     if not bar.chords:
         return False
-    positions = chord_positions(bar, state.bar_width, default_duration=4)
+    positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
     for chord, (pos, _denom, _dot) in zip(bar.chords, positions, strict=False):
         if pos != col:
             continue

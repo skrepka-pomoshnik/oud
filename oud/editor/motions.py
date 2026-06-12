@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from oud.core.model import Bar
-from oud.core.render_utils import chord_positions, spread_flag_positions
+from oud.core.render_utils import chord_slot_positions
 from oud.core.tab_policy import rows_reversed, visual_row_indices
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import (
@@ -51,11 +51,7 @@ def _chord_cols(state: EditorState, bar_index: int) -> list[int]:
     bar = state.piece.bars[bar_index]
     if not bar.chords or _bar_has_grid_data(state, bar_index):
         return []
-    positions = spread_flag_positions(
-        chord_positions(bar, state.bar_width, default_duration=4),
-        state.bar_width,
-        min_gap=1,
-    )
+    positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
     return sorted({col for col, _denom, _dot in positions})
 
 
@@ -101,11 +97,7 @@ def _row_note_cols(state: EditorState, bar_index: int, actual_string: int) -> li
         if b == bar_index and s == actual_string and value and value != "-":
             cols.add(col)
     if bar.chords and not _bar_has_grid_data(state, bar_index):
-        positions = spread_flag_positions(
-            chord_positions(bar, state.bar_width, default_duration=4),
-            state.bar_width,
-            min_gap=1,
-        )
+        positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
         for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
             if any((note.string - 1) == actual_string for note in chord.notes):
                 cols.add(col)
@@ -327,10 +319,10 @@ def target_snap_to_chord_slot(state: EditorState) -> CursorMotionTarget:
         return CursorMotionTarget(state.cursor_bar, state.cursor_col)
     slots = [
         col
-        for (col, _denom, _dot) in spread_flag_positions(
-            chord_positions(bar, state.bar_width, default_duration=4),
+        for (col, _denom, _dot) in chord_slot_positions(
+            bar,
             state.bar_width,
-            min_gap=1,
+            default_duration=4,
         )
     ]
     if not slots or state.cursor_col in slots:

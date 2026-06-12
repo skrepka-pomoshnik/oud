@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from oud.core.render_utils import bar_cells_from_chords, chord_positions, note_type_to_denom
+from oud.core.render_utils import bar_cells_from_chords, chord_slot_positions, note_type_to_denom
 from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 from oud.core.time_utils import parse_time_signature_value
 from oud.core.tuning_utils import parse_tuning_pitches
@@ -170,7 +170,7 @@ def verify_render_bar_issues(state: EditorState, bar_index: int) -> list[RuleIss
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return [RuleIssue(code="render.out_of_range", message="Bar out of range")]
     bar = state.piece.bars[bar_index]
-    positions = chord_positions(bar, state.bar_width, default_duration=4)
+    positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
     if bar.chords and not positions:
         issues.append(
             RuleIssue(code="render.no_positions", message="No render positions for bar chords"),
