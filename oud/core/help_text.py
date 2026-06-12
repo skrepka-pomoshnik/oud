@@ -35,6 +35,7 @@ HELP_LINES = [
     ":wascii [path]   write ascii",
     ":wq/:x           write + quit     :q!               quit without save",
     ":e <path>        open             :source [path]    view file with less",
+    ":help             open this help in less",
     ":time <sig>      set time sig     :verify           check measure length",
     ":info             show info page  :notes            show notes page",
     ":undo             undo             :redo             redo",
@@ -62,7 +63,7 @@ HELP_LINES = [
         "flagstyle=... flagstems=... dotplacement=afterflag|afterstem time=... (or auto)"
     ),
     ":set keys=vim|vim+arrows|casual|casual+arrows",
-    ":set contrast=normal|high",
+    ":set contrast=normal|high   :set theme=auto|dark|light (or :dark / :light)",
     (
         ":set spacing=... barsperline=... maxbars=... maxchords=... chordwrap=... bargap=... "
         "linelen=... staffthick=... fontstyle=..."

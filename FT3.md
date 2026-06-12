@@ -31,15 +31,15 @@ Current FT3 support in `oud` covers:
 
 Main implementation:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
-- [oud/core/ft3_text.py](/Users/s/Documents/Python/frnm/oud/core/ft3_text.py)
-- [oud/core/ft3_extras.py](/Users/s/Documents/Python/frnm/oud/core/ft3_extras.py)
-- [oud/core/key_signature.py](/Users/s/Documents/Python/frnm/oud/core/key_signature.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
+- [oud/core/ft3_text.py](oud/core/ft3_text.py)
+- [oud/core/ft3_extras.py](oud/core/ft3_extras.py)
+- [oud/core/key_signature.py](oud/core/key_signature.py)
 
 Main regression coverage:
 
-- [tests/test_ft3.py](/Users/s/Documents/Python/frnm/tests/test_ft3.py)
-- [tests/test_ft3_text.py](/Users/s/Documents/Python/frnm/tests/test_ft3_text.py)
+- [tests/test_ft3.py](tests/test_ft3.py)
+- [tests/test_ft3_text.py](tests/test_ft3_text.py)
 
 ## 2. File-Level Structure
 
@@ -56,7 +56,7 @@ Detection is by gzip magic `1f 8b`.
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `read_ft3()`
 
 ### 2.2 Chunk Separation
@@ -99,11 +99,11 @@ Current extraction behavior:
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `extract_text()`
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_extract_cpiece_blocks()`
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_strip_rtf()`
 
 ### 3.2 Metadata fields
@@ -131,11 +131,11 @@ The importer also canonicalizes:
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_parse_section_annotations()`
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_canonicalize_metadata_fields()`
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_apply_annotations()`
 
 ### 3.3 Footnote decomposition
@@ -186,9 +186,9 @@ This is how duet/mixed vocal files like `now_o_now` are aligned.
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_parallel_mixed_score_prefix_count()`
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_parallel_raw_bar_targets()`
 
 ## 5. Tablature Bar Binary Layout
@@ -262,7 +262,7 @@ Main-course decoding:
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `parse_bar()`
 
 Compact layout:
@@ -320,7 +320,7 @@ Bit summary:
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `_parse_bar_markers()`
 
 ### 6.2 System break hint
@@ -372,7 +372,7 @@ Current byte mapping:
 
 See:
 
-- [oud/core/ft3.py](/Users/s/Documents/Python/frnm/oud/core/ft3.py)
+- [oud/core/ft3.py](oud/core/ft3.py)
   `parse_time_signature()`
 
 Important nuance:
@@ -513,7 +513,7 @@ with octave suffixes added by row count.
 
 Current implementation:
 
-- [oud/core/ft3_text.py](/Users/s/Documents/Python/frnm/oud/core/ft3_text.py)
+- [oud/core/ft3_text.py](oud/core/ft3_text.py)
   `_vocal_pitch_token()`
 
 ### 8.6 Lyric rows with control-byte anchors
@@ -599,7 +599,7 @@ Current vocal accidental flag handling:
 
 Default vocal accidentals are normalized from key signature using:
 
-- [oud/core/key_signature.py](/Users/s/Documents/Python/frnm/oud/core/key_signature.py)
+- [oud/core/key_signature.py](oud/core/key_signature.py)
 
 Examples:
 
@@ -623,7 +623,7 @@ This was added because several raw mixed-score files sounded wrong otherwise.
 
 Per-note FT3 extras are decoded compositionally in:
 
-- [oud/core/ft3_extras.py](/Users/s/Documents/Python/frnm/oud/core/ft3_extras.py)
+- [oud/core/ft3_extras.py](oud/core/ft3_extras.py)
 
 Currently recognized fingering bits:
 

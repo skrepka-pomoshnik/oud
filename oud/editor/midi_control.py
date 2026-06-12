@@ -88,10 +88,11 @@ def start_midi(
         start_bar=0,
         dotted=export_dotted,
     )
+    effective_end = end_bar if end_bar is not None else max(start_bar, len(state.piece.bars) - 1)
     timeline = _remap_playback_timeline(
         timeline,
         start_bar=start_bar,
-        span=max(1, (end_bar if end_bar is not None else start_bar) - start_bar + 1),
+        span=max(1, effective_end - start_bar + 1),
     )
     prime_playback_animation(state, timeline)
     soundfont = state.settings.get("soundfont", "") or None
@@ -118,7 +119,8 @@ def _playback_export_state(
     if total == 0:
         return state.piece, state.overrides, state.durations, state.dotted, state.ornaments
     start = max(0, min(start_bar, total - 1))
-    end = start if end_bar is None else max(start, min(end_bar, total - 1))
+    # No explicit end means "play to the end of the piece", not a single bar.
+    end = (total - 1) if end_bar is None else max(start, min(end_bar, total - 1))
     loops = max(1, loop_count)
     if start == 0 and end == total - 1 and loops == 1:
         return state.piece, state.overrides, state.durations, state.dotted, state.ornaments

@@ -14,7 +14,7 @@ from oud.tui.input import handle_command as handle_command_input
 from oud.tui.input import handle_search as handle_search_input
 from oud.tui.keycodes import keycodes_from_curses
 from oud.tui.viewport import ensure_cursor_visible
-from oud.ui.adapter import CursesScreen, contrast_attr
+from oud.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
 from oud.ui.framebuffer import (
     FrameBuffer,
     draw_frame_rows,
@@ -96,7 +96,9 @@ def run_loop(
             prev_bar_offset = state.bar_offset
             ensure_cursor_visible(state, width, height)
             viewport_changed = state.bar_offset != prev_bar_offset
-            base_attr = contrast_attr(state.settings.get("contrast", "normal"))
+            theme_base = theme_attr(state.settings.get("theme", "auto"))
+            apply_theme_background(stdscr, theme_base)
+            base_attr = theme_base | contrast_attr(state.settings.get("contrast", "normal"))
             screen = CursesScreen(stdscr, base_attr=base_attr)
             if can_overlay_playback and not viewport_changed:
                 prev_key = state.playback_overlay_key or (-1, -1)
@@ -137,6 +139,7 @@ def run_loop(
                 else None
             )
             frame_buffer = FrameBuffer(height, width)
+            state.display_cursor_maps.clear()
             playback_cache: dict[tuple[int, int], list[tuple[int, int, str, int]]] | None = (
                 {}
                 if not is_duet_score_piece(state.piece)
@@ -178,6 +181,7 @@ def run_loop(
                 None if playback_cache is not None else state.playback_col,
                 playback_markers=state.playback.markers,
                 playback_cache=playback_cache,
+                cursor_display_maps=state.display_cursor_maps,
             )
             base_frame = frame_buffer.snapshot()
             state.last_base_frame = base_frame

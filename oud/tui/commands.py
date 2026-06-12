@@ -74,6 +74,9 @@ from oud.editor.command_ops import (
 from oud.editor.command_ops import (
     cmd_vocal as _cmd_vocal,
 )
+from oud.editor.command_ops import (
+    show_help as _show_help,
+)
 from oud.editor.commands import (
     cmd_author,
     cmd_composer,
@@ -153,6 +156,14 @@ def cmd_set(state: EditorState, args: str, config_path: str) -> None:
     apply_set_command(state, args.strip(), config_path)
 
 
+def cmd_dark(state: EditorState, _args: str, config_path: str) -> None:
+    apply_set_command(state, "theme=dark", config_path)
+
+
+def cmd_light(state: EditorState, _args: str, config_path: str) -> None:
+    apply_set_command(state, "theme=light", config_path)
+
+
 def cmd_orn(state: EditorState, args: str) -> None:
     _set_ornament(state, args.strip())
 
@@ -175,6 +186,10 @@ def cmd_midicmd(state: EditorState, _args: str) -> None:
 
 def cmd_source(state: EditorState, args: str) -> None:
     _cmd_source(state, args)
+
+
+def cmd_help(state: EditorState, _args: str) -> None:
+    _show_help(state)
 
 
 def cmd_info(state: EditorState, _args: str) -> None:
@@ -437,6 +452,8 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("pdf", _with_config(cmd_pdf), takes_path=True),
         CommandSpec("print", _with_config(cmd_pdf), takes_path=True),
         CommandSpec("set", _with_config(cmd_set)),
+        CommandSpec("dark", _with_config(cmd_dark)),
+        CommandSpec("light", _with_config(cmd_light)),
         CommandSpec("convert", _with_config(cmd_convert)),
         CommandSpec("time", _no_config(cmd_time)),
         CommandSpec("verify", _no_config(cmd_verify)),
@@ -454,6 +471,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("highlight", _no_config(cmd_highlight)),
         CommandSpec("midicmd", _no_config(cmd_midicmd)),
         CommandSpec("source", _no_config(cmd_source)),
+        CommandSpec("help", _no_config(cmd_help)),
         CommandSpec("info", _no_config(cmd_info)),
         CommandSpec("notes", _no_config(cmd_notes)),
         CommandSpec("plugins", _no_config(cmd_plugins)),

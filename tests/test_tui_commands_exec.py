@@ -61,6 +61,32 @@ def test_apply_command_quit_flow(tmp_path: Path) -> None:
         cmd.apply_command(state, "q!", str(tmp_path / "cfg.toml"))
 
 
+def test_apply_command_dark_light_set_theme(tmp_path: Path) -> None:
+    state = _state()
+    cfg = str(tmp_path / "cfg.toml")
+    cmd.apply_command(state, "dark", cfg)
+    assert state.settings["theme"] == "dark"
+    cmd.apply_command(state, "light", cfg)
+    assert state.settings["theme"] == "light"
+    cmd.apply_command(state, "set theme=auto", cfg)
+    assert state.settings["theme"] == "auto"
+    cmd.apply_command(state, "set theme=neon", cfg)
+    assert state.settings["theme"] == "auto"
+    assert "Theme must be" in state.message
+
+
+def test_apply_command_help_pipes_through_less(tmp_path: Path, monkeypatch) -> None:
+    state = _state()
+    calls: list[object] = []
+    state.suspend_tui = lambda: calls.append("suspend")
+    state.resume_tui = lambda: calls.append("resume")
+    monkeypatch.setattr(subprocess, "run", lambda argv, **_kwargs: calls.append(argv[0]))
+    monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
+    cmd.apply_command(state, "help", str(tmp_path / "cfg.toml"))
+    assert calls == ["suspend", "/usr/bin/less", "resume"]
+    assert state.message == ""
+
+
 def test_apply_command_unknown_and_wq(tmp_path: Path) -> None:
     state = _state()
     target = tmp_path / "out.tab"
@@ -1007,6 +1033,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_highlight",
         "cmd_midicmd",
         "cmd_source",
+        "cmd_help",
         "cmd_info",
         "cmd_notes",
         "cmd_plugins",
@@ -1036,6 +1063,8 @@ def test_apply_command_dispatch_executes_all_registered_specs(
     }
     patched_3arg = {
         "cmd_set",
+        "cmd_dark",
+        "cmd_light",
         "cmd_convert",
         "cmd_midi",
         "cmd_play",

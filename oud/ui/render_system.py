@@ -1084,6 +1084,7 @@ def render_systems(  # noqa: C901, PLR0912
     lyric_rows_count: int = 0,
     vocal_pos: str = "bottom",
     playback_cache: PlaybackOverlayCache | None = None,
+    cursor_display_maps: dict[int, list[int]] | None = None,
 ) -> None:
     if glisses is None:
         glisses = []
@@ -2352,6 +2353,18 @@ def render_systems(  # noqa: C901, PLR0912
                         )
                         dur_cells = pad_row(dur_cells, display_width, draw_pad)
                     safe_addstr(stdscr, row_start + (rows["dur"] or 0), bar_x, "".join(dur_cells))
+            if cursor_display_maps is not None and grid_map:
+                if bar.chords:
+                    cursor_display_maps[abs_bar] = [
+                        grid_map[
+                            min(len(grid_map) - 1, _scale_col(col, bar_width, grid_width))
+                        ]
+                        for col in range(bar_width)
+                    ]
+                else:
+                    cursor_display_maps[abs_bar] = [
+                        grid_map[min(len(grid_map) - 1, col)] for col in range(bar_width)
+                    ]
             cursor_display_index = cursor_string if cursor_string < system_display_strings else None
             rendered_staff_rows: list[str] = []
             for display_idx in range(system_display_strings):

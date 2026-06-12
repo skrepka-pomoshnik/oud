@@ -57,7 +57,12 @@ def test_keyscript_insert_repeated_notes_visual_l_is_grid_stable_across_spacing_
     )
     press_keys(state, ["i", "a", "a", "a", "a", 27])
     cols = collect_cursor_cols_after_key(state, "l", 10)
-    assert cols == [5, 6, 7, 8, 9, 10, 11, 0, 1, 2], (justify, beatsnap)
+    # The filled bar advances one column per press; the following empty bar is
+    # traversed one *display cell* per press, so its step size depends on how
+    # wide the spacing mode renders an empty bar.
+    assert cols[:8] == [5, 6, 7, 8, 9, 10, 11, 0], (justify, beatsnap)
+    empty_bar_tail = {"compact": [11, 0], "smart": [6, 11], "stretch": [6, 11]}
+    assert cols[8:] == empty_bar_tail[justify], (justify, beatsnap)
 
 
 @pytest.mark.parametrize("justify", ["compact", "smart", "stretch"])

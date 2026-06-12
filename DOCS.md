@@ -183,7 +183,7 @@ Notes:
 
 ## 7.1 Tonality and Accidentals
 
-Tonal accidentals are centralized in [oud/core/key_signature.py](/Users/s/Documents/Python/frnm/oud/core/key_signature.py).
+Tonal accidentals are centralized in [oud/core/key_signature.py](oud/core/key_signature.py).
 
 - `normalize_key_signature_name()` accepts `GM`, `Dm`, `Bb major`, `f# minor`
 - `key_signature_count()` returns the standard circle-of-fifths count
@@ -260,8 +260,8 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 Entry points:
 
-- `/Users/s/Documents/Python/frnm/app.py` -> `/Users/s/Documents/Python/frnm/oud/app.py`
-- `/Users/s/Documents/Python/frnm/cli.py` -> `/Users/s/Documents/Python/frnm/oud/cli.py`
+- `app.py` -> `oud/app.py`
+- `cli.py` -> `oud/cli.py`
 
 ## 12) FT3 Import Layer (Current)
 

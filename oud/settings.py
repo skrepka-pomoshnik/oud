@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-import importlib
+import tomllib
 from pathlib import Path
-from types import ModuleType
-
-try:
-    tomllib: ModuleType = importlib.import_module("tomllib")
-except ModuleNotFoundError:  # pragma: no cover - fallback for Python < 3.11
-    tomllib = importlib.import_module("tomli")
 
 
 def _resolve_config_path(path: str) -> Path:
@@ -31,6 +25,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "strings": "6",
     "showtuning": "on",
     "contrast": "normal",
+    "theme": "auto",
     "flagstyle": "standard",
     "flagstems": "single",
     "flaglean": "right",

@@ -1,16 +1,13 @@
 
-import sys
-
-import pytest
-
 from oud.exports.midi import _midi_command
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="uses a macOS user SoundFont path")
-def test_midi_command_fluidsynth_with_soundfont_darwin() -> None:
+def test_midi_command_fluidsynth_with_soundfont_darwin(tmp_path) -> None:
+    soundfont = tmp_path / "lute.sf2"
+    soundfont.write_bytes(b"sf2")
     cmd = _midi_command(
         path="out.mid",
-        soundfont="/Users/s/Library/Audio/Sounds/Banks/SC-55 SoundFont v1.2b.sf2",
+        soundfont=str(soundfont),
         platform="darwin",
         fluidsynth="/usr/local/bin/fluidsynth",
         timidity="/usr/bin/timidity",
@@ -22,7 +19,7 @@ def test_midi_command_fluidsynth_with_soundfont_darwin() -> None:
         "-a",
         "coreaudio",
         "-ni",
-        "/Users/s/Library/Audio/Sounds/Banks/SC-55 SoundFont v1.2b.sf2",
+        str(soundfont),
         "out.mid",
     ]
 

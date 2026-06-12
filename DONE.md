@@ -2,7 +2,20 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-06-13
+- Fixed `:play`/`M` playback regression: without an explicit end bar it again plays from the start bar to the end of the piece (the loop-range refactor had collapsed it to a single bar) — this was the "no sound on Linux" report.
+- Made visual h/l movement track the rendered cursor exactly: the renderer publishes per-bar logical→display column maps (`cursor_display_maps`), movement steps one display cell per press and lands on each cell's note column (regressions in `tests/test_cursor_display_sync.py`).
+- Fixed motions treating FT3 chord-index duration records as grid columns (`_note_cols`), which mistargeted note snapping in unflattened chord bars.
+- Synced viewport block height with the renderer (always-reserved second stem row, melody staff for lyric-only pieces) and editor system planning with renderer minimum bar widths (time-cue padding, event gaps) — the cursor can no longer land on never-rendered systems.
+- Added `:dark` / `:light` commands and `:set theme=auto|dark|light`: explicit fg/bg color pair plus painted window background for light-background terminals.
+
 ## 2026-06-12
+- Publication prep: scrubbed personal absolute paths from DOCS.md/FT3.md/config.toml/tests, resolved .gitignore vs tracked-file conflicts, added lutemusic.org CC BY-NC-SA 4.0 attribution (`lutemusic/README.md`), added GitHub Actions CI (ruff + pytest on ubuntu/macos), and added a pytest/ruff dev dependency group with `uv.lock`.
+- Moved to Python 3.11+ with stdlib `tomllib`; project now has zero runtime dependencies.
+- Fixed light-theme low contrast: high-contrast mode uses bold on the terminal's default colors instead of forcing a white foreground.
+- Added `:help` command that pages help text through less with TUI suspend/resume, plus a dispatch regression test.
+- Removed scratch `examples/test.tab`; corpus check: all 43 local lutemusic.org files import without crashes (13 with partial-decode warnings).
+- Reordered TODO.md for publication: P0 fix-now, P1 publication blockers (viewer coverage + alpha editing + mechanics), features pushed to P2+.
 - Completed easy TODO cleanup: slimmed the `command_ops.py` compatibility facade, added loop playback for visual/current ranges, covered comment/gridflag/reflow tools, and added a dense synthetic snippet regression.
 - Completed P1 edit foundation work: added cursor/deletable bar range helpers, routed normal-mode bar yank/delete through explicit range operations, and switched normal-mode movement to pure motion targets.
 - Finished remaining P0 edit-mode cleanup: unified edit chord slots on raw chord positions, removed dead insert chord branches, made insert cursor snapping predictable, centralized post-insert advance, added visual delete/change, and recorded the short-term dual-representation decision.

@@ -239,35 +239,9 @@ def auto_system_bar_plan_with_gaps(
     if state.settings.get("layout", "packed") == "auto" and bar_indices:
         # Match renderer's final width normalization so navigation and viewport
         # operate on the same system breaks the user actually sees.
-        from oud.ui.render_system import (  # noqa: PLC0415
-            _redistribute_extra_width,
-            _required_auto_display_width_for_bar,
-        )
+        from oud.ui.render_system import _redistribute_extra_width  # noqa: PLC0415
 
-        barpad_text = state.settings.get("barpad", "1")
-        barpad = int(barpad_text) if barpad_text.isdigit() else 1
-        show_dur = state.settings.get("showdur", "off") == "on"
-        hide_redundant = state.settings.get("flagredundant", "on") == "on"
-        style = state.settings.get("style", "french")
-        french_c = state.settings.get("frenchc", "normal")
-        fretlabelmode = state.settings.get("fretlabelmode", "auto")
-        spacing_fill = state.settings.get("justify", "stretch")
-        min_widths = [
-            _required_auto_display_width_for_bar(
-                bars[abs_bar],
-                total_strings=state.piece.strings,
-                bar_width=state.bar_width,
-                default_duration=4,
-                style=style,
-                french_c=french_c,
-                fretlabelmode=fretlabelmode,
-                show_dur=show_dur,
-                hide_redundant=hide_redundant,
-                barpad=barpad,
-                flag_gap=2 if spacing_fill == "smart" else 1,
-            )
-            for abs_bar in bar_indices
-        ]
+        min_widths = _renderer_min_bar_widths(state, bar_indices)
         bar_widths = [
             max(width, min_width)
             for width, min_width in zip(bar_widths, min_widths, strict=False)
@@ -284,6 +258,69 @@ def auto_system_bar_plan_with_gaps(
             extra=extra,
         )
     return bar_indices, bar_widths, gaps
+
+
+def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list[int]:
+    """Per-bar minimum display widths, mirroring render_systems' computation."""
+    from oud.core.tab_policy import (  # noqa: PLC0415
+        show_time_cue_for_bar,
+        time_cue_side_pad,
+    )
+    from oud.core.view_model import _parse_time_signature  # noqa: PLC0415
+    from oud.ui.render_system import (  # noqa: PLC0415
+        _required_auto_display_width_for_bar,
+        _resolved_bar_time_value,
+    )
+
+    bars = state.piece.bars
+    barpad_text = state.settings.get("barpad", "1")
+    barpad = int(barpad_text) if barpad_text.isdigit() else 1
+    show_dur = state.settings.get("showdur", "off") == "on"
+    hide_redundant = state.settings.get("flagredundant", "on") == "on"
+    style = state.settings.get("style", "french")
+    french_c = state.settings.get("frenchc", "normal")
+    fretlabelmode = state.settings.get("fretlabelmode", "auto")
+    spacing_fill = state.settings.get("justify", "stretch")
+    time_setting = state.settings.get("time", "C")
+    compact_fill = spacing_fill == "compact"
+    auto_event_gap = 1 if compact_fill else 2
+    auto_flag_gap = 0 if compact_fill else (2 if spacing_fill == "smart" else 1)
+    min_widths: list[int] = []
+    for abs_bar in bar_indices:
+        current_time = _resolved_bar_time_value(state.piece, abs_bar, time_setting, 4)
+        _beats, _unit, sig_label = _parse_time_signature(current_time)
+        prev_time = (
+            _resolved_bar_time_value(state.piece, abs_bar - 1, time_setting, 4)
+            if abs_bar > 0
+            else None
+        )
+        show_cue = show_time_cue_for_bar(
+            bar_index=abs_bar,
+            current_time_value=current_time,
+            prev_time_value=prev_time,
+            sig_label=sig_label,
+        )
+        cue_pad_extra = time_cue_side_pad(show_time_cue=show_cue, scale_bar=True)
+        if show_cue and current_time in {"C|", "c|", "2/2", "O", "o", "3/4"}:
+            cue_pad_extra = max(cue_pad_extra, 3)
+        min_widths.append(
+            _required_auto_display_width_for_bar(
+                bars[abs_bar],
+                total_strings=state.piece.strings,
+                bar_width=state.bar_width,
+                default_duration=4,
+                style=style,
+                french_c=french_c,
+                fretlabelmode=fretlabelmode,
+                show_dur=show_dur,
+                hide_redundant=hide_redundant,
+                barpad=barpad,
+                flag_gap=auto_flag_gap,
+                event_gap=auto_event_gap,
+                cue_pad_total=cue_pad_extra * 2,
+            ),
+        )
+    return min_widths
 
 
 def jump_system_row_dynamic(  # noqa: C901

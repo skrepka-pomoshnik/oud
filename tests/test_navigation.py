@@ -148,7 +148,7 @@ def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
     assert mapping[state.cursor_col] != mapping[dup]
 
 
-def test_visual_move_right_stops_on_note_inside_duplicate_render_column(
+def test_visual_move_steps_one_display_cell_and_lands_on_cell_note(
     monkeypatch,
 ) -> None:
     state = _state()
@@ -161,8 +161,14 @@ def test_visual_move_right_stops_on_note_inside_duplicate_render_column(
     monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
     monkeypatch.setattr("oud.editor.motions.cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4])
 
+    # The note at col 1 shares display cell 0 with the cursor; moving right
+    # must advance the drawn cursor to the next display cell instead of
+    # stalling on the hidden duplicate column.
     move_right_visual(state)
+    assert state.cursor_col == 2
 
+    # Coming back into that display cell lands on its note column.
+    move_left_visual(state)
     assert state.cursor_col == 1
 
 

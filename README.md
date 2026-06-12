@@ -16,9 +16,26 @@ Current import/export focus:
 
 Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
 
+The tablature files in `lutemusic/` and most files in `examples/` are typesettings
+by Sarge Gerbode from [lutemusic.org](https://www.lutemusic.org), licensed
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see
+`lutemusic/README.md`. They are not covered by this project's GPL-3.0 license.
+
+## Install
+
+```
+pip install .        # or: uv sync
+```
+
+Requires Python 3.11+. This installs the `oud` command. No runtime
+dependencies beyond the standard library; MIDI playback optionally uses
+`fluidsynth` or `timidity` if installed.
+
 ## Run
 
 ```
+oud examples/example.ft3
+# or straight from a checkout:
 python3 app.py examples/example.ft3
 ```
 
@@ -58,6 +75,7 @@ ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 :w [path]       write .tab
 :wa [path]      write ascii
 :e <path>       open
+:help           open help in less
 :midi [path]    export midi
 :play [bar]     play from bar (1-based)
 :play loop [n]  loop current bar or active visual range n times (default 2)
@@ -69,6 +87,7 @@ ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 :set measures=every measuresstep=10
 :set barsperline=0   auto bars/row
 :set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart
+:dark / :light  force dark/light color theme (:set theme=auto follows terminal)
 ```
 
 ## FT3 Support
@@ -111,7 +130,7 @@ fretlabels = "a b r d e f g h i k l"
 Set your SoundFont in `config.toml`:
 
 ```
-soundfont = "/Users/s/Library/Audio/Sounds/Banks/SC-55 SoundFont v1.2b.sf2"
+soundfont = "~/soundfonts/my-soundfont.sf2"
 midipatch = 24
 ```
 

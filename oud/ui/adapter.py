@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import curses
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Protocol
 
 
@@ -23,30 +23,45 @@ class Screen(Protocol):
 A_BOLD = curses.A_BOLD
 A_REVERSE = curses.A_REVERSE
 CursesError = curses.error
-_HIGH_CONTRAST_PAIR = 1
 
-
-@lru_cache(maxsize=1)
-def _init_high_contrast_colors() -> None:
-    curses.start_color()
-    curses.use_default_colors()
-    curses.init_pair(_HIGH_CONTRAST_PAIR, curses.COLOR_WHITE, -1)
+_THEME_PAIRS = {"dark": 1, "light": 2}
+_initialized_theme_pairs: set[str] = set()
 
 
 def contrast_attr(mode: str) -> int:
-    if mode != "high":
+    # Bold on the terminal's default colors stays readable on both dark and
+    # light themes; forcing a foreground color (e.g. white) does not.
+    return curses.A_BOLD if mode == "high" else 0
+
+
+def theme_attr(theme: str) -> int:
+    """Color attribute for an explicit dark/light theme; 0 follows the terminal."""
+    pair = _THEME_PAIRS.get(theme)
+    if pair is None:
         return 0
     try:
-        has_colors = curses.has_colors()
+        if not curses.has_colors():
+            return 0
+        if theme not in _initialized_theme_pairs:
+            curses.start_color()
+            curses.use_default_colors()
+            if theme == "dark":
+                curses.init_pair(pair, curses.COLOR_WHITE, curses.COLOR_BLACK)
+            else:
+                curses.init_pair(pair, curses.COLOR_BLACK, curses.COLOR_WHITE)
+            _initialized_theme_pairs.add(theme)
+        return curses.color_pair(pair)
     except CursesError:
         return 0
-    if has_colors:
-        try:
-            _init_high_contrast_colors()
-            return curses.color_pair(_HIGH_CONTRAST_PAIR)
-        except CursesError:
-            return curses.A_BOLD
-    return curses.A_BOLD
+
+
+def apply_theme_background(stdscr: curses.window, attr: int) -> None:
+    """Paint the window background so themed colors cover untouched cells."""
+    bkgd = getattr(stdscr, "bkgd", None)
+    if bkgd is None:
+        return
+    with contextlib.suppress(CursesError):
+        bkgd(" ", attr)
 
 
 @dataclass(frozen=True)

@@ -13,49 +13,33 @@ from oud.editor.visual_cursor_map import (
     system_display_indices_for_bar as _system_display_indices_for_bar,
 )
 from oud.ui.layout_map import block_height as _block_height
-from oud.ui.render import _bass_strings_used
+from oud.ui.render import (
+    _bass_strings_used,
+    _piece_has_lyrics,
+    _piece_has_melody_grid,
+    _piece_lyric_row_count,
+)
 from oud.ui.render_vocal import melody_row_count
 
 
 def rows_per_screen(state: EditorState, height: int) -> int:
+    # Mirror render_piece's block-height inputs exactly; any drift makes the
+    # viewport disagree with the renderer about how many systems fit.
     include_meta = True
     show_dur = state.settings.get("showdur", "off") == "on"
-    show_extras = (
-        state.settings.get("showspans", "off") == "on"
-        or state.settings.get("showextras", "off") == "on"
-    )
+    show_extras = state.settings.get("showspans", "off") == "on"
     show_tactus = state.settings.get("showtactus", "off") == "on"
     show_tuplets = state.settings.get("showtuplets", "off") == "on"
-    double_stems = state.settings.get("flagstems", "single") == "double"
-    show_melody = state.settings.get("showmelody", "on") == "on" and any(
-        (bar.melody_grid or "").strip()
-        or any((event.text or "").strip() for event in bar.melody_events)
-        for bar in state.piece.bars
+    # Render always reserves the second tablature stem row.
+    double_stems = True
+    show_melody = state.settings.get("showmelody", "on") == "on" and _piece_has_melody_grid(
+        state.piece,
     )
     melody_rows_count = melody_row_count() if show_melody else 0
-    show_lyrics = state.settings.get("showlyrics", "on") == "on" and any(
-        any(line.strip() for line in bar.lyrics)
-        or any(
-            any((event.text or "").strip() for event in row)
-            for row in bar.lyric_event_rows
-        )
-        for bar in state.piece.bars
+    show_lyrics = state.settings.get("showlyrics", "on") == "on" and _piece_has_lyrics(
+        state.piece,
     )
-    lyric_rows_count = 0
-    if show_lyrics:
-        for bar in state.piece.bars:
-            rows = 0
-            if bar.lyric_event_rows:
-                rows = sum(
-                    1
-                    for row in bar.lyric_event_rows
-                    if any((event.text or "").strip() for event in row)
-                )
-            if rows == 0:
-                rows = len([line for line in bar.lyrics if line.strip()])
-            lyric_rows_count = max(lyric_rows_count, rows)
-            if lyric_rows_count >= 99:
-                break
+    lyric_rows_count = _piece_lyric_row_count(state.piece, max_rows=99) if show_lyrics else 0
     used_bass = _bass_strings_used(state.piece, state.overrides)
     total_strings = state.piece.strings
     base_strings = min(6, total_strings)

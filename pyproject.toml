@@ -7,21 +7,30 @@ name = "oud"
 version = "0.1.0a1"
 description = "Curses lute tablature editor"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "GPL-3.0-only"
 authors = [{name = "frnm"}]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
 ]
-dependencies = [
-  "tomli>=2.0.0; python_version < '3.11'",
-]
+dependencies = []
 
 [project.scripts]
 oud = "oud.app:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "ruff>=0.8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.setuptools.packages.find]
 include = ["oud*"]

@@ -87,6 +87,11 @@ def cursor_display_map_for_bar(
     bar_index: int,
     content_width: int,
 ) -> list[int]:
+    # Prefer the map the renderer published for the last drawn frame; it is the
+    # exact logical-col -> display-col mapping the user sees on screen.
+    rendered = getattr(state, "display_cursor_maps", {}).get(bar_index)
+    if rendered and len(rendered) == state.bar_width:
+        return rendered
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return [_scale_col(col, state.bar_width, content_width) for col in range(state.bar_width)]
     bar = state.piece.bars[bar_index]

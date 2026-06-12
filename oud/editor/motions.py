@@ -40,16 +40,16 @@ def apply_motion_target(state: EditorState, target: CursorMotionTarget) -> None:
 
 
 def _bar_has_grid_data(state: EditorState, bar_index: int) -> bool:
-    return any(b == bar_index for (b, _s, _c) in state.overrides) or any(
-        b == bar_index for (b, _s, _c) in state.durations
-    )
+    # Durations alone do not count: FT3 import seeds chord-index keyed duration
+    # records for unflattened chord bars, which are not grid columns.
+    return any(b == bar_index for (b, _s, _c) in state.overrides)
 
 
 def _chord_cols(state: EditorState, bar_index: int) -> list[int]:
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return []
     bar = state.piece.bars[bar_index]
-    if not bar.chords or _bar_has_grid_data(state, bar_index):
+    if not bar.chords:
         return []
     positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
     return sorted({col for col, _denom, _dot in positions})
@@ -70,12 +70,11 @@ def _grid_cols(state: EditorState, bar_index: int) -> list[int]:
 
 def _note_cols(state: EditorState, bar_index: int) -> list[int]:
     chord_cols = _chord_cols(state, bar_index)
-    grid_cols = _grid_cols(state, bar_index)
-    if not chord_cols:
-        return grid_cols
-    if not grid_cols:
+    if chord_cols:
+        # Unflattened chord bars own their columns; the durations overlay holds
+        # chord-index records for them, not grid columns.
         return chord_cols
-    return sorted(set(chord_cols) | set(grid_cols))
+    return _grid_cols(state, bar_index)
 
 
 def _bar_start_col(state: EditorState, bar_index: int) -> int:
@@ -96,7 +95,7 @@ def _row_note_cols(state: EditorState, bar_index: int, actual_string: int) -> li
     for (b, s, col), value in state.overrides.items():
         if b == bar_index and s == actual_string and value and value != "-":
             cols.add(col)
-    if bar.chords and not _bar_has_grid_data(state, bar_index):
+    if bar.chords:
         positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
         for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
             if any((note.string - 1) == actual_string for note in chord.notes):
@@ -128,6 +127,30 @@ def target_move_right_visual(state: EditorState) -> CursorMotionTarget:
     return _target_move_visual(state, 1)
 
 
+def _snap_bar_entry_col(
+    state: EditorState,
+    target: CursorMotionTarget,
+    delta: int,
+) -> CursorMotionTarget:
+    # Entering a bar at its raw edge often shares a display cell with the
+    # first/last note onset; land on the note directly so the drawn cursor
+    # moves on every keypress.
+    if target.append_bar or not (0 <= target.bar < len(state.piece.bars)):
+        return target
+    cols = _note_cols(state, target.bar)
+    if not cols:
+        return target
+    content_width = bar_content_width_for_cursor(state, target.bar)
+    mapping = cursor_display_map_for_bar(state, target.bar, content_width)
+    cand = cols[0] if delta > 0 else cols[-1]
+    if not (0 <= target.col < len(mapping) and 0 <= cand < len(mapping)):
+        return target
+    in_direction = cand >= target.col if delta > 0 else cand <= target.col
+    if in_direction and mapping[cand] == mapping[target.col]:
+        return CursorMotionTarget(target.bar, cand)
+    return target
+
+
 def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
     target = CursorMotionTarget(state.cursor_bar, state.cursor_col)
     if delta not in (-1, 1):
@@ -137,9 +160,9 @@ def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
         return target
     next_col = state.cursor_col + delta
     if next_col < 0:
-        target = target_move_left(state)
+        target = _snap_bar_entry_col(state, target_move_left(state), delta)
     elif next_col >= state.bar_width:
-        target = target_move_right(state)
+        target = _snap_bar_entry_col(state, target_move_right(state), delta)
     else:
         content_width = bar_content_width_for_cursor(state, bar_index)
         mapping = cursor_display_map_for_bar(state, bar_index, content_width)
@@ -148,7 +171,10 @@ def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
         else:
             current_display_col = mapping[state.cursor_col]
             if mapping[next_col] != current_display_col:
-                target = CursorMotionTarget(bar_index, next_col)
+                target = CursorMotionTarget(
+                    bar_index,
+                    _land_in_display_run(state, bar_index, next_col, mapping),
+                )
             else:
                 target = _target_move_visual_collapsed(
                     state,
@@ -180,20 +206,31 @@ def _target_move_visual_collapsed(
     mapping: list[int],
     delta: int,
 ) -> CursorMotionTarget:
+    # Jump to the next display cell so the drawn cursor moves on every press,
+    # then land on that cell's note column if it has one.
+    scan = next_col
+    while 0 <= scan < len(mapping) and mapping[scan] == current_display_col:
+        scan += delta
+    if not (0 <= scan < min(len(mapping), state.bar_width)):
+        return _target_wrap_horizontal_visual(state, delta)
+    return CursorMotionTarget(bar_index, _land_in_display_run(state, bar_index, scan, mapping))
+
+
+def _land_in_display_run(
+    state: EditorState,
+    bar_index: int,
+    entry_col: int,
+    mapping: list[int],
+) -> int:
     actual_string = string_index(state, state.cursor_string)
     note_cols = set(_row_note_cols(state, bar_index, actual_string)) or set(
         _note_cols(state, bar_index),
     )
-    if not note_cols:
-        return CursorMotionTarget(bar_index, next_col)
-    scan = next_col
-    while 0 <= scan < len(mapping) and mapping[scan] == current_display_col:
-        if scan in note_cols:
-            return CursorMotionTarget(bar_index, scan)
-        scan += delta
-    if 0 <= scan < state.bar_width:
-        return CursorMotionTarget(bar_index, scan)
-    return _target_wrap_horizontal_visual(state, delta)
+    target_display_col = mapping[entry_col]
+    for col in range(min(len(mapping), state.bar_width)):
+        if mapping[col] == target_display_col and col in note_cols:
+            return col
+    return entry_col
 
 
 def target_move_left_note(state: EditorState) -> CursorMotionTarget:
@@ -312,10 +349,7 @@ def target_snap_to_chord_slot(state: EditorState) -> CursorMotionTarget:
     bar = state.piece.bars[bar_index]
     if not bar.chords:
         return CursorMotionTarget(state.cursor_bar, state.cursor_col)
-    has_grid = any(b == bar_index for (b, _s, _c) in state.overrides) or any(
-        b == bar_index for (b, _s, _c) in state.durations
-    )
-    if has_grid:
+    if _bar_has_grid_data(state, bar_index):
         return CursorMotionTarget(state.cursor_bar, state.cursor_col)
     slots = [
         col

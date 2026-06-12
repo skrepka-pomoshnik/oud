@@ -576,6 +576,7 @@ def render_piece(  # noqa: C901, PLR0912
     glisses: list[tuple[int, int, int]] | None = None,
     playback_cache=None,
     playback_markers: list[tuple[int, int]] | None = None,
+    cursor_display_maps: dict[int, list[int]] | None = None,
 ) -> None:
     stdscr.erase()
     height, width = stdscr.getmaxyx()
@@ -832,6 +833,7 @@ def render_piece(  # noqa: C901, PLR0912
             basslabels=basslabels,
             chord_wrap_limit=chord_wrap_limit,
             playback_cache=playback_cache,
+            cursor_display_maps=cursor_display_maps,
         )
 
     if display_strings > 0:

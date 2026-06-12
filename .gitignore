@@ -11,8 +11,10 @@ build/
 downloads/
 .DS_Store
 .vscode/
+.claude/settings.local.json
 *.swp
 *.swo
+# Generated exports (committed examples are re-included below)
 *.mid
 *.ly
 *.pdf
@@ -29,7 +31,7 @@ downloads/
 *.out
 out.*
 quality.txt
-TODO.md
-DONE.md
 refs/
-test.tab
+/test.tab
+!examples/*.mid
+!examples/*.ly
