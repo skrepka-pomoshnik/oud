@@ -600,25 +600,30 @@ def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
         raw_kind = "barline-raw"
     elif len(chunk) > 32:
         payload = chunk[32:]
+        note_staff_markers = (
+            b"\x01\x31",
+            b"\x01\x32",
+            b"\x01\x33",
+            b"\x01\x34",
+            b"\x01\x35",
+        )
+        # Some score records place the staff marker at bytes 30-31,
+        # crossing the nominal 32-byte header boundary.
+        marker_region = chunk[28:]
+        has_note_staff_markers = any(marker in marker_region for marker in note_staff_markers)
+        is_score_settings = (
+            chunk[2:7] == b"\x00\x11\x00\x00\xff"
+            and b"\r\n" not in payload
+            and not has_note_staff_markers
+        )
+        if is_score_settings:
+            return "score-settings-raw"
         nonzero = sum(1 for b in payload if b)
         controls = sum(1 for b in payload if 0 < b < 32 and b not in (9, 10, 13))
         if nonzero >= 12 or controls >= 4:
             if b"{\\rtf" in payload or b"\\fonttbl" in payload:
                 raw_kind = "comment-rtf-raw"
             else:
-                note_staff_markers = (
-                    b"\x01\x31",
-                    b"\x01\x32",
-                    b"\x01\x33",
-                    b"\x01\x34",
-                    b"\x01\x35",
-                )
-                # Some score records place the staff marker at bytes 30-31,
-                # crossing the nominal 32-byte header boundary.
-                marker_region = chunk[28:]
-                has_note_staff_markers = any(
-                    marker in marker_region for marker in note_staff_markers
-                )
                 has_text = b"\r\n" in payload and any(
                     (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A) for b in payload
                 )
@@ -712,7 +717,9 @@ def _append_raw_imported_bar(
     *,
     note_staff: ImportedStaff,
     lyric_staff: ImportedStaff,
+    comment_staff: ImportedStaff,
     barline_staff: ImportedStaff,
+    layout_staff: ImportedStaff,
     unknown_staff: ImportedStaff,
     bar_index: int,
     raw_size: int,
@@ -721,6 +728,9 @@ def _append_raw_imported_bar(
     decoded: FT3TextRecord | None,
 ) -> None:
     base = _imported_bar_base(bar_index, source_bar)
+    if raw_kind == "score-settings-raw":
+        layout_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+        return
     if raw_kind == "barline-raw":
         barline_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
     if raw_kind == "note-staff-raw":
@@ -766,6 +776,26 @@ def _append_raw_imported_bar(
         )
         if raw_kind != "barline-raw":
             return
+    if decoded is not None and (
+        decoded.editorial_text
+        or any(row.kind in {"editorial", "unknown"} for row in decoded.structured_rows)
+    ):
+        text_rows = [
+            row for row in decoded.structured_rows if row.kind in {"editorial", "unknown"}
+        ]
+        comment_staff.bars.append(
+            replace(
+                base,
+                editorial_text=list(decoded.editorial_text)
+                + [row.text for row in text_rows if row.text],
+                text_rows=text_rows,
+                raw_kind=raw_kind,
+                raw_size=raw_size,
+            ),
+        )
+    if raw_kind == "comment-rtf-raw" or (raw_kind == "text-score-raw" and decoded is None):
+        comment_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+        return
     raw_text_kinds = {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}
     if decoded is not None and raw_kind in raw_text_kinds:
         return
@@ -781,6 +811,7 @@ def _build_imported_score(
     lyric_staff = ImportedStaff(kind="lyrics")
     comment_staff = ImportedStaff(kind="comment")
     barline_staff = ImportedStaff(kind="barline")
+    layout_staff = ImportedStaff(kind="layout")
     unknown_staff = ImportedStaff(kind="unknown")
 
     for bar_index, bar in enumerate(piece.bars):
@@ -798,7 +829,9 @@ def _build_imported_score(
         _append_raw_imported_bar(
             note_staff=note_staff,
             lyric_staff=lyric_staff,
+            comment_staff=comment_staff,
             barline_staff=barline_staff,
+            layout_staff=layout_staff,
             unknown_staff=unknown_staff,
             bar_index=bar_index,
             raw_size=raw_size,
@@ -808,7 +841,14 @@ def _build_imported_score(
         )
     staffs = [
         staff
-        for staff in (note_staff, lyric_staff, comment_staff, barline_staff, unknown_staff)
+        for staff in (
+            note_staff,
+            lyric_staff,
+            comment_staff,
+            barline_staff,
+            layout_staff,
+            unknown_staff,
+        )
         if staff.bars
     ]
     if not staffs:
@@ -955,7 +995,6 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     if (
         piece.imported_score is not None
         and any(staff.kind == "unknown" for staff in piece.imported_score.staffs)
-        and not any(bar.chords for bar in piece.bars)
     ):
         piece.import_warnings.append(
             "FT3 contains non-tab score data that is not decoded yet; imported as unknown staves.",

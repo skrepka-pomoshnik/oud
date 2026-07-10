@@ -4,9 +4,9 @@ Minimal curses editor for Renaissance lute tablature.
 
 Current import/export focus:
 
-- `.tab` and `.ft3` editing in TUI
-- vocal note-staff + lyrics rendering for supported FT3 text records
-- read-only mixed-score FT3 views for non-tab note/barline/text staves
+- `.tab` editing and writing
+- `.ft3` import with tab, vocal, lyric, and mixed-score views
+- MIDI, LilyPond/PDF, MusicXML, and ASCII export
 
 ![oud editing a real FT3 score in the terminal](https://raw.githubusercontent.com/skrepka-pomoshnik/oud/main/docs/oud-tui.svg)
 
@@ -124,9 +124,10 @@ and logical-to-display cursor maps for embedding in another terminal UI. Legacy
 
 ## FT3 Support
 
-- Structured FT3 vocal/lyric rows are imported and rendered in TUI.
-- Raw non-tab FT3 note bars and barline-only bars are now classified into dedicated imported staffs instead of generic unknown blobs.
-- All 36 bundled corpus files have a usable view with no importer warnings, including the two four-part fixtures. Proprietary score details without a confirmed binary mapping remain best-effort and are preserved in the read-only import layer.
+- All 35 bundled FT3 files load without warnings or unknown staffs.
+- Tab, vocal/lyric, mixed-score, playback, and LilyPond paths are covered.
+- FT3 is import-only. Save edits as TAB or export to MusicXML/LilyPond/MIDI.
+- Undocumented binary details are preserved but not guessed.
 
 ## Status + Info
 

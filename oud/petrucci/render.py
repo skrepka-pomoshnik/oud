@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from oud.petrucci.duet_score import (
     duet_bar_mapping,
+    duet_raw_bar_index,
     duet_staff_labels,
     duet_view_mode,
     is_duet_score_piece,
@@ -42,7 +43,7 @@ from oud.petrucci.render_status import (
     build_status_lines,
     resolve_duration_text,
 )
-from oud.petrucci.render_system import render_systems
+from oud.petrucci.render_system import PlaybackOverlayCache, render_systems
 from oud.petrucci.render_vocal import melody_row_count
 from oud.petrucci.screen import A_REVERSE, Screen
 from oud.petrucci.tab_style import resolve_tab_style_policy
@@ -103,6 +104,46 @@ def _duet_brace(
     _safe_addstr(stdscr, mid, x, "{")
 
 
+def _merge_duet_cursor_maps(
+    target: dict[int, list[int]] | None,
+    local: dict[int, list[int]] | None,
+    *,
+    piece: Piece,
+    staff_index: int,
+) -> None:
+    if target is None or local is None:
+        return
+    for logical_bar, mapping in local.items():
+        raw_bar = duet_raw_bar_index(staff_index, logical_bar, piece=piece)
+        if 0 <= raw_bar < len(piece.bars):
+            target[raw_bar] = mapping
+
+
+def _collect_duet_playback_ops(
+    target: PlaybackOverlayCache,
+    local: PlaybackOverlayCache | None,
+) -> None:
+    if local is None:
+        return
+    for key, operations in local.items():
+        target.setdefault(key, []).extend(operations)
+
+
+def _publish_duet_playback_cache(
+    target: PlaybackOverlayCache | None,
+    logical: PlaybackOverlayCache,
+    *,
+    piece: Piece,
+) -> None:
+    if target is None:
+        return
+    for (logical_bar, col), operations in logical.items():
+        for staff_index in (0, 1):
+            raw_bar = duet_raw_bar_index(staff_index, logical_bar, piece=piece)
+            if 0 <= raw_bar < len(piece.bars):
+                target[(raw_bar, col)] = list(operations)
+
+
 def _render_duet_score_view(  # noqa: C901, PLR0912
     stdscr: Screen,
     *,
@@ -131,6 +172,8 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     playback_bar: int | None,
     playback_col: int | None,
     playback_markers: list[tuple[int, int]] | None,
+    playback_cache: PlaybackOverlayCache | None,
+    cursor_display_maps: dict[int, list[int]] | None,
     include_meta: bool,
     show_dur: bool,
     show_extras: bool,
@@ -234,6 +277,12 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             _marker_staff, marker_logical = duet_bar_mapping(marker_bar, piece=piece)
             mapped_playback_markers.append((marker_logical, marker_col))
         logical_breaks = _duet_logical_stave_breaks(piece, stave_breaks)
+        local_playback_cache: PlaybackOverlayCache | None = (
+            {} if playback_cache is not None else None
+        )
+        local_cursor_maps: dict[int, list[int]] | None = (
+            {} if cursor_display_maps is not None else None
+        )
         render_systems(
             stdscr,
             piece=payload["piece"],
@@ -285,7 +334,18 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             basslabels=basslabels,
             chord_wrap_limit=chord_wrap_limit,
             lyric_rows_count=0,
+            playback_cache=local_playback_cache,
+            cursor_display_maps=local_cursor_maps,
         )
+        _merge_duet_cursor_maps(
+            cursor_display_maps,
+            local_cursor_maps,
+            piece=piece,
+            staff_index=selected_staff,
+        )
+        logical_playback_ops: PlaybackOverlayCache = {}
+        _collect_duet_playback_ops(logical_playback_ops, local_playback_cache)
+        _publish_duet_playback_cache(playback_cache, logical_playback_ops, piece=piece)
         return True
 
     top = _split_payload(0)
@@ -317,6 +377,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
         if len(top_piece.bars) >= len(bottom_piece.bars)
         else bottom_piece.bars
     )
+    logical_playback_ops: PlaybackOverlayCache = {}
 
     for sys_idx in range(pair_systems):
         if current_logical >= total_logical:
@@ -352,6 +413,8 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 marker_staff, marker_logical = duet_bar_mapping(marker_bar, piece=piece)
                 if marker_staff == staff_index:
                     mapped_playback_markers.append((marker_logical, marker_col))
+            local_playback_cache = {} if playback_cache is not None else None
+            local_cursor_maps = {} if cursor_display_maps is not None else None
             render_systems(
                 stdscr,
                 piece=subpiece,
@@ -403,8 +466,16 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 basslabels=basslabels,
                 chord_wrap_limit=chord_wrap_limit,
                 lyric_rows_count=0,
-                playback_cache=None,
+                playback_cache=local_playback_cache,
+                cursor_display_maps=local_cursor_maps,
             )
+            _merge_duet_cursor_maps(
+                cursor_display_maps,
+                local_cursor_maps,
+                piece=piece,
+                staff_index=staff_index,
+            )
+            _collect_duet_playback_ops(logical_playback_ops, local_playback_cache)
         top_row_start = top_header + 1
         bottom_row_start = bottom_header + 1
         label_x = max(0, left_margin + 1)
@@ -418,6 +489,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             bottom_y=bottom_row_start + content_block_h - 1,
         )
         current_logical = max(current_logical + 1, system_end)
+    _publish_duet_playback_cache(playback_cache, logical_playback_ops, piece=piece)
     return True
 
 
@@ -758,6 +830,8 @@ def render_piece(  # noqa: C901, PLR0912
         playback_bar=playback_bar,
         playback_col=playback_col,
         playback_markers=playback_markers,
+        playback_cache=playback_cache,
+        cursor_display_maps=cursor_display_maps,
         include_meta=include_meta,
         show_dur=show_dur,
         show_extras=show_extras,
@@ -775,7 +849,7 @@ def render_piece(  # noqa: C901, PLR0912
         basslabels=basslabels,
         chord_wrap_limit=chord_wrap_limit,
         lyric_rows_count=0,
-        )
+    )
     if not rendered_duet:
         render_systems(
             stdscr,

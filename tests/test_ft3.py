@@ -464,6 +464,33 @@ def test_load_ft3_classifies_note_marker_crossing_header_boundary(tmp_path) -> N
     assert staffs["note"].bars[0].raw_kind == "note-staff-raw"
 
 
+def test_load_ft3_preserves_score_settings_record_as_layout_staff() -> None:
+    piece = load_ft3("lutemusic/32_passacaglia.ft3")
+    assert piece.imported_score is not None
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "unknown" not in staffs
+    assert staffs["layout"].bars[0].raw_kind == "score-settings-raw"
+    assert staffs["layout"].bars[0].raw_size == 117
+
+
+def test_load_ft3_warns_when_mixed_tab_retains_unknown_staff(tmp_path) -> None:
+    unknown = bytes(32) + (b"\xff" * 16)
+    payload = (
+        b"CPiece\x04Test\x03\x80CBar"
+        + unknown
+        + b"\x03\x80"
+        + _ft3_bar_with_one_note()
+        + b"\x03\x80"
+    )
+    path = tmp_path / "mixed_unknown.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert any(bar.chords for bar in piece.bars)
+    assert piece.imported_score is not None
+    assert any(staff.kind == "unknown" for staff in piece.imported_score.staffs)
+    assert any("unknown staves" in warning for warning in piece.import_warnings)
+
+
 def test_load_ft3_decodes_raw_note_lyric_bars_into_note_and_lyric_staffs(tmp_path) -> None:
     chunk = (
         bytes(32)
@@ -747,3 +774,7 @@ def test_load_ft3_merges_barline_raw_vocal_fragment_into_target_bar(tmp_path) ->
     assert bar1.lyrics
     assert bar0.lyrics[0].startswith("Now")
     assert bar1.lyrics[0].startswith("She")
+    assert piece.imported_score is not None
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert {bar.source_bar_index for bar in staffs["note"].bars} >= {0, 1}
+    assert {bar.source_bar_index for bar in staffs["lyrics"].bars} >= {0, 1}

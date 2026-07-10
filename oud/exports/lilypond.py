@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
@@ -564,6 +565,82 @@ def _imported_staff_by_kind(piece: Piece, kind: str) -> ImportedStaff | None:
     return None
 
 
+def _imported_bar_content_score(bar: ImportedBarContent, kind: str) -> int:
+    if kind == "note":
+        return len(bar.melody_events) * 10 + int(bool((bar.melody_grid or "").strip()))
+    if kind == "lyrics":
+        event_count = sum(len(row) for row in bar.lyric_event_rows)
+        return event_count * 10 + sum(bool(line.strip()) for line in bar.lyrics)
+    return sum(
+        (
+            bool(bar.time_sig),
+            bool(bar.barline),
+            bool(bar.repeat),
+            bool(bar.ending_numbers),
+            bool(bar.system_break),
+        ),
+    )
+
+
+def _coalesced_imported_bars(
+    staff: ImportedStaff | None,
+    *,
+    kind: str,
+) -> dict[int, ImportedBarContent]:
+    if staff is None:
+        return {}
+    grouped: dict[int, list[ImportedBarContent]] = {}
+    for bar in staff.bars:
+        grouped.setdefault(bar.source_bar_index, []).append(bar)
+    out: dict[int, ImportedBarContent] = {}
+    for source_bar_index, candidates in grouped.items():
+        primary = max(candidates, key=lambda bar: _imported_bar_content_score(bar, kind))
+        out[source_bar_index] = replace(
+            primary,
+            time_sig=next((bar.time_sig for bar in candidates if bar.time_sig), None),
+            barline=next((bar.barline for bar in candidates if bar.barline), None),
+            repeat=next((bar.repeat for bar in candidates if bar.repeat), None),
+            ending_numbers=next(
+                (bar.ending_numbers for bar in candidates if bar.ending_numbers),
+                (),
+            ),
+            system_break=any(bar.system_break for bar in candidates),
+        )
+    return out
+
+
+def _with_imported_bar_structure(
+    content: ImportedBarContent,
+    *fallbacks: ImportedBarContent | None,
+) -> ImportedBarContent:
+    available = [bar for bar in fallbacks if bar is not None]
+    return replace(
+        content,
+        time_sig=content.time_sig
+        or next((bar.time_sig for bar in available if bar.time_sig), None),
+        barline=content.barline
+        or next((bar.barline for bar in available if bar.barline), None),
+        repeat=content.repeat or next((bar.repeat for bar in available if bar.repeat), None),
+        ending_numbers=content.ending_numbers
+        or next((bar.ending_numbers for bar in available if bar.ending_numbers), ()),
+        system_break=content.system_break or any(bar.system_break for bar in available),
+    )
+
+
+def _piece_bar_as_imported(piece: Piece, source_bar_index: int) -> ImportedBarContent | None:
+    if not (0 <= source_bar_index < len(piece.bars)):
+        return None
+    bar = piece.bars[source_bar_index]
+    return ImportedBarContent(
+        source_bar_index=source_bar_index,
+        time_sig=bar.time_sig,
+        barline=bar.barline,
+        repeat=bar.repeat,
+        ending_numbers=bar.ending_numbers,
+        system_break=bar.system_break,
+    )
+
+
 def _piece_has_imported_lyrics(piece: Piece) -> bool:
     staff = _imported_staff_by_kind(piece, "lyrics")
     if staff is None:
@@ -572,13 +649,6 @@ def _piece_has_imported_lyrics(piece: Piece) -> bool:
         bar.lyric_event_rows or any(line.strip() for line in bar.lyrics)
         for bar in staff.bars
     )
-
-
-def _piece_has_imported_melody(piece: Piece) -> bool:
-    staff = _imported_staff_by_kind(piece, "note")
-    if staff is None:
-        return False
-    return any(bar.melody_events or (bar.melody_grid or "").strip() for bar in staff.bars)
 
 
 def _initial_time_sig(piece: Piece, settings: dict[str, str]) -> str | None:
@@ -762,6 +832,8 @@ def _build_tab_body(  # noqa: C901, PLR0912
                     body.append(f"  <{' '.join(pitches)}>{dur}{suffix}")
         bar_marker = _barline_token(bar)
         body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
+        if bar.system_break:
+            body.append(r"  \break")
     return body
 
 
@@ -826,8 +898,12 @@ def _build_vocal_bodies(
 
 def _imported_vocal_sources(
     piece: Piece,
-) -> tuple[ImportedStaff | None, ImportedStaff | None]:
-    return _imported_staff_by_kind(piece, "note"), _imported_staff_by_kind(piece, "lyrics")
+) -> tuple[ImportedStaff | None, ImportedStaff | None, ImportedStaff | None]:
+    return (
+        _imported_staff_by_kind(piece, "note"),
+        _imported_staff_by_kind(piece, "lyrics"),
+        _imported_staff_by_kind(piece, "barline"),
+    )
 
 
 def _append_imported_melody_bar(
@@ -869,9 +945,10 @@ def _extend_event_lyric_rows(
     rows: list[list],
     *,
     event_count: int,
+    prior_event_count: int,
 ) -> None:
     while len(lyric_bodies) < len(rows):
-        lyric_bodies.append([])
+        lyric_bodies.append(["_"] * prior_event_count)
     for row_idx, row in enumerate(rows):
         lyric_bodies[row_idx].extend(_lyric_tokens_for_row(row, max(1, event_count)))
     if len(lyric_bodies) > len(rows):
@@ -883,9 +960,10 @@ def _extend_raw_lyric_lines(
     raw_lines: list[str],
     *,
     event_count: int,
+    prior_event_count: int,
 ) -> None:
     while len(lyric_bodies) < len(raw_lines):
-        lyric_bodies.append([])
+        lyric_bodies.append(["_"] * prior_event_count)
     for row_idx, line in enumerate(raw_lines):
         lyric_bodies[row_idx].extend(_raw_lyric_tokens(line, max(1, event_count)))
     if len(lyric_bodies) > len(raw_lines):
@@ -897,6 +975,7 @@ def _extend_imported_lyric_bodies(
     lyric_bar: ImportedBarContent | None,
     *,
     event_count: int,
+    prior_event_count: int,
 ) -> None:
     if lyric_bar is None:
         if lyric_bodies:
@@ -904,11 +983,21 @@ def _extend_imported_lyric_bodies(
         return
     rows = lyric_bar.lyric_event_rows or []
     if rows:
-        _extend_event_lyric_rows(lyric_bodies, rows, event_count=event_count)
+        _extend_event_lyric_rows(
+            lyric_bodies,
+            rows,
+            event_count=event_count,
+            prior_event_count=prior_event_count,
+        )
         return
     raw_lines = [line for line in lyric_bar.lyrics if line.strip()]
     if raw_lines:
-        _extend_raw_lyric_lines(lyric_bodies, raw_lines, event_count=event_count)
+        _extend_raw_lyric_lines(
+            lyric_bodies,
+            raw_lines,
+            event_count=event_count,
+            prior_event_count=prior_event_count,
+        )
         return
     if lyric_bodies:
         _pad_lyric_bodies(lyric_bodies, event_count)
@@ -917,23 +1006,47 @@ def _extend_imported_lyric_bodies(
 def _build_imported_vocal_bodies(
     piece: Piece,
     settings: dict[str, str],
-    note_staff: ImportedStaff,
+    note_staff: ImportedStaff | None,
     lyric_staff: ImportedStaff | None,
+    barline_staff: ImportedStaff | None,
 ) -> tuple[list[str], list[list[str]]]:
     melody_body: list[str] = []
     lyric_bodies: list[list[str]] = []
     current_time_sig = _append_global_prefix(melody_body, piece, settings)
 
-    note_bars = list(note_staff.bars)
-    lyric_bars = list(lyric_staff.bars) if lyric_staff is not None else []
-    for idx, note_bar in enumerate(note_bars):
+    note_bars = _coalesced_imported_bars(note_staff, kind="note")
+    lyric_bars = _coalesced_imported_bars(lyric_staff, kind="lyrics")
+    barline_bars = _coalesced_imported_bars(barline_staff, kind="barline")
+    source_bar_indices = sorted(
+        {
+            *range(len(piece.bars)),
+            *note_bars,
+            *lyric_bars,
+            *barline_bars,
+        },
+    )
+    prior_event_count = 0
+    for source_bar_index in source_bar_indices:
+        note_bar = note_bars.get(source_bar_index) or ImportedBarContent(
+            source_bar_index=source_bar_index,
+        )
+        note_bar = _with_imported_bar_structure(
+            note_bar,
+            barline_bars.get(source_bar_index),
+            _piece_bar_as_imported(piece, source_bar_index),
+        )
         current_time_sig, event_count = _append_imported_melody_bar(
             melody_body,
             note_bar,
             current_time_sig,
         )
-        lyric_bar = lyric_bars[idx] if idx < len(lyric_bars) else None
-        _extend_imported_lyric_bodies(lyric_bodies, lyric_bar, event_count=event_count)
+        _extend_imported_lyric_bodies(
+            lyric_bodies,
+            lyric_bars.get(source_bar_index),
+            event_count=event_count,
+            prior_event_count=prior_event_count,
+        )
+        prior_event_count += max(1, event_count)
     return melody_body, lyric_bodies
 
 
@@ -1041,7 +1154,9 @@ def _build_main_blocks(
         blocks.append(r">>")
         return blocks
 
-    imported_note_staff, imported_lyric_staff = _imported_vocal_sources(piece)
+    imported_note_staff, imported_lyric_staff, imported_barline_staff = (
+        _imported_vocal_sources(piece)
+    )
     tab_body = _build_tab_body(
         piece=piece,
         overrides=overrides,
@@ -1052,10 +1167,10 @@ def _build_main_blocks(
         ties=ties,
         holds=holds,
     )
-    has_imported_melody = imported_note_staff is not None and _piece_has_imported_melody(piece)
+    has_imported_notation = imported_note_staff is not None or imported_barline_staff is not None
     has_imported_lyrics = imported_lyric_staff is not None and _piece_has_imported_lyrics(piece)
     show_melody = settings.get("showmelody", "on") == "on" and (
-        has_imported_melody or _piece_has_melody(piece)
+        has_imported_notation or _piece_has_melody(piece)
     )
     show_lyrics = settings.get("showlyrics", "on") == "on" and (
         has_imported_lyrics or _piece_has_lyrics(piece)
@@ -1066,13 +1181,13 @@ def _build_main_blocks(
     if not show_melody and not show_lyrics:
         return _tab_staff_with_block(None, tab_body, settings, piece)
 
-    if has_imported_melody:
-        assert imported_note_staff is not None
+    if has_imported_notation or has_imported_lyrics:
         melody_body, lyric_bodies = _build_imported_vocal_bodies(
             piece,
             settings,
             imported_note_staff,
             imported_lyric_staff,
+            imported_barline_staff,
         )
     else:
         melody_body, lyric_bodies = _build_vocal_bodies(piece, settings)

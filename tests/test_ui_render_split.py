@@ -253,6 +253,52 @@ def test_render_piece_duet_passes_staff_specific_playback_markers(monkeypatch) -
     assert calls == [[(0, 1)], [(0, 3)]]
 
 
+def test_render_piece_duet_publishes_cursor_maps_for_raw_bars() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Duet maps",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 3, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    cursor_maps: dict[int, list[int]] = {}
+    kwargs["cursor_display_maps"] = cursor_maps
+    render_piece(**kwargs)
+    assert set(cursor_maps) == {0, 1, 2, 3}
+    assert all(len(mapping) == kwargs["bar_width"] for mapping in cursor_maps.values())
+
+
+def test_render_piece_duet_builds_shared_minimal_playback_cache() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Duet playback cache",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 2, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 3, 0)])]),
+        ],
+        strings=6,
+        style="french",
+        ensemble="lute 1:6-course, lute 2:6-course",
+        part="score",
+    )
+    kwargs["settings"]["duetscoreview"] = "both"
+    playback_cache = {}
+    kwargs["playback_cache"] = playback_cache
+    render_piece(**kwargs)
+    assert playback_cache[(0, 0)] == playback_cache[(2, 0)]
+    assert len({y for y, _x, _text, _attr in playback_cache[(0, 0)]}) >= 2
+
+
 def test_render_piece_duet_uses_piece_mapping_for_raw_bar_offset(monkeypatch) -> None:
     logical_bars = 20
     piece = Piece(

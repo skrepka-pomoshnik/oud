@@ -762,6 +762,121 @@ def test_export_lilypond_uses_imported_vocal_staff_over_bar_fallback_when_presen
     assert '"Rest" "sharp"' in text
 
 
+def test_export_lilypond_aligns_sparse_imported_lyrics_by_source_bar(tmp_path) -> None:
+    piece = Piece(
+        title="Sparse imported vocal",
+        bars=[Bar(), Bar(), Bar()],
+        imported_score=ImportedScore(
+            source_format="ft3",
+            staffs=[
+                ImportedStaff(
+                    kind="note",
+                    bars=[
+                        ImportedBarContent(
+                            source_bar_index=0,
+                            melody_events=[MelodyEvent("c", 0, note_type=4)],
+                        ),
+                        ImportedBarContent(
+                            source_bar_index=0,
+                            melody_events=[
+                                MelodyEvent("b", 0, note_type=4),
+                                MelodyEvent("a", 1, note_type=4),
+                            ],
+                        ),
+                        ImportedBarContent(
+                            source_bar_index=2,
+                            melody_events=[MelodyEvent("g", 0, note_type=4)],
+                        ),
+                    ],
+                ),
+                ImportedStaff(
+                    kind="lyrics",
+                    bars=[
+                        ImportedBarContent(
+                            source_bar_index=2,
+                            lyric_event_rows=[[LyricEvent("late", 0)]],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
+    path = tmp_path / "sparse_imported.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showmelody": "on", "showlyrics": "on"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "  c4" not in text
+    assert text.count("  b4") == 1
+    assert text.count("  a4") == 1
+    assert "_ _ _ \"late\"" in text
+
+
+def test_export_lilypond_emits_barline_only_imported_score(tmp_path) -> None:
+    piece = Piece(
+        title="Barlines",
+        imported_score=ImportedScore(
+            source_format="ft3",
+            staffs=[
+                ImportedStaff(
+                    kind="barline",
+                    bars=[
+                        ImportedBarContent(source_bar_index=0, repeat=".:", time_sig="3/4"),
+                        ImportedBarContent(
+                            source_bar_index=1,
+                            barline="||",
+                            system_break=True,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
+    path = tmp_path / "barline_only.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showmelody": "on"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "\\new TabStaff" not in text
+    assert text.count("  r4") == 2
+    assert '\\bar ".|:"' in text
+    assert '\\bar "||"' in text
+    assert "\\break" in text
+
+
+def test_export_lilypond_preserves_ft3_tab_system_break(tmp_path) -> None:
+    piece = Piece(
+        title="Break",
+        bars=[
+            Bar(
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
+                system_break=True,
+            ),
+        ],
+        strings=6,
+    )
+    path = tmp_path / "tab_break.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4"},
+    )
+    assert "\\break" in path.read_text(encoding="utf-8")
+
+
 def test_export_lilypond_respects_vocalpos_bottom_order(tmp_path) -> None:
     bar = Bar(
         chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],

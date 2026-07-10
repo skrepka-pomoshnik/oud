@@ -540,6 +540,7 @@ Non-tab `CBar` chunks are currently classified as:
 - `note-lyric-raw`
 - `text-score-raw`
 - `comment-rtf-raw`
+- `score-settings-raw`
 - `unknown`
 
 Current meaning:
@@ -548,6 +549,7 @@ Current meaning:
 - `note-staff-raw`: note-staff-like chunk with little/no text
 - `note-lyric-raw`: note-staff plus lyric payload
 - `text-score-raw`: text-heavy raw score record
+- `score-settings-raw`: non-musical score settings record found after the final bar
 
 These feed `ImportedScore` rather than the tab editor core.
 
@@ -560,6 +562,7 @@ Classifier rule of thumb:
 | `note-staff-raw` | raw record has note markers but little/no text; marker search includes bytes 28+ because some markers cross the 32-byte header boundary |
 | `text-score-raw` | raw payload has text but no note markers |
 | `comment-rtf-raw` | raw payload contains RTF/font data |
+| `score-settings-raw` | settings signature `00 11 00 00 ff` with no text or note markers |
 
 ## 10. Imported Score Model
 
@@ -577,10 +580,14 @@ Current imported staff kinds:
 - `lyrics`
 - `comment`
 - `barline`
+- `layout`
 - `unknown`
 
 This is the read-only representation used for non-tab FT3 viewing and the
 staging area for richer proprietary score semantics.
+
+The bundled corpus currently produces no `unknown` staffs. Unrecognized future
+records still retain that type so unsupported bytes are never silently dropped.
 
 ## 11. Vocal Accidental Handling
 
@@ -759,8 +766,9 @@ without warnings; exact edition-quality spacing is not guaranteed.
 
 ### 14.6 FT3 instrument/style/tuning fields outside current metadata extraction
 
-Some header-level fields likely exist beyond what we map today from metadata
-annotations.
+Every metadata key observed in the bundled corpus maps to a canonical field or
+a key-signature alias. Future fields remain available in `raw_metadata` even
+when no canonical field exists yet.
 
 ### 14.7 Additional FT3 extras patterns
 
@@ -876,6 +884,7 @@ Compact practical matrix for the local corpus:
 | explicit structured vocal melody | decoded subset |
 | structured lyric rows | decoded subset |
 | editorial prose text rows | decoded subset |
+| score-settings/layout record | classified and preserved |
 | raw mixed note/text bars | partially decoded |
 | 2-verse raw lyric recovery | heuristic |
 | 3-verse raw lyric recovery | heuristic |
@@ -885,6 +894,7 @@ Compact practical matrix for the local corpus:
 | ties/slurs/holds in FT3 binary | unknown |
 | bundled bar-header combinations | decoded |
 | full non-tab score semantics | read-only decoded subset |
+| bundled imported staffs | no unknown records |
 
 ## 17. Reimplementation Checklist
 
@@ -912,20 +922,14 @@ Rule of thumb:
 - first make the confirmed subset work
 - then layer heuristics explicitly
 - never silently mix heuristic repairs into the confirmed binary model
-## 18. What Still Needs Deciphering
 
-If continuing FT3 reverse-engineering, the highest-value next steps are:
+## 18. Deliberate Boundaries
 
-1. Decode remaining raw multi-verse vocal-text variants into stable verse rows.
-2. Decode remaining non-tab note-staff raw bar semantics.
-3. Decode remaining bar header bits beyond repeat/double/system-break.
-4. Confirm whether ties/slurs/holds are stored in FT3 bar records and where.
-5. Expand FT3 extras decoding from current subset to a fuller matrix.
-6. Document a corpus-backed feature matrix:
-   - seen
-   - decoded
-   - partially decoded
-   - ignored
+- FT3 is import-only; `oud` does not write the proprietary format.
+- Unconfirmed tie/slur/hold, volta, extras, and raw score flags are preserved
+  but not assigned semantics without a verified fixture or format reference.
+- The corpus feature matrix above is the release contract for the supported
+  subset.
 
 ## 19. Practical Reading Rule
 

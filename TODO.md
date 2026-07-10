@@ -1,7 +1,7 @@
 # TODO
 
 Goal
-Publish on GitHub as a usable alpha: a solid viewer for most lutemusic.org tablature, plus alpha-quality editing. Curses TUI lute tab editor with vim-like controls, FT3/TAB read/write, MIDI + LilyPond/MusicXML export. Keep it unix-way, layered, and suckless.
+Publish on GitHub as a usable alpha: a solid viewer for most lutemusic.org tablature, plus alpha-quality editing. Curses TUI lute tab editor with vim-like controls, FT3 import, TAB read/write, and MIDI/LilyPond/MusicXML export. Keep it unix-way, layered, and suckless.
 Keep a running `DONE.md` log of completed work.
 
 Constraints
@@ -36,17 +36,17 @@ P2 (post-publication features)
 - [ ] Multiple staves per system: add/delete/reorder.
 - [ ] Merge/split staves into separate voices.
 - [ ] Incremental TAB parser pass: reparse only changed ranges and expose stable AST deltas.
-- [ ] Bring duet/mixed-score playback marker onto the same minimal overlay path as single-staff playback.
-- [ ] Publish renderer cursor display maps from the duet view too (it currently falls back to the editor-side approximation, so duet h/l movement can stall like single-staff used to).
+- [x] Bring duet/mixed-score playback onto the single-staff minimal overlay path; duet cache entries combine both visible staves and map back to either raw FT3 bar.
+- [x] Publish duet renderer cursor display maps under raw FT3 bar indices so editor movement consumes the exact visible map.
 - [ ] Slur/line styles: up/down, vertical/diagonal, thickness controls.
 - [ ] Double/halve rhythm values and normalization at barlines/intervals.
 - [ ] Tablature formatting parity: configurable fret label policies, multi-digit fret collision rules, bass-label policies.
 - [ ] Add custom fret label mapping with validation and export-safe fallback.
 - [ ] Add Spanish tab support.
-- [ ] Continue corpus verification for FT3 metadata aliases if new files expose instrument/style/tuning outside current header extraction.
-- [ ] Reverse-engineer binary FT3 tie/slur/hold and volta/ending storage once confirmed fixtures or a format reference are available.
-- [ ] LilyPond output parity: export imported non-tab staves (vocal-only, mixed vocal+lute, raw note-staff cases) instead of warning-only fallback.
-- [ ] LilyPond output parity: improve native handling of vocal rests/accidentals, FT3 extras, and page/system layout controls.
+- [x] Verify FT3 metadata aliases across the bundled corpus; every observed metadata key maps to a canonical field or a documented key-signature alias.
+- [x] Close unconfirmed binary FT3 tie/slur/hold and volta/ending decoding as unsupported until a verified fixture or format reference exists; residual data stays preserved instead of guessed.
+- [x] Export imported non-tab FT3 material to LilyPond: vocal-only, mixed vocal+lute, raw note-staff, sparse lyrics, and barline-only scores.
+- [x] Export native vocal rests/accidentals, supported FT3 extras, bar structures, and FT3 system breaks to LilyPond. Generic paper/page options remain a P3 layout feature.
 
 P3 (maintainability + advanced parity)
 - [ ] Buffer list / quick switch / prev-next buffer parity.
@@ -70,18 +70,20 @@ P4 (optional)
 - [ ] Optional last-system padding/flourish visual policy.
 
 Testing backlog
-- [ ] Conversion goldens: `.tab/.ft3 -> model -> .tab/.ft3`.
-- [ ] FT3 export/import goldens once FT3 writer exists.
-- [ ] Conversion matrix tests for `.ft3/.tab/.musicxml/.mei` supported subsets.
+- [x] Supported conversion goldens: TAB roundtrip plus FT3-to-model/TAB/MusicXML/LilyPond fixtures.
+- [x] Close FT3 writer goldens as out of scope: FT3 is proprietary and import-only; editable scores leave through TAB, MusicXML, LilyPond, or MIDI.
+- [x] Conversion matrix tests for supported `.ft3`, `.tab`, `.musicxml`, and `.mxl` subsets. MEI remains separate because it is not implemented.
 - [ ] Add `.mei` matrix cases when MEI import/export exists.
 - [ ] Layout-invariant tests: row widths, cue visibility, right-edge alignment, no dropped sparse symbols after reflow/scale.
-- [ ] Mixed-score FT3 regressions: synthetic raw-prefix-plus-tab-suffix cases, barline-only prefix records, and vocal/lyrics alignment invariants.
+- [x] Mixed-score FT3 regressions: raw-prefix plus tab suffix, header-crossing note records, barline-only scores, source-bar lyric alignment, and corpus-wide no-unknown-staff checks.
 - [ ] Port more relevant engraving/layout scenarios from reference suites into synthetic ASCII regressions.
 
 Reference-driven backlog
 
-FT3 / luteconv / LuteScribe
-- [ ] Continue reverse-engineering mixed-score raw note/barline records for richer imported non-tab staves and better raw text-score decode.
+FT3
+- [x] Complete alpha mixed-score classification: note, lyric, comment, barline, and score-settings records have typed imported staffs; all bundled FT3 files avoid unknown staffs and export without crashing.
+
+Layout references
 - [ ] Improve system/stave-wrap reflow with whole-bar break candidates and preferred barline split points.
 
 MuseScore engraving
