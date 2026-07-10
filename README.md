@@ -1,4 +1,4 @@
-# oud
+# OUD
 
 Minimal curses editor for Renaissance lute tablature.
 
@@ -14,15 +14,6 @@ Current import/export focus:
 
 - User/developer usage reference: `DOCS.md`
 - Release checklist: `RELEASING.md`
-
-## Credits
-
-Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
-
-The tablature files in `lutemusic/` and most files in `examples/` are typesettings
-by Sarge Gerbode from [lutemusic.org](https://www.lutemusic.org), licensed
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see
-`lutemusic/README.md`. They are not covered by this project's GPL-3.0 license.
 
 ## Install
 
@@ -81,26 +72,6 @@ python3 app.py examples/example.ft3
 
 ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 
-## Petrucci typesetting library
-
-`oud.petrucci` is the reusable character-cell typesetting layer behind the TUI.
-It owns the score model, tablature policies, spacing, vocal/note-staff engraving,
-and framebuffer renderer without requiring editor state:
-
-```python
-from oud.petrucci import Bar, Chord, Note, Piece, TypesetOptions, typeset_text
-
-piece = Piece(
-    title="Fantasia",
-    bars=[Bar(chords=[Chord(4, False, None, [Note(1, 0, 0)])])],
-)
-print(typeset_text(piece, options=TypesetOptions(width=80, height=20)))
-```
-
-`typeset_piece` also returns fixed-size frame lines, per-cell style attributes,
-and logical-to-display cursor maps for embedding in another terminal UI. Legacy
-`oud.core` and `oud.ui` rendering imports remain compatible for this alpha.
-
 ## Commands
 
 ```
@@ -122,42 +93,6 @@ and logical-to-display cursor maps for embedding in another terminal UI. Legacy
 :dark / :light  force dark/light color theme (:set theme=auto follows terminal)
 ```
 
-## FT3 Support
-
-- All 35 bundled FT3 files load without warnings or unknown staffs.
-- Tab, vocal/lyric, mixed-score, playback, and LilyPond paths are covered.
-- FT3 is import-only. Save edits as TAB or export to MusicXML/LilyPond/MIDI.
-- Undocumented binary details are preserved but not guessed.
-
-## Status + Info
-
-- Status bar shows: bar/beat, current duration, current time symbol.
-- File path and technical metadata are in `:info`.
-
-## Tuning order
-
-Tuning strings are written low → high, e.g. `g2c3f3a3d4g4`.
-
-## Duration keys (French insert mode)
-
-- `1 -> 1` (whole)
-- `2 -> 2` (half)
-- `3 -> 4` (quarter)
-- `4 -> 8` (eighth)
-- `5 -> 16`
-- `6 -> 32`
-- `7 -> 64`
-
-## LilyPond tablature
-
-French tablature output uses `fret-letter-tablature-format` with default letter labels.
-You can customize bass strings and labels in `config.toml`:
-
-```
-basstuning = "c2 d2 e2 fis2 g2"
-fretlabels = "a b r d e f g h i k l"
-```
-
 ## MIDI soundfont
 
 Set your SoundFont in `config.toml`:
@@ -166,12 +101,7 @@ Set your SoundFont in `config.toml`:
 soundfont = "~/soundfonts/my-soundfont.sf2"
 midipatch = 24
 ```
-
-## Rest rendering
-
-Rests are shown as `_.` in the staff.
-
-## Architecture (quick)
+## Architecture overview
 
 - `oud/petrucci/` reusable score model and tab/note character-cell typesetting
 - `oud/core/` FT3/TAB/MusicXML parsing and import semantics
@@ -184,3 +114,12 @@ Rests are shown as `_.` in the staff.
 Entry points:
 - `app.py` (root wrapper) → `oud/app.py`
 - `cli.py` (root wrapper) → `oud/cli.py`
+
+## Thanks
+
+Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
+
+The tablature files in `lutemusic/` and most files in `examples/` are typesettings
+by Sarge Gerbode from [lutemusic.org](https://www.lutemusic.org), licensed
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see
+`lutemusic/README.md`. They are not covered by this project's GPL-3.0 license.
