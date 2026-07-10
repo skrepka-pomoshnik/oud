@@ -3,11 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from oud.core.ft3 import load_ft3
-from oud.core.model import Piece
 from oud.core.musicxml_import import load_musicxml, load_mxl
-from oud.core.tab_parser import load_tab, load_tab_data
+from oud.core.tab_parser import TabData, load_tab, load_tab_data
 from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState
+from oud.petrucci.model import Piece
 
 LoadResult = tuple[
     Piece,
@@ -16,6 +16,36 @@ LoadResult = tuple[
     set[tuple[int, int]],
     int | None,
 ]
+TabOpenResult = tuple[
+    Piece,
+    dict[tuple[int, int, int], str],
+    dict[tuple[int, int, int], int],
+    set[tuple[int, int]],
+    int | None,
+    TabData | None,
+]
+
+
+def import_warning_summary(piece: Piece) -> str:
+    if not piece.import_warnings:
+        return ""
+    count = len(piece.import_warnings)
+    suffix = f"; {count} total" if count > 1 else ""
+    return f"Import warning: {piece.import_warnings[0]} (:info{suffix})"
+
+
+def _load_tab_for_open(path: str, *, load_tab_data_fn, load_tab_fn) -> TabOpenResult:
+    parsed = load_tab_data_fn(path)
+    if parsed is None:
+        return load_tab_fn(path), {}, {}, set(), None, None
+    return (
+        parsed.piece,
+        parsed.overrides,
+        parsed.durations,
+        parsed.dotted,
+        parsed.bar_width,
+        parsed,
+    )
 
 
 def _invalid_load_result(path: str | None, message: str) -> LoadResult:
@@ -111,17 +141,16 @@ def cmd_open(
     dotted: set[tuple[int, int]] = set()
     bar_width: int | None = None
     if path.lower().endswith(".tab"):
-        parsed = load_tab_data_fn(path)
-        if parsed is not None:
-            state.piece = parsed.piece
-            overrides = parsed.overrides
-            durations = parsed.durations
-            dotted = parsed.dotted
-            bar_width = parsed.bar_width
-            state.tab_data = parsed
-        else:
-            state.piece = load_tab_fn(path)
-            state.tab_data = None
+        loaded_piece, overrides, durations, dotted, bar_width, parsed = _load_tab_for_open(
+            path,
+            load_tab_data_fn=load_tab_data_fn,
+            load_tab_fn=load_tab_fn,
+        )
+        if not loaded_piece.bars and loaded_piece.import_warnings:
+            state.message = import_warning_summary(loaded_piece)
+            return
+        state.piece = loaded_piece
+        state.tab_data = parsed
     elif path.lower().endswith(".mxl"):
         state.piece = load_mxl_fn(path)
         state.tab_data = None
@@ -148,4 +177,4 @@ def cmd_open(
         state.durations = build_durations_fn(state.piece)
     state.message = f"Opened {path}"
     if state.piece.import_warnings:
-        state.message = f"{state.message} ({state.piece.import_warnings[0]})"
+        state.message = f"{state.message} ({import_warning_summary(state.piece)})"

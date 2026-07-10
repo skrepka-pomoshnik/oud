@@ -10,27 +10,27 @@ Constraints
 - pure curses, zero runtime dependencies
 
 P0 (fix immediately)
-- [ ] `.tab` import: malformed or partially saved files silently load as an empty piece (strict parser returns None, legacy fallback yields 0 bars, no warning). Emit an import warning and keep whatever content is recoverable.
-- [ ] Triage the import warnings across the local lutemusic corpus (13/43 files warn): each warning class must either be decoded (see P1) or degrade gracefully with no visual damage in the viewer.
+- [x] `.tab` import: malformed/empty files show a persistent import warning and cannot replace the active score; partially saved files retain recoverable bars and report the missing end marker.
+- [x] Triage the bundled lutemusic corpus: 36/36 supported files load, all formerly warned content is represented, and the release smoke pass reports zero errors and zero warnings.
 
 P1 (publication blockers)
 
 Viewer — support most lutemusic.org tabs:
-- [ ] Readonly viewer parity for mixed/multi-part FT3 scores: `lutemusic/05_can_she_excuse/can_she_excuse_4_part.ft3` still imports as unknown staves (the only local corpus file without a usable view).
-- [ ] Decode remaining FT3 bar-record semantics: ties/slurs/holds, volta/endings, and still-unclassified header bits beyond repeats/double bars/system breaks (5/43 corpus files warn about extra bar header markers).
-- [ ] Vocal/lyric FT3 parity: finish duet/vocal integration with shared system breaks and shared playback mapping (7/43 corpus files warn that vocal details may be omitted).
-- [ ] Normalize remaining multi-verse raw FT3 vocal-text variants (`now_o_now`/`felice`-like cases) beyond current row-preserving decode. Symptom: `lutemusic/01_felice_fu_quel_anon.ft3` renders a blank staff at width 100 — inflated lyric rows make every bar wider than the screen, so the system packer drops all bars.
-- [ ] Wide-corpus smoke test: batch-load a few hundred lutemusic.org files (importer must never crash; count and classify warnings). Keep it as a repeatable script in `scripts/`.
+- [x] Readonly viewer parity for bundled mixed/multi-part FT3 scores: header-boundary staff markers and empty note records are preserved as note staves; `can_she_excuse_4_part.ft3` and `unquiet_thoughts_4-part.ft3` render without unknown staves.
+- [x] Decode all bar-header semantics observed in the bundled corpus: repeats, double bars, system breaks, and the redundant `0x20` repeat-boundary modifier. Isolated unknown marker combinations still warn; unconfirmed FT3 tie/slur/hold and volta storage is post-alpha reverse engineering.
+- [x] Vocal/lyric FT3 viewer parity: structured and recovered text is represented in note/lyric/comment staves, systems share layout, and playback markers use the shared render mapping without partial-support warnings.
+- [x] Normalize multi-verse raw FT3 vocal-text display: auto layout caps an oversized text lane to the viewport and never drops the only bar; `felice` remains visible at width 100 and `now_o_now` retains its recovered verses.
+- [x] Wide-corpus smoke test: batch-load a few hundred lutemusic.org files (importer must never crash; count and classify warnings). Repeatable local/live scanner: `scripts/corpus_smoke.py`.
 
 Editing — alpha quality:
-- [ ] Reflow/transform undo integration: use compound undo grouping for multi-step commands (transpose/retune/reflow).
-- [ ] Manual alpha pass of the full edit loop on a real piece (enter, correct, save, export, reopen); file each paper cut found here.
+- [x] Reflow/transform undo integration: use compound undo grouping for multi-step commands (transpose/retune/reflow).
+- [x] Alpha pass of the full edit loop on a real piece (enter, correct, save, MIDI/LilyPond export, reopen), preserved as `tests/test_release_workflow.py`.
 
 Publication mechanics:
-- [ ] Add a screenshot or asciicast to README (the first thing visitors look at).
-- [ ] Fill `[project.urls]` in pyproject.toml with the repository URL; verify the `oud` name is free on PyPI before any package release (rename the package if taken).
-- [ ] Decide whether the existing git history (personal email in commits) is fine to publish; rewriting or squashing history is only practical before the repo goes public.
-- [ ] First push checklist: commit `uv.lock`, `.github/workflows/ci.yml`, `lutemusic/README.md`; confirm CI green on ubuntu + macos.
+- [x] Add a screenshot or asciicast to README (generated from the real renderer by `scripts/render_readme_screenshot.py`).
+- [x] Fill `[project.urls]` in pyproject.toml; PyPI `oud` endpoint returned 404 on 2026-07-10. Recheck immediately before first upload because names are not reserved.
+- [x] Keep existing git history: audit found only local-host/placeholder/blank emails, not a personal mailbox requiring a rewrite.
+- [ ] Confirm GitHub Actions green on macOS. Required first-push files are already tracked on `origin/main`; the private Actions API is not observable without authentication.
 
 P2 (post-publication features)
 - [ ] Multiple staves per system: add/delete/reorder.
@@ -44,6 +44,7 @@ P2 (post-publication features)
 - [ ] Add custom fret label mapping with validation and export-safe fallback.
 - [ ] Add Spanish tab support.
 - [ ] Continue corpus verification for FT3 metadata aliases if new files expose instrument/style/tuning outside current header extraction.
+- [ ] Reverse-engineer binary FT3 tie/slur/hold and volta/ending storage once confirmed fixtures or a format reference are available.
 - [ ] LilyPond output parity: export imported non-tab staves (vocal-only, mixed vocal+lute, raw note-staff cases) instead of warning-only fallback.
 - [ ] LilyPond output parity: improve native handling of vocal rests/accidentals, FT3 extras, and page/system layout controls.
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Chord, Note
-from oud.core.render_utils import chord_slot_positions
+from oud.petrucci.model import Bar, Chord, Note
+from oud.petrucci.render_utils import chord_slot_positions
 
 
 def duration_value(key: int, style: str) -> int | None:

@@ -2,6 +2,15 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-07-10
+- Extracted the canonical score model and complete tab/vocal/note character-cell renderer into `oud.petrucci`, with a reusable `typeset_piece`/`typeset_text` API and compatibility aliases for former `oud.core`/`oud.ui` paths.
+- Improved import UX: malformed TAB files no longer silently replace an open score, partial TAB bars survive missing end markers, warning summaries point to `:info`, and all import warnings remain visible there.
+- Closed the bundled FT3 viewer blockers: multipart note markers crossing the raw header boundary become note staves, unknown text remains visible as comments, observed bar headers are classified, vocal/multipart playback mapping is covered, and narrow multi-verse scores retain a visible bar.
+- Finished automatable release polish: project URLs and alpha metadata, a renderer-generated README screenshot, a documented release procedure, and an audited decision to retain the existing non-personal commit metadata.
+- Added `scripts/corpus_smoke.py` for local or bounded live lutemusic.org batches; it continues after per-file failures, classifies importer warnings, supports JSON output, and is wired into macOS CI. Release pass: 250/250 live files and 36/36 bundled files loaded with zero errors or warnings.
+- Grouped transpose, retune, and reflow into explicit compound undo entries with regressions.
+- Added a real-piece alpha workflow regression covering enter, correction, TAB save, MIDI/LilyPond export, and reopen.
+
 ## 2026-06-13
 - Fixed `:play`/`M` playback regression: without an explicit end bar it again plays from the start bar to the end of the piece (the loop-range refactor had collapsed it to a single bar) — this was the "no sound on Linux" report.
 - Made visual h/l movement track the rendered cursor exactly: the renderer publishes per-bar logical→display column maps (`cursor_display_maps`), movement steps one display cell per press and lands on each cell's note column (regressions in `tests/test_cursor_display_sync.py`).

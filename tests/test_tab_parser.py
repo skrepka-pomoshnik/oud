@@ -47,6 +47,28 @@ def test_load_tab_simple(tmp_path) -> None:
     assert len(piece.bars[0].chords) == 2
 
 
+def test_load_tab_partial_file_recovers_bars_and_warns(tmp_path) -> None:
+    path = tmp_path / "partial.tab"
+    path.write_text("{Partial}\nb\n0a-----\n", encoding="utf-8")
+
+    parsed = load_tab_data(str(path))
+
+    assert parsed is not None
+    assert len(parsed.piece.bars) == 1
+    assert "missing final 'e'" in parsed.piece.import_warnings[0]
+
+
+def test_load_tab_empty_file_returns_named_warning_piece(tmp_path) -> None:
+    path = tmp_path / "broken.tab"
+    path.write_text("this is not tablature\n", encoding="utf-8")
+
+    piece = load_tab(str(path))
+
+    assert piece.title == "broken"
+    assert piece.bars == []
+    assert "no recoverable bars" in piece.import_warnings[0]
+
+
 def test_load_tab_data_cripps_format(tmp_path) -> None:
     content = "\n".join(
         [

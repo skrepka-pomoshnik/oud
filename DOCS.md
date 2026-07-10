@@ -241,20 +241,22 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - Primary UI is TUI/curses only (Qt backend is future work).
 - Some advanced historical symbols/layouts are partial or pending.
 - Import is best-effort for proprietary formats (FT3/JT* semantics vary).
-- Mixed/non-tab FT3 material is now classified into imported staffs, but full readonly viewer parity for 4-part/general-score FT3 is still incomplete.
+- All bundled mixed/non-tab FT3 files have usable read-only views; unconfirmed proprietary notation details may still be omitted.
 - Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
 
 ## 12) Status and Info Split
 
 - Main status bar keeps live editing context only (bar/beat, duration, time).
 - Path/file metadata is intentionally moved to `:info` to keep editing status compact.
+- Import warnings remain listed in `:info` after their transient status message fades.
 
 ## 11) Architecture Map
 
-- `oud/core/`: model, parsers, time/tuning/render utilities.
+- `oud/petrucci/`: canonical score model, spacing policies, framebuffer, and tab/note renderer.
+- `oud/core/`: file parsers and format-specific import semantics.
 - `oud/editor/`: state + editing ops + command ops + undo/redo.
 - `oud/tui/`: input/prompt/controller/main loop.
-- `oud/ui/`: framebuffer adapter + render/layout mapping.
+- `oud/ui/`: curses adapter plus compatibility paths for the former renderer modules.
 - `oud/exports/`: TAB/LilyPond/MIDI exporters.
 - `oud/plugins/`: plugin implementations.
 
@@ -278,7 +280,7 @@ FT3 import now has two layers:
 - `barline` staffs from `barline-raw`
 - `unknown` only for content still not decoded
 
-This keeps raw FT3 material out of generic unknown blobs and makes later readonly mixed-score rendering tractable.
+This keeps represented FT3 material out of generic unknown blobs and drives the read-only mixed-score view. The bundled corpus currently produces no unknown staffs or import warnings.
 
 ## 13) Rendering Notes
 
@@ -308,3 +310,23 @@ Status values:
 | FT3 -> LilyPond/PDF export semantics | partial | exporter preserves FT3 bar markers/repeats, key parsing, mid-piece meter changes (`C/O/fractions` -> LilyPond `\\time`), and imported FT3 extras in `tabnotation=full`; numeric LH/RH fingerings and thumb pluck use native LilyPond attachments (`-N`, `\\rightHandFinger #N`, `\\rightHandFinger \\markup { "t" }`), while ornaments still fall back to markup. `:pdf`/CLI `convert ... .pdf` path handling is covered, and `:pdf` forces readable full-notation export by default | `tests/test_lilypond.py`, `tests/test_tui_commands_exec.py`, `tests/test_oud_app_cli_more.py` | `test_export_lilypond_ft3_meter_mapping_and_midpiece_changes_synthetic`, `test_export_lilypond_real_ft3_smoke_matrix_if_available`, `test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available` |
 | Polyphonic TabVoice behavior | missing | no independent voice model/collision precedence yet | TODO `P3 LilyPond parity: polyphonic TabVoice behavior...` | n/a |
 | Assignment constraints (`minimumFret`, stretch, forced string) | partial | pure assignment-policy module exists with diagnostics/tests; partially reused by temporary preset converter fallback; not yet wired into general edit/engrave placement paths | `tests/test_tab_assign_policy.py`, `tests/test_tui_commands_exec.py` | `test_assign_chord_pitches_max_stretch_constraint`, `test_cmd_set_guitar_partial_convert_negative_shift_uses_target_tuning_for_next_course` |
+
+## 15) Petrucci Embedding API
+
+`oud.petrucci` can typeset a score without constructing an editor or curses
+window. `typeset_text(...)` returns clean terminal text; `typeset_piece(...)`
+returns a `TypesetResult` containing the fixed-size `Frame` and cursor display
+maps. `TypesetOptions` controls viewport size, bar width, settings, cursor, and
+whether an editor-like status row is included.
+
+The package is the authoritative implementation home for:
+
+- score, bar, chord, note, melody, and lyric event dataclasses
+- French/Italian tablature labels and notation policies
+- rhythm flags, spacing, system packing, and text-lane layout
+- tablature, vocal/lyric, and pitched note-staff character-cell rendering
+- framebuffer snapshots and style attributes
+
+Old `oud.core.*` model/render utility paths and `oud.ui.*` renderer paths are
+module aliases to Petrucci for compatibility; new integrations should import
+from `oud.petrucci`.

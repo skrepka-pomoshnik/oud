@@ -55,9 +55,15 @@ def test_cmd_tool_variants(tmp_path: Path) -> None:
         saves.append(dict(settings))
 
     cfg = str(tmp_path / "cfg.toml")
+    state.stave_breaks = {1}
     state.annotations[(0, 0)] = "x"
     cmd_tool(state, "reflow", cfg, save_fn=_save)
     assert state.message == "Reflowed (breaks cleared)"
+    assert state.stave_breaks == set()
+    assert state.undo_stack[-1].kind == "group"
+    assert state.undo_stack[-1].data["label"] == "reflow"
+    undo(state, config_path=cfg)
+    assert state.stave_breaks == {1}
     cmd_tool(state, "gridflags", cfg, save_fn=_save)
     assert state.settings["flagstyle"] in ("board", "standard")
     cmd_tool(state, "comments", cfg, save_fn=_save)
@@ -99,8 +105,21 @@ def test_cmd_open_appends_import_warning_to_message(tmp_path: Path) -> None:
     )
     assert "Opened" in state.message
     assert "lyric/melody text records" in state.message
+    assert ":info" in state.message
     assert state.insert_prefix == ""
     assert state.replace_once is False
+
+
+def test_cmd_open_empty_tab_preserves_current_score(tmp_path: Path) -> None:
+    state = _state()
+    state.piece.title = "Keep me"
+    target = tmp_path / "broken.tab"
+    target.write_text("not tablature\n", encoding="utf-8")
+
+    cmd_open(state, str(target), no_path_msg="No path", build_durations_fn=None)
+
+    assert state.piece.title == "Keep me"
+    assert "no recoverable bars" in state.message
 
 
 def test_cmd_open_resets_previous_file_state(tmp_path: Path) -> None:

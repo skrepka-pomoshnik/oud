@@ -1,19 +1,5 @@
 from __future__ import annotations
 
-from oud.core.model import Bar
-from oud.core.render_utils import (
-    chord_positions,
-    smart_group_map,
-    soft_beat_snap_map,
-    spread_flag_positions,
-    trim_right_slack_for_onsets,
-)
-from oud.core.tab_policy import (
-    bar_has_multifret_tokens,
-    multifret_event_gap,
-    system_display_indices_for_bars,
-)
-from oud.core.view_model import _filter_redundant_positions, _parse_time_signature, _scale_col
 from oud.editor.layout import (
     auto_system_bar_plan,
     bars_per_line,
@@ -21,6 +7,20 @@ from oud.editor.layout import (
     system_range,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar
+from oud.petrucci.render_utils import (
+    chord_positions,
+    smart_group_map,
+    soft_beat_snap_map,
+    spread_flag_positions,
+    trim_right_slack_for_onsets,
+)
+from oud.petrucci.tab_policy import (
+    bar_has_multifret_tokens,
+    multifret_event_gap,
+    system_display_indices_for_bars,
+)
+from oud.petrucci.view_model import _filter_redundant_positions, _parse_time_signature, _scale_col
 
 
 def bar_content_width_for_cursor(state: EditorState, bar_index: int) -> int:

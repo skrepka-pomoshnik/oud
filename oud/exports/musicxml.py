@@ -4,8 +4,8 @@ import zipfile
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from oud.core.model import Bar, Piece
-from oud.core.time_utils import parse_time_signature_value
+from oud.petrucci.model import Bar, Piece
+from oud.petrucci.time_utils import parse_time_signature_value
 
 MUSICXML_DOCTYPE = (
     '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" '

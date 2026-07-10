@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from oud.core.spacing import auto_bar_plan
-from oud.core.view_model import (
+from oud.editor.state import EditorState
+from oud.petrucci.spacing import auto_bar_plan
+from oud.petrucci.view_model import (
     _next_system_start,
 )
-from oud.editor.state import EditorState
 
 
 def bar_gap(state: EditorState) -> int:
@@ -239,11 +239,11 @@ def auto_system_bar_plan_with_gaps(
     if state.settings.get("layout", "packed") == "auto" and bar_indices:
         # Match renderer's final width normalization so navigation and viewport
         # operate on the same system breaks the user actually sees.
-        from oud.ui.render_system import _redistribute_extra_width  # noqa: PLC0415
+        from oud.petrucci.render_system import _redistribute_extra_width  # noqa: PLC0415
 
         min_widths = _renderer_min_bar_widths(state, bar_indices)
         bar_widths = [
-            max(width, min_width)
+            min(max(1, usable_width), max(width, min_width))
             for width, min_width in zip(bar_widths, min_widths, strict=False)
         ]
         while bar_widths and (sum(bar_widths) + sum(gaps)) > usable_width:
@@ -262,15 +262,15 @@ def auto_system_bar_plan_with_gaps(
 
 def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list[int]:
     """Per-bar minimum display widths, mirroring render_systems' computation."""
-    from oud.core.tab_policy import (  # noqa: PLC0415
-        show_time_cue_for_bar,
-        time_cue_side_pad,
-    )
-    from oud.core.view_model import _parse_time_signature  # noqa: PLC0415
-    from oud.ui.render_system import (  # noqa: PLC0415
+    from oud.petrucci.render_system import (  # noqa: PLC0415
         _required_auto_display_width_for_bar,
         _resolved_bar_time_value,
     )
+    from oud.petrucci.tab_policy import (  # noqa: PLC0415
+        show_time_cue_for_bar,
+        time_cue_side_pad,
+    )
+    from oud.petrucci.view_model import _parse_time_signature  # noqa: PLC0415
 
     bars = state.piece.bars
     barpad_text = state.settings.get("barpad", "1")

@@ -90,6 +90,7 @@ def test_info_help_plugin_and_info_render() -> None:
         footnote_editor="Ed",
         footnote_comment="Fc",
         comment="Commentary",
+        import_warnings=["Recovered partial TAB content."],
     )
     lines = info_lines(
         piece,
@@ -106,6 +107,8 @@ def test_info_help_plugin_and_info_render() -> None:
     assert any(line.startswith("Comment:") and line.endswith("Commentary") for line in lines)
     assert any(line.startswith("LyricBars:") and line.endswith("1") for line in lines)
     assert any(line.startswith("MelodyBars:") and line.endswith("1") for line in lines)
+    assert "Import warnings" in lines
+    assert any("Recovered partial TAB content" in line for line in lines)
     notes = notes_lines(piece)
     assert notes[0] == "NOTES"
     assert any("Sarge Gerbode" in line for line in notes)

@@ -283,8 +283,7 @@ def test_can_she_excuse_ft3_drops_noise_token_from_second_verse_bar_38() -> None
     lyric_rows = [[ev.text for ev in row] for row in bar.lyric_event_rows]
     assert lyric_rows == [["come", "her", "will", "Thy"], ["it", "was", "I", "Who"]]
     assert all("WN" not in text for row in lyric_rows for text in row)
-    assert piece.import_warnings
-    assert "structured records" in piece.import_warnings[0]
+    assert piece.import_warnings == []
     assert any(bar.lyrics for bar in piece.bars)
     assert any(
         bar.melody_grid or bar.melody_events or bar.lyrics or bar.lyric_event_rows
@@ -297,7 +296,7 @@ def test_can_she_excuse_ft3_drops_noise_token_from_second_verse_bar_38() -> None
     assert [ev.text for ev in piece.bars[1].melody_events[:3]] == ["c'", "bb", "a"]
 
 
-def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> None:
+def test_load_ft3_structured_lyric_records_do_not_warn_when_represented(tmp_path) -> None:
     text_record = bytes(32) + b"\x01\x00\x03\x00\x08Can\r\nWas\x06she\r\nI\x07ex-\r\nso\r\n"
     payload = (
         b"CPieceTest\x03\x80CBar"
@@ -311,8 +310,8 @@ def test_load_ft3_structured_lyric_records_emit_specific_warning(tmp_path) -> No
     path = tmp_path / "structured_text.ft3"
     path.write_bytes(payload)
     piece = load_ft3(str(path))
-    assert piece.import_warnings
-    assert "structured text records" in piece.import_warnings[0]
+    assert piece.import_warnings == []
+    assert any(bar.lyric_event_rows for bar in piece.bars)
 
 
 def test_load_ft3_warns_on_additional_unclassified_bar_header_markers(tmp_path) -> None:
@@ -321,6 +320,16 @@ def test_load_ft3_warns_on_additional_unclassified_bar_header_markers(tmp_path) 
     path.write_bytes(payload)
     piece = load_ft3(str(path))
     assert any("additional bar header markers" in warning for warning in piece.import_warnings)
+
+
+def test_load_ft3_accepts_redundant_repeat_boundary_modifier(tmp_path) -> None:
+    payload = b"CPieceTest\x03\x80CBar" + bytes([0xB0, 0x00]) + bytes(30) + b"\x03\x80"
+    path = tmp_path / "known_header_markers.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert not any("additional bar header markers" in warning for warning in piece.import_warnings)
+    assert piece.bars[0].repeat == ":."
+    assert piece.bars[0].barline == "||"
 
 
 def test_load_ft3_attaches_single_structured_editorial_record_to_preceding_bar(tmp_path) -> None:
@@ -440,6 +449,21 @@ def test_load_ft3_classifies_raw_note_staff_chunks_in_imported_score(tmp_path) -
     assert [event.text for event in note_bar.melody_events] == ["g", "b", "d"]
 
 
+def test_load_ft3_classifies_note_marker_crossing_header_boundary(tmp_path) -> None:
+    chunk = bytearray(68)
+    chunk[30:32] = b"\x01\x31"
+    chunk[32:48] = b"\xff" * 16
+    payload = b"CPiece\x04Test\x03\x80CBar" + bytes(chunk) + b"\x03\x80"
+    path = tmp_path / "header_boundary_note_staff.ft3"
+    path.write_bytes(payload)
+    piece = load_ft3(str(path))
+    assert piece.imported_score is not None
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "note" in staffs
+    assert "unknown" not in staffs
+    assert staffs["note"].bars[0].raw_kind == "note-staff-raw"
+
+
 def test_load_ft3_decodes_raw_note_lyric_bars_into_note_and_lyric_staffs(tmp_path) -> None:
     chunk = (
         bytes(32)
@@ -461,7 +485,7 @@ def test_load_ft3_decodes_raw_note_lyric_bars_into_note_and_lyric_staffs(tmp_pat
     assert lyric_bar.lyrics == ["Can"]
 
 
-def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) -> None:
+def test_load_ft3_preserves_unclassified_text_rows_as_comments(tmp_path) -> None:
     text_record = bytes(32) + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n%%%%\r\n"
     payload = (
         b"CPiece\x04Test\x03\x80CBar"
@@ -474,8 +498,9 @@ def test_load_ft3_preserves_font_noise_rows_in_unknown_imported_staff(tmp_path) 
     path.write_bytes(payload)
     piece = load_ft3(str(path))
     assert piece.imported_score is not None
-    unknown_staff = next(staff for staff in piece.imported_score.staffs if staff.kind == "unknown")
-    assert any(row.kind == "font" for bar in unknown_staff.bars for row in bar.text_rows)
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "unknown" not in staffs
+    assert any(row.kind == "font" for bar in staffs["comment"].bars for row in bar.text_rows)
 
 
 def test_load_ft3_does_not_create_unknown_staff_for_font_and_control_rows_only(tmp_path) -> None:

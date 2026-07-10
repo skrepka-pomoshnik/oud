@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from oud.editor.edit_ops import record_action
+from oud.editor.edit_ops import record_action, undo_group
 from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState, UndoAction
 
@@ -34,15 +34,16 @@ def cmd_tool(
 ) -> None:
     value = action.strip() or "reflow"
     if value == "reflow":
-        prev = set(state.stave_breaks)
-        state.stave_breaks.clear()
-        record_action(
-            state,
-            UndoAction(
-                kind="stave-breaks",
-                data={"prev": prev, "new": set(state.stave_breaks)},
-            ),
-        )
+        with undo_group(state, label="reflow"):
+            prev = set(state.stave_breaks)
+            state.stave_breaks.clear()
+            record_action(
+                state,
+                UndoAction(
+                    kind="stave-breaks",
+                    data={"prev": prev, "new": set(state.stave_breaks)},
+                ),
+            )
         state.message = "Reflowed (breaks cleared)"
         return
     if value == "gridflags":

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from oud.core.model import Bar
 from oud.editor.ops import chord_index_at_col
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar
 
 
 @dataclass(frozen=True)

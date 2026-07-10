@@ -8,7 +8,6 @@ from dataclasses import replace
 from pathlib import Path
 
 from oud import __version__
-from oud.core.model import Piece
 from oud.editor.actions import handle_insert, handle_normal
 from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.init import init_state
@@ -17,6 +16,7 @@ from oud.exports.export_tab import export_tab_to_file
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import export_midi
 from oud.exports.musicxml import export_musicxml, export_mxl
+from oud.petrucci.model import Piece
 from oud.settings import DEFAULT_SETTINGS, load_settings
 from oud.tui.commands import apply_command
 from oud.tui.loop import run_loop

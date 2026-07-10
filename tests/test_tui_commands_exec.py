@@ -135,6 +135,8 @@ def test_cmd_transpose_retune_and_courseshift_with_undo(tmp_path: Path) -> None:
     state.cursor_col = 0
     state.cursor_string = 0
     cmd.apply_command(state, "transpose 2", str(tmp_path / "cfg.toml"))
+    assert state.undo_stack[-1].kind == "group"
+    assert state.undo_stack[-1].data["label"] == "transpose 2"
     notes = {(n.string, n.fret) for n in state.piece.bars[0].chords[0].notes}
     assert notes != {(1, 0), (3, 2)}
     assert "Transposed +2" in state.message
@@ -143,6 +145,8 @@ def test_cmd_transpose_retune_and_courseshift_with_undo(tmp_path: Path) -> None:
     assert notes == {(1, 0), (3, 2)}
 
     cmd.apply_command(state, "retune e2a2d3g3b3e4", str(tmp_path / "cfg.toml"))
+    assert state.undo_stack[-1].kind == "group"
+    assert state.undo_stack[-1].data["label"] == "retune e2a2d3g3b3e4"
     assert sorted(parse_tuning_pitches(state.settings["tuning"])) == sorted(
         parse_tuning_pitches("e2a2d3g3b3e4"),
     )

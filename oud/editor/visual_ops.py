@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from oud.core.render_utils import bar_cells, bar_cells_from_chords
 from oud.editor.controller_utils import string_index
 from oud.editor.edit_ops import clear_cell_note, undo_group
 from oud.editor.edit_range import BarRange
 from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState
+from oud.petrucci.render_utils import bar_cells, bar_cells_from_chords
 
 
 def enter_visual_mode(state: EditorState, *, linewise: bool = False) -> None:

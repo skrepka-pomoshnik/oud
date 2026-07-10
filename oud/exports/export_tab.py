@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.model import Piece
-from oud.core.render_utils import (
+from oud.petrucci.model import Piece
+from oud.petrucci.render_utils import (
     bar_cells,
     bar_cells_from_chords,
     chord_positions,

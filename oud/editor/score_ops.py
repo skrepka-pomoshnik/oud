@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 
-from oud.core.model import Bar
 from oud.editor.bar_ops import clear_bar_contents, delete_bar, insert_bar, snapshot_bar
 from oud.editor.edit_ops import record_action
 from oud.editor.edit_range import (
@@ -17,6 +16,7 @@ from oud.editor.messages import NO_BARS
 from oud.editor.motions import apply_motion_target, target_home_bar
 from oud.editor.ops import chord_index_at_col, insert_chord
 from oud.editor.state import EditorState, UndoAction, YankedBar
+from oud.petrucci.model import Bar
 
 
 def _inserted_chord_range(

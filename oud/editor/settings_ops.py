@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from oud.core.tab_policy import apply_tabnotation_preset
-from oud.core.tuning_utils import tuning_preset
 from oud.editor.edit_ops import apply_override
 from oud.editor.ops import (
     french_to_fret,
@@ -12,6 +10,8 @@ from oud.editor.ops import (
     italian_to_fret,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.tab_policy import apply_tabnotation_preset
+from oud.petrucci.tuning_utils import tuning_preset
 from oud.settings import DEFAULT_SETTINGS, save_settings
 
 SetHandler = Callable[[EditorState, str], bool]

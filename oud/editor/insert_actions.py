@@ -3,11 +3,6 @@ from __future__ import annotations
 import copy
 from collections.abc import Callable
 
-from oud.core.render_utils import (
-    chord_slot_positions,
-    format_fret,
-    note_type_to_denom,
-)
 from oud.editor.controller_utils import cursor_key, string_index
 from oud.editor.edit_ops import (
     apply_duration,
@@ -40,6 +35,11 @@ from oud.editor.ops import (
 )
 from oud.editor.rhythm import advance_if_overflow, cell_has_duration
 from oud.editor.state import EditorState, UndoAction
+from oud.petrucci.render_utils import (
+    chord_slot_positions,
+    format_fret,
+    note_type_to_denom,
+)
 
 
 def _column_has_event(state: EditorState, bar_index: int, col: int) -> bool:

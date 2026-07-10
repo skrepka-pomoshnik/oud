@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from oud.core.model import Bar
-from oud.core.render_utils import chord_slot_positions
-from oud.core.tab_policy import rows_reversed, visual_row_indices
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import (
     auto_system_bar_plan_with_gaps,
@@ -19,6 +16,9 @@ from oud.editor.visual_cursor_map import (
     cursor_display_map_for_bar,
     system_display_indices_for_bar,
 )
+from oud.petrucci.model import Bar
+from oud.petrucci.render_utils import chord_slot_positions
+from oud.petrucci.tab_policy import rows_reversed, visual_row_indices
 
 
 @dataclass(frozen=True)

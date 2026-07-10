@@ -2,27 +2,27 @@ from __future__ import annotations
 
 import curses
 
-from oud.core.duet_score import is_duet_score_piece
 from oud.editor.init import init_state
 from oud.editor.playback import update_playback_animation
 from oud.editor.status import status_line
 from oud.editor.transient_message import decay_transient_message
 from oud.editor.view_state import view_commit_frame, view_merge_dirty, view_resize
 from oud.exports.export_tab import export_ascii
-from oud.tui.controller import handle_key as handle_key_impl
-from oud.tui.input import handle_command as handle_command_input
-from oud.tui.input import handle_search as handle_search_input
-from oud.tui.keycodes import keycodes_from_curses
-from oud.tui.viewport import ensure_cursor_visible
-from oud.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
-from oud.ui.framebuffer import (
+from oud.petrucci.duet_score import is_duet_score_piece
+from oud.petrucci.framebuffer import (
     FrameBuffer,
     draw_frame_rows,
     frame_diff_rows,
     overlay_dirty_rows,
     overlay_frame,
 )
-from oud.ui.render import render_piece
+from oud.petrucci.render import render_piece
+from oud.tui.controller import handle_key as handle_key_impl
+from oud.tui.input import handle_command as handle_command_input
+from oud.tui.input import handle_search as handle_search_input
+from oud.tui.keycodes import keycodes_from_curses
+from oud.tui.viewport import ensure_cursor_visible
+from oud.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
 
 
 def run_loop(

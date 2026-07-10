@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from oud.core.model import Bar, Chord, Note, Piece
+from oud.petrucci.model import Bar, Chord, Note, Piece
 
 FLAG_TO_NOTE_TYPE = {
     "W": 2,
@@ -20,6 +20,9 @@ FLAG_TO_NOTE_TYPE = {
     "5": 9,
     "6": 10,
 }
+
+TAB_EMPTY_WARNING = "TAB import found no recoverable bars; opened a blank score instead."
+TAB_INCOMPLETE_WARNING = "TAB appears incomplete (missing final 'e'); recovered {bars} bar(s)."
 
 
 @dataclass(slots=True)
@@ -355,6 +358,7 @@ def parse_tab_lines_data(lines: list[str], strings: int = 6) -> TabData | None: 
     bar_line_spans: list[tuple[int, int]] = []
     current_bar_span_start: int | None = None
     current_bar_span_end: int | None = None
+    saw_end_marker = False
     for line_no, raw in enumerate(lines):
         line = raw.rstrip("\n").rstrip("\r")
         if not line:
@@ -413,6 +417,7 @@ def parse_tab_lines_data(lines: list[str], strings: int = 6) -> TabData | None: 
             current_bar_span_end = line_no
             continue
         if line.strip() == "e":
+            saw_end_marker = True
             _finalize_current_bar(
                 piece,
                 current_bar,
@@ -450,6 +455,10 @@ def parse_tab_lines_data(lines: list[str], strings: int = 6) -> TabData | None: 
         piece.style = "italian"
     if not piece.bars and not piece.title and not piece.author and not piece.composer:
         return None
+    if not piece.bars:
+        piece.import_warnings.append(TAB_EMPTY_WARNING)
+    elif not saw_end_marker:
+        piece.import_warnings.append(TAB_INCOMPLETE_WARNING.format(bars=len(piece.bars)))
     return TabData(
         piece=piece,
         overrides={},
@@ -469,7 +478,9 @@ def load_tab_data(path: str, strings: int = 6) -> TabData | None:
 def load_tab(path: str, strings: int = 6) -> Piece:
     data = load_tab_data(path, strings=strings)
     if data is None:
-        return Piece(title=None, author=None, composer=None, bars=[], strings=strings)
+        piece = Piece(title=Path(path).stem, bars=[], strings=strings)
+        piece.import_warnings.append(TAB_EMPTY_WARNING)
+        return piece
     return data.piece
 
 

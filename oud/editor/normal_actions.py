@@ -111,7 +111,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
                 block_read_only()
                 state.pending_key = ""
                 return True
-            from oud.core.tuning_utils import parse_bass_strings, tuning_count  # noqa: PLC0415
+            from oud.petrucci.tuning_utils import parse_bass_strings, tuning_count  # noqa: PLC0415
 
             tuning = state.settings.get("tuning", "")
             base = tuning_count(tuning) if tuning else state.piece.strings

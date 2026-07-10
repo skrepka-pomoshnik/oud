@@ -5,17 +5,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from oud.core.duet_score import (
+from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
+from oud.petrucci.duet_score import (
     duet_staff_labels,
     is_duet_score_piece,
     split_duet_piece_staff,
     split_duet_span_list,
     split_duet_triplet_map,
 )
-from oud.core.model import Bar, ImportedBarContent, ImportedStaff, Piece
-from oud.core.render_utils import chord_positions, note_type_to_denom
-from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
-from oud.core.vocal_line import infer_vocal_events
+from oud.petrucci.model import Bar, ImportedBarContent, ImportedStaff, Piece
+from oud.petrucci.render_utils import chord_positions, note_type_to_denom
+from oud.petrucci.vocal_line import infer_vocal_events
 
 
 def _escape_lilypond(text: str) -> str:

@@ -1,25 +1,25 @@
 from __future__ import annotations
 
-from oud.core.duet_score import (
-    duet_bar_mapping,
-    duet_logical_bar_count,
-    duet_raw_bar_index,
-    is_duet_score_piece,
-)
 from oud.editor.controller_utils import string_index
 from oud.editor.layout import bars_per_line, dynamic_system_starts, system_index, system_start_index
 from oud.editor.state import EditorState
 from oud.editor.visual_cursor_map import (
     system_display_indices_for_bar as _system_display_indices_for_bar,
 )
-from oud.ui.layout_map import block_height as _block_height
-from oud.ui.render import (
+from oud.petrucci.duet_score import (
+    duet_bar_mapping,
+    duet_logical_bar_count,
+    duet_raw_bar_index,
+    is_duet_score_piece,
+)
+from oud.petrucci.layout_map import block_height as _block_height
+from oud.petrucci.render import (
     _bass_strings_used,
     _piece_has_lyrics,
     _piece_has_melody_grid,
     _piece_lyric_row_count,
 )
-from oud.ui.render_vocal import melody_row_count
+from oud.petrucci.render_vocal import melody_row_count
 
 
 def rows_per_screen(state: EditorState, height: int) -> int:

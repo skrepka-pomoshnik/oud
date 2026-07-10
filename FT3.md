@@ -557,7 +557,7 @@ Classifier rule of thumb:
 | --- | --- |
 | `barline-raw` | parsed bar has meter/barline/repeat but no tab notes |
 | `note-lyric-raw` | raw payload has note markers and text |
-| `note-staff-raw` | raw payload has note markers but little/no text |
+| `note-staff-raw` | raw record has note markers but little/no text; marker search includes bytes 28+ because some markers cross the 32-byte header boundary |
 | `text-score-raw` | raw payload has text but no note markers |
 | `comment-rtf-raw` | raw payload contains RTF/font data |
 
@@ -579,7 +579,8 @@ Current imported staff kinds:
 - `barline`
 - `unknown`
 
-This is the current staging area for non-tab FT3 parity work.
+This is the read-only representation used for non-tab FT3 viewing and the
+staging area for richer proprietary score semantics.
 
 ## 11. Vocal Accidental Handling
 
@@ -708,23 +709,26 @@ These are not yet decoded well enough to call specified.
 
 ### 14.1 Remaining bar header bits
 
-- byte0 bit `0x20`
-- any still-unclassified combinations beyond repeats/double bars/system breaks
+- byte0 bit `0x20` is classified as a redundant boundary modifier when paired
+  with the explicit closing bar and right repeat bits (`0x80 | 0x10`), matching
+  every occurrence in the bundled corpus
+- isolated `0x20` and any still-unclassified combinations beyond
+  repeats/double bars/system breaks remain unknown and produce a warning
 - possible volta / first-ending / second-ending markers, if FT3 stores them in
   the same 32-byte bar header region
 
 `oud` now has manual bar-level ending semantics (`ending_numbers`) for
 playback/rendering, but FT3 import does not yet fill them automatically.
 
-Current corpus evidence suggests `byte0 & 0x20` is not a simple standalone
+Current corpus evidence confirms `byte0 & 0x20` is not a simple standalone
 repeat/volta flag:
 
 - it often appears on otherwise empty bars
 - it often appears immediately before a bar that already carries the explicit
   closing/repeat markers we do decode
 
-So far it looks more like a boundary/meta marker class than a directly playable
-repeat instruction.
+In the observed `0xb0` combination it behaves as a redundant boundary/meta
+modifier rather than a directly playable repeat instruction.
 
 ### 14.2 Ties / slurs / holds in binary FT3
 
@@ -745,14 +749,13 @@ We still do not have a complete note-staff specification for:
 
 ### 14.5 Multi-verse raw vocal text semantics
 
-This remains the biggest parser debt.
+This remains heuristic parser territory rather than a confirmed format rule.
 
 We currently reconstruct many bars successfully, but not yet with a guaranteed
 general rule for all 3-verse raw files.
 
-Examples:
-
-- `now_o_now.ft3` is much improved, but still not edition-quality in every bar.
+The `now_o_now.ft3` and `felice` variants retain their recovered rows and render
+without warnings; exact edition-quality spacing is not guaranteed.
 
 ### 14.6 FT3 instrument/style/tuning fields outside current metadata extraction
 
@@ -880,8 +883,8 @@ Compact practical matrix for the local corpus:
 | FT3 note extras fingering subset | decoded |
 | FT3 note extras ornament subset | decoded subset |
 | ties/slurs/holds in FT3 binary | unknown |
-| remaining header bits beyond current set | unknown |
-| full non-tab score semantics | unknown |
+| bundled bar-header combinations | decoded |
+| full non-tab score semantics | read-only decoded subset |
 
 ## 17. Reimplementation Checklist
 

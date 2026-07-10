@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, replace
 
-from oud.core.model import ImportedTextRow, LyricEvent, MelodyEvent
+from oud.petrucci.model import ImportedTextRow, LyricEvent, MelodyEvent
 
 
 @dataclass(frozen=True)

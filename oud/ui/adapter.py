@@ -3,26 +3,19 @@ from __future__ import annotations
 import contextlib
 import curses
 from dataclasses import dataclass
-from typing import Protocol
 
+from oud.petrucci.screen import A_BOLD, A_REVERSE, CursesError, Screen
 
-class Screen(Protocol):
-    def getmaxyx(self) -> tuple[int, int]:
-        ...
-
-    def addstr(self, y: int, x: int, text: str, attr: int = 0) -> None:
-        ...
-
-    def erase(self) -> None:
-        ...
-
-    def refresh(self) -> None:
-        ...
-
-
-A_BOLD = curses.A_BOLD
-A_REVERSE = curses.A_REVERSE
-CursesError = curses.error
+__all__ = [
+    "A_BOLD",
+    "A_REVERSE",
+    "CursesError",
+    "CursesScreen",
+    "Screen",
+    "apply_theme_background",
+    "contrast_attr",
+    "theme_attr",
+]
 
 _THEME_PAIRS = {"dark": 1, "light": 2}
 _initialized_theme_pairs: set[str] = set()

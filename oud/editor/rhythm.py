@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from oud.core.render_utils import chord_slot_positions, note_type_to_denom
 from oud.editor.motions import apply_motion_target, target_advance_next_bar_home
 from oud.editor.state import EditorState
+from oud.petrucci.render_utils import chord_slot_positions, note_type_to_denom
 
 
 def expected_beats(state: EditorState) -> float | None:

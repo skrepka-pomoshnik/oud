@@ -4,13 +4,13 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from oud.core.tab_assign_policy import assign_chord_pitches
-from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor.ops import (
     french_to_fret,
     fret_to_french,
     fret_to_italian,
     italian_to_fret,
 )
+from oud.petrucci.tuning_utils import parse_tuning_pitches
 
 if TYPE_CHECKING:
     from oud.editor.state import EditorState

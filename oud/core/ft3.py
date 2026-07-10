@@ -14,8 +14,8 @@ from oud.core.ft3_text import (
     parse_ft3_text_record,
     refine_ft3_raw_text_record,
 )
-from oud.core.key_signature import key_signature_accidentals
-from oud.core.model import (
+from oud.petrucci.key_signature import key_signature_accidentals
+from oud.petrucci.model import (
     Bar,
     Chord,
     ImportedBarContent,
@@ -434,30 +434,6 @@ def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
         bar.barline = "||"
 
 
-def _ft3_text_import_warning(records: list[FT3TextRecord]) -> str | None:
-    if not records:
-        return None
-    ascii_fallback = any(record.parse_mode == "ascii" for record in records)
-    has_lyrics = any(record.lyric_event_rows or record.lyrics for record in records)
-    has_melody = any(record.melody_events or record.melody_grid for record in records)
-    has_editorial = any(record.editorial_text for record in records)
-    if ascii_fallback:
-        return "FT3 vocal text imported via raw fallback; lyric alignment may be approximate."
-    if has_lyrics and not has_melody:
-        return (
-            "FT3 lyrics parsed from structured text records; "
-            "melody lane is inferred from tablature."
-        )
-    if has_lyrics or has_melody:
-        return (
-            "FT3 vocal text parsed from structured records; "
-            "some vocal details may still be omitted."
-        )
-    if has_editorial:
-        return "FT3 editorial text parsed from structured records."
-    return None
-
-
 def _record_has_content(record: FT3TextRecord) -> bool:
     return bool(
         record.melody_grid
@@ -472,7 +448,12 @@ def _record_has_content(record: FT3TextRecord) -> bool:
 def _has_unclassified_bar_header_markers(bar_data: bytes) -> bool:
     if len(bar_data) < 1:
         return False
-    return bool(bar_data[0] & 0x20)
+    byte0 = bar_data[0]
+    if not byte0 & 0x20:
+        return False
+    # In the local FT3 corpus 0x20 is a redundant boundary modifier when it
+    # accompanies an explicit closing bar and right repeat (0x80 | 0x10).
+    return byte0 & 0x90 != 0x90
 
 
 def _next_melody_onset(events: list[MelodyEvent]) -> int:
@@ -625,8 +606,19 @@ def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
             if b"{\\rtf" in payload or b"\\fonttbl" in payload:
                 raw_kind = "comment-rtf-raw"
             else:
-                note_staff_markers = (b"\x01\x32", b"\x01\x33", b"\x01\x34", b"\x01\x35")
-                has_note_staff_markers = any(marker in payload for marker in note_staff_markers)
+                note_staff_markers = (
+                    b"\x01\x31",
+                    b"\x01\x32",
+                    b"\x01\x33",
+                    b"\x01\x34",
+                    b"\x01\x35",
+                )
+                # Some score records place the staff marker at bytes 30-31,
+                # crossing the nominal 32-byte header boundary.
+                marker_region = chunk[28:]
+                has_note_staff_markers = any(
+                    marker in marker_region for marker in note_staff_markers
+                )
                 has_text = b"\r\n" in payload and any(
                     (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A) for b in payload
                 )
@@ -680,7 +672,6 @@ def _import_decoded_bar_text_layers(
     note_staff: ImportedStaff,
     lyric_staff: ImportedStaff,
     comment_staff: ImportedStaff,
-    unknown_staff: ImportedStaff,
     bar_index: int,
     bar: Bar,
 ) -> None:
@@ -703,19 +694,17 @@ def _import_decoded_bar_text_layers(
                 text_rows=[row for row in bar.structured_text_rows if row.kind == "lyrics"],
             ),
         )
-    if bar.editorial_text:
+    editorial_text_rows = [row for row in bar.structured_text_rows if row.kind == "editorial"]
+    unknown_text_rows = [row for row in bar.structured_text_rows if row.kind == "unknown"]
+    meta_text_rows = [row for row in bar.structured_text_rows if row.kind in {"font", "control"}]
+    if bar.editorial_text or unknown_text_rows:
         comment_staff.bars.append(
             replace(
                 base,
-                editorial_text=list(bar.editorial_text),
-                text_rows=[row for row in bar.structured_text_rows if row.kind == "editorial"],
+                editorial_text=list(bar.editorial_text)
+                + [row.text for row in unknown_text_rows if row.text],
+                text_rows=editorial_text_rows + unknown_text_rows + meta_text_rows,
             ),
-        )
-    unknown_text_rows = [row for row in bar.structured_text_rows if row.kind == "unknown"]
-    meta_text_rows = [row for row in bar.structured_text_rows if row.kind in {"font", "control"}]
-    if unknown_text_rows:
-        unknown_staff.bars.append(
-            replace(base, text_rows=unknown_text_rows + meta_text_rows, raw_kind="structured-text"),
         )
 
 
@@ -734,6 +723,22 @@ def _append_raw_imported_bar(
     base = _imported_bar_base(bar_index, source_bar)
     if raw_kind == "barline-raw":
         barline_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+    if raw_kind == "note-staff-raw":
+        note_staff.bars.append(
+            replace(
+                base,
+                melody_grid=decoded.melody_grid if decoded is not None else None,
+                melody_events=list(decoded.melody_events) if decoded is not None else [],
+                text_rows=(
+                    [row for row in decoded.structured_rows if row.kind == "vocal"]
+                    if decoded is not None
+                    else []
+                ),
+                raw_kind=raw_kind,
+                raw_size=raw_size,
+            ),
+        )
+        return
     if decoded is not None and decoded.melody_events:
         note_staff.bars.append(
             replace(
@@ -783,7 +788,6 @@ def _build_imported_score(
             note_staff=note_staff,
             lyric_staff=lyric_staff,
             comment_staff=comment_staff,
-            unknown_staff=unknown_staff,
             bar_index=bar_index,
             bar=bar,
         )
@@ -943,10 +947,6 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
             for record in records:
                 _merge_text_record_into_bar(bar, record)
     piece.imported_score = _build_imported_score(piece, unknown_bar_chunks=unknown_bar_chunks)
-    if parsed_text_records:
-        warning = _ft3_text_import_warning(parsed_text_records)
-        if warning:
-            piece.import_warnings.append(warning)
     if has_unclassified_bar_markers:
         piece.import_warnings.append(
             "FT3 contains additional bar header markers; "

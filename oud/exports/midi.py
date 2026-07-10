@@ -6,12 +6,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from oud.core.duet_score import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
-from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.playback_timeline import PlaybackCursor, build_timeline_from_events
-from oud.core.time_utils import parse_time_signature_value
-from oud.core.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
-from oud.core.vocal_line import infer_vocal_events
+from oud.petrucci.duet_score import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.time_utils import parse_time_signature_value
+from oud.petrucci.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
+from oud.petrucci.vocal_line import infer_vocal_events
 
 TICKS_PER_QUARTER = 480
 BASE_NOTE_VELOCITY = 80

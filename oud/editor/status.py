@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.core.time_utils import parse_time_signature_value
 from oud.editor.state import EditorState
+from oud.petrucci.time_utils import parse_time_signature_value
 
 
 def status_line(state: EditorState) -> str:

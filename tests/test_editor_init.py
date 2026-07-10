@@ -22,9 +22,11 @@ def test_init_state_preserves_inferred_ft3_extra_courses() -> None:
     assert state.piece.strings >= 8
 
 
-def test_init_state_shows_import_warning_for_ft3_text_records() -> None:
+def test_init_state_loads_represented_ft3_text_without_warning() -> None:
     state = init_state("lutemusic/can_she_excuse.ft3", config_path="config.toml")
-    assert "structured records" in state.message
+    assert state.message == ""
+    assert state.piece.import_warnings == []
+    assert any(bar.lyric_event_rows for bar in state.piece.bars)
 
 
 def test_init_state_marks_read_only_viewer_mode(tmp_path: Path) -> None:
@@ -58,3 +60,16 @@ def test_init_state_invalid_file_falls_back_to_new_piece_with_warning(
     assert state.path is None
     assert len(state.piece.bars) == 8
     assert "Could not open broken.ft3" in state.message
+
+
+def test_init_state_empty_tab_falls_back_with_visible_warning(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.toml"
+    broken = tmp_path / "broken.tab"
+    broken.write_text("not tablature\n", encoding="utf-8")
+
+    state = init_state(str(broken), config_path=str(cfg))
+
+    assert state.path is None
+    assert len(state.piece.bars) == 8
+    assert "no recoverable bars" in state.message
+    assert ":info" in state.message

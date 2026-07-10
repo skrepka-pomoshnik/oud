@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from oud.core.ft3 import build_durations
-from oud.core.model import Bar
 from oud.core.tab_parser import load_tab_data
-from oud.core.tuning_utils import tuning_count
-from oud.editor.load_ops import load_piece_data
+from oud.editor.load_ops import import_warning_summary, load_piece_data
 from oud.editor.messages import READ_ONLY_VIEWER
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar
+from oud.petrucci.tuning_utils import tuning_count
 from oud.settings import DEFAULT_SETTINGS, load_settings
 
 
@@ -82,7 +82,7 @@ def init_state(  # noqa: C901, PLR0912
     if not state.durations:
         state.durations = build_durations(piece)
     if piece.import_warnings:
-        state.message = piece.import_warnings[0]
+        state.message = import_warning_summary(piece)
     elif read_only:
         state.message = READ_ONLY_VIEWER
     return state

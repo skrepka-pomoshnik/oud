@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from oud.core.time_utils import parse_time_signature_value
 from oud.editor.controller_utils import string_index
 from oud.editor.edit_ops import record_action
 from oud.editor.messages import NO_BARS
 from oud.editor.state import EditorState, UndoAction
+from oud.petrucci.time_utils import parse_time_signature_value
 
 
 def cmd_time(state: EditorState, value: str) -> None:

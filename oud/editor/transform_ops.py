@@ -3,13 +3,13 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
-from oud.core.render_utils import chord_positions
 from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
-from oud.core.tuning_utils import parse_tuning_pitches, tuning_preset
 from oud.editor.controller_utils import string_index
-from oud.editor.edit_ops import record_action
+from oud.editor.edit_ops import record_action, undo_group
 from oud.editor.ops import french_to_fret, fret_to_french, fret_to_italian, italian_to_fret
 from oud.editor.state import EditorState, UndoAction
+from oud.petrucci.render_utils import chord_positions
+from oud.petrucci.tuning_utils import parse_tuning_pitches, tuning_preset
 
 
 @dataclass
@@ -284,14 +284,16 @@ def cmd_transpose(state: EditorState, value: str) -> None:
         state.message = "Transpose must be int"
         return
     tuning_text = state.settings.get("tuning", "")
-    report = transform_score_to_tuning(
-        state,
-        target_tuning_text=tuning_text,
-        target_strings=state.piece.strings,
-        semitones=semitones,
-        label=f"transpose {semitones}",
-        update_settings_tuning=False,
-    )
+    label = f"transpose {semitones}"
+    with undo_group(state, label=label):
+        report = transform_score_to_tuning(
+            state,
+            target_tuning_text=tuning_text,
+            target_strings=state.piece.strings,
+            semitones=semitones,
+            label=label,
+            update_settings_tuning=False,
+        )
     if report.total == 0:
         return
     diag = f" ({report.first_diagnostic})" if report.skipped and report.first_diagnostic else ""
@@ -310,14 +312,16 @@ def cmd_retune(state: EditorState, value: str) -> None:
     if not target_pitches:
         state.message = "Invalid target tuning"
         return
-    report = transform_score_to_tuning(
-        state,
-        target_tuning_text=target_tuning,
-        target_strings=len(target_pitches),
-        semitones=0,
-        label=f"retune {raw}",
-        update_settings_tuning=True,
-    )
+    label = f"retune {raw}"
+    with undo_group(state, label=label):
+        report = transform_score_to_tuning(
+            state,
+            target_tuning_text=target_tuning,
+            target_strings=len(target_pitches),
+            semitones=0,
+            label=label,
+            update_settings_tuning=True,
+        )
     if report.total == 0:
         return
     diag = f" ({report.first_diagnostic})" if report.skipped and report.first_diagnostic else ""
