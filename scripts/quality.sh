@@ -1,37 +1,31 @@
 #!/usr/bin/env bash
-set -u
-set -o pipefail
+set -uo pipefail
 
-LOG_FILE="quality.txt"
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-.uv-cache}"
 STATUS=0
-: > "${LOG_FILE}"
-PY_TARGETS=(app.py cli.py oud tests)
 
-{
-  echo "== ruff check =="
-  if command -v ruff >/dev/null 2>&1; then
-    ruff check --fix "${PY_TARGETS[@]}" || STATUS=1
-    ruff check "${PY_TARGETS[@]}" || STATUS=1
+command -v uv >/dev/null 2>&1 || { echo "ERROR: uv is required" >&2; exit 127; }
+
+run_check() {
+  local label="$1"
+  shift
+  echo "== $label =="
+  if "$@"; then
+    echo "[ok] $label"
   else
-    echo "ruff not found"
+    local exit_code=$?
+    echo "[fail:$exit_code] $label" >&2
     STATUS=1
   fi
   echo
-  echo "== ty check =="
-  if command -v ty >/dev/null 2>&1; then
-    ty check "${PY_TARGETS[@]}" || STATUS=1
-  else
-    echo "ty not found"
-    STATUS=1
-  fi
-  echo
-  echo "== pytest =="
-  if python3 -m pytest --version >/dev/null 2>&1; then
-    python3 -m pytest tests --cov --cov-fail-under=80 || STATUS=1
-  else
-    echo "pytest not found"
-    STATUS=1
-  fi
-} 2>&1 | tee -a "${LOG_FILE}"
+}
 
-exit "${STATUS}"
+run_check "Ruff" uv run ruff check .
+run_check "Ruff format" uv run ruff format --check .
+run_check "Ty" uv run ty check app.py cli.py oud tests
+run_check "Pytest + coverage" uv run pytest tests --cov --cov-fail-under=80
+run_check "Corpus smoke" uv run python scripts/corpus_smoke.py lutemusic
+
+exit "$STATUS"

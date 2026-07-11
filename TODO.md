@@ -9,6 +9,10 @@ Constraints
 - macOS/Linux
 - pure curses, zero runtime dependencies
 
+Repository hygiene
+- [ ] Audit generated artifacts before removing anything: classify caches, `dist/`, `*.egg-info`, `quality.txt`, exported media, and local reports as tracked release material or reproducible local output. Delete only confirmed generated output, never tracked examples or baselines.
+- [ ] Move remaining completed `[x]` roadmap entries from `TODO.md` into `DONE.md` in context-preserving batches; keep this file focused on unfinished work.
+
 P0 (fix immediately)
 - [x] `.tab` import: malformed/empty files show a persistent import warning and cannot replace the active score; partially saved files retain recoverable bars and report the missing end marker.
 - [x] Triage the bundled lutemusic corpus: 36/36 supported files load, all formerly warned content is represented, and the release smoke pass reports zero errors and zero warnings.

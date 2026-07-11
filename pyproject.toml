@@ -33,10 +33,14 @@ oud = "oud.app:main"
 dev = [
   "pytest>=8",
   "ruff>=0.8",
+  "ty",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.ty]
+environment.python-version = "3.11"
 
 [tool.setuptools.packages.find]
 include = ["oud*"]

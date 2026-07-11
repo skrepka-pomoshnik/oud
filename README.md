@@ -1,4 +1,20 @@
-# OUD
+# OUD(1)
+
+## NAME
+
+`oud` - terminal editor and viewer for Renaissance lute tablature
+
+## DISCLAIMER
+
+This project is vibe-coded. Treat its documented format boundaries and quality gates as the source of truth, and preserve source files when testing import or export behavior.
+
+## SYNOPSIS
+
+```text
+oud [FILE]
+```
+
+## DESCRIPTION
 
 Minimal curses editor for Renaissance lute tablature.
 
@@ -12,10 +28,12 @@ Current import/export focus:
 
 ## Docs
 
-- User/developer usage reference: `DOCS.md`
-- Release checklist: `RELEASING.md`
+- [User and developer guide](docs/user-guide.md)
+- [FT3 reverse-engineering notes](docs/ft3-format.md)
+- [Release checklist](docs/releasing.md)
+- [Documentation map](docs/README.md)
 
-## Install
+## QUICK START
 
 ```
 pip install .        # or: uv sync
@@ -123,3 +141,24 @@ The tablature files in `lutemusic/` and most files in `examples/` are typesettin
 by Sarge Gerbode from [lutemusic.org](https://www.lutemusic.org), licensed
 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see
 `lutemusic/README.md`. They are not covered by this project's GPL-3.0 license.
+
+## FILES
+
+- `docs/README.md` - documentation map
+- `docs/user-guide.md` - detailed usage and workflows
+- `docs/ft3-format.md` - reverse-engineered FT3 format notes
+- `docs/releasing.md` - release procedure
+- `scripts/quality.sh` - shared local and CI quality gate
+
+## DEVELOPMENT
+
+```bash
+uv sync --dev
+./scripts/quality.sh
+```
+
+The gate runs Ruff linting, Ruff formatting checks, project-scoped Ty, pytest with coverage, and the corpus smoke test.
+
+## LICENSE
+
+See `LICENSE`.
