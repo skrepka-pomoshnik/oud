@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Piece
 from oud.editor.state import EditorState
 from oud.editor.view_state import (
     view_commit_frame,
@@ -8,7 +7,8 @@ from oud.editor.view_state import (
     view_merge_dirty,
     view_resize,
 )
-from oud.ui.framebuffer import Frame
+from oud.petrucci.framebuffer import Frame
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

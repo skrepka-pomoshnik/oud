@@ -1,12 +1,12 @@
 import pytest
 
-from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor import actions, edit_ops, ops, undo_ops
 from oud.editor import command_ops as cmd_ops
 from oud.editor.controller import handle_key as dispatch_key
 from oud.editor.state import EditorState
-from oud.ui.framebuffer import FrameBuffer
-from oud.ui.render import render_piece
+from oud.petrucci.framebuffer import FrameBuffer
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.render import render_piece
 
 
 def _state() -> EditorState:

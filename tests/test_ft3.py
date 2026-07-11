@@ -10,7 +10,7 @@ from oud.core.ft3 import (
     note_type_to_denominator,
     parse_bar,
 )
-from oud.core.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
+from oud.petrucci.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 
 def test_load_minimal_ft3(tmp_path) -> None:

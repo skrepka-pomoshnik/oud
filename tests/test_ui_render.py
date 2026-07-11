@@ -1,7 +1,14 @@
-from oud.core.model import Bar, Chord, Note, Piece
-from oud.core.render_utils import bar_cells_from_chords
-from oud.core.tuning_utils import default_bass_strings
-from oud.core.view_model import (
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.render import _apply_overrides, _bass_strings_used
+from oud.petrucci.render_system import (
+    _build_chord_scale_map,
+    _chord_positions_distinct,
+    _playback_scaled_col_for_chords,
+    _scale_chord_row,
+)
+from oud.petrucci.render_utils import bar_cells_from_chords
+from oud.petrucci.tuning_utils import default_bass_strings
+from oud.petrucci.view_model import (
     _bar_display_width,
     _bars_fit,
     _inline_bass_row,
@@ -11,13 +18,6 @@ from oud.core.view_model import (
     _string_label,
     _tactus_row,
     _tuning_labels,
-)
-from oud.ui.render import _apply_overrides, _bass_strings_used
-from oud.ui.render_system import (
-    _build_chord_scale_map,
-    _chord_positions_distinct,
-    _playback_scaled_col_for_chords,
-    _scale_chord_row,
 )
 from tests.helpers_regression_cases import mapped_column_transition_piece
 

@@ -1,5 +1,5 @@
-from oud.core.model import Bar, Chord, Note
-from oud.core.tab_policy import (
+from oud.petrucci.model import Bar, Chord, Note
+from oud.petrucci.tab_policy import (
     TAB_NOTATION_PRESETS,
     apply_tabnotation_preset,
     bar_has_multifret_tokens,

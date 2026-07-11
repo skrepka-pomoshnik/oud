@@ -1,4 +1,3 @@
-from oud.core.model import Bar, Chord, Note
 from oud.editor.ops import (
     chord_index_at_col,
     delete_chord,
@@ -13,6 +12,7 @@ from oud.editor.ops import (
     italian_to_fret,
     set_chord_note,
 )
+from oud.petrucci.model import Bar, Chord, Note
 
 
 def test_duration_value_maps_french_keys() -> None:

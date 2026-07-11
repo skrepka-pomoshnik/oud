@@ -5,13 +5,13 @@ from typing import cast
 
 import pytest
 
-from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.core.tab_parser import TabData
-from oud.core.tuning_utils import parse_tuning_pitches
 from oud.editor import command_ops as cmd_ops
 from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.ops import french_to_fret
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from oud.petrucci.tuning_utils import parse_tuning_pitches
 from oud.tui import commands as cmd
 
 
@@ -1039,6 +1039,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_source",
         "cmd_help",
         "cmd_info",
+        "cmd_ack",
         "cmd_notes",
         "cmd_plugins",
         "cmd_bar",

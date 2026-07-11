@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.render_utils import chord_positions, note_type_to_denom
 from oud.core.tab_parser import load_tab
 from oud.editor.load_ops import load_piece_data
 from oud.exports.export_tab import export_tab
+from oud.petrucci.render_utils import chord_positions, note_type_to_denom
 
 
 def _piece_signature(piece) -> tuple:

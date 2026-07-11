@@ -2,11 +2,11 @@ import compileall
 
 
 def test_import_app_module() -> None:
-    __import__("app")
+    __import__("oud.app")
 
 
 def test_import_render_module() -> None:
-    __import__("oud.ui.render")
+    __import__("oud.petrucci.render")
 
 
 def test_import_export_tab_module() -> None:

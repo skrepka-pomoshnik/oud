@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from oud.core.model import Bar, Chord, LyricEvent, Note
-from oud.core.render_utils import smart_group_map, spread_flag_positions
-from oud.core.view_model import _filter_redundant_positions, bar_cells_from_chords
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
-from oud.ui.render_bar import build_flag_rows
-from oud.ui.render_system import (
+from oud.petrucci.model import Bar, Chord, LyricEvent, Note
+from oud.petrucci.render_bar import build_flag_rows
+from oud.petrucci.render_system import (
     _build_chord_scale_map,
     _chord_positions_distinct,
     _grid_display_map,
@@ -16,6 +14,8 @@ from oud.ui.render_system import (
     _required_flag_content_width,
     _scale_chord_row,
 )
+from oud.petrucci.render_utils import smart_group_map, spread_flag_positions
+from oud.petrucci.view_model import _filter_redundant_positions, bar_cells_from_chords
 from tests.helpers_regression_cases import regression_state, stem_alignment_problem_piece
 
 

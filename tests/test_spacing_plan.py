@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Note
-from oud.core.spacing import auto_bar_plan
+from oud.petrucci.model import Bar, Note
+from oud.petrucci.spacing import auto_bar_plan
 
 
 def _bars(count: int) -> list[Bar]:

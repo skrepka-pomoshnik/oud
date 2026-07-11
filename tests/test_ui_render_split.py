@@ -5,19 +5,19 @@ import unicodedata
 
 import pytest
 
-from oud.core.duet_score import (
+from oud.petrucci.duet_score import (
     duet_bar_mapping,
     duet_raw_bar_index,
     duet_staff_labels,
     duet_storage_mode,
     split_duet_piece_staff,
 )
-from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from oud.petrucci.framebuffer import FrameBuffer
+from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from oud.petrucci.render import _apply_overrides, render_piece
+from oud.petrucci.render_text_lanes import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
+from oud.petrucci.render_vocal import melody_row_count
 from oud.ui.adapter import Screen
-from oud.ui.framebuffer import FrameBuffer
-from oud.ui.render import _apply_overrides, render_piece
-from oud.ui.render_text_lanes import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
-from oud.ui.render_vocal import melody_row_count
 from tests.helpers_regression_cases import repeat_and_meter_change_piece
 
 
@@ -188,7 +188,7 @@ def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:
         called["bars_limit"] = kwargs["bars_per_line_limit"]
         called["reverse"] = kwargs["reverse_strings"]
 
-    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("oud.petrucci.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["settings"]["viewinvert"] = "on"
     render_piece(**kwargs)
@@ -203,7 +203,7 @@ def test_render_piece_passes_explicit_barsperline_limit(monkeypatch) -> None:
     def _fake_render_systems(*_args, **kwargs):
         called["bars_limit"] = kwargs["bars_per_line_limit"]
 
-    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("oud.petrucci.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["settings"]["layout"] = "auto"
     kwargs["settings"]["barsperline"] = "4"
@@ -218,7 +218,7 @@ def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
     def _fake_render_systems(*_args, **kwargs):
         called["bars_limit"] = kwargs["bars_per_line_limit"]
 
-    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("oud.petrucci.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["settings"]["layout"] = "auto"
     kwargs["settings"]["barsperline"] = "0"
@@ -244,7 +244,7 @@ def test_render_piece_duet_passes_staff_specific_playback_markers(monkeypatch) -
     def _fake_render_systems(*_args, **kwargs):
         calls.append(list(kwargs["playback_markers"]))
 
-    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("oud.petrucci.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["piece"] = piece
     kwargs["settings"]["duetscoreview"] = "both"
@@ -321,7 +321,7 @@ def test_render_piece_duet_uses_piece_mapping_for_raw_bar_offset(monkeypatch) ->
     def _fake_render_systems(*_args, **kwargs):
         bar_offsets.append(kwargs["bar_offset"])
 
-    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("oud.petrucci.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["piece"] = piece
     kwargs["settings"]["duetscoreview"] = "both"
@@ -1543,7 +1543,7 @@ def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(m
     def _fake_render_systems(*_args, **kwargs):
         captured["show_extras"] = kwargs["show_extras"]
 
-    monkeypatch.setattr("oud.ui.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("oud.petrucci.render.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["settings"]["showextras"] = "on"
     kwargs["settings"]["showspans"] = "off"

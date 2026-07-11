@@ -263,12 +263,12 @@ def cmd_tool(state: EditorState, action: str, config_path: str) -> None:
     _cmd_tool(state, action, config_path, save_fn=save_settings)
 
 
-def cmd_write(state: EditorState, path: str) -> None:
-    _cmd_write(state, path)
+def cmd_write(state: EditorState, path: str) -> bool:
+    return _cmd_write(state, path)
 
 
-def cmd_write_default(state: EditorState, args: str) -> None:
-    _cmd_write_default(state, args)
+def cmd_write_default(state: EditorState, args: str, *, prompt_command: str = "w") -> bool:
+    return _cmd_write_default(state, args, prompt_command=prompt_command)
 
 
 def cmd_write_ascii(state: EditorState, path: str) -> None:

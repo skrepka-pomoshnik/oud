@@ -91,16 +91,9 @@ from oud.editor.state import EditorState
 READ_ONLY_BLOCKED_COMMANDS = frozenset(
     {
         "w",
-        "wa",
-        "wascii",
         "write",
         "set",
         "convert",
-        "midi",
-        "lilypond",
-        "musicxml",
-        "pdf",
-        "print",
         "time",
         "title",
         "author",
@@ -194,6 +187,11 @@ def cmd_help(state: EditorState, _args: str) -> None:
 
 def cmd_info(state: EditorState, _args: str) -> None:
     _cmd_info(state)
+
+
+def cmd_ack(state: EditorState, _args: str) -> None:
+    state.persistent_notice = ""
+    state.message = "Notice acknowledged"
 
 
 def cmd_notes(state: EditorState, _args: str) -> None:
@@ -324,8 +322,8 @@ def cmd_redo(state: EditorState, _args: str, config_path: str) -> None:
     redo(state, config_path=config_path)
 
 
-def cmd_write(state: EditorState, args: str) -> None:
-    cmd_write_default(state, args)
+def cmd_write(state: EditorState, args: str) -> bool:
+    return cmd_write_default(state, args)
 
 
 def cmd_write_ascii(state: EditorState, args: str) -> None:
@@ -403,8 +401,8 @@ def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:
     handler = _command_map().get(cmd)
     if handler is None:
         if cmd in ("wq", "x"):
-            cmd_write(state, args)
-            if state.message.startswith("Wrote "):
+            wrote = cmd_write_default(state, args, prompt_command=cmd)
+            if wrote:
                 raise SystemExit(0)
             return
         state.message = f"Unknown command: {cmdline}"
@@ -419,7 +417,7 @@ class CommandSpec:
     takes_path: bool = False
 
 
-def _no_config(func: Callable[[EditorState, str], None]) -> Callable[[EditorState, str, str], None]:
+def _no_config(func: Callable[[EditorState, str], object]) -> Callable[[EditorState, str, str], None]:
     def _handler(state: EditorState, args: str, _config_path: str) -> None:
         func(state, args)
 
@@ -473,6 +471,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("source", _no_config(cmd_source)),
         CommandSpec("help", _no_config(cmd_help)),
         CommandSpec("info", _no_config(cmd_info)),
+        CommandSpec("ack", _no_config(cmd_ack)),
         CommandSpec("notes", _no_config(cmd_notes)),
         CommandSpec("plugins", _no_config(cmd_plugins)),
         CommandSpec("bar", _no_config(cmd_bar)),
@@ -504,11 +503,11 @@ def _command_map() -> dict[str, Callable[[EditorState, str, str], None]]:
 
 
 def command_names() -> list[str]:
-    return [spec.name for spec in _command_specs()] + ["q", "quit"]
+    return [spec.name for spec in _command_specs()] + ["q", "quit", "wq", "x"]
 
 
 def path_commands() -> set[str]:
-    return {spec.name for spec in _command_specs() if spec.takes_path}
+    return {spec.name for spec in _command_specs() if spec.takes_path} | {"wq", "x"}
 
 
 def no_space_commands() -> set[str]:

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.controller_utils import clamp_cursor
+from oud.editor.document import DocumentMode
 from oud.editor.keycodes import DEFAULT_KEYCODES, KeyCodes
 from oud.editor.transient_message import DEFAULT_MESSAGE_TTL_TICKS
 from oud.petrucci.model import Bar, Chord, Piece
@@ -42,6 +43,12 @@ class EditorState:
         self.message_ttl_ticks = 0
         self.message = ""
         self.path: str | None = None
+        self.write_path: str | None = None
+        self.source_format = "new"
+        self.document_mode = DocumentMode.NATIVE
+        self.forced_read_only = False
+        self.persistent_notice = ""
+        self.pending_overwrite_path: str | None = None
         self.modified = False
         self.clean_undo_depth = 0
         self.undo_stack: list[UndoAction] = []
@@ -117,6 +124,10 @@ class EditorState:
     def message(self, value: str) -> None:
         self._message = value
         self.message_ttl_ticks = DEFAULT_MESSAGE_TTL_TICKS if value else 0
+
+    @property
+    def visible_message(self) -> str:
+        return self.message or self.persistent_notice
 
     @property
     def command_history(self) -> list[str]:

@@ -16,9 +16,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from oud.core.ft3 import load_ft3  # noqa: E402
-from oud.core.model import Piece  # noqa: E402
 from oud.core.plugin_model import RemoteTab  # noqa: E402
 from oud.core.tab_parser import load_tab, load_tab_data  # noqa: E402
+from oud.petrucci.model import Piece  # noqa: E402
 from oud.plugins.lutemusic import (  # noqa: E402
     LUTEMUSIC_URLS,
     download_tab,

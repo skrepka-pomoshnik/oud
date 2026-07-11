@@ -3,7 +3,6 @@ from __future__ import annotations
 import subprocess
 from typing import cast
 
-from oud.core.model import Bar, Chord, Note, Piece
 from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.midi_control import midi_output_path, start_midi, stop_midi
 from oud.editor.playback import (
@@ -14,6 +13,7 @@ from oud.editor.playback import (
     update_playback_animation,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Chord, Note, Piece
 
 
 class _Proc:

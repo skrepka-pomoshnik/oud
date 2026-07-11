@@ -24,11 +24,11 @@ python3 -m oud.app examples/example.ft3
 python3 -m oud.app examples/example.tab
 ```
 
-Also supported wrappers:
+From a checkout:
 
 ```bash
-python3 app.py
-python3 app.py examples/example.ft3
+uv run oud
+uv run oud examples/example.ft3
 ```
 
 ## 3) Modes
@@ -113,7 +113,7 @@ Durations are tracked per onset column and rendered according to current flag st
 ## 6.1 File and session
 
 - `:e <path>` open file
-- `:w [path]` write TAB
+- `:w [path]` write TAB; new/imported documents prompt for a `.tab` destination
 - `:wa [path]` / `:wascii [path]` write ASCII snapshot/export
 - `:wq`, `:x` write + quit
 - `:q!` force quit
@@ -211,13 +211,14 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 ## 9) Typical Workflows
 
-## 9.1 Edit an existing FT3/TAB, export PDF
+## 9.1 Edit a TAB or tab-only FT3 projection, export PDF
 
 1. Open: `:e file.ft3`
-2. Edit in `insert` mode (`i`)
-3. Check bar rhythm: `:verify`
-4. Export LilyPond: `:lilypond out.ly`
-5. Build PDF: `:pdf`
+2. Check the persistent document label. `FT3->TAB?` is editable; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
+3. Edit in `insert` mode (`i`).
+4. Check bar rhythm: `:verify`.
+5. Save with `:w`; imported files prompt for an explicit `.tab` destination and leave the FT3 source unchanged.
+6. Export LilyPond with `:lilypond out.ly` or build PDF with `:pdf`.
 
 ## 9.2 Fast TAB cleanup and reflow
 
@@ -242,13 +243,16 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - Some advanced historical symbols/layouts are partial or pending.
 - Import is best-effort for proprietary formats (FT3/JT* semantics vary).
 - All bundled mixed/non-tab FT3 files have usable read-only views; unconfirmed proprietary notation details may still be omitted.
+- FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
+- The status line always distinguishes the source document from its confirmed TAB write target.
 - Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
 
 ## 12) Status and Info Split
 
-- Main status bar keeps live editing context only (bar/beat, duration, time).
-- Path/file metadata is intentionally moved to `:info` to keep editing status compact.
+- Main status bar keeps the short filename, modified marker, document/write mode, cursor location, and editing mode visible.
+- `:info` retains full source and write-target paths plus detailed file metadata.
 - Import warnings remain listed in `:info` after their transient status message fades.
+- Important import and document notices remain in the status area until `:ack`; the document classification itself is always visible.
 
 ## 11) Architecture Map
 
@@ -256,14 +260,11 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - `oud/core/`: file parsers and format-specific import semantics.
 - `oud/editor/`: state + editing ops + command ops + undo/redo.
 - `oud/tui/`: input/prompt/controller/main loop.
-- `oud/ui/`: curses adapter plus compatibility paths for the former renderer modules.
+- `oud/ui/`: curses adapter.
 - `oud/exports/`: TAB/LilyPond/MIDI exporters.
 - `oud/plugins/`: plugin implementations.
 
-Entry points:
-
-- `app.py` -> `oud/app.py`
-- `cli.py` -> `oud/cli.py`
+Entry point: `oud` -> `oud.app:main`.
 
 ## 12) FT3 Import Layer (Current)
 
@@ -328,6 +329,6 @@ The package is the authoritative implementation home for:
 - tablature, vocal/lyric, and pitched note-staff character-cell rendering
 - framebuffer snapshots and style attributes
 
-Old `oud.core.*` model/render utility paths and `oud.ui.*` renderer paths are
-module aliases to Petrucci for compatibility; new integrations should import
-from `oud.petrucci`.
+`oud.petrucci` is the only public path for these typesetting modules. The former
+`oud.core.*` model/render and `oud.ui.*` renderer aliases were removed before
+the first public release.

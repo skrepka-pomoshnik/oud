@@ -1,19 +1,20 @@
 import curses
 from typing import cast
 
-from oud.core.model import Bar, Piece
 from oud.editor.actions import handle_insert, handle_normal
 from oud.editor.command_ops import cmd_bar, cmd_stave
 from oud.editor.commands import cmd_footnote, cmd_header_template, cmd_subtitle, cmd_title
+from oud.editor.document import configure_document
 from oud.editor.state import EditorState
 from oud.editor.status import status_line
+from oud.petrucci.framebuffer import Frame
+from oud.petrucci.model import Bar, Piece
 from oud.tui.commands import apply_command, apply_set_command
 from oud.tui.controller import handle_key
 from oud.tui.input import handle_command as handle_command_input
 from oud.tui.input import handle_search as handle_search_input
 from oud.tui.input import history_next, history_prev, parse_search
 from oud.tui.loop import run_loop
-from oud.ui.framebuffer import Frame
 
 
 def _state() -> EditorState:
@@ -43,18 +44,17 @@ def _state() -> EditorState:
 
 def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     state = _state()
-    state.path = str(tmp_path / "example.ft3")
-    state.settings["filepath"] = state.path
+    configure_document(state, str(tmp_path / "example.ft3"))
     state.cursor_bar = 1
     state.cursor_string = 2
     state.cursor_col = 3
     state.modified = True
     line = status_line(state)
-    assert "example.ft3" not in line
-    assert line.startswith("*bar:2")
+    assert "example.ft3*" in line
+    assert "[FT3->TAB?]" in line
     assert "bar:2" in line
     assert "beat:2/4" in line
-    assert "str:" not in line
+    assert "str:3" in line
     assert "style:" not in line
 
 

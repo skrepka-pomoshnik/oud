@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Piece
 from oud.editor.state import EditorState
 from oud.editor.transient_message import (
     DEFAULT_MESSAGE_TTL_TICKS,
     decay_transient_message,
 )
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

@@ -21,8 +21,10 @@ Minimal curses editor for Renaissance lute tablature.
 Current import/export focus:
 
 - `.tab` editing and writing
-- `.ft3` import with tab, vocal, lyric, and mixed-score views
+- `.ft3` import with editable tab-only projections and read-only vocal, lyric, duet, and mixed-score views
 - MIDI, LilyPond/PDF, MusicXML, and ASCII export
+
+FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target and never changes the source. FT3 scores containing non-TAB or duet layers open read-only so visible material cannot disappear on save.
 
 ![oud editing a real FT3 score in the terminal](https://raw.githubusercontent.com/skrepka-pomoshnik/oud/main/docs/oud-tui.svg)
 
@@ -57,7 +59,7 @@ python3 scripts/corpus_smoke.py --fetch-lutemusic 250 \
 ```
 oud examples/example.ft3
 # or straight from a checkout:
-python3 app.py examples/example.ft3
+uv run oud examples/example.ft3
 ```
 
 ## Controls (vim)
@@ -93,8 +95,8 @@ ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 ## Commands
 
 ```
-:w [path]       write .tab
-:wa [path]      write ascii
+:w [path]       write .tab (first write prompts for Save As)
+:wa [path]      export ascii without marking the score saved
 :e <path>       open
 :help           open help in less
 :midi [path]    export midi
@@ -125,13 +127,11 @@ midipatch = 24
 - `oud/core/` FT3/TAB/MusicXML parsing and import semantics
 - `oud/editor/` state, ops, undo/redo, commands
 - `oud/tui/` input, controller, viewport
-- `oud/ui/` curses adapter and compatibility imports
+- `oud/ui/` curses adapter
 - `oud/exports/` tab/ly/midi exporters
 - `oud/plugins/` self-contained plugins
 
-Entry points:
-- `app.py` (root wrapper) → `oud/app.py`
-- `cli.py` (root wrapper) → `oud/cli.py`
+Entry point: `oud` -> `oud.app:main`.
 
 ## Thanks
 

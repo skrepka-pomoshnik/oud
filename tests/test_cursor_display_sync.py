@@ -13,10 +13,10 @@ import curses
 from oud.editor import actions
 from oud.editor.controller import handle_key
 from oud.editor.state import EditorState
+from oud.petrucci.framebuffer import FrameBuffer
+from oud.petrucci.render import render_piece
 from oud.tui.commands import apply_command
 from oud.tui.viewport import ensure_cursor_visible
-from oud.ui.framebuffer import FrameBuffer
-from oud.ui.render import render_piece
 from tests.helpers_keyscript import keyscript_state
 
 

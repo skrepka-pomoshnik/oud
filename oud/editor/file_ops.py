@@ -4,6 +4,8 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from oud.editor.document import set_write_target
+from oud.editor.insert_session import set_mode
 from oud.editor.messages import MISSING_LESS, NO_SOURCE_PATH
 from oud.editor.state import EditorState
 from oud.exports.export_tab import export_ascii, export_tab_to_file
@@ -12,45 +14,81 @@ RunFn = Callable[..., subprocess.CompletedProcess[str]]
 WhichFn = Callable[[str], str | None]
 
 
-def cmd_write(state: EditorState, path: str) -> None:
-    export_tab_to_file(
-        path,
-        state.piece,
-        state.overrides,
-        state.durations,
-        state.bar_width,
-        settings=state.settings,
-        dotted=state.dotted,
-        ornaments=state.ornaments,
-        annotations=state.annotations,
-        slurs=state.slurs,
-        ties=state.ties,
-        holds=state.holds,
-    )
+def _normalized_path(path: str) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def _confirm_new_target(state: EditorState, path: str) -> bool:
+    target = _normalized_path(path)
+    established = state.write_path and _normalized_path(state.write_path) == target
+    if not target.exists() or established:
+        state.pending_overwrite_path = None
+        return True
+    if state.pending_overwrite_path == str(target):
+        state.pending_overwrite_path = None
+        return True
+    state.pending_overwrite_path = str(target)
+    state.message = f"File exists; repeat write to replace {target.name}"
+    return False
+
+
+def request_save_as(state: EditorState, command: str = "w") -> None:
+    set_mode(state, "command")
+    state.cmdline = f"{command} "
+    state.message = "Save As .tab; source unchanged"
+
+
+def cmd_write(state: EditorState, path: str) -> bool:
+    target = path.strip()
+    if state.read_only:
+        state.message = "Read-only imported score: TAB write disabled"
+        return False
+    if Path(target).suffix.lower() != ".tab":
+        state.message = "TAB destination must end in .tab"
+        return False
+    if not _confirm_new_target(state, target):
+        return False
+    try:
+        export_tab_to_file(
+            target,
+            state.piece,
+            state.overrides,
+            state.durations,
+            state.bar_width,
+            settings=state.settings,
+            dotted=state.dotted,
+            ornaments=state.ornaments,
+            annotations=state.annotations,
+            slurs=state.slurs,
+            ties=state.ties,
+            holds=state.holds,
+        )
+    except OSError as exc:
+        state.message = f"Write failed: {exc}"
+        return False
+    set_write_target(state, target)
     state.modified = False
     state.clean_undo_depth = len(state.undo_stack)
     state.pending_quit = False
-    state.message = f"Wrote {path}"
+    state.message = f"Wrote TAB {target}"
+    return True
 
 
-def cmd_write_default(state: EditorState, args: str) -> None:
+def cmd_write_default(state: EditorState, args: str, *, prompt_command: str = "w") -> bool:
     path = args.strip()
-    if not path and state.path:
-        path = state.path if state.path.endswith(".tab") else state.path + ".tab"
+    if not path and state.write_path:
+        path = state.write_path
     if not path:
-        state.message = "No path for write"
-        return
-    cmd_write(state, path)
+        request_save_as(state, prompt_command)
+        return False
+    return cmd_write(state, path)
 
 
 def cmd_write_ascii(state: EditorState, path: str) -> None:
     content = render_ascii_snapshot(state)
     with Path(path).open("w", encoding="utf-8") as handle:
         handle.write(content)
-    state.modified = False
-    state.clean_undo_depth = len(state.undo_stack)
-    state.pending_quit = False
-    state.message = f"Wrote {path}"
+    state.message = f"Exported ASCII {path}"
 
 
 def render_ascii_snapshot(state: EditorState) -> str:
@@ -80,7 +118,7 @@ def render_ascii_snapshot(state: EditorState) -> str:
             state.holds,
             state.mode,
             state.cmdline,
-            state.message,
+            state.visible_message,
             status_line(state),
             state.searchline,
             state.settings,

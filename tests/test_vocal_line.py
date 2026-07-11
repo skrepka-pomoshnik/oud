@@ -1,5 +1,5 @@
-from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
-from oud.core.vocal_line import infer_vocal_events
+from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note
+from oud.petrucci.vocal_line import infer_vocal_events
 
 
 def test_infer_vocal_events_without_explicit_melody_uses_all_chord_onsets() -> None:

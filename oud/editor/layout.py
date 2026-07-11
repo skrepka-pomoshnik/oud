@@ -119,10 +119,7 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
     usable_width = max(1, max_width - left_margin - right_padding)
     spacing_mode = state.settings.get("layout", "packed")
     bargap = state.settings.get("bargap", "")
-    if bargap.isdigit():
-        bar_gap = max(0, int(bargap))
-    else:
-        bar_gap = 1 if spacing_mode in ("packed", "auto") else 3
+    bar_gap = max(0, int(bargap)) if bargap.isdigit() else 1 if spacing_mode in ("packed", "auto") else 3
     barsperline = state.settings.get("barsperline", "")
     bars_per_line_limit = 0
     if spacing_mode != "auto":

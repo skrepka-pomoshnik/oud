@@ -164,7 +164,7 @@ def run_loop(
                 state.holds,
                 state.mode,
                 state.cmdline,
-                state.message,
+                state.visible_message,
                 status_line(state),
                 state.searchline,
                 state.settings,

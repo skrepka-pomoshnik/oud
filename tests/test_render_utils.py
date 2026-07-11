@@ -1,5 +1,5 @@
-from oud.core.model import Bar, Chord, Note
-from oud.core.render_utils import (
+from oud.petrucci.model import Bar, Chord, Note
+from oud.petrucci.render_utils import (
     bar_cells,
     bar_cells_from_chords,
     duration_display,

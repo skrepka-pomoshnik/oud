@@ -1,7 +1,7 @@
-from oud.core.model import Bar, Piece
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 from oud.editor.undo_ops import undo
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

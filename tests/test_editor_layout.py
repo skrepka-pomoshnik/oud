@@ -1,4 +1,3 @@
-from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.layout import (
     auto_system_bar_plan_with_gaps,
     bars_per_line,
@@ -7,6 +6,7 @@ from oud.editor.layout import (
     jump_system_row_dynamic,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Chord, Note, Piece
 
 
 def _state(settings: dict[str, str]) -> EditorState:

@@ -2,6 +2,15 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-07-11
+- Removed the root `app.py`/`cli.py` launchers and obsolete `oud.cli`; `oud` -> `oud.app:main` is now the single command path. Removed the former `oud.core` and `oud.ui` Petrucci aliases, migrated tests/scripts to canonical imports, and retained only real parser/domain modules plus the curses adapter.
+- Closed the compatibility-layer static-analysis debt: Ruff and Ty pass, 1101 tests pass, and the local corpus smoke test loads 37/37 files with no errors or warnings.
+- Added explicit document modes and separate source/write-target state. Tab-only FT3 opens as an editable projection with explicit Save As; mixed, vocal-only, and duet FT3 opens read-only so visible non-TAB layers cannot be lost.
+- Replaced implicit `name.ft3.tab` writes with a shared `:w`/`:wq`/`:x` Save As flow, confirmed overwrite handling, truthful modified state, and source-preserving target reuse. ASCII export no longer marks a score saved.
+- Added persistent filename, modified, document-mode, write-target, bar, and string/staff context; added acknowledgeable notices and an 80-column first-run/safety presentation.
+- Added key-driven workflow regressions for save/cancel/overwrite/reopen and solo, mixed, vocal-only, duet, and TAB classification.
+- Reframed the active roadmap around two user-facing alpha blockers: trustworthy FT3 edit/save semantics and persistent workflow context, with explicit macOS interaction tests and release acceptance criteria. Removed completed checklist entries from `TODO.md`; their outcomes remain recorded below.
+
 ## 2026-07-10
 - Extracted the canonical score model and complete tab/vocal/note character-cell renderer into `oud.petrucci`, with a reusable `typeset_piece`/`typeset_text` API and compatibility aliases for former `oud.core`/`oud.ui` paths.
 - Improved import UX: malformed TAB files no longer silently replace an open score, partial TAB bars survive missing end markers, warning summaries point to `:info`, and all import warnings remain visible there.

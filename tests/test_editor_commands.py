@@ -1,4 +1,3 @@
-from oud.core.model import Bar, Piece
 from oud.editor.commands import (
     cmd_author,
     cmd_composer,
@@ -8,6 +7,7 @@ from oud.editor.commands import (
     cmd_title,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

@@ -1,4 +1,4 @@
-from oud.core.tab_style import resolve_tab_style_policy
+from oud.petrucci.tab_style import resolve_tab_style_policy
 
 
 def test_resolve_tab_style_policy_maps_scattered_settings_to_single_bundle() -> None:

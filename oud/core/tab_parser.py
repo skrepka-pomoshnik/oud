@@ -240,10 +240,10 @@ def _tab_delta_reason(
 def _line_slice_has_structural_change(lines: list[str], start: int, end: int) -> bool:
     lo = min(start, end)
     hi = max(start, end)
-    for idx in range(lo, hi + 1):
-        if 0 <= idx < len(lines) and _is_structural_tab_line(lines[idx]):
-            return True
-    return False
+    return any(
+        0 <= idx < len(lines) and _is_structural_tab_line(lines[idx])
+        for idx in range(lo, hi + 1)
+    )
 
 
 def _full_reparse_delta(

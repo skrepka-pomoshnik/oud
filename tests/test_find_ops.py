@@ -1,6 +1,6 @@
-from oud.core.model import Bar, Piece
 from oud.editor.find_ops import perform_find, repeat_find, target_find_col, target_repeat_find
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

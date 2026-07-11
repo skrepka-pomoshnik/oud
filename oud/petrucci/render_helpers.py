@@ -87,6 +87,8 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
 
     fields = [
         line("File:", settings.get("filepath")),
+        line("Write target:", settings.get("writepath")),
+        line("Document:", settings.get("documentmode")),
         line("Terminal:", settings.get("terminal")),
         line("Version:", _PACKAGE_VERSION),
         line("Title:", piece.title),

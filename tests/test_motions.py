@@ -1,4 +1,3 @@
-from oud.core.model import Bar, Piece
 from oud.editor.motions import (
     target_advance_next_bar_home,
     target_bar_end,
@@ -21,6 +20,7 @@ from oud.editor.motions import (
 )
 from oud.editor.navigation import jump_row_visual, move_left_note, move_right_note
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Piece
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 
@@ -299,7 +299,7 @@ def test_target_snap_to_chord_slot_chooses_nearest_chord_position() -> None:
     state.bar_width = 8
     bar = Bar()
     # Three chord onsets; cursor starts between them.
-    from oud.core.model import Chord, Note  # noqa: PLC0415
+    from oud.petrucci.model import Chord, Note  # noqa: PLC0415
 
     bar.chords = [
         Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=0)]),
@@ -307,7 +307,7 @@ def test_target_snap_to_chord_slot_chooses_nearest_chord_position() -> None:
         Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=2)]),
     ]
     state.piece.bars[0] = bar
-    from oud.core.render_utils import chord_positions  # noqa: PLC0415
+    from oud.petrucci.render_utils import chord_positions  # noqa: PLC0415
 
     slots = [col for (col, _denom, _dot) in chord_positions(bar, state.bar_width, default_duration=4)]
     between = next((c for c in range(state.bar_width) if c not in slots), None)

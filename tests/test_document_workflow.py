@@ -1,0 +1,197 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from oud.editor.document import DocumentMode
+from oud.editor.file_ops import cmd_write_ascii
+from oud.editor.init import init_state
+from oud.editor.status import status_line
+from oud.tui.commands import apply_command
+from oud.tui.input import handle_command
+from tests.helpers_keyscript import press_keys
+
+PURE_FT3 = "lutemusic/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
+MIXED_FT3 = "lutemusic/can_she_excuse.ft3"
+DUET_FT3 = "lutemusic/willoughby_duet.ft3"
+VOCAL_ONLY_FT3 = "lutemusic/01_unquiet_thoughts/unquiet_thoughts_4-part.ft3"
+TAB_FILE = "examples/si_par_souffrir.tab"
+
+
+def _submit_command_path(state, path: Path, config_path: str) -> None:
+    def apply(current, command: str) -> None:
+        apply_command(current, command, config_path)
+
+    for char in str(path):
+        handle_command(state, ord(char), apply)
+    handle_command(state, 10, apply)
+
+
+def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
+    config = str(tmp_path / "config.toml")
+
+    projection = init_state(PURE_FT3, config_path=config)
+    assert projection.document_mode is DocumentMode.IMPORTED_PROJECTION
+    assert projection.read_only is False
+    assert projection.write_path is None
+    assert "source unchanged" in projection.visible_message
+
+    mixed = init_state(MIXED_FT3, config_path=config)
+    assert mixed.document_mode is DocumentMode.IMPORTED_READ_ONLY
+    assert mixed.read_only is True
+    assert mixed.visible_message == "non-TAB layers"
+
+    duet = init_state(DUET_FT3, config_path=config)
+    assert duet.document_mode is DocumentMode.IMPORTED_READ_ONLY
+    assert duet.read_only is True
+
+    vocal_only = init_state(VOCAL_ONLY_FT3, config_path=config)
+    assert vocal_only.document_mode is DocumentMode.IMPORTED_READ_ONLY
+    assert vocal_only.read_only is True
+
+    tab = init_state(TAB_FILE, config_path=config)
+    assert tab.document_mode is DocumentMode.NATIVE
+    assert tab.read_only is False
+    assert tab.path == TAB_FILE
+    assert tab.write_path == TAB_FILE
+
+
+def test_first_ft3_write_prompts_and_cancel_preserves_modified_state(tmp_path: Path) -> None:
+    config = str(tmp_path / "config.toml")
+    state = init_state(PURE_FT3, config_path=config)
+    state.modified = True
+
+    apply_command(state, "w", config)
+
+    assert state.mode == "command"
+    assert state.cmdline == "w "
+    assert "Save As" in state.message
+    assert state.path == PURE_FT3
+    assert state.write_path is None
+
+    handle_command(state, 27, lambda current, command: apply_command(current, command, config))
+    assert state.mode == "normal"
+    assert state.modified is True
+    assert state.path == PURE_FT3
+    assert state.write_path is None
+
+
+def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -> None:
+    config = str(tmp_path / "config.toml")
+    target = tmp_path / "projection.tab"
+    state = init_state(PURE_FT3, config_path=config)
+    source = state.path
+    state.modified = True
+
+    apply_command(state, "w", config)
+    _submit_command_path(state, target, config)
+
+    assert target.exists()
+    assert state.path == source
+    assert state.write_path == str(target)
+    assert state.modified is False
+    assert state.settings["filepath"] == source
+    assert state.settings["writepath"] == str(target)
+
+    reopened = init_state(str(target), config_path=config)
+    assert reopened.document_mode is DocumentMode.NATIVE
+    assert reopened.path == str(target)
+    assert reopened.write_path == str(target)
+
+    state.modified = True
+    apply_command(state, "w", config)
+    assert state.mode == "normal"
+    assert state.modified is False
+    assert state.write_path == str(target)
+
+
+@pytest.mark.parametrize("command", ["wq", "x"])
+def test_write_quit_uses_same_save_as_prompt_and_exits_only_after_write(
+    tmp_path: Path,
+    command: str,
+) -> None:
+    config = str(tmp_path / "config.toml")
+    target = tmp_path / "projection.tab"
+    state = init_state(PURE_FT3, config_path=config)
+    state.modified = True
+
+    apply_command(state, command, config)
+    assert state.mode == "command"
+    assert state.cmdline == f"{command} "
+
+    with pytest.raises(SystemExit):
+        _submit_command_path(state, target, config)
+    assert target.exists()
+    assert state.modified is False
+
+
+def test_new_target_requires_overwrite_confirmation(tmp_path: Path) -> None:
+    config = str(tmp_path / "config.toml")
+    target = tmp_path / "existing.tab"
+    target.write_text("keep me\n", encoding="utf-8")
+    state = init_state(None, config_path=config)
+    state.modified = True
+
+    apply_command(state, f"w {target}", config)
+    assert target.read_text(encoding="utf-8") == "keep me\n"
+    assert state.modified is True
+    assert "repeat write" in state.message
+
+    apply_command(state, f"w {target}", config)
+    assert target.read_text(encoding="utf-8") != "keep me\n"
+    assert state.modified is False
+    assert state.write_path == str(target)
+
+
+def test_mixed_ft3_blocks_editing_but_allows_ascii_export(tmp_path: Path) -> None:
+    config = str(tmp_path / "config.toml")
+    output = tmp_path / "view.txt"
+    state = init_state(MIXED_FT3, config_path=config)
+
+    press_keys(state, ["i", "a", 27])
+    assert state.modified is False
+    assert state.overrides == {}
+
+    apply_command(state, f"wa {output}", config)
+    assert output.exists()
+
+
+def test_ascii_export_does_not_mark_score_saved(tmp_path: Path) -> None:
+    state = init_state(None, config_path=str(tmp_path / "config.toml"))
+    state.modified = True
+
+    cmd_write_ascii(state, str(tmp_path / "snapshot.txt"))
+
+    assert state.modified is True
+    assert state.write_path is None
+    assert state.message.startswith("Exported ASCII")
+
+
+def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: Path) -> None:
+    state = init_state(PURE_FT3, config_path=str(tmp_path / "config.toml"))
+    state.screen_width = 80
+    state.modified = True
+    target = tmp_path / "edited.tab"
+    apply_command(state, f"w {target}", state.config_path)
+    state.modified = True
+
+    line = status_line(state)
+
+    assert "unquiet_thoughts_T.ft3*" in line
+    assert "FT3->edited.tab" in line
+    assert "bar:1" in line
+    assert "str:1" in line
+    assert len(line) <= 80
+
+
+def test_persistent_notice_requires_acknowledgement(tmp_path: Path) -> None:
+    state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
+    assert state.persistent_notice
+
+    state.message = ""
+    assert state.visible_message == "non-TAB layers"
+
+    apply_command(state, "ack", state.config_path)
+    assert state.persistent_notice == ""
+    assert state.message == "Notice acknowledged"

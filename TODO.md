@@ -1,97 +1,20 @@
 # TODO
 
-Goal
-Publish on GitHub as a usable alpha: a solid viewer for most lutemusic.org tablature, plus alpha-quality editing. Curses TUI lute tab editor with vim-like controls, FT3 import, TAB read/write, and MIDI/LilyPond/MusicXML export. Keep it unix-way, layered, and suckless.
-Keep a running `DONE.md` log of completed work.
+## P0: Release usability
 
-Constraints
-- Python 3.11+
-- macOS/Linux
-- pure curses, zero runtime dependencies
+Persistent workflow context
+- [ ] Give errors, destructive confirmations, and successful writes distinct terminal attributes while retaining explicit text labels.
+- [ ] Make the cursor's current staff or voice explicit in every mixed-score view; duet staff identity is covered, but imported vocal/note staves still need a precise cursor contract.
+- [ ] Add a real curses resize regression at 80x24 and larger sizes that preserves the score cursor, filename, modified marker, document mode, and write target without overlap.
+- [ ] Add a macOS terminal interaction pass covering first run, open failure, edit/undo, modified quit, first Save As, overwrite refusal, read-only navigation, resize, and reopen.
+- [ ] Verify from visible help alone that a first-time user can open or create a score, enter one note, undo it, save safely, and quit.
+- [ ] Confirm GitHub Actions green on macOS.
 
-Repository hygiene
-- [ ] Audit generated artifacts before removing anything: classify caches, `dist/`, `*.egg-info`, `quality.txt`, exported media, and local reports as tracked release material or reproducible local output. Delete only confirmed generated output, never tracked examples or baselines.
-- [ ] Move remaining completed `[x]` roadmap entries from `TODO.md` into `DONE.md` in context-preserving batches; keep this file focused on unfinished work.
+## Later: Manual page
 
-P0 (fix immediately)
-- [x] `.tab` import: malformed/empty files show a persistent import warning and cannot replace the active score; partially saved files retain recoverable bars and report the missing end marker.
-- [x] Triage the bundled lutemusic corpus: 36/36 supported files load, all formerly warned content is represented, and the release smoke pass reports zero errors and zero warnings.
-
-P1 (publication blockers)
-
-Viewer — support most lutemusic.org tabs:
-- [x] Readonly viewer parity for bundled mixed/multi-part FT3 scores: header-boundary staff markers and empty note records are preserved as note staves; `can_she_excuse_4_part.ft3` and `unquiet_thoughts_4-part.ft3` render without unknown staves.
-- [x] Decode all bar-header semantics observed in the bundled corpus: repeats, double bars, system breaks, and the redundant `0x20` repeat-boundary modifier. Isolated unknown marker combinations still warn; unconfirmed FT3 tie/slur/hold and volta storage is post-alpha reverse engineering.
-- [x] Vocal/lyric FT3 viewer parity: structured and recovered text is represented in note/lyric/comment staves, systems share layout, and playback markers use the shared render mapping without partial-support warnings.
-- [x] Normalize multi-verse raw FT3 vocal-text display: auto layout caps an oversized text lane to the viewport and never drops the only bar; `felice` remains visible at width 100 and `now_o_now` retains its recovered verses.
-- [x] Wide-corpus smoke test: batch-load a few hundred lutemusic.org files (importer must never crash; count and classify warnings). Repeatable local/live scanner: `scripts/corpus_smoke.py`.
-
-Editing — alpha quality:
-- [x] Reflow/transform undo integration: use compound undo grouping for multi-step commands (transpose/retune/reflow).
-- [x] Alpha pass of the full edit loop on a real piece (enter, correct, save, MIDI/LilyPond export, reopen), preserved as `tests/test_release_workflow.py`.
-
-Publication mechanics:
-- [x] Add a screenshot or asciicast to README (generated from the real renderer by `scripts/render_readme_screenshot.py`).
-- [x] Fill `[project.urls]` in pyproject.toml; PyPI `oud` endpoint returned 404 on 2026-07-10. Recheck immediately before first upload because names are not reserved.
-- [x] Keep existing git history: audit found only local-host/placeholder/blank emails, not a personal mailbox requiring a rewrite.
-- [ ] Confirm GitHub Actions green on macOS. Required first-push files are already tracked on `origin/main`; the private Actions API is not observable without authentication.
-
-P2 (post-publication features)
-- [ ] Multiple staves per system: add/delete/reorder.
-- [ ] Merge/split staves into separate voices.
-- [ ] Incremental TAB parser pass: reparse only changed ranges and expose stable AST deltas.
-- [x] Bring duet/mixed-score playback onto the single-staff minimal overlay path; duet cache entries combine both visible staves and map back to either raw FT3 bar.
-- [x] Publish duet renderer cursor display maps under raw FT3 bar indices so editor movement consumes the exact visible map.
-- [ ] Slur/line styles: up/down, vertical/diagonal, thickness controls.
-- [ ] Double/halve rhythm values and normalization at barlines/intervals.
-- [ ] Tablature formatting parity: configurable fret label policies, multi-digit fret collision rules, bass-label policies.
-- [ ] Add custom fret label mapping with validation and export-safe fallback.
-- [ ] Add Spanish tab support.
-- [x] Verify FT3 metadata aliases across the bundled corpus; every observed metadata key maps to a canonical field or a documented key-signature alias.
-- [x] Close unconfirmed binary FT3 tie/slur/hold and volta/ending decoding as unsupported until a verified fixture or format reference exists; residual data stays preserved instead of guessed.
-- [x] Export imported non-tab FT3 material to LilyPond: vocal-only, mixed vocal+lute, raw note-staff, sparse lyrics, and barline-only scores.
-- [x] Export native vocal rests/accidentals, supported FT3 extras, bar structures, and FT3 system breaks to LilyPond. Generic paper/page options remain a P3 layout feature.
-
-P3 (maintainability + advanced parity)
-- [ ] Buffer list / quick switch / prev-next buffer parity.
-- [ ] Register-like macro/prompt buffers.
-- [ ] Generic plugin protocol and plugin lifecycle cleanup.
-- [ ] Partial undo snapshots (system/stave-scoped restore).
-- [ ] True multiple-staves-per-system editing beyond duet hint rendering.
-- [ ] Keep canonical command storage and display formatting separate; audit view-only suppression/de-emphasis rules.
-- [ ] Unify pitch<->string/fret transforms around one shared service for input and export.
-- [ ] Add tab fret-glyph metrics/cache layer so spacing uses measured label width.
-- [ ] Add multi-voice tab collision precedence model before true polyphonic tab voices.
-- [ ] Add German tab support.
-- [ ] Historical style presets (fonts/layouts per source).
-- [ ] MEI import/export support.
-- [ ] Export tablature as graphics formats.
-- [ ] Page layout options (orientation, paper, margins, spacing, indents).
-
-P4 (optional)
-- [ ] Mouse support.
-- [ ] Qt GUI backend adapter over renderer/controller core.
-- [ ] Optional last-system padding/flourish visual policy.
-
-Testing backlog
-- [x] Supported conversion goldens: TAB roundtrip plus FT3-to-model/TAB/MusicXML/LilyPond fixtures.
-- [x] Close FT3 writer goldens as out of scope: FT3 is proprietary and import-only; editable scores leave through TAB, MusicXML, LilyPond, or MIDI.
-- [x] Conversion matrix tests for supported `.ft3`, `.tab`, `.musicxml`, and `.mxl` subsets. MEI remains separate because it is not implemented.
-- [ ] Add `.mei` matrix cases when MEI import/export exists.
-- [ ] Layout-invariant tests: row widths, cue visibility, right-edge alignment, no dropped sparse symbols after reflow/scale.
-- [x] Mixed-score FT3 regressions: raw-prefix plus tab suffix, header-crossing note records, barline-only scores, source-bar lyric alignment, and corpus-wide no-unknown-staff checks.
-- [ ] Port more relevant engraving/layout scenarios from reference suites into synthetic ASCII regressions.
-
-Reference-driven backlog
-
-FT3
-- [x] Complete alpha mixed-score classification: note, lyric, comment, barline, and score-settings records have typed imported staffs; all bundled FT3 files avoid unknown staffs and export without crashing.
-
-Layout references
-- [ ] Improve system/stave-wrap reflow with whole-bar break candidates and preferred barline split points.
-
-MuseScore engraving
-- [ ] Add transaction-style edit grouping around complex operations (reflow, transpose/retune, split/merge).
-
-General
-- [ ] Review remaining reference repos (`VITABS`, `tuitar`, `LuteScribe`, `MuseScore`) only for missing behavior still not mapped here.
+- [ ] Ship a real `oud(1)` manual page that works with `man oud`.
+  - Maintain `man/oud.1.scd` as the readable source and commit generated `man/oud.1` roff output.
+  - Cover synopsis, options and subcommands, files, environment, exit status, examples, diagnostics, and see-also references.
+  - Add reproducible build and user-local installation under `~/.local/share/man/man1` without requiring sudo.
+  - Validate with `mandoc -T lint man/oud.1` and `man -l man/oud.1` when available.
+  - Keep README as the quick-start landing page and the man page as the exhaustive command reference.

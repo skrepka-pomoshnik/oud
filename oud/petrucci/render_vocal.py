@@ -94,10 +94,11 @@ def _scaled_onset_cols_from_lyrics(
     cols: list[int] = []
     prev = max(0, left_pad)
     for onset_idx in range(event_count):
-        if onset_idx in by_onset:
-            src = by_onset[onset_idx]
-        else:
-            src = round((onset_idx / max(1, event_count - 1)) * max_src)
+        src = (
+            by_onset[onset_idx]
+            if onset_idx in by_onset
+            else round((onset_idx / max(1, event_count - 1)) * max_src)
+        )
         col = max(0, left_pad) + min(span - 1, (src * span) // src_den)
         col = min(width - 1, max(prev, col))
         cols.append(col)
@@ -258,10 +259,11 @@ def _scaled_onset_cols_from_events(
     cols: list[int] = []
     prev = max(0, left_pad)
     for onset_idx in range(event_count):
-        if onset_idx in by_onset:
-            src = by_onset[onset_idx]
-        else:
-            src = round((onset_idx / max(1, event_count - 1)) * max_src)
+        src = (
+            by_onset[onset_idx]
+            if onset_idx in by_onset
+            else round((onset_idx / max(1, event_count - 1)) * max_src)
+        )
         col = max(0, left_pad) + min(span - 1, (src * span) // src_den)
         col = min(width - 1, max(prev, col))
         cols.append(col)

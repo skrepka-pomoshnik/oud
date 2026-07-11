@@ -1,5 +1,5 @@
-from oud.core.model import Bar, Piece
 from oud.exports.export_tab import export_ascii, export_tab, export_tab_to_file
+from oud.petrucci.model import Bar, Piece
 
 
 def test_export_tab_includes_headers_and_chords() -> None:

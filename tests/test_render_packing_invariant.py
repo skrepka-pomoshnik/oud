@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from oud.core.model import Bar, Chord, Note, Piece
+from oud.petrucci.framebuffer import FrameBuffer
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.render import render_piece
 from oud.settings import DEFAULT_SETTINGS
-from oud.ui.framebuffer import FrameBuffer
-from oud.ui.render import render_piece
 
 
 def _render(fill: str) -> str:

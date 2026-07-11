@@ -5,6 +5,7 @@ from typing import cast
 
 from oud.editor.bar_ops import clear_bar_contents, delete_bar, insert_bar, restore_bar_snapshot
 from oud.editor.state import BarSnapshot, EditorState, UndoAction
+from oud.petrucci.model import Piece
 from oud.settings import save_settings
 
 
@@ -13,9 +14,9 @@ def _restore_action_cursor(state: EditorState, action: UndoAction, *, redo: bool
     cursor = action.data.get(key)
     if not isinstance(cursor, tuple) or len(cursor) != 3:
         return
-    bar, cursor_string, col = cursor
     if not all(isinstance(value, int) for value in cursor):
         return
+    bar, cursor_string, col = cast(tuple[int, int, int], cursor)
     state.cursor_bar = bar
     state.cursor_string = cursor_string
     state.cursor_col = col
@@ -214,7 +215,7 @@ def apply_action(  # noqa: C901, PLR0911, PLR0912
         return
     if kind == "score-transform":
         payload = cast(dict[str, object], data["after"] if redo else data["before"])
-        piece = payload.get("piece")
+        piece = cast(Piece | None, payload.get("piece"))
         overrides = payload.get("overrides")
         if piece is not None:
             state.piece = copy.deepcopy(piece)

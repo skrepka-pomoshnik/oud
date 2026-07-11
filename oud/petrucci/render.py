@@ -689,10 +689,7 @@ def render_piece(  # noqa: C901, PLR0912
     spacing_mode = settings.get("layout", "packed")
     spacing_fill = settings.get("justify", "stretch")
     bargap = settings.get("bargap", "")
-    if bargap.isdigit():
-        bar_gap = max(0, int(bargap))
-    else:
-        bar_gap = 1 if spacing_mode in ("packed", "auto") else 3
+    bar_gap = max(0, int(bargap)) if bargap.isdigit() else 1 if spacing_mode in ("packed", "auto") else 3
     barpad = 1
     barpad_text = settings.get("barpad", "1")
     if barpad_text.isdigit():
@@ -784,10 +781,7 @@ def render_piece(  # noqa: C901, PLR0912
     chord_wrap_text = settings.get("chordwrap", "")
     if chord_wrap_text.isdigit():
         chord_wrap_limit = int(chord_wrap_text)
-    if spacing_mode == "auto":
-        bars_per_line_limit = 0
-    else:
-        bars_per_line_limit = max(1, usable_width // (bar_width + bar_gap))
+    bars_per_line_limit = 0 if spacing_mode == "auto" else max(1, usable_width // (bar_width + bar_gap))
     barsperline = settings.get("barsperline", "")
     if barsperline.isdigit():
         limit = int(barsperline)

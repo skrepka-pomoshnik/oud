@@ -4,6 +4,7 @@ from pathlib import Path
 
 from oud.core.ft3 import build_durations
 from oud.core.tab_parser import load_tab_data
+from oud.editor.document import configure_document
 from oud.editor.load_ops import import_warning_summary, load_piece_data
 from oud.editor.messages import READ_ONLY_VIEWER
 from oud.editor.state import EditorState
@@ -37,15 +38,13 @@ def init_state(  # noqa: C901, PLR0912
         piece.bars = [Bar() for _ in range(initial_bars)]
 
     state = EditorState(piece, settings, config_path=config_path)
-    state.read_only = read_only
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
     if path and path.lower().endswith(".tab"):
         state.tab_data = load_tab_data(path)
     valid_path = None if invalid_source else path
-    state.path = valid_path
-    state.settings["filepath"] = valid_path or ""
+    configure_document(state, valid_path, forced_read_only=read_only)
     is_tab = bool(path and path.lower().endswith(".tab"))
     if piece.style:
         state.settings["style"] = piece.style
@@ -82,7 +81,9 @@ def init_state(  # noqa: C901, PLR0912
     if not state.durations:
         state.durations = build_durations(piece)
     if piece.import_warnings:
-        state.message = import_warning_summary(piece)
+        warning = import_warning_summary(piece)
+        state.persistent_notice = warning
+        state.message = warning
     elif read_only:
         state.message = READ_ONLY_VIEWER
     return state

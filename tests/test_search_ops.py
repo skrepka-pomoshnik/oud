@@ -1,4 +1,3 @@
-from oud.core.model import Bar, Piece
 from oud.editor.search_ops import (
     jump_mark,
     jump_match,
@@ -11,6 +10,7 @@ from oud.editor.search_ops import (
     target_search_word_under_cursor,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

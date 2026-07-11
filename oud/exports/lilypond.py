@@ -1295,10 +1295,11 @@ def print_lilypond_pdf(ly_path: str, output_base: str | None = None) -> str:
         )
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr or b""
-        if isinstance(stderr, bytes):
-            err = stderr.decode("utf-8", errors="replace").strip()
-        else:
-            err = str(stderr).strip()
+        err = (
+            stderr.decode("utf-8", errors="replace").strip()
+            if isinstance(stderr, bytes)
+            else str(stderr).strip()
+        )
         detail = err.splitlines()[-1] if err else "unknown error"
         return f"LilyPond failed: {detail}"
     pdf_path = (workdir / f"{out_base.name}.pdf").resolve()

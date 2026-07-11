@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from oud.core.model import Piece
 from oud.editor.init import init_state
+from oud.petrucci.model import Piece
 
 
 def test_init_state_new_file_defaults_to_8_bars(tmp_path: Path) -> None:
@@ -26,6 +26,8 @@ def test_init_state_loads_represented_ft3_text_without_warning() -> None:
     state = init_state("lutemusic/can_she_excuse.ft3", config_path="config.toml")
     assert state.message == ""
     assert state.piece.import_warnings == []
+    assert state.read_only is True
+    assert state.visible_message == "non-TAB layers"
     assert any(bar.lyric_event_rows for bar in state.piece.bars)
 
 

@@ -1,4 +1,3 @@
-from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.edit_range import (
     BarRange,
     ChordRange,
@@ -8,6 +7,7 @@ from oud.editor.edit_range import (
     deletable_bar_range_from_cursor,
 )
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Chord, Note, Piece
 
 
 def test_bar_range_single_count_and_indices() -> None:

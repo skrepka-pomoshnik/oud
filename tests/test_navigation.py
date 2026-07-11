@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from oud.core.model import Bar, Chord, Note, Piece
 from oud.editor.init import init_state
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.editor.navigation import (
@@ -18,6 +17,7 @@ from oud.editor.visual_cursor_map import (
     bar_content_width_for_cursor,
     cursor_display_map_for_bar,
 )
+from oud.petrucci.model import Bar, Chord, Note, Piece
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 

@@ -167,14 +167,13 @@ def build_status_lines(
         status = f"/{searchline}"
     if mode == "help":
         status = "help  j/k scroll  q close"
-    if dur_text and mode not in ("command", "search"):
+    if dur_text and not message and mode not in ("command", "search"):
         status = f"{status}  len:{dur_text}"
     if message and mode not in ("command", "search"):
         status = f"{status}  {message}"
     if mode in ("command", "search"):
-        if message and message.startswith(("Matches:", "Options:")):
-            return f"{status}  {message}".strip()
-        return status
+        suffix = f"  {message}" if message else ""
+        return f"{status_line}  {status}{suffix}".strip()
     status_line_text = status_line
     if integrity_marker and status_line_text:
         status_line_text = f"{status_line_text} {integrity_marker}"

@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from oud.core.model import Piece as LegacyPiece
 from oud.petrucci import (
     Bar,
     Chord,
@@ -15,8 +14,6 @@ from oud.petrucci import (
     typeset_piece,
     typeset_text,
 )
-from oud.petrucci import render as petrucci_render
-from oud.ui import render as legacy_render
 
 
 def _score() -> Piece:
@@ -40,11 +37,6 @@ def _score() -> Piece:
         strings=6,
         style="french",
     )
-
-
-def test_petrucci_model_is_canonical_legacy_model() -> None:
-    assert LegacyPiece is Piece
-    assert legacy_render is petrucci_render
 
 
 def test_petrucci_has_no_core_or_ui_imports() -> None:

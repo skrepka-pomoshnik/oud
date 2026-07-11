@@ -477,18 +477,12 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
     move_mode = state.settings.get("movementmode", "visual")
     if key in keys.left:
         for _ in range(count):
-            if move_mode == "note":
-                target = target_move_left_note(state)
-            else:
-                target = target_move_left_visual(state)
+            target = target_move_left_note(state) if move_mode == "note" else target_move_left_visual(state)
             apply_motion_target(state, target)
         return True
     if key in keys.right:
         for _ in range(count):
-            if move_mode == "note":
-                target = target_move_right_note(state)
-            else:
-                target = target_move_right_visual(state)
+            target = target_move_right_note(state) if move_mode == "note" else target_move_right_visual(state)
             apply_motion_target(state, target)
         return True
     if key in keys.up:

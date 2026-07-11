@@ -5,6 +5,7 @@ from pathlib import Path
 from oud.core.ft3 import load_ft3
 from oud.core.musicxml_import import load_musicxml, load_mxl
 from oud.core.tab_parser import TabData, load_tab, load_tab_data
+from oud.editor.document import configure_document
 from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState
 from oud.petrucci.model import Piece
@@ -160,12 +161,11 @@ def cmd_open(
     else:
         state.piece = load_ft3_fn(path)
         state.tab_data = None
-    state.path = path
-    state.settings["filepath"] = path
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
     reset_loaded_file_state(state)
+    configure_document(state, path, forced_read_only=state.forced_read_only)
     if bar_width:
         state.bar_width = max(4, bar_width)
     state.cursor_bar = 0
@@ -177,4 +177,6 @@ def cmd_open(
         state.durations = build_durations_fn(state.piece)
     state.message = f"Opened {path}"
     if state.piece.import_warnings:
-        state.message = f"{state.message} ({import_warning_summary(state.piece)})"
+        warning = import_warning_summary(state.piece)
+        state.persistent_notice = warning
+        state.message = f"{state.message} ({warning})"

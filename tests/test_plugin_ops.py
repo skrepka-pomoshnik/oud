@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.model import Bar, Piece
 from oud.core.plugin_model import RemoteTab
 from oud.editor.plugin_ops import enter_plugin_mode, handle_plugin_key
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

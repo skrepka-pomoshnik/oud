@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Chord, Note, Piece
-from oud.ui.render_status import (
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.render_status import (
     bar_meter_integrity_marker,
     build_status_lines,
     resolve_duration_text,
@@ -51,7 +51,7 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text="8",
     )
-    assert line == ":w"
+    assert line == "base  :w  ok"
     line = build_status_lines(
         mode="command",
         cmdline="e ex",
@@ -60,7 +60,7 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text=None,
     )
-    assert line.startswith(":e ex  Matches:")
+    assert line.startswith("base  :e ex  Matches:")
     line = build_status_lines(
         mode="normal",
         cmdline="",
@@ -69,7 +69,7 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text="4",
     )
-    assert "len:4" in line
+    assert "len:4" not in line
     assert "msg" in line
     assert "base" in line
 

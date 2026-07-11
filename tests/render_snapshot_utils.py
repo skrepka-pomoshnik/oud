@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from oud.core.ft3 import build_durations
-from oud.core.model import Bar, Chord, Note, Piece
-from oud.ui.framebuffer import FrameBuffer
-from oud.ui.render import render_piece
+from oud.petrucci.framebuffer import FrameBuffer
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.render import render_piece
 from tests.helpers_regression_cases import dense_flag_alignment_piece, regression_state
 
 

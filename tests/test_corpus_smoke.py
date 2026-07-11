@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from oud.core.model import Bar, Piece
+from oud.petrucci.model import Bar, Piece
 from scripts import corpus_smoke
 
 

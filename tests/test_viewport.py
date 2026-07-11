@@ -1,8 +1,8 @@
 import pytest
 
-from oud.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
+from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.tui.viewport import ensure_cursor_visible
 from tests.helpers_regression_cases import (
     multi_bar_spacing_piece,

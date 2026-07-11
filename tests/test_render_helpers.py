@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from oud.core.model import Bar, Chord, Note, Piece
-from oud.ui.adapter import CursesError, Screen
-from oud.ui.render_helpers import (
+from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.petrucci.render_helpers import (
     apply_overrides,
     bass_strings_used,
     clean_text,
@@ -16,6 +15,7 @@ from oud.ui.render_helpers import (
     render_plugin,
     safe_addstr,
 )
+from oud.ui.adapter import CursesError, Screen
 
 
 class _Screen(Screen):
