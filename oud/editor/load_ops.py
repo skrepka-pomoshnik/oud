@@ -7,6 +7,7 @@ from oud.core.musicxml_import import load_musicxml, load_mxl
 from oud.core.tab_parser import TabData, load_tab, load_tab_data
 from oud.editor.document import configure_document
 from oud.editor.insert_session import set_mode
+from oud.editor.messages import MessageLevel
 from oud.editor.state import EditorState
 from oud.petrucci.model import Piece
 
@@ -179,4 +180,5 @@ def cmd_open(
     if state.piece.import_warnings:
         warning = import_warning_summary(state.piece)
         state.persistent_notice = warning
+        state.persistent_notice_level = MessageLevel.WARNING
         state.message = f"{state.message} ({warning})"

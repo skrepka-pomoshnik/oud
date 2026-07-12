@@ -171,13 +171,13 @@ def test_render_matrix_bass_rows_show_only_when_used_across_label_policies(bassl
             "showtuning": "on",
             "showdur": "off",
             "showextras": "off",
-                "showtactus": "off",
-                "layout": "packed",
-                "justify": "stretch",
-                "basslabels": basslabels,
-                "linelen": "0",
-                "barsperline": "0",
-                "maxbars": "0",
+            "showtactus": "off",
+            "layout": "packed",
+            "justify": "stretch",
+            "basslabels": basslabels,
+            "linelen": "0",
+            "barsperline": "0",
+            "maxbars": "0",
         },
     )
     without_bass = "\n".join(_render_lines(piece, settings))
@@ -279,16 +279,10 @@ def test_render_matrix_duration_text_stays_aligned_with_flags() -> None:
     )
     lines = _render_lines(piece, settings)
     flag_row = next(line for line in lines if "\\\\" in line)
-    dur_row = next(
-        line
-        for line in lines[lines.index(flag_row) + 1 :]
-        if any(ch.isdigit() for ch in line)
-    )
+    dur_row = next(line for line in lines[lines.index(flag_row) + 1 :] if any(ch.isdigit() for ch in line))
     flag_cols = [idx for idx, ch in enumerate(flag_row) if ch == "|"]
     dur_starts = [
-        idx
-        for idx, ch in enumerate(dur_row)
-        if ch.isdigit() and (idx == 0 or not dur_row[idx - 1].isdigit())
+        idx for idx, ch in enumerate(dur_row) if ch.isdigit() and (idx == 0 or not dur_row[idx - 1].isdigit())
     ]
     assert flag_cols == dur_starts
 
@@ -427,10 +421,7 @@ def test_render_matrix_smart_fill_reaches_right_edge_on_staff_rows() -> None:
     )
     staff_rows = [line for line in lines if "-" in line and "|" in line][:6]
     assert len(staff_rows) == 6
-    right_edges = [
-        max((idx for idx, ch in enumerate(line) if ch != " "), default=-1)
-        for line in staff_rows
-    ]
+    right_edges = [max((idx for idx, ch in enumerate(line) if ch != " "), default=-1) for line in staff_rows]
     assert all(edge == width - 2 for edge in right_edges)
     assert all(line[width - 2] == "|" for line in staff_rows)
 
@@ -488,10 +479,7 @@ def test_render_matrix_empty_bar_does_not_draw_lonely_flag_stem() -> None:
 
 def test_render_matrix_chord_onsets_not_lost_when_flags_are_redundant() -> None:
     bar = Bar(
-        chords=[
-            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, fret, 0)])
-            for fret in range(10)
-        ],
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, fret, 0)]) for fret in range(10)],
     )
     piece = Piece(title="ChordMap", bars=[bar, bar], strings=6)
     settings = dict(DEFAULT_SETTINGS)

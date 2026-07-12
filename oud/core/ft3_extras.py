@@ -11,6 +11,7 @@ class DecodedFT3Extras:
     left_fingering: str | None = None
     right_ornament: str | None = None
     left_ornament: str | None = None
+    arpeggio: str | None = None
     residual: int | None = None
 
 
@@ -26,17 +27,14 @@ _LEFT_FINGERING_BITS: tuple[tuple[int, str], ...] = (
     (0x0080, "3"),
     (0x0100, "4"),
 )
-_LEFT_ORNAMENT_HIGH_BYTE_BITS: tuple[tuple[int, str], ...] = (
-    (0x0400, "#"),
-    (0x0800, "+"),
-    (0x0C00, "x"),
-)
-_RIGHT_ORNAMENT_HIGH_BYTE_BITS: tuple[tuple[int, str], ...] = (
-    (0x0600, "#"),
-)
-_LEFT_ORNAMENT_EXACT_PATTERNS: tuple[tuple[int, str], ...] = (
-    (0x4A00, "dot-left"),
-)
+_LEFT_ORNAMENT_HIGH_BYTES = {0x0400: "#", 0x0800: "+", 0x0C00: "x"}
+_RIGHT_ORNAMENT_HIGH_BYTES = {0x0600: "#", 0x0E00: "x"}
+_ARPEGGIO_HIGH_BYTE_PATTERNS = {
+    0x0200: "single",
+    0x4A00: "bottom",
+    0x4E00: "middle",
+    0x5200: "top",
+}
 
 
 def _pick_single_flag(extras: int, flags: tuple[tuple[int, str], ...]) -> tuple[str | None, int]:
@@ -46,12 +44,19 @@ def _pick_single_flag(extras: int, flags: tuple[tuple[int, str], ...]) -> tuple[
     return None, 0
 
 
+def _decode_ornaments(high_byte: int) -> tuple[str | None, str | None, int]:
+    left = _LEFT_ORNAMENT_HIGH_BYTES.get(high_byte)
+    right = _RIGHT_ORNAMENT_HIGH_BYTES.get(high_byte)
+    return left, right, high_byte if left or right else 0
+
+
 def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
     if extras <= 0:
         return DecodedFT3Extras(raw=extras)
 
     consumed = 0
-    barre = extras == 0x3400
+    # The high-byte barre marker composes with low-byte fingering flags.
+    barre = (extras & 0xFE00) == 0x3400
     if barre:
         consumed |= 0x3400
     right_fingering, used = _pick_single_flag(extras, _RIGHT_FINGERING_BITS)
@@ -59,25 +64,13 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
     left_fingering, used = _pick_single_flag(extras, _LEFT_FINGERING_BITS)
     consumed |= used
 
-    left_ornament: str | None = None
-    for mask, value in _LEFT_ORNAMENT_EXACT_PATTERNS:
-        if extras == mask:
-            consumed |= mask
-            left_ornament = value
-            break
-    if left_ornament is None:
-        for mask, value in _LEFT_ORNAMENT_HIGH_BYTE_BITS:
-            if (extras & 0xFE00) == mask:
-                consumed |= mask
-                left_ornament = value
-                break
+    high_byte = extras & 0xFE00
+    arpeggio = _ARPEGGIO_HIGH_BYTE_PATTERNS.get(high_byte)
+    if arpeggio is not None:
+        consumed |= high_byte
 
-    right_ornament: str | None = None
-    for mask, value in _RIGHT_ORNAMENT_HIGH_BYTE_BITS:
-        if (extras & 0xFE00) == mask:
-            consumed |= mask
-            right_ornament = value
-            break
+    left_ornament, right_ornament, used = _decode_ornaments(high_byte)
+    consumed |= used
 
     residual = extras & ~consumed
     return DecodedFT3Extras(
@@ -87,5 +80,6 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         left_fingering=left_fingering,
         right_ornament=right_ornament,
         left_ornament=left_ornament,
+        arpeggio=arpeggio,
         residual=residual or None,
     )

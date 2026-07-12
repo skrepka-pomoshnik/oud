@@ -27,9 +27,7 @@ class TabStylePolicy:
 
     @property
     def reverse_rows(self) -> bool:
-        return self.viewinvert == "on" or (
-            self.style == "italian" and self.italianorient == "reverse"
-        )
+        return self.viewinvert == "on" or (self.style == "italian" and self.italianorient == "reverse")
 
 
 def resolve_tab_style_policy(settings: dict[str, str]) -> TabStylePolicy:

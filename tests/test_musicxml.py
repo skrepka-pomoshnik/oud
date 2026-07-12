@@ -65,7 +65,7 @@ def test_export_musicxml_signs_fingering_pluck_dynamic_fermata(tmp_path) -> None
                 dotted=False,
                 grid=None,
                 notes=[
-                    Note(1, 1, 0, left_fingering="4", right_fingering="thumb"),
+                    Note(1, 1, 0, left_fingering="4", right_fingering="thumb", arpeggio="single"),
                     Note(2, 3, 0, left_fingering="2", right_fingering="2"),
                 ],
             ),
@@ -88,6 +88,7 @@ def test_export_musicxml_signs_fingering_pluck_dynamic_fermata(tmp_path) -> None
     assert "<dynamics>" in text
     assert "<mf />" in text
     assert "<fermata>normal</fermata>" in text
+    assert "<arpeggiate" in text
     assert "<fingering>4</fingering>" in text
     assert "<fingering>2</fingering>" in text
     assert "<pluck>p</pluck>" in text

@@ -117,9 +117,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("ShowDur:", settings.get("showdur")),
         line(
             "ShowSpans:",
-            "on"
-            if settings.get("showspans", "off") == "on" or settings.get("showextras", "off") == "on"
-            else "off",
+            "on" if settings.get("showspans", "off") == "on" or settings.get("showextras", "off") == "on" else "off",
         ),
         line("ShowFingerings:", settings.get("showfingerings", settings.get("showft3extras"))),
         line("ShowOrnaments:", settings.get("showornaments", settings.get("showft3extras"))),
@@ -144,10 +142,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         warnings = [
             "",
             "Import warnings",
-            *[
-                f"{index}. {warning}"
-                for index, warning in enumerate(piece.import_warnings, start=1)
-            ],
+            *[f"{index}. {warning}" for index, warning in enumerate(piece.import_warnings, start=1)],
         ]
     return ["INFO", "", *fields, *warnings, "", "q/esc to close"]
 
@@ -166,12 +161,7 @@ def notes_lines(piece: Piece) -> list[str]:
         lines.append(f"Editor: {piece.editor}")
     if piece.comment:
         lines.append(f"Comment: {piece.comment}")
-    editorial = [
-        (idx + 1, text)
-        for idx, bar in enumerate(piece.bars)
-        for text in bar.editorial_text
-        if text.strip()
-    ]
+    editorial = [(idx + 1, text) for idx, bar in enumerate(piece.bars) for text in bar.editorial_text if text.strip()]
     if editorial:
         lines.append("")
         lines.append("Bar Comments")
@@ -276,7 +266,7 @@ def flag_symbols(style: str, flaglean: str = "right") -> tuple[str, str]:
 
 def bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:
     used: set[int] = set()
-    for (_bar, string, _col) in overrides:
+    for _bar, string, _col in overrides:
         if string >= 6:
             used.add(string)
     for bar in piece.bars:

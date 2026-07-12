@@ -94,11 +94,7 @@ def _scaled_onset_cols_from_lyrics(
     cols: list[int] = []
     prev = max(0, left_pad)
     for onset_idx in range(event_count):
-        src = (
-            by_onset[onset_idx]
-            if onset_idx in by_onset
-            else round((onset_idx / max(1, event_count - 1)) * max_src)
-        )
+        src = by_onset[onset_idx] if onset_idx in by_onset else round((onset_idx / max(1, event_count - 1)) * max_src)
         col = max(0, left_pad) + min(span - 1, (src * span) // src_den)
         col = min(width - 1, max(prev, col))
         cols.append(col)
@@ -154,11 +150,7 @@ def _dedup_lyric_rows(event_rows: list[list[LyricEvent]]) -> list[list[LyricEven
     out: list[list[LyricEvent]] = []
     seen: set[tuple[tuple[int, str], ...]] = set()
     for row in event_rows:
-        key = tuple(
-            (ev.onset_index, (ev.text or "").strip())
-            for ev in row
-            if (ev.text or "").strip()
-        )
+        key = tuple((ev.onset_index, (ev.text or "").strip()) for ev in row if (ev.text or "").strip())
         if not key or key in seen:
             continue
         seen.add(key)
@@ -259,11 +251,7 @@ def _scaled_onset_cols_from_events(
     cols: list[int] = []
     prev = max(0, left_pad)
     for onset_idx in range(event_count):
-        src = (
-            by_onset[onset_idx]
-            if onset_idx in by_onset
-            else round((onset_idx / max(1, event_count - 1)) * max_src)
-        )
+        src = by_onset[onset_idx] if onset_idx in by_onset else round((onset_idx / max(1, event_count - 1)) * max_src)
         col = max(0, left_pad) + min(span - 1, (src * span) // src_den)
         col = min(width - 1, max(prev, col))
         cols.append(col)

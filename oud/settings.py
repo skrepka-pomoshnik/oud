@@ -16,6 +16,7 @@ def _resolve_config_path(path: str) -> Path:
         return config_home
     return cwd_path
 
+
 DEFAULT_SETTINGS: dict[str, str] = {
     "style": "french",
     "measures": "every",

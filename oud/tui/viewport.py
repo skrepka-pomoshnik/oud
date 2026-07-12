@@ -44,9 +44,7 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     total_strings = state.piece.strings
     base_strings = min(6, total_strings)
     display_indices = list(range(base_strings))
-    display_indices.extend(
-        idx for idx in sorted(used_bass) if base_strings <= idx < total_strings
-    )
+    display_indices.extend(idx for idx in sorted(used_bass) if base_strings <= idx < total_strings)
     display_strings = len(display_indices)
     block_h = _block_height(
         include_meta,
@@ -147,8 +145,7 @@ def _playback_target_bar(state: EditorState) -> int | None:
     if state.playback.markers:
         if is_duet_score_piece(state.piece):
             logical = min(
-                duet_bar_mapping(marker_bar, piece=state.piece)[1]
-                for marker_bar, _marker_col in state.playback.markers
+                duet_bar_mapping(marker_bar, piece=state.piece)[1] for marker_bar, _marker_col in state.playback.markers
             )
             return duet_raw_bar_index(0, logical, piece=state.piece)
         return min(marker_bar for marker_bar, _marker_col in state.playback.markers)
@@ -195,12 +192,8 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
     # Clamp cursor to rows that are actually visible in the current rendered system.
     # Auto layout hides unused bass rows per system, so a globally valid cursor_string
     # can become invisible after J/K jumps.
-    reverse_strings = (
-        state.settings.get("viewinvert", "off") == "on"
-        or (
-            state.settings.get("style") == "italian"
-            and state.settings.get("italianorient", "normal") == "reverse"
-        )
+    reverse_strings = state.settings.get("viewinvert", "off") == "on" or (
+        state.settings.get("style") == "italian" and state.settings.get("italianorient", "normal") == "reverse"
     )
     display_indices = _system_display_indices_for_bar(state, state.cursor_bar)
     if not display_indices:

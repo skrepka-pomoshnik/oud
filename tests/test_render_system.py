@@ -160,9 +160,7 @@ def test_first_synthetic_bar_stem_aligns_to_second_string_note() -> None:
     positions, width = _chord_positions_distinct(bar, bar_width=10, default_duration=4)
     _, src_to_dest = _build_chord_scale_map(positions, bar_width=width, content_width=10)
     filtered = _filter_redundant_positions(positions)
-    render_positions = [
-        (src_to_dest.get(col, 0), denom, dot) for col, denom, dot in filtered
-    ]
+    render_positions = [(src_to_dest.get(col, 0), denom, dot) for col, denom, dot in filtered]
     flags, _stems = build_flag_rows(
         render_positions,
         spacing_mode="fixed",
@@ -202,9 +200,7 @@ def test_smart_flags_align_with_note_columns_in_synthetic_dense_bar() -> None:
         content_width=content_width,
         min_gap=2,
     )
-    render_positions = [
-        (src_to_dest.get(col, 0), denom, dot) for (col, denom, dot) in ordered_flags
-    ]
+    render_positions = [(src_to_dest.get(col, 0), denom, dot) for (col, denom, dot) in ordered_flags]
     final_positions = spread_flag_positions(render_positions, content_width, min_gap=1)
     final_map = {
         raw_col: final_col
@@ -315,9 +311,7 @@ def test_all_synthetic_8course_smart_stems_have_notes_underneath() -> None:
                 french_c="normal",
             )
             visible_cols = {
-                col
-                for col in range(grid_width)
-                if any(cells[s][col] != "-" for s in range(state.piece.strings))
+                col for col in range(grid_width) if any(cells[s][col] != "-" for s in range(state.piece.strings))
             }
             positions = [item for item in positions if item[0] in visible_cols]
             ordered_flags = sorted(_filter_redundant_positions(positions), key=lambda item: item[0])

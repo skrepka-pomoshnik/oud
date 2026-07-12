@@ -22,14 +22,8 @@ def expected_beats(state: EditorState) -> float | None:
 
 
 def column_duration(state: EditorState, bar_index: int, col: int) -> float | None:
-    has_note = any(
-        (bar_index, s_idx, col) in state.overrides
-        for s_idx in range(state.piece.strings)
-    )
-    has_duration = any(
-        (bar_index, s_idx, col) in state.durations
-        for s_idx in range(state.piece.strings)
-    )
+    has_note = any((bar_index, s_idx, col) in state.overrides for s_idx in range(state.piece.strings))
+    has_duration = any((bar_index, s_idx, col) in state.durations for s_idx in range(state.piece.strings))
     if not (has_note or has_duration):
         return None
     found = None
@@ -59,10 +53,7 @@ def column_denom(state: EditorState, bar_index: int, col: int) -> int:
 
 
 def column_has_duration(state: EditorState, bar_index: int, col: int) -> bool:
-    return any(
-        (bar_index, s_idx, col) in state.durations
-        for s_idx in range(state.piece.strings)
-    )
+    return any((bar_index, s_idx, col) in state.durations for s_idx in range(state.piece.strings))
 
 
 def cell_has_duration(state: EditorState, bar_index: int, string: int, col: int) -> bool:
@@ -127,14 +118,8 @@ def bar_duration_sum_by_col(state: EditorState, bar_index: int) -> float:  # noq
         return total
     total = 0.0
     for col in range(state.bar_width):
-        has_note = any(
-            (bar_index, s_idx, col) in state.overrides
-            for s_idx in range(state.piece.strings)
-        )
-        has_duration = any(
-            (bar_index, s_idx, col) in state.durations
-            for s_idx in range(state.piece.strings)
-        )
+        has_note = any((bar_index, s_idx, col) in state.overrides for s_idx in range(state.piece.strings))
+        has_duration = any((bar_index, s_idx, col) in state.durations for s_idx in range(state.piece.strings))
         if not (has_note or has_duration):
             continue
         found = None

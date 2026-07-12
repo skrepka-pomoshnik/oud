@@ -32,6 +32,7 @@ oud = "oud.app:main"
 [dependency-groups]
 dev = [
   "pytest>=8",
+  "pytest-cov>=7.1.0",
   "ruff>=0.8",
   "ty",
 ]

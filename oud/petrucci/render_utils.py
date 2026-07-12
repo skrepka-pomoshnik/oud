@@ -77,7 +77,9 @@ def note_type_to_denom(note_type: int) -> int | None:
 
 
 def chord_positions(
-    bar: Bar, bar_width: int, default_duration: int,
+    bar: Bar,
+    bar_width: int,
+    default_duration: int,
 ) -> list[tuple[int, int, bool]]:
     chords = [chord for chord in (bar.chords or []) if chord.notes]
     denoms: list[int] = []
@@ -264,9 +266,7 @@ def spread_flag_positions(
     while gap >= 0:
         solved = _solve_spread_cols(ordered, spans, bar_width, gap)
         if solved is not None:
-            return [
-                (solved[idx], denom, dot) for idx, (_c, denom, dot) in enumerate(ordered)
-            ]
+            return [(solved[idx], denom, dot) for idx, (_c, denom, dot) in enumerate(ordered)]
         gap -= 1
 
     cols = _fallback_spread_cols(len(ordered), spans, bar_width)
@@ -424,10 +424,7 @@ def soft_beat_snap_map(
 
     width = max(1, grid_width)
     bucket_count = max(1, beats)
-    raw_buckets = [
-        min(bucket_count - 1, (raw_col * bucket_count) // width)
-        for (raw_col, _denom, _dot) in ordered
-    ]
+    raw_buckets = [min(bucket_count - 1, (raw_col * bucket_count) // width) for (raw_col, _denom, _dot) in ordered]
     min_bucket = min(raw_buckets)
     max_bucket = max(raw_buckets)
     active_bucket_count = max(1, (max_bucket - min_bucket) + 1)
@@ -444,9 +441,7 @@ def soft_beat_snap_map(
         if raw_end == raw_start:
             target = dst_start
         else:
-            target = dst_start + ((raw_col - raw_start) * max(0, dst_end - dst_start)) // (
-                raw_end - raw_start
-            )
+            target = dst_start + ((raw_col - raw_start) * max(0, dst_end - dst_start)) // (raw_end - raw_start)
         seeded.append((max(0, min(content_width - 1, target)), denom, dot))
         raw_cols.append(raw_col)
 
@@ -457,10 +452,7 @@ def soft_beat_snap_map(
     # not visible flag tails.
     unit_seeded = [(col, 2, False) for (col, _denom, _dot) in seeded]
     spread = spread_flag_positions(unit_seeded, content_width, min_gap=max(0, min_gap))
-    return {
-        raw: col
-        for raw, (col, _denom, _dot) in zip(raw_cols, spread, strict=False)
-    }
+    return {raw: col for raw, (col, _denom, _dot) in zip(raw_cols, spread, strict=False)}
 
 
 def trim_right_slack_for_onsets(
@@ -476,9 +468,7 @@ def trim_right_slack_for_onsets(
     last_raw = max(col for (col, _denom, _dot) in all_positions)
     if last_raw not in src_to_dest:
         return src_to_dest
-    visible_map = {
-        col: (denom, dot) for (col, denom, dot) in (visible_positions or all_positions)
-    }
+    visible_map = {col: (denom, dot) for (col, denom, dot) in (visible_positions or all_positions)}
     required_slack = 1
     if last_raw in visible_map:
         denom, dot = visible_map[last_raw]

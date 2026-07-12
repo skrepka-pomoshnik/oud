@@ -132,11 +132,7 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
     if maxbars.isdigit():
         limit = int(maxbars)
         if limit > 0:
-            bars_per_line_limit = (
-                limit
-                if bars_per_line_limit <= 0
-                else min(bars_per_line_limit, limit)
-            )
+            bars_per_line_limit = limit if bars_per_line_limit <= 0 else min(bars_per_line_limit, limit)
     starts = [0]
     current = 0
     while current < total:
@@ -208,11 +204,7 @@ def auto_system_bar_plan_with_gaps(
     if maxbars.isdigit():
         value = int(maxbars)
         if value > 0:
-            bars_per_line_limit = (
-                value
-                if bars_per_line_limit <= 0
-                else min(bars_per_line_limit, value)
-            )
+            bars_per_line_limit = value if bars_per_line_limit <= 0 else min(bars_per_line_limit, value)
     max_chords_text = state.settings.get("maxchords", "0")
     max_chords = int(max_chords_text) if max_chords_text.isdigit() else 0
     chord_wrap_text = state.settings.get("chordwrap", "0")
@@ -286,11 +278,7 @@ def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list
     for abs_bar in bar_indices:
         current_time = _resolved_bar_time_value(state.piece, abs_bar, time_setting, 4)
         _beats, _unit, sig_label = _parse_time_signature(current_time)
-        prev_time = (
-            _resolved_bar_time_value(state.piece, abs_bar - 1, time_setting, 4)
-            if abs_bar > 0
-            else None
-        )
+        prev_time = _resolved_bar_time_value(state.piece, abs_bar - 1, time_setting, 4) if abs_bar > 0 else None
         show_cue = show_time_cue_for_bar(
             bar_index=abs_bar,
             current_time_value=current_time,

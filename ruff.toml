@@ -31,6 +31,7 @@ select = [
   "SIM",
 ]
 ignore = [
+  "COM812", # Conflicts with Ruff's formatter; retain the rest of the COM rules.
   "FBT",
   "PLR0913",
   "PLR0915",

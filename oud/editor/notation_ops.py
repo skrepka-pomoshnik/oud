@@ -67,8 +67,7 @@ def cmd_repeat(state: EditorState, value: str) -> None:
         "dsalcoda",
     }:
         state.message = (
-            "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
-            "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
+            "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
         )
         return
     set_repeat(state, normalized)
@@ -112,7 +111,7 @@ def cmd_fermata(state: EditorState, value: str) -> None:
 
 
 def cmd_arpeggio(state: EditorState, value: str) -> None:
-    normalized = (value.strip().lower() or "toggle")
+    normalized = value.strip().lower() or "toggle"
     if normalized not in {"on", "off", "toggle"}:
         state.message = "Arpeggio must be on/off/toggle"
         return
@@ -120,7 +119,7 @@ def cmd_arpeggio(state: EditorState, value: str) -> None:
 
 
 def cmd_separee(state: EditorState, value: str) -> None:
-    normalized = (value.strip().lower() or "toggle")
+    normalized = value.strip().lower() or "toggle"
     if normalized not in {"on", "off", "toggle"}:
         state.message = "Separee must be on/off/toggle"
         return
@@ -282,9 +281,7 @@ def set_repeat(state: EditorState, value: str) -> None:
     structural = new in {".:", ":.", ".", ":|:"}
     if structural and not prev:
         limit = int(state.settings.get("maxrepeats", "30") or 30)
-        existing = sum(
-            1 for entry in state.piece.bars if entry.repeat in {".:", ":.", ".", ":|:"}
-        )
+        existing = sum(1 for entry in state.piece.bars if entry.repeat in {".:", ":.", ".", ":|:"})
         if existing >= limit:
             state.message = f"Repeat limit {limit} reached"
             return

@@ -16,12 +16,8 @@ class FrameBuffer(Screen):
     def __init__(self, height: int, width: int) -> None:
         self._height = height
         self._width = width
-        self._chars: list[list[str]] = [
-            [" " for _ in range(width)] for _ in range(height)
-        ]
-        self._attrs: list[list[int]] = [
-            [0 for _ in range(width)] for _ in range(height)
-        ]
+        self._chars: list[list[str]] = [[" " for _ in range(width)] for _ in range(height)]
+        self._attrs: list[list[int]] = [[0 for _ in range(width)] for _ in range(height)]
 
     def getmaxyx(self) -> tuple[int, int]:
         return self._height, self._width

@@ -13,6 +13,7 @@ from oud.petrucci.duet_score import (
     split_duet_triplet_map,
     split_duet_triplet_set,
 )
+from oud.petrucci.imported_score import project_imported_staff
 from oud.petrucci.model import Piece
 from oud.petrucci.render_helpers import (
     apply_overrides as _apply_overrides_impl,
@@ -42,6 +43,7 @@ from oud.petrucci.render_status import (
     bar_meter_integrity_marker,
     build_status_lines,
     resolve_duration_text,
+    status_attr_for_message,
 )
 from oud.petrucci.render_system import PlaybackOverlayCache, render_systems
 from oud.petrucci.render_vocal import melody_row_count
@@ -277,12 +279,8 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             _marker_staff, marker_logical = duet_bar_mapping(marker_bar, piece=piece)
             mapped_playback_markers.append((marker_logical, marker_col))
         logical_breaks = _duet_logical_stave_breaks(piece, stave_breaks)
-        local_playback_cache: PlaybackOverlayCache | None = (
-            {} if playback_cache is not None else None
-        )
-        local_cursor_maps: dict[int, list[int]] | None = (
-            {} if cursor_display_maps is not None else None
-        )
+        local_playback_cache: PlaybackOverlayCache | None = {} if playback_cache is not None else None
+        local_cursor_maps: dict[int, list[int]] | None = {} if cursor_display_maps is not None else None
         render_systems(
             stdscr,
             piece=payload["piece"],
@@ -372,11 +370,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
     current_logical = max(0, duet_logical_offset)
     total_logical = max(len(top_piece.bars), len(bottom_piece.bars))
     logical_breaks = _duet_logical_stave_breaks(piece, stave_breaks)
-    logical_bars = (
-        top_piece.bars
-        if len(top_piece.bars) >= len(bottom_piece.bars)
-        else bottom_piece.bars
-    )
+    logical_bars = top_piece.bars if len(top_piece.bars) >= len(bottom_piece.bars) else bottom_piece.bars
     logical_playback_ops: PlaybackOverlayCache = {}
 
     for sys_idx in range(pair_systems):
@@ -546,6 +540,7 @@ def _piece_has_imported_ft3_extras(piece: Piece) -> bool:
                 or note.left_fingering
                 or note.right_ornament
                 or note.left_ornament
+                or note.arpeggio
             ):
                 return True
     return False
@@ -580,11 +575,7 @@ def _piece_lyric_row_count(piece: Piece, *, max_rows: int = 99) -> int:
     for bar in piece.bars:
         rows = 0
         if bar.lyric_event_rows:
-            rows = sum(
-                1
-                for row in bar.lyric_event_rows
-                if any((event.text or "").strip() for event in row)
-            )
+            rows = sum(1 for row in bar.lyric_event_rows if any((event.text or "").strip() for event in row))
         if rows == 0:
             rows = len([line for line in bar.lyrics if line.strip()])
         if rows > 0:
@@ -649,12 +640,15 @@ def render_piece(  # noqa: C901, PLR0912
     playback_cache=None,
     playback_markers: list[tuple[int, int]] | None = None,
     cursor_display_maps: dict[int, list[int]] | None = None,
+    message_level: str = "info",
+    focused_imported_staff_index: int | None = None,
 ) -> None:
+    piece = project_imported_staff(piece, focused_imported_staff_index)
     stdscr.erase()
     height, width = stdscr.getmaxyx()
     total_strings = piece.strings
 
-    status_attr = A_REVERSE
+    status_attr = status_attr_for_message(message_level) if message else A_REVERSE
     if mode == "info":
         info_settings = dict(settings)
         info_settings["terminal"] = f"{width}x{height}"
@@ -720,9 +714,7 @@ def render_piece(  # noqa: C901, PLR0912
     show_dur = settings.get("showdur", "off") == "on"
     show_fingerings = policy.showfingerings
     show_ornaments = policy.showornaments
-    imported_extras_visible = (
-        show_fingerings or show_ornaments
-    ) and _piece_has_imported_ft3_extras(piece)
+    imported_extras_visible = (show_fingerings or show_ornaments) and _piece_has_imported_ft3_extras(piece)
     # Imported FT3 local extras render inline; they should not force reserve extra rows.
     _ = imported_extras_visible
     show_extras = settings.get("showspans", "off") == "on"
@@ -746,9 +738,7 @@ def render_piece(  # noqa: C901, PLR0912
         bass_tokens = default_bass_strings(max(0, total_strings - tuning_strings))
     base_strings = min(6, total_strings)
     display_indices = list(range(base_strings))
-    display_indices.extend(
-        idx for idx in sorted(used_bass) if base_strings <= idx < total_strings
-    )
+    display_indices.extend(idx for idx in sorted(used_bass) if base_strings <= idx < total_strings)
     display_strings = len(display_indices)
     tuning_labels = _tuning_labels(
         tuning_text,
@@ -791,11 +781,7 @@ def render_piece(  # noqa: C901, PLR0912
     if maxbars.isdigit():
         limit = int(maxbars)
         if limit > 0:
-            bars_per_line_limit = (
-                limit
-                if bars_per_line_limit <= 0
-                else min(bars_per_line_limit, limit)
-            )
+            bars_per_line_limit = limit if bars_per_line_limit <= 0 else min(bars_per_line_limit, limit)
 
     rendered_duet = _render_duet_score_view(
         stdscr,

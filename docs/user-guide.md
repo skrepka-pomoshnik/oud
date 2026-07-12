@@ -11,7 +11,7 @@ This document describes the current feature set, common use cases, and day-to-da
 - TAB and ASCII export.
 - MIDI and LilyPond export.
 - Vocal note-staff and lyric rendering for supported FT3 text records.
-- Partial mixed-score FT3 import layer for non-tab note/barline/text staves.
+- Read-only mixed and polyphonic FT3 import with per-staff focus.
 - Minimal dependency runtime.
 
 ## 2) Run and Open Files
@@ -241,8 +241,8 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 - Primary UI is TUI/curses only (Qt backend is future work).
 - Some advanced historical symbols/layouts are partial or pending.
-- Import is best-effort for proprietary formats (FT3/JT* semantics vary).
-- All bundled mixed/non-tab FT3 files have usable read-only views; unconfirmed proprietary notation details may still be omitted.
+- FT3/JT* are proprietary import formats; support is validated against the bundled corpus rather than every historical producer version.
+- All bundled mixed/non-tab FT3 files have usable read-only views and pass the unresolved-semantics audit. Exact Fronimo engraving coordinates are reflowed.
 - FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
 - The status line always distinguishes the source document from its confirmed TAB write target.
 - Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
@@ -253,6 +253,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - `:info` retains full source and write-target paths plus detailed file metadata.
 - Import warnings remain listed in `:info` after their transient status message fades.
 - Important import and document notices remain in the status area until `:ack`; the document classification itself is always visible.
+- In read-only mixed and duet scores, `j/k` (or `w/s` with casual keys) cycles the visible staff focus shown in the status line.
 
 ## 11) Architecture Map
 
@@ -273,16 +274,13 @@ FT3 import now has two layers:
 - `Piece.bars`: the editable tablature projection used by the editor/TUI.
 - `Piece.imported_score`: a read-oriented import layer for structured/non-tab FT3 content.
 
-`imported_score` currently stores:
+`imported_score` stores semantic `note`, `lyrics`, `comment`, and `layout` staffs.
+Typed source provenance (`note`, `note-lyrics`, `annotation-group`, and
+`score-terminator`) is recorded once in `source_records`, separately from the
+musical bars. Future unclassified records use `unknown` and fail the FT3 audit.
 
-- `note` staffs from structured vocal rows and decoded `note-staff-raw` / `note-lyric-raw` bars
-- `lyrics` staffs from structured lyric rows and decoded `note-lyric-raw` bars
-- `comment` staffs from editorial FT3 text rows
-- `barline` staffs from `barline-raw`
-- `layout` staffs from non-musical score-settings records
-- `unknown` only for future records that cannot be classified safely
-
-This keeps represented FT3 material out of generic unknown blobs and drives the read-only mixed-score view. The bundled corpus currently produces no unknown staffs or import warnings.
+The read-only viewer cycles actual imported voices and LilyPond exports every
+mapped voice. The bundled corpus produces no unknown staffs or import warnings.
 
 ## 13) Rendering Notes
 
@@ -309,7 +307,7 @@ Status values:
 | Ties/slurs/holds cue rows | partial | span rows render and align; configurable cue styles (`tiecuestyle`, `slurcuestyle`, `holdcuestyle`, `glisscuestyle`) exist. Continued tied-note noteheads support `show|hide|parenthesize` (`tienoteheads`) via fixed-width cue proxies (`(` / `)`) with shared-row collision precedence (parenthesize cues survive against tie/slur/hold/gliss span glyphs); system-break regressions and dense collision regressions exist. Richer follow semantics remain pending | `tests/test_tab_parity_snippets.py`, `tests/test_render.py`, `tests/test_tab_policy.py`, `tests/test_tui_commands_exec.py` | `test_tab_snippet_tie_followed_by_gliss_cues_survive_system_break_collisions`, `test_tab_snippet_slur_gliss_parenthesize_collision_regression_with_system_breaks` |
 | Gliss/slides/harmonics | partial | configurable gliss cue row style (`glisscuestyle`) and shared-row cue collision precedence exist, with synthetic dense/system-break regressions that also preserve staff fret glyphs under cue pressure; true gliss/harmonic semantics and dedicated glyph rules are still incomplete | `tests/test_tab_parity_snippets.py`, `tests/test_render.py`, `tests/test_tab_policy.py`, `tests/test_tui_commands_exec.py` | `test_tab_snippet_slur_gliss_parenthesize_cues_do_not_clobber_dense_frets`, `test_build_bar_view_gliss_cue_style_variants_and_tie_parenthesize_fallback` |
 | Repeats/barlines | partial | repeat markers/barline types are editable and render in score; synthetic parity snippets cover basic repeat glyphs, double barline rendering, and a small repeat/barline variant matrix | `tests/test_editor_commands.py`, `tests/test_ui_render.py`, `tests/test_tab_parity_snippets.py` | `test_tab_snippet_repeats_and_double_barline_render_without_breaking_staff`, `test_tab_snippet_repeat_and_barline_variant_matrix_renders` |
-| FT3 -> LilyPond/PDF supported subset | done | exporter handles tab, vocal-only, mixed vocal+lute, raw note-staff, sparse lyric, and barline-only imports; preserves repeats, meter/key changes, system breaks, rests/accidentals, and supported FT3 extras. Unknown proprietary semantics remain out of scope rather than guessed | `tests/test_alpha_viewer.py`, `tests/test_lilypond.py`, `tests/test_tui_commands_exec.py` | `test_local_ft3_corpus_exports_to_lilypond`, `test_export_lilypond_aligns_sparse_imported_lyrics_by_source_bar`, `test_export_lilypond_emits_barline_only_imported_score` |
+| FT3 -> LilyPond/PDF supported corpus | done | exporter handles tab, vocal-only, mixed vocal+lute, and polyphonic note staffs; preserves repeats/endings, meter/key changes, explicit sections/pages, rests, accidentals, beams, fermatas, and decoded FT3 extras | `tests/test_alpha_viewer.py`, `tests/test_lilypond.py`, `tests/test_tui_commands_exec.py` | `test_local_ft3_corpus_exports_to_lilypond`, `test_export_lilypond_emits_every_imported_polyphonic_staff`, `test_export_lilypond_preserves_imported_beams_and_fermata` |
 | Polyphonic TabVoice behavior | missing | no independent voice model/collision precedence yet | TODO `P3 LilyPond parity: polyphonic TabVoice behavior...` | n/a |
 | Assignment constraints (`minimumFret`, stretch, forced string) | partial | pure assignment-policy module exists with diagnostics/tests; partially reused by temporary preset converter fallback; not yet wired into general edit/engrave placement paths | `tests/test_tab_assign_policy.py`, `tests/test_tui_commands_exec.py` | `test_assign_chord_pitches_max_stretch_constraint`, `test_cmd_set_guitar_partial_convert_negative_shift_uses_target_tuning_for_next_course` |
 

@@ -3,7 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from oud.core.plugin_model import RemoteTab
-from oud.editor.plugin_ops import enter_plugin_mode, handle_plugin_key
+from oud.editor.plugin_ops import (
+    download_plugin_folder_recursive,
+    download_plugin_item,
+    enter_plugin_mode,
+    handle_plugin_key,
+    open_plugin_item,
+)
 from oud.editor.state import EditorState
 from oud.petrucci.model import Bar, Piece
 
@@ -120,3 +126,123 @@ def test_plugin_folder_download_confirmation_clears_on_navigation() -> None:
     assert state.plugins.confirm
     handle_plugin_key(state, ord("j"))
     assert state.plugins.confirm == ""
+
+
+def test_plugin_search_found_empty_missing_and_cancelled() -> None:
+    state = _state()
+    enter_plugin_mode(state)
+    state.screen_height = 6
+    state.plugin_items = [
+        RemoteTab(title="One", url="https://example.com/one.ft3"),
+        RemoteTab(title="Two", url="https://example.com/two.ft3"),
+    ]
+
+    for key in (ord("/"), ord("t"), ord("x"), 127, ord("w"), ord("o"), 10):
+        handle_plugin_key(state, key)
+    assert state.plugin_index == 1
+    assert state.message == "Found: Two"
+
+    handle_plugin_key(state, ord("/"))
+    handle_plugin_key(state, 10)
+    assert state.message == ""
+
+    for key in (ord("/"), ord("z"), 10):
+        handle_plugin_key(state, key)
+    assert state.message == "No match"
+
+    for key in (ord("/"), ord("x"), 27):
+        handle_plugin_key(state, key)
+    assert state.plugin_query_active is False
+    assert state.message == ""
+
+
+def test_plugin_download_guards_and_failures(monkeypatch) -> None:
+    state = _state()
+    assert download_plugin_item(state) is None
+    assert state.message == "No plugin items"
+
+    state.plugin_items = [RemoteTab("Song", "https://example.com/song.ft3")]
+    assert download_plugin_item(state) is None
+    assert state.message == "Select a plugin first"
+
+    state.plugin_name = "lutemusic"
+    state.plugin_items = [RemoteTab("Folder", "https://example.com/folder/", is_dir=True)]
+    assert download_plugin_item(state) is None
+    assert state.message == "Select a list first"
+
+    state.plugin_name = "custom"
+    state.plugin_items = [RemoteTab("Song", "https://example.com/song.ft3")]
+    assert download_plugin_item(state) is None
+    assert state.message == "Plugin does not support downloads"
+
+    state.plugin_name = "lutemusic"
+    monkeypatch.setattr("oud.plugins.lutemusic.download_tab", lambda _item, _dest: (_ for _ in ()).throw(OSError("no")))
+    assert download_plugin_item(state) is None
+    assert state.message == "Download failed: no"
+
+
+def test_recursive_plugin_download_guards_and_failure(monkeypatch) -> None:
+    state = _state()
+    assert download_plugin_folder_recursive(state) is None
+    assert state.message == "No plugin items"
+
+    state.plugin_items = [RemoteTab("Song", "https://example.com/song.ft3")]
+    state.plugin_name = "custom"
+    assert download_plugin_folder_recursive(state) is None
+    assert state.message == "Plugin does not support folder downloads"
+
+    state.plugin_name = "lutemusic"
+    assert download_plugin_folder_recursive(state) is None
+    assert state.message == "Select a folder"
+
+    folder = RemoteTab("Folder", "https://example.com/folder/", is_dir=True)
+    state.plugin_items = [folder]
+    assert download_plugin_folder_recursive(state) is None
+    monkeypatch.setattr(
+        "oud.plugins.lutemusic.download_folder_ft3",
+        lambda _item, _dest: (_ for _ in ()).throw(OSError("offline")),
+    )
+    assert download_plugin_folder_recursive(state) is None
+    assert state.plugins.confirm == ""
+    assert state.message == "Download failed: offline"
+
+
+def test_plugin_open_failure_messages(monkeypatch) -> None:
+    state = _state()
+    state.plugin_name = "custom"
+    state.plugin_items = [RemoteTab("Song", "https://example.com/song.ft3")]
+    open_plugin_item(state)
+    assert state.message == "Plugin does not support opening files"
+
+    state.plugin_name = ""
+    state.plugin_items = [RemoteTab("Missing", "plugin:missing", is_dir=True)]
+    open_plugin_item(state)
+    assert state.message == "Failed to load plugin missing"
+
+    state.plugin_items = [RemoteTab("Random", "lutemusic:random")]
+    monkeypatch.setattr("oud.plugins.lutemusic.random_ft3", lambda: None)
+    open_plugin_item(state)
+    assert state.message == "No random FT3 found"
+
+    state.plugin_name = "lutemusic"
+    state.plugin_items = [RemoteTab("Folder", "https://example.com/folder/", is_dir=True)]
+    monkeypatch.setattr("oud.plugins.lutemusic.fetch_supported_tabs", lambda _url: [])
+    open_plugin_item(state)
+    assert state.message == "No supported files found"
+
+
+def test_plugin_help_empty_and_exit_paths(monkeypatch) -> None:
+    state = _state()
+    calls: list[EditorState] = []
+
+    def fake_show_help(current: EditorState) -> None:
+        calls.append(current)
+
+    monkeypatch.setattr("oud.editor.command_ops.show_help", fake_show_help)
+    handle_plugin_key(state, ord("?"))
+    assert calls == [state]
+
+    assert handle_plugin_key(state, ord("j")) is True
+    enter_plugin_mode(state)
+    handle_plugin_key(state, ord("q"))
+    assert state.mode == "normal"

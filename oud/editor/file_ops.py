@@ -6,7 +6,7 @@ from pathlib import Path
 
 from oud.editor.document import set_write_target
 from oud.editor.insert_session import set_mode
-from oud.editor.messages import MISSING_LESS, NO_SOURCE_PATH
+from oud.editor.messages import MISSING_LESS, NO_SOURCE_PATH, MessageLevel
 from oud.editor.state import EditorState
 from oud.exports.export_tab import export_ascii, export_tab_to_file
 
@@ -44,7 +44,7 @@ def cmd_write(state: EditorState, path: str) -> bool:
         state.message = "Read-only imported score: TAB write disabled"
         return False
     if Path(target).suffix.lower() != ".tab":
-        state.message = "TAB destination must end in .tab"
+        state.notify("TAB destination must end in .tab", MessageLevel.ERROR)
         return False
     if not _confirm_new_target(state, target):
         return False
@@ -130,7 +130,10 @@ def render_ascii_snapshot(state: EditorState) -> str:
             state.plugin_offset,
             state.info_offset
             if state.mode == "info"
-            else state.notes_offset if state.mode == "notes" else state.help_offset,
+            else state.notes_offset
+            if state.mode == "notes"
+            else state.help_offset,
+            message_level=state.visible_message_level.value,
         )
         content = "\n".join(frame.snapshot().lines) + "\n"
     else:

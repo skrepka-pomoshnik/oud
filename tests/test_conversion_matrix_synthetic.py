@@ -105,7 +105,9 @@ def test_load_piece_data_synthetic_input_matrix_supported_formats(tmp_path: Path
     }
 
     tab_path = tmp_path / "in.tab"
-    tab_path.write_text(export_tab(piece, overrides={}, durations={}, bar_width=12, settings=settings), encoding="utf-8")
+    tab_path.write_text(
+        export_tab(piece, overrides={}, durations={}, bar_width=12, settings=settings), encoding="utf-8"
+    )
 
     xml_path = tmp_path / "in.musicxml"
     mxl_path = tmp_path / "in.mxl"

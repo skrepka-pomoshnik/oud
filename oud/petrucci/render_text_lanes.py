@@ -448,6 +448,7 @@ def melody_staff_rows(  # noqa: C901
         )
     onset_accidental = _event_accidental_map_for_bar(events, bar=bar)
     floor = effective_left_pad
+    beam_points: list[tuple[str, int, int]] = []
     for event in vocal_events:
         onset_idx = event.onset_index
         if onset_idx < 0 or onset_idx >= len(onset_cols):
@@ -472,6 +473,9 @@ def melody_staff_rows(  # noqa: C901
         if accidental:
             _draw_vocal_accidental(rows, row=row, col=col, accidental=accidental, floor=floor)
         rows[row][col] = _melody_notehead_glyph(event.note_type)
+        if beam := getattr(event, "beam", None):
+            beam_points.append((beam, row, col))
+    _draw_vocal_beams(rows, beam_points)
     return rows
 
 
@@ -499,7 +503,7 @@ def draw_melody_time_signature(
 
 
 _TREBLE_SHARP_PITCHES = (77, 72, 79, 74, 69, 76, 71)  # F5 C5 G5 D5 A4 E5 B4
-_TREBLE_FLAT_PITCHES = (71, 76, 69, 74, 67, 72, 65)   # B4 E5 A4 D5 G4 C5 F4
+_TREBLE_FLAT_PITCHES = (71, 76, 69, 74, 67, 72, 65)  # B4 E5 A4 D5 G4 C5 F4
 
 
 def melody_key_signature_width(key: str | None) -> int:
@@ -566,6 +570,30 @@ def _draw_vocal_stem(
         dot_col = col + flags + 1
         if 0 <= dot_col < len(rows[flag_row]):
             rows[flag_row][dot_col] = "."
+
+
+def _draw_vocal_beams(rows: list[list[str]], points: list[tuple[str, int, int]]) -> None:
+    group: list[tuple[int, int]] = []
+    for beam, row, col in points:
+        if beam == "start":
+            group = [(row, col)]
+            continue
+        if beam == "continue" and group:
+            group.append((row, col))
+            continue
+        if beam != "end" or not group:
+            group = []
+            continue
+        group.append((row, col))
+        beam_row = min(max(0, note_row - _MELODY_STEM_LEN) for note_row, _note_col in group)
+        for note_row, note_col in group:
+            for stem_row in range(beam_row, max(beam_row, note_row)):
+                rows[stem_row][note_col] = "|"
+        start_col = min(note_col for _note_row, note_col in group)
+        end_col = max(note_col for _note_row, note_col in group)
+        for beam_col in range(start_col + 1, end_col):
+            rows[beam_row][beam_col] = "="
+        group = []
 
 
 def _draw_vocal_ledger(

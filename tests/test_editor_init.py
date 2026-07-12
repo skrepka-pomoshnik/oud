@@ -27,7 +27,7 @@ def test_init_state_loads_represented_ft3_text_without_warning() -> None:
     assert state.message == ""
     assert state.piece.import_warnings == []
     assert state.read_only is True
-    assert state.visible_message == "non-TAB layers"
+    assert state.visible_message == "non-TAB; j/k focus"
     assert any(bar.lyric_event_rows for bar in state.piece.bars)
 
 

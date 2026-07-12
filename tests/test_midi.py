@@ -298,6 +298,31 @@ def test_build_playback_timeline_includes_bar_and_col() -> None:
     assert col >= 0
 
 
+def test_vocal_only_ft3_events_drive_timeline_and_midi(tmp_path) -> None:
+    piece = Piece(
+        bars=[
+            Bar(
+                melody_events=[
+                    MelodyEvent("c'", 0, note_type=4),
+                    MelodyEvent("d'", 1, note_type=5, fermata=True),
+                ],
+                fermata=True,
+            ),
+        ],
+    )
+    timeline = build_playback_timeline(
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={},
+    )
+    assert [cursor.col for cursor in timeline] == [0, 1]
+    path = tmp_path / "vocal_only.mid"
+    export_midi(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
+    assert b"\x91" in _track_data(path)
+
+
 def test_build_playback_timeline_uses_chord_index_for_marker_col() -> None:
     bar = Bar(
         chords=[

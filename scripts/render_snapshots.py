@@ -13,14 +13,14 @@ def _ensure_repo_on_path() -> None:
         sys.path.insert(0, root_str)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check/update synthetic ASCII render snapshots")
     parser.add_argument(
         "--update",
         action="store_true",
         help="Rewrite snapshot fixtures from current renderer output",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     _ensure_repo_on_path()
     from tests.render_snapshot_utils import (  # noqa: PLC0415
@@ -42,8 +42,7 @@ def main() -> int:
     if mismatches:
         print("\n\n".join(mismatches))
         print(
-            "\nRun `./.venv/bin/python scripts/render_snapshots.py --update` "
-            "to refresh fixtures.",
+            "\nRun `./.venv/bin/python scripts/render_snapshots.py --update` to refresh fixtures.",
         )
         return 1
     print("All render snapshots match.")

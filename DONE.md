@@ -2,7 +2,19 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-07-12
+- Closed the remaining release-usability P0 items: the first 80x24 help page now gives a complete open/create, note entry, undo, safe save, and quit path, backed by an executable first-score regression.
+- Added a macOS-only PTY regression around the real curses loop. It verifies 80x24 -> 120x40 resize preserves the score cursor, source filename, modified marker, imported-projection mode, and TAB write target while keeping cursor and status on separate rows.
+- Raised the enforced line/branch coverage floor to 85%, removed the unreachable partial preset converter superseded by the canonical pitch-preserving transform, and covered screenshot/snapshot release tools, corpus failures, the FT3 audit CLI, and plugin error workflows.
+- Validation: Ruff, Ruff format, Ty, 1,144 passed with one Darwin-only test skipped on Linux, the 85% coverage gate (85.40%), and the 37-file corpus smoke check all pass locally; the FT3 semantic audit separately passes 36/36 files with zero unresolved records or values.
+- Closed the bundled Gerbode FT3 semantic audit: 36/36 files now have zero residual note bits, vocal bits, unknown source records, or import warnings. Typed source provenance is stored once on `ImportedScore`, separate from decoded staff bars.
+- Corrected FT3 boundary semantics from PDF evidence (`0x20` first ending, `0x40` second ending), decoded vocal beams/fermatas, Ich annotation groups, arpeggio segments and right-side `x` ornaments, and Passacaglia's editorial appendix page/section records.
+- Completed polyphonic viewer/export behavior: every source voice has a complete logical bar map, staff focus changes the rendered voice, LilyPond emits all standard staffs with beams/fermatas, and vocal-only scores now drive MIDI and playback timelines.
+
 ## 2026-07-11
+- Added a reproducible FT3 residual/raw-record audit and manually compared representative solo, mixed, duet, and three-verse vocal fixtures with Gerbode's published PDFs. Structural content agrees; exact source systems, pages, and edition engraving remain explicit P0 gaps. Decoded the real compositional `0x3500` barre plus left-finger value without residual loss.
+- Added explicit read-only staff focus: `j/k` cycles projected Tab/Melody/Lyrics lanes, duet focus maps to the corresponding source staff bar, and the active focus remains visible in status. Added typed info/success/warning/error/confirmation messages with distinct portable terminal attributes.
+- Fixed the macOS CI quality environment by declaring `pytest-cov` in the uv dev group and locking coverage dependencies. Applied the repository's Ruff format baseline and documented the formatter-required `COM812` exception; Ruff, format, Ty, 1109 tests, the 82.50% coverage gate, and the 37-file corpus smoke pass locally.
 - Removed the root `app.py`/`cli.py` launchers and obsolete `oud.cli`; `oud` -> `oud.app:main` is now the single command path. Removed the former `oud.core` and `oud.ui` Petrucci aliases, migrated tests/scripts to canonical imports, and retained only real parser/domain modules plus the curses adapter.
 - Closed the compatibility-layer static-analysis debt: Ruff and Ty pass, 1101 tests pass, and the local corpus smoke test loads 37/37 files with no errors or warnings.
 - Added explicit document modes and separate source/write-target state. Tab-only FT3 opens as an editable projection with explicit Save As; mixed, vocal-only, and duet FT3 opens read-only so visible non-TAB layers cannot be lost.

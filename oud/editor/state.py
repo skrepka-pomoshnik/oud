@@ -9,6 +9,7 @@ from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.controller_utils import clamp_cursor
 from oud.editor.document import DocumentMode
 from oud.editor.keycodes import DEFAULT_KEYCODES, KeyCodes
+from oud.editor.messages import MessageLevel, infer_message_level
 from oud.editor.transient_message import DEFAULT_MESSAGE_TTL_TICKS
 from oud.petrucci.model import Bar, Chord, Piece
 
@@ -40,6 +41,7 @@ class EditorState:
         self.cmdline = ""
         self.searchline = ""
         self._message = ""
+        self._message_level = MessageLevel.INFO
         self.message_ttl_ticks = 0
         self.message = ""
         self.path: str | None = None
@@ -48,7 +50,9 @@ class EditorState:
         self.document_mode = DocumentMode.NATIVE
         self.forced_read_only = False
         self.persistent_notice = ""
+        self.persistent_notice_level = MessageLevel.INFO
         self.pending_overwrite_path: str | None = None
+        self.view_staff_index = 0
         self.modified = False
         self.clean_undo_depth = 0
         self.undo_stack: list[UndoAction] = []
@@ -104,14 +108,10 @@ class EditorState:
         self.last_frame: Frame | None = None
         self.last_base_frame: Frame | None = None
         self.last_frame_size: tuple[int, int] | None = None
-        self.playback_overlay_cache: (
-            dict[tuple[int, int], list[tuple[int, int, str, int]]] | None
-        ) = None
+        self.playback_overlay_cache: dict[tuple[int, int], list[tuple[int, int, str, int]]] | None = None
         self.playback_overlay_key: tuple[int, int] | None = None
         self.tab_data: TabData | None = None
         self.viewport_scroll_hold_ticks = 0
-        # Temporary bridge marker for preset-based partial conversion (guitar/lute).
-        self.partial_preset_convert_applied: str | None = None
 
     def clamp(self) -> None:
         clamp_cursor(self)
@@ -123,11 +123,24 @@ class EditorState:
     @message.setter
     def message(self, value: str) -> None:
         self._message = value
+        self._message_level = infer_message_level(value)
         self.message_ttl_ticks = DEFAULT_MESSAGE_TTL_TICKS if value else 0
+
+    @property
+    def message_level(self) -> MessageLevel:
+        return self._message_level
+
+    def notify(self, value: str, level: MessageLevel) -> None:
+        self.message = value
+        self._message_level = level
 
     @property
     def visible_message(self) -> str:
         return self.message or self.persistent_notice
+
+    @property
+    def visible_message_level(self) -> MessageLevel:
+        return self.message_level if self.message else self.persistent_notice_level
 
     @property
     def command_history(self) -> list[str]:

@@ -123,11 +123,7 @@ def snapshot_bar(state: EditorState, index: int) -> BarSnapshot:
     ties = [s for s in state.ties if s[0] == index]
     holds = [s for s in state.holds if s[0] == index]
     glisses = [s for s in state.glisses if s[0] == index]
-    marks = {
-        name: (0, string, col)
-        for name, (bar_idx, string, col) in state.marks.items()
-        if bar_idx == index
-    }
+    marks = {name: (0, string, col) for name, (bar_idx, string, col) in state.marks.items() if bar_idx == index}
     return {
         "bar": bar,
         "overrides": overrides,
@@ -155,9 +151,7 @@ def _remove_bar_entries(state: EditorState, index: int) -> None:
     state.ties = [s for s in state.ties if s[0] != index]
     state.holds = [s for s in state.holds if s[0] != index]
     state.glisses = [s for s in state.glisses if s[0] != index]
-    state.marks = {
-        name: value for name, value in state.marks.items() if value[0] != index
-    }
+    state.marks = {name: value for name, value in state.marks.items() if value[0] != index}
 
 
 def clear_bar_contents(state: EditorState, index: int) -> None:

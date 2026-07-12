@@ -161,7 +161,7 @@ def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:
 
 
 def _column_has_notes(state: EditorState, bar: int, col: int) -> bool:
-    for (b, _s, c) in state.overrides:
+    for b, _s, c in state.overrides:
         if b == bar and c == col:
             return True
     if 0 <= bar < len(state.piece.bars):
@@ -195,9 +195,7 @@ def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None
             state.overrides.pop(key, None)
             record_undo(state, "override", key, prev, None)
         if not _column_has_notes(state, bar, col):
-            prev_durations = {
-                k: v for k, v in state.durations.items() if k[0] == bar and k[2] == col
-            }
+            prev_durations = {k: v for k, v in state.durations.items() if k[0] == bar and k[2] == col}
             if prev_durations:
                 for prev_key in prev_durations:
                     state.durations.pop(prev_key, None)

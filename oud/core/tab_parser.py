@@ -107,7 +107,9 @@ def _normalize_chord_line(line: str) -> str:
 
 
 def _parse_chord_line(  # noqa: C901
-    line: str, strings: int, last_note_type: int | None,
+    line: str,
+    strings: int,
+    last_note_type: int | None,
 ) -> tuple[Chord | None, int | None]:
     text = _normalize_chord_line(line)
     if not text:
@@ -123,7 +125,7 @@ def _parse_chord_line(  # noqa: C901
     if flag.isspace():
         return None, last_note_type
     dotted = False
-    rest = text[idx + 1:]
+    rest = text[idx + 1 :]
     if rest.startswith("!"):
         rest = rest[1:]
     if rest.startswith("."):
@@ -240,10 +242,7 @@ def _tab_delta_reason(
 def _line_slice_has_structural_change(lines: list[str], start: int, end: int) -> bool:
     lo = min(start, end)
     hi = max(start, end)
-    return any(
-        0 <= idx < len(lines) and _is_structural_tab_line(lines[idx])
-        for idx in range(lo, hi + 1)
-    )
+    return any(0 <= idx < len(lines) and _is_structural_tab_line(lines[idx]) for idx in range(lo, hi + 1))
 
 
 def _full_reparse_delta(
@@ -504,9 +503,7 @@ def reparse_tab_text_delta(
     strings = strings or previous.piece.strings
     new_lines = new_text.splitlines()
     old_lines = previous.source_lines or []
-    old_changed_start = (
-        changed_line_start if old_changed_line_start is None else old_changed_line_start
-    )
+    old_changed_start = changed_line_start if old_changed_line_start is None else old_changed_line_start
     old_changed_end = changed_line_end if old_changed_line_end is None else old_changed_line_end
     old_range = _bar_range_for_line_span(
         previous.bar_line_spans,
@@ -566,9 +563,7 @@ def reparse_tab_text_delta(
     seg_end_line = previous.bar_line_spans[ctx_end - 1][1]
     seg_lines = new_lines[seg_start_line : seg_end_line + 1]
     seed_default_time = previous.piece.bars[ctx_start - 1].time_sig if ctx_start > 0 else None
-    seed_last_note_type = (
-        _last_note_type_from_bar(previous.piece.bars[ctx_start - 1]) if ctx_start > 0 else None
-    )
+    seed_last_note_type = _last_note_type_from_bar(previous.piece.bars[ctx_start - 1]) if ctx_start > 0 else None
     seg = _parse_bar_segment_lines(
         seg_lines,
         start_line_no=seg_start_line,

@@ -112,7 +112,8 @@ def _parse_tuning(tuning: str) -> list[int]:
             octave = text[start:idx]
             octave_num = 3 if not octave else int(octave)
             semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-                note, 0,
+                note,
+                0,
             )
             if accidental in ("+", "#"):
                 semis += 1
@@ -211,7 +212,9 @@ def _collect_manual_chords(
 
 
 def _chord_positions(
-    chords: list[Chord], bar_width: int, default_duration: int,
+    chords: list[Chord],
+    bar_width: int,
+    default_duration: int,
 ) -> list[int]:
     denoms: list[int] = []
     dotted: list[bool] = []
@@ -291,6 +294,13 @@ def _bar_chord_events(
         )
         for start, duration, col, notes in manual:
             events.append((start, duration, col, notes))
+        if not events:
+            time = 0
+            for event in bar.melody_events:
+                denom = _note_type_to_denom(event.note_type or default_duration) or default_duration
+                duration = _duration_ticks(denom, event.dotted)
+                events.append((time, duration, event.onset_index, []))
+                time += duration
         return events
     time = 0
     positions = _chord_positions(bar.chords, bar_width, default_duration)
@@ -498,11 +508,7 @@ def _duet_note_events(
             for start, duration, col, notes in chord_events:
                 velocity = _accent_velocity(start, beats, unit)
                 note_len = max(1, int(duration * gate))
-                bar_ornament = (
-                    ornaments.get((b_idx, col))
-                    if (show_ornaments and ornaments)
-                    else None
-                )
+                bar_ornament = ornaments.get((b_idx, col)) if (show_ornaments and ornaments) else None
                 for note in notes:
                     s_idx = note.string - 1
                     if s_idx < 0 or s_idx >= len(pitches):
@@ -510,10 +516,13 @@ def _duet_note_events(
                     pitch = pitches[s_idx] + note.fret
                     ornament_symbol = None
                     if show_ornaments:
-                        ornament_symbol = _picked_note_ornament(
-                            note,
-                            ornament_mode=ornament_mode,
-                        ) or bar_ornament
+                        ornament_symbol = (
+                            _picked_note_ornament(
+                                note,
+                                ornament_mode=ornament_mode,
+                            )
+                            or bar_ornament
+                        )
                     _append_note_messages(
                         events,
                         channel=0,
@@ -547,8 +556,7 @@ def _append_vocal_messages(
     settings: dict[str, str],
 ) -> None:
     has_explicit_melody = bool(
-        (getattr(bar, "melody_events", None) or [])
-        or (getattr(bar, "melody_grid", None) or "").strip(),
+        (getattr(bar, "melody_events", None) or []) or (getattr(bar, "melody_grid", None) or "").strip(),
     )
     allow_inferred = settings.get("midivocalinfer", "off") == "on"
     if not has_explicit_melody and not allow_inferred:
@@ -570,6 +578,8 @@ def _append_vocal_messages(
             continue
         start, duration, _col, _notes = chord_events[event.chord_index]
         note_len = max(1, int(duration * gate))
+        if event.fermata:
+            note_len = max(note_len, int(duration * 1.5))
         _append_note_messages(
             events,
             channel=1,
@@ -671,6 +681,7 @@ def build_playback_timeline(
     )
     for b_idx in bar_order:
         bar = piece.bars[b_idx]
+        has_explicit_melody = bool(bar.melody_events)
         chord_events = _bar_chord_events(
             bar,
             b_idx,
@@ -686,7 +697,7 @@ def build_playback_timeline(
             continue
         max_end = 0
         for event_idx, (start, duration, col, notes) in enumerate(chord_events):
-            if not notes:
+            if not notes and not has_explicit_melody:
                 continue
             marker_col = event_idx if bar.chords else col
             timeline_events.append(
@@ -910,10 +921,13 @@ def _single_score_midi_note_events(
                 pitch = pitches[s_idx] + note.fret
                 ornament_symbol = None
                 if show_ornaments:
-                    ornament_symbol = _picked_note_ornament(
-                        note,
-                        ornament_mode=ornament_mode,
-                    ) or bar_ornament
+                    ornament_symbol = (
+                        _picked_note_ornament(
+                            note,
+                            ornament_mode=ornament_mode,
+                        )
+                        or bar_ornament
+                    )
                 _append_note_messages(
                     note_events,
                     channel=0,

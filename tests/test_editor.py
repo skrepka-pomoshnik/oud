@@ -247,7 +247,7 @@ def test_confirm_quit_when_modified() -> None:
         dispatch_key(
             state,
             ord("q"),
-                handle_insert=actions.handle_insert,
+            handle_insert=actions.handle_insert,
             handle_normal=actions.handle_normal,
             handle_command=lambda _state, _key: True,
             handle_search=lambda _state, _key: True,

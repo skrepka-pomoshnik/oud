@@ -313,16 +313,19 @@ def test_load_tab_y_prefix_normalization_preserves_semantics(tmp_path) -> None:
 
 
 def test_parse_tab_text_data_matches_file_loader_signature(tmp_path) -> None:
-    content = "\n".join(
-        [
-            "{Inline/Composer}",
-            "#time: Sc",
-            "b",
-            "0a",
-            "1 b",
-            "e",
-        ],
-    ) + "\n"
+    content = (
+        "\n".join(
+            [
+                "{Inline/Composer}",
+                "#time: Sc",
+                "b",
+                "0a",
+                "1 b",
+                "e",
+            ],
+        )
+        + "\n"
+    )
     path = tmp_path / "inline.tab"
     path.write_text(content, encoding="utf-8")
     parsed_inline = parse_tab_text_data(content)

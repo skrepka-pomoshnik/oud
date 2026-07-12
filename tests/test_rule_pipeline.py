@@ -33,4 +33,3 @@ def test_verify_bar_issues_uses_default_pipeline() -> None:
     issues = verify_bar_issues(state, 0)
     assert issues
     assert issues[0].code == "time.invalid"
-

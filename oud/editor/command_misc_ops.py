@@ -81,9 +81,7 @@ def cmd_cursor(state: EditorState, args: str) -> None:
     if len(tokens) >= 3:
         state.cursor_col = max(0, int(tokens[2]) - 1)
     state.clamp()
-    state.message = (
-        f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{state.cursor_col + 1}"
-    )
+    state.message = f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{state.cursor_col + 1}"
 
 
 def cmd_verify(state: EditorState, args: str = "") -> None:
@@ -109,8 +107,7 @@ def cmd_vocal(state: EditorState, args: str) -> None:
     removed = 0
     for bar in state.piece.bars:
         has_lyric_events = any(
-            any((ev.text or "").strip() or ev.extender for ev in row)
-            for row in bar.lyric_event_rows
+            any((ev.text or "").strip() or ev.extender for ev in row) for row in bar.lyric_event_rows
         )
         had = (
             (bar.melody_grid or "").strip()

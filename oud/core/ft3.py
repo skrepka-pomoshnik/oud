@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import gzip
 import re
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from statistics import median
 
 from oud.core.ft3_extras import decode_ft3_extras
 from oud.core.ft3_text import (
     FT3TextRecord,
+    decode_ft3_annotation_group,
     decode_ft3_vocal_events,
     is_ft3_text_record,
     parse_ft3_text_record,
@@ -20,7 +21,9 @@ from oud.petrucci.model import (
     Chord,
     ImportedBarContent,
     ImportedScore,
+    ImportedSourceRecord,
     ImportedStaff,
+    ImportedTextRow,
     LyricEvent,
     MelodyEvent,
     Note,
@@ -60,6 +63,119 @@ def _parallel_raw_bar_targets(raw_kinds: list[str], *, bar_count: int) -> list[i
     return targets
 
 
+@dataclass(frozen=True)
+class _BodyEntry:
+    kind: str
+    chunk: bytes
+    parsed: Bar
+    score_kind: str | None
+
+
+@dataclass(frozen=True)
+class _MappedScoreEntry:
+    bar_index: int
+    staff_index: int
+    entry: _BodyEntry
+
+
+@dataclass(frozen=True)
+class _ImportedScoreChunk:
+    bar_index: int
+    staff_index: int
+    raw_size: int
+    record_kind: str
+    chunk: bytes
+
+
+_SOURCE_RECORD_KINDS = {
+    "annotation-group-raw": "annotation-group",
+    "barline-raw": "barline",
+    "comment-rtf-raw": "comment",
+    "note-lyric-raw": "note-lyrics",
+    "note-staff-raw": "note",
+    "score-settings-raw": "score-terminator",
+    "text-score-raw": "text",
+    "unknown": "unknown",
+}
+
+
+def _entry_run_end(entries: list[_BodyEntry], start: int, kind: str) -> int:
+    end = start
+    while end < len(entries) and entries[end].kind == kind:
+        end += 1
+    return end
+
+
+def _map_body_with_tab(entries: list[_BodyEntry]) -> tuple[list[_BodyEntry], list[_MappedScoreEntry]]:
+    tab_entries: list[_BodyEntry] = []
+    score_entries: list[_MappedScoreEntry] = []
+    index = 0
+    while index < len(entries):
+        entry = entries[index]
+        if entry.kind == "tab":
+            end = _entry_run_end(entries, index, "tab")
+            tab_entries.extend(entries[index:end])
+            index = end
+            continue
+        if entry.kind != "raw":
+            index += 1
+            continue
+
+        raw_end = _entry_run_end(entries, index, "raw")
+        tab_end = _entry_run_end(entries, raw_end, "tab")
+        raw_run = entries[index:raw_end]
+        tab_run = entries[raw_end:tab_end]
+        parallel_score = any(
+            _is_standard_staff_record(raw_entry.chunk)
+            or bool(
+                raw_entry.score_kind
+                and (decoded := _decode_raw_score_record(raw_entry.score_kind, raw_entry.chunk))
+                and decoded.melody_events
+            )
+            for raw_entry in raw_run
+        )
+        if parallel_score and tab_run and len(raw_run) % len(tab_run) == 0:
+            bar_offset = len(tab_entries)
+            for raw_index, raw_entry in enumerate(raw_run):
+                score_entries.append(
+                    _MappedScoreEntry(
+                        bar_index=bar_offset + (raw_index % len(tab_run)),
+                        staff_index=raw_index // len(tab_run),
+                        entry=raw_entry,
+                    ),
+                )
+            tab_entries.extend(tab_run)
+            index = tab_end
+            continue
+
+        anchors_next_bar = tab_end > raw_end and all(
+            raw_entry.score_kind == "annotation-group-raw" for raw_entry in raw_run
+        )
+        target = len(tab_entries) if anchors_next_bar else max(0, len(tab_entries) - 1)
+        score_entries.extend(_MappedScoreEntry(target, 0, raw_entry) for raw_entry in raw_run)
+        index = raw_end
+    return tab_entries, score_entries
+
+
+def _ensemble_staff_labels(annotations: dict[str, str]) -> list[str]:
+    ensemble = annotations.get("ensemble", "")
+    return [part.split(":", 1)[0].strip() for part in ensemble.split(",") if part.strip()]
+
+
+def _map_score_only_body(
+    entries: list[_BodyEntry],
+    annotations: dict[str, str],
+) -> tuple[int, list[_MappedScoreEntry], list[str]] | None:
+    if not entries or any(entry.kind != "raw" for entry in entries):
+        return None
+    labels = list(reversed(_ensemble_staff_labels(annotations)))
+    if not labels or len(entries) % len(labels):
+        return None
+    bar_count = len(entries) // len(labels)
+    mapped = [_MappedScoreEntry(index % bar_count, index // bar_count, entry) for index, entry in enumerate(entries)]
+    return bar_count, mapped, labels
+
+
 def _strip_rtf(text: str) -> str:
     if "\\rtf" not in text:
         return text.strip()
@@ -74,6 +190,52 @@ def _strip_rtf(text: str) -> str:
     cleaned = re.sub(r"\\+", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip()
+
+
+def _embedded_rtf_blocks(data: bytes) -> list[str]:
+    blocks: list[str] = []
+    index = 0
+    while True:
+        start = data.find(b"{\\rtf", index)
+        if start < 0:
+            return blocks
+        end = _find_matching_brace(data, start, len(data))
+        if end is None:
+            return blocks
+        text = _strip_rtf(data[start : end + 1].decode("latin1", errors="ignore"))
+        if text:
+            blocks.append(text)
+        index = end + 1
+
+
+def _embedded_plain_text(data: bytes) -> list[str]:
+    texts: list[str] = []
+    scan_data = bytearray(data)
+    rtf_index = 0
+    while True:
+        start = data.find(b"{\\rtf", rtf_index)
+        if start < 0:
+            break
+        end = _find_matching_brace(data, start, len(data))
+        if end is None:
+            break
+        scan_data[start : end + 1] = bytes(end + 1 - start)
+        rtf_index = end + 1
+    index = 32
+    while index < len(scan_data):
+        size = scan_data[index]
+        end = index + 1 + size
+        if 8 <= size <= 160 and end <= len(scan_data):
+            raw = scan_data[index + 1 : end]
+            if all(32 <= value <= 126 for value in raw):
+                text = raw.decode("latin1").strip()
+                alpha = sum(char.isalpha() for char in text)
+                if alpha >= 4 and "\\rtf" not in text and text not in texts:
+                    texts.append(text)
+                index = end
+                continue
+        index += 1
+    return texts
 
 
 def read_ft3(path: str) -> bytes:
@@ -248,10 +410,7 @@ def _apply_annotations(piece: Piece, annotations: dict[str, str]) -> None:
     source_value = _annotation_lookup(normalized, "source")
     editor_value = _annotation_lookup(annotations, "editor")
     comment_value = _annotation_lookup(annotations, "comment")
-    publisher_value = (
-        _annotation_lookup(annotations, "publisher/library")
-        or _annotation_lookup(annotations, "library")
-    )
+    publisher_value = _annotation_lookup(annotations, "publisher/library") or _annotation_lookup(annotations, "library")
     volume_value = _annotation_lookup(annotations, "volume")
     page_value = _annotation_lookup(annotations, "page")
     piece_value = _annotation_lookup(annotations, "piece")
@@ -341,13 +500,90 @@ def _decode_ft3_note_position(
     return None
 
 
-def parse_bar(bar_data: bytes) -> Bar:
-    bar = Bar()
-    bar.time_sig = parse_time_signature(bar_data)
-    _parse_bar_markers(bar_data, bar)
+_STANDARD_STAFF_MARKERS = {bytes((0x01, row)) for row in range(0x31, 0x36)}
+_DYNAMIC_TEXT = {"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"}
+
+
+def _is_standard_staff_record(data: bytes) -> bool:
+    return len(data) >= 32 and data[30:32] in _STANDARD_STAFF_MARKERS
+
+
+def _is_embedded_score_text_record(data: bytes) -> bool:
+    if len(data) < 32 or data[30:32] != b"\x90\x01":
+        return False
+    alpha = sum((0x41 <= value <= 0x5A) or (0x61 <= value <= 0x7A) for value in data[32:])
+    return is_ft3_text_record(data) or alpha >= 24
+
+
+def _leading_tab_text_object(data: bytes) -> tuple[str, int] | None:
+    if len(data) < 44 or data[30:32] != b"\x00\x00" or data[32:36] != b"\x01\x00\x00\x00":
+        return None
+    text_size = data[41]
+    end = 44 + text_size
+    if end > len(data):
+        return None
+    text = data[42 : 42 + text_size].decode("latin1", errors="replace").strip()
+    return text, end
+
+
+def _prepare_tab_body(data: bytes, bar: Bar) -> tuple[int, int] | None:
+    if _is_standard_staff_record(data) or _is_embedded_score_text_record(data):
+        return None
+    object_count = int.from_bytes(data[28:30], "little") + 1 if len(data) >= 30 else 0
+    if object_count > 128:
+        return None
     ptr = 32
+    text_object = _leading_tab_text_object(data)
+    if text_object is None:
+        return ptr, object_count
+    text, ptr = text_object
+    lowered = text.lower().rstrip(".")
+    if lowered in _DYNAMIC_TEXT:
+        bar.dynamic = lowered
+    elif text and any(char.isalnum() for char in text):
+        bar.editorial_text.append(text)
+    return ptr, max(0, object_count - 1)
+
+
+def _grid_kind(flags: int) -> str | None:
+    if flags & 0x02:
+        return "start"
+    if flags & 0x04:
+        return "mid"
+    if flags & 0x08:
+        return "end"
+    return None
+
+
+def _append_ft3_note(bar: Bar, chord: Chord, data: bytes, ptr: int) -> None:
+    decoded_position = _decode_ft3_note_position(data[ptr], data[ptr + 1], data[ptr + 4])
+    if decoded_position is None:
+        return
+    string, fret = decoded_position
+    extras = (data[ptr + 3] << 8) | data[ptr + 2]
+    decoded = decode_ft3_extras(extras)
+    note = Note(
+        string=string,
+        fret=fret,
+        raw_pos=ptr,
+        barre=decoded.barre,
+        right_fingering=decoded.right_fingering,
+        left_fingering=decoded.left_fingering,
+        right_ornament=decoded.right_ornament,
+        left_ornament=decoded.left_ornament,
+        arpeggio=decoded.arpeggio,
+        ft3_extras=extras if extras else None,
+        ft3_extra_residual=decoded.residual,
+    )
+    bar.notes.append(note)
+    chord.notes.append(note)
+
+
+def _parse_tab_chords(bar_data: bytes, bar: Bar, ptr: int, object_count: int) -> None:
 
     while ptr + 9 <= len(bar_data):
+        if len(bar.chords) >= object_count:
+            break
         if not at_next_note(bar_data[ptr + 4], bar_data[ptr + 5]):
             ptr += 1
             continue
@@ -358,49 +594,45 @@ def parse_bar(bar_data: bytes) -> Bar:
             # Valid FT3 rhythmic note types map to known denominators.
             ptr += 1
             continue
-        dotted = bool(bar_data[ptr + 1] & 0x10)
-        grid = None
-        if bar_data[ptr + 1] & 0x02:
-            grid = "start"
-        elif bar_data[ptr + 1] & 0x04:
-            grid = "mid"
-        elif bar_data[ptr + 1] & 0x08:
-            grid = "end"
-        chord = Chord(note_type=note_type, dotted=dotted, grid=grid)
+        flags = bar_data[ptr + 1]
+        chord = Chord(note_type=note_type, dotted=bool(flags & 0x10), grid=_grid_kind(flags))
+        item_count = int.from_bytes(bar_data[ptr - 2 : ptr], "little") if ptr >= 2 else 0
+        # Minimal hand-built fixtures predate the decoded item-count field.
+        note_count = max(0, item_count - 1) if item_count else 128
         ptr += 4
 
-        while ptr + 5 <= len(bar_data) and at_next_note(bar_data[ptr], bar_data[ptr + 1]):
-            decoded_position = _decode_ft3_note_position(
-                bar_data[ptr],
-                bar_data[ptr + 1],
-                bar_data[ptr + 4],
-            )
-
-            if decoded_position is not None:
-                string, fret = decoded_position
-                extras = (bar_data[ptr + 3] << 8) | bar_data[ptr + 2]
-                decoded = decode_ft3_extras(extras)
-                note = Note(
-                    string=string,
-                    fret=fret,
-                    raw_pos=ptr,
-                    barre=decoded.barre,
-                    right_fingering=decoded.right_fingering,
-                    left_fingering=decoded.left_fingering,
-                    right_ornament=decoded.right_ornament,
-                    left_ornament=decoded.left_ornament,
-                    ft3_extras=extras if extras else None,
-                    ft3_extra_residual=decoded.residual,
-                )
-                bar.notes.append(note)
-                chord.notes.append(note)
-
+        while note_count and ptr + 5 <= len(bar_data) and at_next_note(bar_data[ptr], bar_data[ptr + 1]):
+            _append_ft3_note(bar, chord, bar_data, ptr)
             ptr += 5
+            note_count -= 1
 
         if chord.notes:
             bar.chords.append(chord)
 
+
+def parse_bar(bar_data: bytes) -> Bar:
+    bar = Bar()
+    bar.time_sig = parse_time_signature(bar_data)
+    _parse_bar_markers(bar_data, bar)
+    body_plan = _prepare_tab_body(bar_data, bar)
+    if body_plan is not None:
+        _parse_tab_chords(bar_data, bar, *body_plan)
+        for text in _embedded_plain_text(bar_data):
+            if text not in bar.editorial_text:
+                bar.editorial_text.append(text)
     return bar
+
+
+def _apply_embedded_sections(chunks: list[bytes], bars: list[Bar]) -> None:
+    for index, chunk in enumerate(chunks[:-1]):
+        titles = _embedded_rtf_blocks(chunk)
+        if not titles:
+            continue
+        bars[index].system_break = True
+        target = bars[index + 1]
+        target.page_break_before = True
+        target.section_title = titles[0]
+        target.section_subtitle = titles[1] if len(titles) > 1 else None
 
 
 def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
@@ -425,10 +657,7 @@ def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
     elif right_repeat:
         bar.repeat = ":."
 
-    # Corpus-backed hint: byte0 bit 0x40 appears on section/final boundary bars
-    # and behaves like a forced system break for FT3 layout.
-    if b0 & 0x40:
-        bar.system_break = True
+    bar.ending_numbers = tuple(number for bit, number in ((0x20, 1), (0x40, 2)) if b0 & bit)
 
     if (b0 & 0x80) or (b1 & 0x01):
         bar.barline = "||"
@@ -445,27 +674,13 @@ def _record_has_content(record: FT3TextRecord) -> bool:
     )
 
 
-def _has_unclassified_bar_header_markers(bar_data: bytes) -> bool:
-    if len(bar_data) < 1:
-        return False
-    byte0 = bar_data[0]
-    if not byte0 & 0x20:
-        return False
-    # In the local FT3 corpus 0x20 is a redundant boundary modifier when it
-    # accompanies an explicit closing bar and right repeat (0x80 | 0x10).
-    return byte0 & 0x90 != 0x90
-
-
 def _next_melody_onset(events: list[MelodyEvent]) -> int:
     return max((event.onset_index for event in events), default=-1) + 1
 
 
 def _next_lyric_onset(rows: list[list[LyricEvent]]) -> int:
     return max(
-        (
-            max((event.onset_index for event in row), default=-1) + 1
-            for row in rows
-        ),
+        (max((event.onset_index for event in row), default=-1) + 1 for row in rows),
         default=0,
     )
 
@@ -493,6 +708,8 @@ def _shift_melody_events(events: list[MelodyEvent], offset: int) -> list[MelodyE
             dotted=event.dotted,
             accidental_flags=event.accidental_flags,
             is_rest=event.is_rest,
+            beam=event.beam,
+            fermata=event.fermata,
         )
         for event in events
     ]
@@ -534,6 +751,7 @@ def _merge_melody_record_into_bar(
     if bar.melody_events and min((event.onset_index for event in incoming), default=0) == 0:
         incoming = _shift_melody_events(incoming, _next_melody_onset(bar.melody_events))
     bar.melody_events.extend(incoming)
+    bar.fermata = bar.fermata or any(event.fermata for event in incoming)
 
 
 def _merge_lyric_record_into_bar(
@@ -569,9 +787,7 @@ def _is_meaningful_lyric_line(line: str) -> bool:
     words = re.findall(r"[A-Za-z][A-Za-z'-]*", stripped)
     if not words:
         return False
-    return not (
-        len(words) == 1 and len(words[0]) == 1 and words[0].lower() not in {"i", "a", "o"}
-    )
+    return not (len(words) == 1 and len(words[0]) == 1 and words[0].lower() not in {"i", "a", "o"})
 
 
 def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
@@ -585,65 +801,72 @@ def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
         lyrics=list(record.lyrics),
         lyric_event_rows=[list(row) for row in record.lyric_event_rows],
     )
-    if record.editorial_text:
-        bar.editorial_text.extend(text for text in record.editorial_text if text)
+    for text in record.editorial_text:
+        normalized = text.lower().rstrip(".")
+        if normalized in _DYNAMIC_TEXT and bar.dynamic is None:
+            bar.dynamic = normalized
+        elif text:
+            bar.editorial_text.append(text)
     if record.structured_rows:
         bar.structured_text_rows.extend(record.structured_rows)
     _finalize_explicit_vocal_melody(bar)
 
 
+def _score_record_kind(chunk: bytes) -> str | None:
+    if _is_standard_staff_record(chunk):
+        decoded = parse_ft3_text_record(chunk)
+        return "note-lyric-raw" if decoded.lyrics or decoded.lyric_event_rows else "note-staff-raw"
+    if _is_embedded_score_text_record(chunk):
+        decoded = parse_ft3_text_record(chunk)
+        return "note-lyric-raw" if decoded.lyrics or decoded.lyric_event_rows else "text-score-raw"
+    return None
+
+
+def _has_structural_score_marker(bar: Bar) -> bool:
+    return bool(bar.time_sig or bar.barline or bar.repeat or bar.ending_numbers)
+
+
+def _classify_score_payload(chunk: bytes) -> str | None:
+    payload = chunk[32:]
+    note_staff_markers = tuple(bytes((0x01, row)) for row in range(0x31, 0x36))
+    marker_region = chunk[28:]
+    has_note_staff_markers = any(marker in marker_region for marker in note_staff_markers)
+    is_score_settings = chunk[2:7] == b"\x00\x11\x00\x00\xff" and b"\r\n" not in payload
+    if is_score_settings and not has_note_staff_markers:
+        return "score-settings-raw"
+    object_index = int.from_bytes(chunk[28:30], "little") if len(chunk) >= 30 else 0
+    if object_index > 128 and chunk[30:32] == b"\x02\x00":
+        return "annotation-group-raw"
+    nonzero = sum(1 for value in payload if value)
+    controls = sum(1 for value in payload if 0 < value < 32 and value not in (9, 10, 13))
+    if nonzero < 12 and controls < 4:
+        return None
+    if b"{\\rtf" in payload or b"\\fonttbl" in payload:
+        return "comment-rtf-raw"
+    has_text = b"\r\n" in payload and any((0x41 <= value <= 0x5A) or (0x61 <= value <= 0x7A) for value in payload)
+    if has_note_staff_markers:
+        return "note-lyric-raw" if has_text else "note-staff-raw"
+    return "text-score-raw" if has_text else "unknown"
+
+
 def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
+    if score_kind := _score_record_kind(chunk):
+        return score_kind
+    if _has_structural_score_marker(bar):
+        return "barline-raw"
     if bar.chords or bar.notes:
         return None
-    raw_kind: str | None = None
-    if bar.time_sig or bar.barline or bar.repeat:
-        raw_kind = "barline-raw"
-    elif len(chunk) > 32:
-        payload = chunk[32:]
-        note_staff_markers = (
-            b"\x01\x31",
-            b"\x01\x32",
-            b"\x01\x33",
-            b"\x01\x34",
-            b"\x01\x35",
-        )
-        # Some score records place the staff marker at bytes 30-31,
-        # crossing the nominal 32-byte header boundary.
-        marker_region = chunk[28:]
-        has_note_staff_markers = any(marker in marker_region for marker in note_staff_markers)
-        is_score_settings = (
-            chunk[2:7] == b"\x00\x11\x00\x00\xff"
-            and b"\r\n" not in payload
-            and not has_note_staff_markers
-        )
-        if is_score_settings:
-            return "score-settings-raw"
-        nonzero = sum(1 for b in payload if b)
-        controls = sum(1 for b in payload if 0 < b < 32 and b not in (9, 10, 13))
-        if nonzero >= 12 or controls >= 4:
-            if b"{\\rtf" in payload or b"\\fonttbl" in payload:
-                raw_kind = "comment-rtf-raw"
-            else:
-                has_text = b"\r\n" in payload and any(
-                    (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A) for b in payload
-                )
-                if has_note_staff_markers and has_text:
-                    raw_kind = "note-lyric-raw"
-                elif has_note_staff_markers:
-                    raw_kind = "note-staff-raw"
-                elif has_text:
-                    raw_kind = "text-score-raw"
-                else:
-                    raw_kind = "unknown"
-    return raw_kind
+    return _classify_score_payload(chunk) if len(chunk) > 32 else None
 
 
 def _decode_raw_score_record(raw_kind: str, chunk: bytes) -> FT3TextRecord | None:
+    if raw_kind == "annotation-group-raw":
+        return decode_ft3_annotation_group(chunk)
     if raw_kind not in {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}:
         return None
     payload = chunk[32:] if len(chunk) > 32 else chunk
     record = parse_ft3_text_record(bytes(32) + payload)
-    if raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"}:
+    if raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"} and record.parse_mode != "structured":
         record = refine_ft3_raw_text_record(record, bytes(32) + payload)
     if record and _record_has_content(record):
         return record
@@ -669,6 +892,8 @@ def _imported_bar_base(bar_index: int, bar: Bar) -> ImportedBarContent:
         repeat=bar.repeat,
         ending_numbers=bar.ending_numbers,
         system_break=bar.system_break,
+        dynamic=bar.dynamic,
+        fermata=bar.fermata,
     )
 
 
@@ -706,11 +931,37 @@ def _import_decoded_bar_text_layers(
         comment_staff.bars.append(
             replace(
                 base,
-                editorial_text=list(bar.editorial_text)
-                + [row.text for row in unknown_text_rows if row.text],
+                editorial_text=list(bar.editorial_text) + [row.text for row in unknown_text_rows if row.text],
                 text_rows=editorial_text_rows + unknown_text_rows + meta_text_rows,
             ),
         )
+
+
+def _decoded_comment_content(decoded: FT3TextRecord | None) -> tuple[list[str], list[ImportedTextRow]] | None:
+    if decoded is None:
+        return None
+    text_rows = [row for row in decoded.structured_rows if row.kind in {"editorial", "unknown"}]
+    meta_rows = [row for row in decoded.structured_rows if row.kind in {"font", "control"}]
+    if decoded.editorial_text or text_rows or meta_rows:
+        editorial = list(decoded.editorial_text) + [row.text for row in text_rows if row.text]
+        return editorial, text_rows + meta_rows
+    return None
+
+
+def _decoded_note_content(
+    base: ImportedBarContent,
+    decoded: FT3TextRecord | None,
+) -> ImportedBarContent:
+    events = list(decoded.melody_events) if decoded is not None else []
+    event_bar = Bar(time_sig=base.time_sig, melody_events=events)
+    _finalize_explicit_vocal_melody(event_bar)
+    return replace(
+        base,
+        melody_grid=decoded.melody_grid if decoded is not None else None,
+        melody_events=event_bar.melody_events,
+        text_rows=[row for row in decoded.structured_rows if row.kind == "vocal"] if decoded is not None else [],
+        fermata=base.fermata or any(event.fermata for event in event_bar.melody_events),
+    )
 
 
 def _append_raw_imported_bar(
@@ -722,43 +973,18 @@ def _append_raw_imported_bar(
     layout_staff: ImportedStaff,
     unknown_staff: ImportedStaff,
     bar_index: int,
-    raw_size: int,
     raw_kind: str,
     source_bar: Bar,
     decoded: FT3TextRecord | None,
 ) -> None:
     base = _imported_bar_base(bar_index, source_bar)
     if raw_kind == "score-settings-raw":
-        layout_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+        layout_staff.bars.append(base)
         return
     if raw_kind == "barline-raw":
-        barline_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
-    if raw_kind == "note-staff-raw":
-        note_staff.bars.append(
-            replace(
-                base,
-                melody_grid=decoded.melody_grid if decoded is not None else None,
-                melody_events=list(decoded.melody_events) if decoded is not None else [],
-                text_rows=(
-                    [row for row in decoded.structured_rows if row.kind == "vocal"]
-                    if decoded is not None
-                    else []
-                ),
-                raw_kind=raw_kind,
-                raw_size=raw_size,
-            ),
-        )
-        return
-    if decoded is not None and decoded.melody_events:
-        note_staff.bars.append(
-            replace(
-                base,
-                melody_events=list(decoded.melody_events),
-                text_rows=[row for row in decoded.structured_rows if row.kind == "vocal"],
-                raw_kind=raw_kind,
-                raw_size=raw_size,
-            ),
-        )
+        barline_staff.bars.append(base)
+    if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (decoded is not None and decoded.melody_events):
+        note_staff.bars.append(_decoded_note_content(base, decoded))
     if (
         raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"}
         and decoded is not None
@@ -770,62 +996,59 @@ def _append_raw_imported_bar(
                 lyrics=list(decoded.lyrics),
                 lyric_event_rows=[list(row) for row in decoded.lyric_event_rows],
                 text_rows=[row for row in decoded.structured_rows if row.kind == "lyrics"],
-                raw_kind=raw_kind,
-                raw_size=raw_size,
             ),
         )
-        if raw_kind != "barline-raw":
-            return
-    if decoded is not None and (
-        decoded.editorial_text
-        or any(row.kind in {"editorial", "unknown"} for row in decoded.structured_rows)
-    ):
-        text_rows = [
-            row for row in decoded.structured_rows if row.kind in {"editorial", "unknown"}
-        ]
+    if comment_content := _decoded_comment_content(decoded):
+        editorial_text, text_rows = comment_content
         comment_staff.bars.append(
             replace(
                 base,
-                editorial_text=list(decoded.editorial_text)
-                + [row.text for row in text_rows if row.text],
+                editorial_text=editorial_text,
                 text_rows=text_rows,
-                raw_kind=raw_kind,
-                raw_size=raw_size,
             ),
         )
-    if raw_kind == "comment-rtf-raw" or (raw_kind == "text-score-raw" and decoded is None):
-        comment_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+        if raw_kind == "annotation-group-raw":
+            return
+    if raw_kind in {"comment-rtf-raw", "annotation-group-raw"} or (raw_kind == "text-score-raw" and decoded is None):
+        comment_staff.bars.append(base)
         return
     raw_text_kinds = {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}
-    if decoded is not None and raw_kind in raw_text_kinds:
+    if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (decoded is not None and raw_kind in raw_text_kinds):
         return
-    unknown_staff.bars.append(replace(base, raw_kind=raw_kind, raw_size=raw_size))
+    unknown_staff.bars.append(base)
 
 
 def _build_imported_score(
     piece: Piece,
     *,
-    unknown_bar_chunks: list[tuple[int, int, str, bytes]],
+    imported_chunks: list[_ImportedScoreChunk],
+    staff_labels: list[str],
 ) -> ImportedScore | None:
-    note_staff = ImportedStaff(kind="note")
-    lyric_staff = ImportedStaff(kind="lyrics")
+    note_staffs: dict[int, ImportedStaff] = {}
+    lyric_staffs: dict[int, ImportedStaff] = {}
     comment_staff = ImportedStaff(kind="comment")
     barline_staff = ImportedStaff(kind="barline")
     layout_staff = ImportedStaff(kind="layout")
     unknown_staff = ImportedStaff(kind="unknown")
 
-    for bar_index, bar in enumerate(piece.bars):
-        _import_decoded_bar_text_layers(
-            note_staff=note_staff,
-            lyric_staff=lyric_staff,
-            comment_staff=comment_staff,
-            bar_index=bar_index,
-            bar=bar,
-        )
+    if not imported_chunks:
+        note_staffs[0] = ImportedStaff(kind="note")
+        lyric_staffs[0] = ImportedStaff(kind="lyrics")
+        for bar_index, bar in enumerate(piece.bars):
+            _import_decoded_bar_text_layers(
+                note_staff=note_staffs[0],
+                lyric_staff=lyric_staffs[0],
+                comment_staff=comment_staff,
+                bar_index=bar_index,
+                bar=bar,
+            )
 
-    for bar_index, raw_size, raw_kind, chunk in unknown_bar_chunks:
-        source_bar = piece.bars[bar_index] if 0 <= bar_index < len(piece.bars) else Bar()
-        decoded = _decode_raw_score_record(raw_kind, chunk)
+    for imported in imported_chunks:
+        label = staff_labels[imported.staff_index] if imported.staff_index < len(staff_labels) else None
+        note_staff = note_staffs.setdefault(imported.staff_index, ImportedStaff(kind="note", label=label))
+        lyric_staff = lyric_staffs.setdefault(imported.staff_index, ImportedStaff(kind="lyrics", label=label))
+        source_bar = piece.bars[imported.bar_index] if 0 <= imported.bar_index < len(piece.bars) else Bar()
+        decoded = _decode_raw_score_record(imported.record_kind, imported.chunk)
         _append_raw_imported_bar(
             note_staff=note_staff,
             lyric_staff=lyric_staff,
@@ -833,27 +1056,26 @@ def _build_imported_score(
             barline_staff=barline_staff,
             layout_staff=layout_staff,
             unknown_staff=unknown_staff,
-            bar_index=bar_index,
-            raw_size=raw_size,
-            raw_kind=raw_kind,
+            bar_index=imported.bar_index,
+            raw_kind=imported.record_kind,
             source_bar=source_bar,
             decoded=decoded,
         )
-    staffs = [
-        staff
-        for staff in (
-            note_staff,
-            lyric_staff,
-            comment_staff,
-            barline_staff,
-            layout_staff,
-            unknown_staff,
-        )
-        if staff.bars
-    ]
+    ordered = [*note_staffs.values(), *lyric_staffs.values()]
+    ordered.extend((comment_staff, barline_staff, layout_staff, unknown_staff))
+    staffs = [staff for staff in ordered if staff.bars]
     if not staffs:
         return None
-    return ImportedScore(source_format="ft3", staffs=staffs)
+    source_records = [
+        ImportedSourceRecord(
+            source_bar_index=imported.bar_index,
+            source_staff_index=imported.staff_index,
+            kind=_SOURCE_RECORD_KINDS.get(imported.record_kind, imported.record_kind),
+            size=imported.raw_size,
+        )
+        for imported in imported_chunks
+    ]
+    return ImportedScore(source_format="ft3", staffs=staffs, source_records=source_records)
 
 
 def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
@@ -872,23 +1094,21 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     if not title:
         title = Path(path).stem.replace("_", " ")
     author = None
+    annotations = _parse_section_annotations(metadata_blob)
 
     raw_chunks = re.split(b"\x03\x80", data)
     parsed_text_records: list[FT3TextRecord] = []
     bar_chunks = raw_chunks
     bar_text_records: list[list[FT3TextRecord]] = []
     parsed_bars: list[Bar] = []
-    unknown_bar_chunks: list[tuple[int, int, str, bytes]] = []
+    imported_chunks: list[_ImportedScoreChunk] = []
+    imported_staff_labels: list[str] = []
     parallel_meta_bars: list[tuple[int, Bar]] = []
-    has_unclassified_bar_markers = False
     body_start = data.find(b"CBar")
     if body_start >= 0:
         body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
-        body_entries: list[tuple[str, bytes, Bar, str | None]] = []
+        body_entries: list[_BodyEntry] = []
         for chunk in body_chunks:
-            has_unclassified_bar_markers = (
-                has_unclassified_bar_markers or _has_unclassified_bar_header_markers(chunk)
-            )
             parsed = parse_bar(chunk)
             raw_kind = _classify_unknown_score_chunk(chunk, parsed)
             kind = "other"
@@ -896,40 +1116,62 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
                 kind = "tab"
             elif raw_kind is not None:
                 kind = "raw"
-            body_entries.append((kind, chunk, parsed, raw_kind))
-        parallel_prefix_count = _parallel_mixed_score_prefix_count(
-            [kind for kind, _chunk, _parsed, _raw_kind in body_entries],
-        )
-        if parallel_prefix_count is not None:
-            prefix_entries = body_entries[:parallel_prefix_count]
-            tab_entries = body_entries[parallel_prefix_count:]
-            bar_chunks = [chunk for _kind, chunk, _parsed, _raw_kind in tab_entries]
+            body_entries.append(_BodyEntry(kind, chunk, parsed, raw_kind))
+        if any(entry.kind == "tab" for entry in body_entries):
+            tab_entries, mapped_score_entries = _map_body_with_tab(body_entries)
+            max_staff_index = max((mapped.staff_index for mapped in mapped_score_entries), default=-1)
+            ensemble_labels = _ensemble_staff_labels(annotations)
+            imported_staff_labels = list(reversed(ensemble_labels[-max_staff_index - 1 :]))
+            bar_chunks = [entry.chunk for entry in tab_entries]
             bar_text_records = [[] for _ in tab_entries]
-            raw_targets = _parallel_raw_bar_targets(
-                [raw_kind or "" for _kind, _chunk, _parsed, raw_kind in prefix_entries],
-                bar_count=len(tab_entries),
-            )
-            for target_index, (_kind, chunk, parsed, raw_kind) in zip(
-                raw_targets,
-                prefix_entries,
-                strict=False,
-            ):
+            for mapped in mapped_score_entries:
+                target_index = mapped.bar_index
+                chunk = mapped.entry.chunk
+                parsed = mapped.entry.parsed
+                raw_kind = mapped.entry.score_kind
                 if raw_kind is None:
                     continue
-                unknown_bar_chunks.append((target_index, len(chunk), raw_kind, chunk))
+                imported_chunks.append(
+                    _ImportedScoreChunk(target_index, mapped.staff_index, len(chunk), raw_kind, chunk),
+                )
                 decoded = _decode_raw_score_record(raw_kind, chunk)
                 if decoded is not None and _record_has_content(decoded):
                     parsed_text_records.append(decoded)
                     bar_text_records[target_index].append(decoded)
                 if parsed.time_sig or parsed.barline or parsed.repeat or parsed.system_break:
                     parallel_meta_bars.append((target_index, parsed))
+        elif score_plan := _map_score_only_body(body_entries, annotations):
+            bar_count, mapped_score_entries, imported_staff_labels = score_plan
+            parsed_bars = [Bar() for _ in range(bar_count)]
+            bar_chunks = []
+            bar_text_records = [[] for _ in range(bar_count)]
+            for mapped in mapped_score_entries:
+                raw_kind = mapped.entry.score_kind
+                if raw_kind is None:
+                    continue
+                imported_chunks.append(
+                    _ImportedScoreChunk(
+                        mapped.bar_index,
+                        mapped.staff_index,
+                        len(mapped.entry.chunk),
+                        raw_kind,
+                        mapped.entry.chunk,
+                    ),
+                )
+                decoded = _decode_raw_score_record(raw_kind, mapped.entry.chunk)
+                if mapped.staff_index == 0 and decoded is not None and _record_has_content(decoded):
+                    parsed_text_records.append(decoded)
+                    bar_text_records[mapped.bar_index].append(decoded)
+                if mapped.staff_index == 0 and _has_structural_score_marker(mapped.entry.parsed):
+                    parallel_meta_bars.append((mapped.bar_index, mapped.entry.parsed))
         else:
             # Always parse bars from the CBar body stream so CPiece/metadata bytes
             # cannot pollute bar 1 (common in duet-score files).
             bar_chunks = []
             bar_text_records = []
             leading_records: list[FT3TextRecord] = []
-            for chunk in body_chunks:
+            for entry in body_entries:
+                chunk = entry.chunk
                 if is_ft3_text_record(chunk):
                     record = parse_ft3_text_record(chunk)
                     if not _record_has_content(record):
@@ -946,13 +1188,12 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
                     attached.append(leading_records.pop(0))
                 bar_text_records.append(attached)
     for bar_index, chunk in enumerate(bar_chunks):
-        has_unclassified_bar_markers = (
-            has_unclassified_bar_markers or _has_unclassified_bar_header_markers(chunk)
-        )
         bar = parse_bar(chunk)
         parsed_bars.append(bar)
-        if raw_kind := _classify_unknown_score_chunk(chunk, bar):
-            unknown_bar_chunks.append((bar_index, len(chunk), raw_kind, chunk))
+        if not _is_tab_bar(bar) and (raw_kind := _classify_unknown_score_chunk(chunk, bar)):
+            imported_chunks.append(_ImportedScoreChunk(bar_index, 0, len(chunk), raw_kind, chunk))
+    if bar_chunks:
+        _apply_embedded_sections(bar_chunks, parsed_bars)
     for bar_index, meta_bar in parallel_meta_bars:
         if 0 <= bar_index < len(parsed_bars):
             target = parsed_bars[bar_index]
@@ -986,20 +1227,15 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
         for bar, records in zip(piece.bars, bar_text_records, strict=False):
             for record in records:
                 _merge_text_record_into_bar(bar, record)
-    piece.imported_score = _build_imported_score(piece, unknown_bar_chunks=unknown_bar_chunks)
-    if has_unclassified_bar_markers:
-        piece.import_warnings.append(
-            "FT3 contains additional bar header markers; "
-            "only repeats, double bars, and system breaks are decoded.",
-        )
-    if (
-        piece.imported_score is not None
-        and any(staff.kind == "unknown" for staff in piece.imported_score.staffs)
-    ):
+    piece.imported_score = _build_imported_score(
+        piece,
+        imported_chunks=imported_chunks,
+        staff_labels=imported_staff_labels,
+    )
+    if piece.imported_score is not None and any(staff.kind == "unknown" for staff in piece.imported_score.staffs):
         piece.import_warnings.append(
             "FT3 contains non-tab score data that is not decoded yet; imported as unknown staves.",
         )
-    annotations = _parse_section_annotations(metadata_blob)
     _apply_annotations(piece, annotations)
     _apply_preamble_notes(piece, preamble_notes)
     for bar in piece.bars:
@@ -1073,6 +1309,8 @@ def _event_from_units(event: MelodyEvent, units: int) -> MelodyEvent:
         dotted=dotted,
         accidental_flags=event.accidental_flags,
         is_rest=event.is_rest,
+        beam=event.beam,
+        fermata=event.fermata,
     )
 
 
@@ -1145,6 +1383,8 @@ def _normalize_vocal_event_accidentals(
                 dotted=event.dotted,
                 accidental_flags=event.accidental_flags,
                 is_rest=event.is_rest,
+                beam=event.beam,
+                fermata=event.fermata,
             ),
         )
     bar.melody_events = normalized
@@ -1211,21 +1451,6 @@ def _apply_legacy_duration_fix(bars: list[Bar]) -> None:
         _shift_note_types_one_step_longer(bars, time_sig="C")
 
 
-def _sum_matches_meter(sum_quarter_beats: float, meter: str) -> bool:
-    target = {
-        "O": 1.5,
-        "3/4": 1.5,
-        "6/8": 1.5,
-        "C|": 2.0,
-        "C": 4.0,
-        "4/4": 4.0,
-        "2/2": 2.0,
-    }.get(meter)
-    if target is None:
-        return False
-    return abs(sum_quarter_beats - target) <= 0.15
-
-
 def _infer_meter_from_sum(sum_quarter_beats: float) -> str | None:
     if abs(sum_quarter_beats - 1.5) <= 0.15:
         return "O"
@@ -1236,7 +1461,7 @@ def _infer_meter_from_sum(sum_quarter_beats: float) -> str | None:
     return None
 
 
-def _fill_missing_time_signatures(bars: list[Bar]) -> None:  # noqa: C901
+def _fill_missing_time_signatures(bars: list[Bar]) -> None:
     if not bars:
         return
     explicit = [idx for idx, bar in enumerate(bars) if bar.time_sig]
@@ -1248,45 +1473,17 @@ def _fill_missing_time_signatures(bars: list[Bar]) -> None:  # noqa: C901
                     bar.time_sig = guessed
         return
 
-    def _fill_range(
-        start: int,
-        end: int,
-        *,
-        prev_meter: str | None,
-        next_meter: str | None,
-    ) -> None:
-        for idx in range(start, end):
-            bar = bars[idx]
-            if bar.time_sig is not None or not bar.chords:
-                continue
-            total = _bar_sum_quarter_beats(bar)
-            if prev_meter is None and next_meter:
-                # Before the first explicit meter: keep strong sum-based guesses
-                # (e.g. O for 3/4-like bars), otherwise fall back to next_meter
-                # so short lead-ins still show the score meter cue.
-                guessed = _infer_meter_from_sum(total)
-                if guessed:
-                    bar.time_sig = guessed
-                    continue
-                bar.time_sig = next_meter
-                continue
-            if prev_meter and _sum_matches_meter(total, prev_meter):
-                bar.time_sig = prev_meter
-                continue
-            if next_meter and _sum_matches_meter(total, next_meter):
-                bar.time_sig = next_meter
-                continue
-            guessed = _infer_meter_from_sum(total)
-            if guessed:
-                bar.time_sig = guessed
-
     first = explicit[0]
-    _fill_range(0, first, prev_meter=None, next_meter=bars[first].time_sig)
-    for pos, idx in enumerate(explicit[:-1]):
-        nxt = explicit[pos + 1]
-        _fill_range(idx + 1, nxt, prev_meter=bars[idx].time_sig, next_meter=bars[nxt].time_sig)
-    last = explicit[-1]
-    _fill_range(last + 1, len(bars), prev_meter=bars[last].time_sig, next_meter=None)
+    first_meter = bars[first].time_sig
+    for bar in bars[:first]:
+        if bar.time_sig is None:
+            bar.time_sig = first_meter
+    current_meter: str | None = None
+    for bar in bars[first:]:
+        if bar.time_sig is not None:
+            current_meter = bar.time_sig
+        else:
+            bar.time_sig = current_meter
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:

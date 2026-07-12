@@ -6,7 +6,7 @@ from oud.core.ft3 import build_durations
 from oud.core.tab_parser import load_tab_data
 from oud.editor.document import configure_document
 from oud.editor.load_ops import import_warning_summary, load_piece_data
-from oud.editor.messages import READ_ONLY_VIEWER
+from oud.editor.messages import READ_ONLY_VIEWER, MessageLevel
 from oud.editor.state import EditorState
 from oud.petrucci.model import Bar
 from oud.petrucci.tuning_utils import tuning_count
@@ -23,11 +23,7 @@ def init_state(  # noqa: C901, PLR0912
     requested_path = path
     piece, overrides, durations, dotted, bar_width = load_piece_data(path)
     invalid_source = bool(
-        requested_path
-        and (
-            Path(requested_path).is_dir()
-            or (piece.import_warnings and not piece.bars)
-        ),
+        requested_path and (Path(requested_path).is_dir() or (piece.import_warnings and not piece.bars)),
     )
     if not piece.bars:
         try:
@@ -83,6 +79,7 @@ def init_state(  # noqa: C901, PLR0912
     if piece.import_warnings:
         warning = import_warning_summary(piece)
         state.persistent_notice = warning
+        state.persistent_notice_level = MessageLevel.WARNING
         state.message = warning
     elif read_only:
         state.message = READ_ONLY_VIEWER

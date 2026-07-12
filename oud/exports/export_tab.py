@@ -176,10 +176,7 @@ def export_ascii(
     settings_map = settings or {}
     style = settings_map.get("style") or "french"
     french_c = settings_map.get("frenchc") or "normal"
-    reverse_strings = (
-        style == "italian"
-        and (settings_map.get("italianorient") or "normal") == "reverse"
-    )
+    reverse_strings = style == "italian" and (settings_map.get("italianorient") or "normal") == "reverse"
     for b_idx, bar in enumerate(piece.bars):
         cells = (
             bar_cells_from_chords(

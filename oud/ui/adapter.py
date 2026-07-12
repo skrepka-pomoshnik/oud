@@ -4,11 +4,13 @@ import contextlib
 import curses
 from dataclasses import dataclass
 
-from oud.petrucci.screen import A_BOLD, A_REVERSE, CursesError, Screen
+from oud.petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE, CursesError, Screen
 
 __all__ = [
     "A_BOLD",
+    "A_DIM",
     "A_REVERSE",
+    "A_UNDERLINE",
     "CursesError",
     "CursesScreen",
     "Screen",

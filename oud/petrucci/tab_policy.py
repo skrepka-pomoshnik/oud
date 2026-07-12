@@ -200,18 +200,10 @@ def string_label(
     if actual >= 6 and basslabels != "tuning":
         label_value = bass_fallback_label(actual, basslabels)
     elif actual < len(tuning_labels):
-        fallback = (
-            bass_fallback_label(actual, basslabels)
-            if actual >= 6
-            else str(total_strings - actual)
-        )
+        fallback = bass_fallback_label(actual, basslabels) if actual >= 6 else str(total_strings - actual)
         label_value = tuning_labels[actual] or fallback
     else:
-        label_value = (
-            bass_fallback_label(actual, basslabels)
-            if actual >= 6
-            else str(total_strings - actual)
-        )
+        label_value = bass_fallback_label(actual, basslabels) if actual >= 6 else str(total_strings - actual)
     if len(label_value) > width:
         label_value = label_value[:width]
     return f"{label_value:>{width}}"

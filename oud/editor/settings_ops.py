@@ -192,6 +192,7 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "frenchc": ({"normal", "alt"}, "Frenchc must be normal/alt"),
 }
 
+
 def _set_bool(state: EditorState, key: str, value: str) -> bool:
     if value not in ("on", "off"):
         state.message = f"{key.capitalize()} must be on/off"
@@ -201,8 +202,7 @@ def _set_bool(state: EditorState, key: str, value: str) -> bool:
         state.settings["showextras"] = value
     elif key in {"showfingerings", "showornaments"}:
         both_on = (
-            state.settings.get("showfingerings", "on") == "on"
-            and state.settings.get("showornaments", "on") == "on"
+            state.settings.get("showfingerings", "on") == "on" and state.settings.get("showornaments", "on") == "on"
         )
         state.settings["showft3extras"] = "on" if both_on else "off"
     return True
@@ -336,9 +336,7 @@ def _apply_meta_preset(state: EditorState, name: str) -> bool:  # noqa: C901
             diag = ""
             if report.skipped and report.first_diagnostic:
                 diag = f" ({report.first_diagnostic})"
-            conversion_note = (
-                f"converted content: changed {report.changed}, skipped {report.skipped}{diag}"
-            )
+            conversion_note = f"converted content: changed {report.changed}, skipped {report.skipped}{diag}"
     style = preset.get("style")
     if style is not None:
         _set_enum(state, "style", style)

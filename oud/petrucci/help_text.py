@@ -3,6 +3,12 @@ from __future__ import annotations
 HELP_LINES = [
     "HELP",
     "",
+    "FIRST SCORE",
+    "Open/create  oud [FILE] / oud       Open here  :e FILE",
+    "Enter note   i, type fret a-t or 0-9, then Esc",
+    "Undo         u                       Save       :w [FILE.tab]",
+    "Quit         :q                      Discard    :q!",
+    "",
     "NAVIGATION                              EDITING",
     "Up   k / ^P / Up                        Insert   i / Enter",
     "Down j / ^N / Down                      Replace  r (one)",
@@ -29,6 +35,7 @@ HELP_LINES = [
     "Barline: | sets thin barline",
     "Esc returns to normal",
     "Mixed/duet FT3 scores are view-only because non-TAB layers cannot round-trip",
+    "Viewer staff focus: j/k (or w/s in casual keys) cycles visible staves",
     "",
     "COMMANDS",
     ":w [path]        write .tab       First imported/new write prompts for Save As",
@@ -71,10 +78,7 @@ HELP_LINES = [
         "linelen=... staffthick=... fontstyle=..."
     ),
     ":set flagredundant=on|off",
-    (
-        ":set layout=packed|spread|auto|stretch justify=stretch|center|compact|smart|edge "
-        "showtuning=on|off"
-    ),
+    (":set layout=packed|spread|auto|stretch justify=stretch|center|compact|smart|edge showtuning=on|off"),
     ":set key=... countdots=on/off grid=on/off",
     ":set lute|guitar (preset metasettings)",
     ":set measuresstep=... (used with measures=every)",

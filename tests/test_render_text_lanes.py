@@ -338,6 +338,21 @@ def test_melody_staff_rows_draw_full_stems_by_default() -> None:
     assert stem_rows == list(range(stem_rows[0], stem_rows[0] + 3))
 
 
+def test_melody_staff_rows_draws_explicit_ft3_beam_group_without_tab_chords() -> None:
+    events = [
+        MelodyEvent("c'", 0, note_type=5, beam="start"),
+        MelodyEvent("d'", 1, note_type=5, beam="continue"),
+        MelodyEvent("e'", 2, note_type=5, beam="end"),
+    ]
+    rows = melody_staff_rows(
+        events,
+        onset_cols=[2, 8, 14],
+        width=18,
+        bar=Bar(melody_events=events),
+    )
+    assert any("=" in "".join(row) for row in rows)
+
+
 def test_melody_staff_rows_use_consistent_stem_length_for_different_pitches() -> None:
     rows = melody_staff_rows(
         [MelodyEvent("d", 0), MelodyEvent("a", 1), MelodyEvent("d'", 2)],

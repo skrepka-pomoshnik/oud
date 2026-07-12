@@ -42,7 +42,8 @@ def _parse_tuning(tuning: str) -> list[int]:
             octave = text[start:idx]
             octave_num = int(octave) if octave else 3
             semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-                note, 0,
+                note,
+                0,
             )
             if accidental in ("+", "#"):
                 semis += 1
@@ -247,10 +248,7 @@ def _lily_pitches_for_chord_notes(
         if not keep_note:
             continue
         base = _midi_to_lilypond(pitch)
-        native = (
-            _note_native_lh_fingering_suffix(note, settings)
-            + _note_native_rh_fingering_suffix(note, settings)
-        )
+        native = _note_native_lh_fingering_suffix(note, settings) + _note_native_rh_fingering_suffix(note, settings)
         out.append(base + native)
     return out
 
@@ -277,7 +275,8 @@ def _lily_pitches_for_override_event(
 
 
 def _span_maps(
-    spans: list[tuple[int, int, int]] | None, bar_index: int,
+    spans: list[tuple[int, int, int]] | None,
+    bar_index: int,
 ) -> tuple[set[int], set[int]]:
     starts: set[int] = set()
     ends: set[int] = set()
@@ -517,6 +516,8 @@ def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C
     below = _dedup_keep_order(below)
 
     parts: list[str] = []
+    if show_ornaments and any(getattr(note, "arpeggio", None) for note in chord.notes):
+        parts.append(r"\arpeggio")
     if above:
         text = _escape_lilypond(" ".join(above))
         parts.append(f'^\\markup {{ \\tiny "{text}" }}')
@@ -536,10 +537,7 @@ def _bar_sign_mark_tokens(bar: Bar) -> list[str]:
 
 
 def _piece_has_lyrics(piece: Piece) -> bool:
-    return any(
-        any(line.strip() for line in bar.lyrics) or bar.lyric_event_rows
-        for bar in piece.bars
-    )
+    return any(any(line.strip() for line in bar.lyrics) or bar.lyric_event_rows for bar in piece.bars)
 
 
 def _piece_has_melody(piece: Piece) -> bool:
@@ -556,13 +554,15 @@ def _piece_has_tab_content(piece: Piece) -> bool:
 
 
 def _imported_staff_by_kind(piece: Piece, kind: str) -> ImportedStaff | None:
+    staffs = _imported_staffs_by_kind(piece, kind)
+    return staffs[0] if staffs else None
+
+
+def _imported_staffs_by_kind(piece: Piece, kind: str) -> list[ImportedStaff]:
     imported = piece.imported_score
     if imported is None:
-        return None
-    for staff in imported.staffs:
-        if staff.kind == kind and staff.bars:
-            return staff
-    return None
+        return []
+    return [staff for staff in imported.staffs if staff.kind == kind and staff.bars]
 
 
 def _imported_bar_content_score(bar: ImportedBarContent, kind: str) -> int:
@@ -616,10 +616,8 @@ def _with_imported_bar_structure(
     available = [bar for bar in fallbacks if bar is not None]
     return replace(
         content,
-        time_sig=content.time_sig
-        or next((bar.time_sig for bar in available if bar.time_sig), None),
-        barline=content.barline
-        or next((bar.barline for bar in available if bar.barline), None),
+        time_sig=content.time_sig or next((bar.time_sig for bar in available if bar.time_sig), None),
+        barline=content.barline or next((bar.barline for bar in available if bar.barline), None),
         repeat=content.repeat or next((bar.repeat for bar in available if bar.repeat), None),
         ending_numbers=content.ending_numbers
         or next((bar.ending_numbers for bar in available if bar.ending_numbers), ()),
@@ -642,11 +640,9 @@ def _piece_bar_as_imported(piece: Piece, source_bar_index: int) -> ImportedBarCo
 
 
 def _piece_has_imported_lyrics(piece: Piece) -> bool:
-    staff = _imported_staff_by_kind(piece, "lyrics")
-    if staff is None:
-        return False
     return any(
         bar.lyric_event_rows or any(line.strip() for line in bar.lyrics)
+        for staff in _imported_staffs_by_kind(piece, "lyrics")
         for bar in staff.bars
     )
 
@@ -760,6 +756,12 @@ def _build_tab_body(  # noqa: C901, PLR0912
     tuning_lookup = list(reversed(tuning_pitches))
 
     for b_idx, bar in enumerate(piece.bars):
+        if bar.page_break_before:
+            body.append(r"  \pageBreak")
+        if bar.section_title or bar.section_subtitle:
+            title = f'\\bold "{_escape_lilypond(bar.section_title)}"' if bar.section_title else ""
+            subtitle = f'"{_escape_lilypond(bar.section_subtitle)}"' if bar.section_subtitle else ""
+            body.append(f"  \\mark \\markup {{ \\center-column {{ {title} {subtitle} }} }}")
         current_time_sig = _append_bar_time_change(body, bar, current_time_sig)
         repeat_mark = _repeat_mark_token(bar)
         if repeat_mark:
@@ -896,14 +898,16 @@ def _build_vocal_bodies(
     return melody_body, lyric_bodies
 
 
-def _imported_vocal_sources(
-    piece: Piece,
-) -> tuple[ImportedStaff | None, ImportedStaff | None, ImportedStaff | None]:
-    return (
-        _imported_staff_by_kind(piece, "note"),
-        _imported_staff_by_kind(piece, "lyrics"),
-        _imported_staff_by_kind(piece, "barline"),
-    )
+def _matching_imported_lyric_staff(
+    note_staff: ImportedStaff,
+    lyric_staffs: list[ImportedStaff],
+    index: int,
+) -> ImportedStaff | None:
+    if note_staff.label is not None:
+        matched = next((staff for staff in lyric_staffs if staff.label == note_staff.label), None)
+        if matched is not None:
+            return matched
+    return lyric_staffs[index] if index < len(lyric_staffs) else None
 
 
 def _append_imported_melody_bar(
@@ -915,19 +919,35 @@ def _append_imported_melody_bar(
         time_sig=note_bar.time_sig,
         barline=note_bar.barline,
         repeat=note_bar.repeat,
+        ending_numbers=note_bar.ending_numbers,
         system_break=note_bar.system_break,
+        dynamic=note_bar.dynamic,
+        fermata=note_bar.fermata,
     )
     current_time_sig = _append_bar_time_change(melody_body, bar_like, current_time_sig)
+    repeat_mark = _repeat_mark_token(bar_like)
+    if repeat_mark:
+        melody_body.append(f"  {repeat_mark}")
     event_count = 0
     for event in note_bar.melody_events:
         is_rest = getattr(event, "is_rest", False)
         lily = "r" if is_rest else _lily_note_from_event_text(event.text)
         note_type = event.note_type or 4
         duration = _duration_token(note_type_to_denom(note_type) or 4, event.dotted)
-        melody_body.append(f"  {(lily or 'r')}{duration}")
+        suffix = ""
+        if event.beam == "start":
+            suffix += "["
+        elif event.beam == "end":
+            suffix += "]"
+        if event.fermata:
+            suffix += r"\fermata"
+        if event_count == 0 and note_bar.dynamic:
+            suffix += f"\\{note_bar.dynamic}"
+        melody_body.append(f"  {(lily or 'r')}{duration}{suffix}")
         event_count += 1
     if event_count == 0:
         melody_body.append("  r4")
+        melody_body.extend(f"  {mark}" for mark in _bar_sign_mark_tokens(bar_like))
     bar_marker = _barline_token(bar_like)
     melody_body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
     if note_bar.system_break:
@@ -1055,14 +1075,29 @@ def _vocal_blocks(
     lyric_bodies: list[list[str]],
     *,
     show_lyrics: bool,
+    identifier: str = "melody",
+    label: str | None = None,
 ) -> list[str]:
-    vocal_block = [r'\new Staff = "melodyStaff" <<', r'  \new Voice = "melodyVoice" {']
+    staff_name = f"{identifier}Staff"
+    voice_name = f"{identifier}Voice"
+    vocal_block = [f'\\new Staff = "{staff_name}"']
+    if label:
+        escaped = _escape_lilypond(label)
+        vocal_block.extend(
+            [
+                r"\with {",
+                f'  instrumentName = "{escaped}"',
+                f'  shortInstrumentName = "{escaped}"',
+                r"}",
+            ],
+        )
+    vocal_block.extend([r"<<", f'  \\new Voice = "{voice_name}" {{'])
     vocal_block.extend(melody_body)
     vocal_block.extend([r"  }", r">>"])
     lyric_blocks: list[str] = []
     if show_lyrics:
         for row in lyric_bodies:
-            lyric_blocks.append(r'\new Lyrics \lyricsto "melodyVoice" {')
+            lyric_blocks.append(f'\\new Lyrics \\lyricsto "{voice_name}" {{')
             lyric_blocks.append("  " + " ".join(row))
             lyric_blocks.append(r"}")
     return [*vocal_block, *lyric_blocks]
@@ -1154,9 +1189,9 @@ def _build_main_blocks(
         blocks.append(r">>")
         return blocks
 
-    imported_note_staff, imported_lyric_staff, imported_barline_staff = (
-        _imported_vocal_sources(piece)
-    )
+    imported_note_staffs = _imported_staffs_by_kind(piece, "note")
+    imported_lyric_staffs = _imported_staffs_by_kind(piece, "lyrics")
+    imported_barline_staff = _imported_staff_by_kind(piece, "barline")
     tab_body = _build_tab_body(
         piece=piece,
         overrides=overrides,
@@ -1167,31 +1202,48 @@ def _build_main_blocks(
         ties=ties,
         holds=holds,
     )
-    has_imported_notation = imported_note_staff is not None or imported_barline_staff is not None
-    has_imported_lyrics = imported_lyric_staff is not None and _piece_has_imported_lyrics(piece)
-    show_melody = settings.get("showmelody", "on") == "on" and (
-        has_imported_notation or _piece_has_melody(piece)
-    )
-    show_lyrics = settings.get("showlyrics", "on") == "on" and (
-        has_imported_lyrics or _piece_has_lyrics(piece)
-    )
+    has_imported_notation = bool(imported_note_staffs) or imported_barline_staff is not None
+    has_imported_lyrics = bool(imported_lyric_staffs) and _piece_has_imported_lyrics(piece)
+    show_melody = settings.get("showmelody", "on") == "on" and (has_imported_notation or _piece_has_melody(piece))
+    show_lyrics = settings.get("showlyrics", "on") == "on" and (has_imported_lyrics or _piece_has_lyrics(piece))
     has_tab = _piece_has_tab_content(piece) or bool(overrides)
     if not has_tab and not show_melody and not show_lyrics:
         return [r"\new Staff {", "  r4", r"}"]
     if not show_melody and not show_lyrics:
         return _tab_staff_with_block(None, tab_body, settings, piece)
 
-    if has_imported_notation or has_imported_lyrics:
+    if imported_note_staffs:
+        vocal_stack: list[str] = []
+        for index, note_staff in enumerate(imported_note_staffs):
+            lyric_staff = _matching_imported_lyric_staff(note_staff, imported_lyric_staffs, index)
+            melody_body, lyric_bodies = _build_imported_vocal_bodies(
+                piece,
+                settings,
+                note_staff,
+                lyric_staff,
+                imported_barline_staff,
+            )
+            vocal_stack.extend(
+                _vocal_blocks(
+                    melody_body,
+                    lyric_bodies,
+                    show_lyrics=show_lyrics,
+                    identifier="melody" if index == 0 else f"melody{index + 1}",
+                    label=note_staff.label,
+                ),
+            )
+    elif has_imported_notation or has_imported_lyrics:
         melody_body, lyric_bodies = _build_imported_vocal_bodies(
             piece,
             settings,
-            imported_note_staff,
-            imported_lyric_staff,
+            None,
+            imported_lyric_staffs[0] if imported_lyric_staffs else None,
             imported_barline_staff,
         )
+        vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
     else:
         melody_body, lyric_bodies = _build_vocal_bodies(piece, settings)
-    vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
+        vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
 
     if not has_tab:
         blocks = [r"\new StaffGroup <<"]
@@ -1247,7 +1299,7 @@ def export_lilypond(
         labels = _parse_fret_labels(settings.get("fretlabels", "") or "")
         if not labels:
             labels = ["a", "b", "r", "d", "e", "f", "g", "h", "i", "k", "l"]
-        labels_text = " ".join(f"\"{label}\"" for label in labels)
+        labels_text = " ".join(f'"{label}"' for label in labels)
         layout.append(f"    fretLabels = #'({labels_text})")
     layout += [r"  }", r"}"]
     blocks = _build_main_blocks(
@@ -1295,11 +1347,7 @@ def print_lilypond_pdf(ly_path: str, output_base: str | None = None) -> str:
         )
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr or b""
-        err = (
-            stderr.decode("utf-8", errors="replace").strip()
-            if isinstance(stderr, bytes)
-            else str(stderr).strip()
-        )
+        err = stderr.decode("utf-8", errors="replace").strip() if isinstance(stderr, bytes) else str(stderr).strip()
         detail = err.splitlines()[-1] if err else "unknown error"
         return f"LilyPond failed: {detail}"
     pdf_path = (workdir / f"{out_base.name}.pdf").resolve()

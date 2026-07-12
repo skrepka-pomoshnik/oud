@@ -42,11 +42,7 @@ def update_prompt(  # noqa: C901, PLR0911
     if key in bindings.history_up:
         if not history:
             return PromptResult(text, history_index)
-        history_index = (
-            len(history) - 1
-            if history_index is None
-            else max(0, history_index - 1)
-        )
+        history_index = len(history) - 1 if history_index is None else max(0, history_index - 1)
         return PromptResult(history[history_index], history_index)
     if key in bindings.history_down:
         if not history:

@@ -96,12 +96,12 @@ def dense_flag_alignment_piece() -> Piece:
     # Synthetic "problem bar" with dense mixed durations and staggered chords.
     bar = Bar(
         chords=[
-            Chord(note_type=2, dotted=True, grid=None, notes=[Note(1, 7, 0), Note(4, 3, 0)]),   # 1.
+            Chord(note_type=2, dotted=True, grid=None, notes=[Note(1, 7, 0), Note(4, 3, 0)]),  # 1.
             Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 6, 0), Note(5, 2, 0)]),  # 4
             Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 4, 0), Note(2, 2, 0)]),  # 8
-            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 3, 0)]),                  # 16
-            Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 0, 0), Note(6, 4, 0)]),   # 16
-            Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0), Note(4, 1, 0)]),   # 8
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, 3, 0)]),  # 16
+            Chord(note_type=6, dotted=False, grid=None, notes=[Note(2, 0, 0), Note(6, 4, 0)]),  # 16
+            Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 2, 0), Note(4, 1, 0)]),  # 8
         ],
         time_sig="C",
     )
@@ -438,7 +438,12 @@ def stem_alignment_problem_piece() -> Piece:
             Bar(
                 chords=[
                     Chord(note_type=5 if i % 2 else 6, dotted=False, grid=None, notes=[Note(1, (i + 2) % 6, 0)]),
-                    Chord(note_type=6, dotted=False, grid=None, notes=[Note(3, (i + 3) % 5, 0), Note(7 if i % 3 == 0 else 6, i % 4, 0)]),
+                    Chord(
+                        note_type=6,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(3, (i + 3) % 5, 0), Note(7 if i % 3 == 0 else 6, i % 4, 0)],
+                    ),
                     Chord(note_type=5, dotted=False, grid=None, notes=[Note(2, (i + 1) % 4, 0)]),
                     Chord(note_type=4, dotted=False, grid=None, notes=[Note(4, (i + 2) % 4, 0)]),
                 ],

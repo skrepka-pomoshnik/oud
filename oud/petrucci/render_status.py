@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from oud.petrucci.model import Piece
 from oud.petrucci.render_utils import note_type_to_denom
+from oud.petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 from oud.petrucci.time_utils import parse_time_signature_value
 from oud.petrucci.view_model import chord_positions
 
@@ -43,9 +44,7 @@ def _bar_has_manual_entries(
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
 ) -> bool:
-    return any(b == cursor_bar for (b, _s, _c) in overrides) or any(
-        b == cursor_bar for (b, _s, _c) in durations
-    )
+    return any(b == cursor_bar for (b, _s, _c) in overrides) or any(b == cursor_bar for (b, _s, _c) in durations)
 
 
 def _chord_bar_sum_quarter_beats(
@@ -180,3 +179,12 @@ def build_status_lines(
     if status_line_text:
         return f"{status_line_text}  {status}".strip()
     return status
+
+
+def status_attr_for_message(level: str) -> int:
+    return {
+        "success": A_REVERSE | A_BOLD,
+        "warning": A_REVERSE | A_UNDERLINE,
+        "error": A_REVERSE | A_BOLD | A_UNDERLINE,
+        "confirm": A_REVERSE | A_DIM,
+    }.get(level, A_REVERSE)

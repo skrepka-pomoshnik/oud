@@ -63,11 +63,7 @@ def test_local_ft3_metadata_keys_are_covered_by_canonical_fields(
     canonical_keys = {"type", "dif", "ensemble", "part", "piece", "arranger", "con"}
     uncovered: dict[str, list[str]] = {}
     for path, piece in loaded_corpus:
-        extra = sorted(
-            key
-            for key in piece.raw_metadata
-            if key not in canonical_keys and not key.endswith("key")
-        )
+        extra = sorted(key for key in piece.raw_metadata if key not in canonical_keys and not key.endswith("key"))
         if extra:
             uncovered[str(path.relative_to(CORPUS))] = extra
         if any(key.endswith("key") for key in piece.raw_metadata):

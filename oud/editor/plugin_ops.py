@@ -69,14 +69,12 @@ def _discover_plugins() -> tuple[PluginInfo, ...]:
 
 
 def _plugin_root() -> list[RemoteTab]:
-    return [
-        RemoteTab(title=info.title, url=f"plugin:{info.name}", is_dir=True)
-        for info in _discover_plugins()
-    ]
+    return [RemoteTab(title=info.title, url=f"plugin:{info.name}", is_dir=True) for info in _discover_plugins()]
 
 
 def _clear_plugin_confirm(state: EditorState) -> None:
     state.plugins.confirm = ""
+
 
 def _load_plugin_module(name: str, path: Path):
     module_name = f"oud_plugin_{name}"

@@ -162,12 +162,8 @@ def _capture_yanked_bar(state: EditorState, index: int) -> YankedBar | None:
         return None
     index = bar_range.start
     bar_copy = copy.deepcopy(state.piece.bars[index])
-    overrides = {
-        (0, s, c): value for (b, s, c), value in state.overrides.items() if b == index
-    }
-    durations = {
-        (0, s, c): value for (b, s, c), value in state.durations.items() if b == index
-    }
+    overrides = {(0, s, c): value for (b, s, c), value in state.overrides.items() if b == index}
+    durations = {(0, s, c): value for (b, s, c), value in state.durations.items() if b == index}
     annotations = {(0, c): value for (b, c), value in state.annotations.items() if b == index}
     ornaments = {(0, c): value for (b, c), value in state.ornaments.items() if b == index}
     dotted = {(0, c) for (b, c) in state.dotted if b == index}
@@ -175,11 +171,7 @@ def _capture_yanked_bar(state: EditorState, index: int) -> YankedBar | None:
     ties = [(0, start, end) for (b, start, end) in state.ties if b == index]
     holds = [(0, start, end) for (b, start, end) in state.holds if b == index]
     glisses = [(0, start, end) for (b, start, end) in state.glisses if b == index]
-    marks = {
-        name: (0, string, col)
-        for name, (b, string, col) in state.marks.items()
-        if b == index
-    }
+    marks = {name: (0, string, col) for name, (b, string, col) in state.marks.items() if b == index}
     return YankedBar(
         bar=bar_copy,
         overrides=overrides,
@@ -199,11 +191,7 @@ def yank_bar(state: EditorState, index: int, *, count: int = 1) -> None:
     bar_range = BarRange.from_start_count(index, count).clamp(len(state.piece.bars))
     if bar_range.is_empty:
         return
-    captured = [
-        item
-        for item in (_capture_yanked_bar(state, idx) for idx in bar_range.indices())
-        if item is not None
-    ]
+    captured = [item for item in (_capture_yanked_bar(state, idx) for idx in bar_range.indices()) if item is not None]
     if not captured:
         return
     state.yanked_bar = copy.deepcopy(captured[0])
@@ -232,7 +220,7 @@ def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> 
         state.annotations[(index + b, c)] = value
     for (b, c), value in yanked.ornaments.items():
         state.ornaments[(index + b, c)] = value
-    for (b, c) in yanked.dotted:
+    for b, c in yanked.dotted:
         state.dotted.add((index + b, c))
     for b, start, end in yanked.slurs:
         state.slurs.append((index + b, start, end))

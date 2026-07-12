@@ -7,10 +7,7 @@ from oud.petrucci.render_utils import bar_cells, bar_cells_from_chords
 
 
 def _display_string_for_actual(state: EditorState, actual: int) -> int:
-    if (
-        state.settings.get("style") == "italian"
-        and state.settings.get("italianorient") == "reverse"
-    ):
+    if state.settings.get("style") == "italian" and state.settings.get("italianorient") == "reverse":
         return max(0, state.piece.strings - 1 - actual)
     return actual
 

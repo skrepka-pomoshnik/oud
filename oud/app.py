@@ -43,7 +43,9 @@ def _main(stdscr, path: str | None, config_path: str, read_only: bool = False) -
     )
 
 
-def _export_context(path: str, config_path: str) -> tuple[
+def _export_context(
+    path: str, config_path: str
+) -> tuple[
     dict[str, str],
     int,
     Piece,
@@ -117,31 +119,11 @@ def _slice_for_ascii(state, bars_spec: str | None) -> None:
     def remap_bar(bar_idx: int) -> int:
         return bar_idx - start
 
-    state.overrides = {
-        (remap_bar(b), s, c): v
-        for (b, s, c), v in state.overrides.items()
-        if in_range(b)
-    }
-    state.durations = {
-        (remap_bar(b), s, c): v
-        for (b, s, c), v in state.durations.items()
-        if in_range(b)
-    }
-    state.dotted = {
-        (remap_bar(b), c)
-        for (b, c) in state.dotted
-        if in_range(b)
-    }
-    state.annotations = {
-        (remap_bar(b), c): v
-        for (b, c), v in state.annotations.items()
-        if in_range(b)
-    }
-    state.ornaments = {
-        (remap_bar(b), c): v
-        for (b, c), v in state.ornaments.items()
-        if in_range(b)
-    }
+    state.overrides = {(remap_bar(b), s, c): v for (b, s, c), v in state.overrides.items() if in_range(b)}
+    state.durations = {(remap_bar(b), s, c): v for (b, s, c), v in state.durations.items() if in_range(b)}
+    state.dotted = {(remap_bar(b), c) for (b, c) in state.dotted if in_range(b)}
+    state.annotations = {(remap_bar(b), c): v for (b, c), v in state.annotations.items() if in_range(b)}
+    state.ornaments = {(remap_bar(b), c): v for (b, c), v in state.ornaments.items() if in_range(b)}
 
     def remap_spans(spans: list[tuple[int, int, int]]) -> list[tuple[int, int, int]]:
         out: list[tuple[int, int, int]] = []
@@ -335,8 +317,7 @@ def main(argv: list[str] | None = None) -> int:
     parsed = _build_parser().parse_args(args)
     if parsed.command == "tui":
         read_only = bool(
-            getattr(parsed, "readonly_global", False)
-            or getattr(parsed, "readonly_tui", False),
+            getattr(parsed, "readonly_global", False) or getattr(parsed, "readonly_tui", False),
         )
         return curses.wrapper(_main, parsed.path, parsed.config, read_only)
     if parsed.command == "ascii":

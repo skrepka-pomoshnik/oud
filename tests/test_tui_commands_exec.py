@@ -344,7 +344,8 @@ def test_cmd_set_tabnotation_full_preset(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 
 def test_cmd_set_tabnotation_full_reapply_overrides_user_toggles(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     state = _state()
 
@@ -403,7 +404,8 @@ def test_cmd_set_ft3_extra_display_policies(monkeypatch: pytest.MonkeyPatch, tmp
 
 
 def test_cmd_set_deprecated_show_aliases_map_to_explicit_keys(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     state = _state()
 
@@ -481,7 +483,8 @@ def test_cmd_set_meta_presets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
 
 
 def test_cmd_set_guitar_preset_retunes_content_preserving_pitch(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     state = _state()
     state.piece.bars[0].chords = [
@@ -507,7 +510,8 @@ def test_cmd_set_guitar_preset_retunes_content_preserving_pitch(
 
 
 def test_cmd_set_guitar_preset_retune_uses_target_tuning_mapping(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     state = _state()
     state.piece.bars[0].chords = [
@@ -529,7 +533,8 @@ def test_cmd_set_guitar_preset_retune_uses_target_tuning_mapping(
 
 
 def test_cmd_set_guitar_preset_retune_preserves_chord_without_string_collisions(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     state = _state()
     state.piece.bars[0].chords = [
@@ -557,7 +562,8 @@ def test_cmd_set_guitar_preset_retune_preserves_chord_without_string_collisions(
 
 
 def test_cmd_set_guitar_reassigns_removed_bass_course_under_target_tuning(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     state = _state()
     state.piece.strings = 7
@@ -608,6 +614,7 @@ def test_cmd_ascii_and_midicmd(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cmd_ops.shutil, "which", lambda _name: None)
     cmd.cmd_midicmd(state, "")
     assert state.message == "No MIDI player found"
+
 
 def test_cmd_open_tab_and_ft3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     state = _state()
@@ -721,10 +728,7 @@ def test_cmd_time_and_verify() -> None:
     assert state.message == "Invalid time signature"
     cmd.cmd_time(state, "3/4")
     assert state.piece.bars[state.cursor_bar].time_sig == "3/4"
-    state.piece.bars[0].chords = [
-        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
-        for _ in range(4)
-    ]
+    state.piece.bars[0].chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]) for _ in range(4)]
     state.settings["time"] = "4/4"
     cmd.cmd_verify(state, "")
     assert state.message == "Measure ok"
@@ -959,8 +963,7 @@ def test_cmd_pdf_forces_full_tabnotation_only_for_pdf_export(
     assert state.piece.bars[state.cursor_bar].repeat == "DC al Fine"
     cmd.cmd_repeat(state, "bad")
     assert state.message == (
-        "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/"
-        "tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
+        "Repeat must be none/start/end/dots/both/dc/ds/fine/coda/tocoda/dcalfine/dcalcoda/dsalfine/dsalcoda"
     )
     cmd.apply_command(state, "ending 1,2", str(tmp_path / "cfg.toml"))
     assert state.piece.bars[state.cursor_bar].ending_numbers == (1, 2)
@@ -1049,11 +1052,11 @@ def test_apply_command_dispatch_executes_all_registered_specs(
         "cmd_stave",
         "cmd_slur",
         "cmd_tie",
-            "cmd_hold",
-            "cmd_barline",
-            "cmd_repeat",
-            "cmd_ending",
-            "cmd_dynamic",
+        "cmd_hold",
+        "cmd_barline",
+        "cmd_repeat",
+        "cmd_ending",
+        "cmd_dynamic",
         "cmd_fermata",
         "cmd_arpeggio",
         "cmd_separee",

@@ -20,9 +20,5 @@ def test_normalize_snapshot_lines_trims_header_status_and_blank_padding() -> Non
 
 
 def test_snapshot_fixtures_match_current_render_output() -> None:
-    mismatches = [
-        report
-        for case in snapshot_cases()
-        if (report := snapshot_mismatch_report(case)) is not None
-    ]
+    mismatches = [report for case in snapshot_cases() if (report := snapshot_mismatch_report(case)) is not None]
     assert mismatches == []

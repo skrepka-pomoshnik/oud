@@ -56,7 +56,7 @@ def _profile(state) -> KeyProfile:
         bar_prev=(ord("b"),),
         page_up=(ord("K"), ord("{")),
         page_down=(ord("J"), ord("}")),
-        scroll_up=(keycodes.ppage, 21),   # PgUp, Ctrl-U
+        scroll_up=(keycodes.ppage, 21),  # PgUp, Ctrl-U
         scroll_down=(keycodes.npage, 4),  # PgDn, Ctrl-D
         col_start=(),
         col_end=(ord("e"), ord("$")),

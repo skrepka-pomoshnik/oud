@@ -25,7 +25,7 @@ run_check() {
 run_check "Ruff" uv run ruff check .
 run_check "Ruff format" uv run ruff format --check .
 run_check "Ty" uv run ty check oud tests
-run_check "Pytest + coverage" uv run pytest tests --cov --cov-fail-under=80
+run_check "Pytest + coverage" uv run pytest tests --cov --cov-fail-under=85
 run_check "Corpus smoke" uv run python scripts/corpus_smoke.py lutemusic
 
 exit "$STATUS"

@@ -1,943 +1,310 @@
 # FT3 Reverse-Engineered Specification
 
-This file documents what `oud` currently knows about the FT3 format from local
-corpus analysis, parser work, and regression tests.
+This document describes the FT3 subset implemented by `oud`, based on the bundled
+Gerbode corpus, binary comparisons, published PDFs, and regression fixtures. FT3
+is proprietary; this is not an official Fronimo specification.
 
-This is not an official Fronimo specification. It is a practical,
-reverse-engineered description of the subset we currently import.
+Status terms:
 
-This document records the model we can justify from our own importer, corpus
-analysis, and regression tests.
+- **Confirmed**: repeated corpus evidence and a regression fixture.
+- **Inferred**: consistent corpus/PDF evidence, but no vendor specification.
+- **Unsupported**: deliberately outside the importer contract.
 
-Status labels used below:
+Implementation:
 
-- `Confirmed`: strongly supported by corpus behavior and tests.
-- `Inferred`: strongly suggested by corpus patterns, but still partly heuristic.
-- `Heuristic`: we currently reconstruct behavior because the encoding is not yet
-  fully decoded.
-- `Unknown`: still not deciphered well enough.
+- `oud/core/ft3.py`: container, records, tablature, score mapping
+- `oud/core/ft3_text.py`: vocal, lyric, editorial, and annotation records
+- `oud/core/ft3_extras.py`: per-note fingering and ornament flags
+- `scripts/ft3_audit.py`: corpus residual and unknown-record inventory
 
-## 1. Scope
+## 1. Container
 
-Current FT3 support in `oud` covers:
+### Compression
 
-- metadata/header extraction
-- tablature bars and notes
-- barline/repeat/system-break header hints
-- structured vocal text records
-- raw mixed-score note/text bars as imported auxiliary staves
-- partial vocal note decoding
-- partial FT3 per-note extras decoding
+**Confirmed.** Files may be plain binary or gzip-compressed. Gzip is detected by
+the `1f 8b` magic bytes.
 
-Main implementation:
+### Main regions
 
-- [oud/core/ft3.py](oud/core/ft3.py)
-- [oud/core/ft3_text.py](oud/core/ft3_text.py)
-- [oud/core/ft3_extras.py](oud/core/ft3_extras.py)
-- [oud/core/key_signature.py](oud/core/key_signature.py)
-
-Main regression coverage:
-
-- [tests/test_ft3.py](tests/test_ft3.py)
-- [tests/test_ft3_text.py](tests/test_ft3_text.py)
-
-## 2. File-Level Structure
-
-### 2.1 Compression
-
-`Confirmed`
-
-FT3 files may be:
-
-- plain binary FT3
-- gzipped FT3
-
-Detection is by gzip magic `1f 8b`.
-
-See:
-
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `read_ft3()`
-
-### 2.2 Chunk Separation
-
-`Confirmed`
-
-The parser splits major FT3 body sections using the byte delimiter:
+**Confirmed.** `CPiece` starts title/metadata material and `CBar` starts the score
+body. Body records are separated by:
 
 ```text
 03 80
 ```
 
-This is used to separate:
+The importer starts bar parsing at `CBar`; bytes in `CPiece` must never be
+interpreted as bar 1.
 
-- metadata-ish header blocks
-- `CBar` records
-- FT3 text records
+## 2. Metadata
 
-This is how the current importer discovers record boundaries.
+**Confirmed for the corpus.** `CPiece` contains length-prefixed or RTF strings.
+The first fields are title, subtitle, composer, and footnote. Section-style text
+also supplies key, type, difficulty, ensemble, part, instrumentation, arranger,
+source, editor, comment, publisher, volume, page, style, and tuning.
 
-## 3. Header and Metadata
+Unknown metadata remains in `Piece.raw_metadata`. The importer never invents a
+value for an absent field.
 
-### 3.1 `CPiece`
+## 3. Body Record Mapping
 
-`Confirmed`
+The `CBar` stream can contain several record shapes.
 
-`CPiece` marks the header area.
+### Tablature
 
-Two observed forms:
+**Confirmed.** Ordinary records contain tablature chord/note objects. Each such
+record maps to one logical `Piece.bars` entry.
 
-1. length-prefixed short text
-2. embedded RTF blocks
+### Mixed voice and tablature scores
 
-Current extraction behavior:
+**Confirmed.** A run of standard-note records followed by an equal-sized tab run
+is parallel notation, not extra bars. A multiple of the tab-run length maps to
+multiple standard staffs. This covers the bundled vocal/lute and three-voice
+plus lute scores.
 
-- tries to find RTF blocks first
-- strips RTF control syntax
-- falls back to short text extraction
-- if title is still missing, uses filename stem
+### Score-only polyphony
 
-See:
+**Confirmed for the corpus.** When every body record is a standard-note record,
+the ensemble metadata supplies staff labels and the record count divides evenly
+into logical bars. `oud` maps all voices separately. Every note staff receives
+one imported entry per logical bar, including rests and empty measures.
 
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `extract_text()`
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_extract_cpiece_blocks()`
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_strip_rtf()`
+### Annotation groups
 
-### 3.2 Metadata fields
+**Confirmed for the corpus.** Three Ich records have a large object index at
+bytes `28..29`, marker `02 00` at bytes `30..31`, and length-prefixed edition
+text such as `p`, `cresc.`, `BI`, `BII`, and `BIV`. They are annotation groups,
+not tablature bars or system breaks. They attach to the following logical bar.
 
-`Confirmed`
+### Score terminator
 
-Current metadata extraction recognizes section-style annotations in the metadata
-blob after `CPiece`, including fields like:
+**Inferred.** One Passacaglia record follows the final appendix bar. Its signature
+starts `00 00 00 11 00 00 ff`, has no musical/text object, and is represented as
+a typed `score-terminator` source record rather than a visible bar.
 
-- title / subtitle
-- composer / author / arranger
-- footnote
-- source / editor / comment
-- key
-- type
-- difficulty
-- ensemble
-- instrumentation
-- part
-- publisher / volume / page
+## 4. Tablature Bar Header
 
-The importer also canonicalizes:
+The first 32 bytes are a control/header region.
 
-- `con` -> appended into `source`
+### Meter
 
-See:
+**Confirmed subset.** `byte0 & 0x7f` selects:
 
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_parse_section_annotations()`
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_canonicalize_metadata_fields()`
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_apply_annotations()`
+| Value | Meaning |
+| --- | --- |
+| `01` | common time (`C`) |
+| `02` | cut time (`C|`) |
+| `03` | triple meter (`3/4`) |
+| `06` | fraction using denominator byte 8 and numerator byte 9 |
 
-### 3.3 Footnote decomposition
+An explicit meter remains active until another explicit meter appears. If a
+file has no explicit meter, duration sums provide a conservative initial guess.
 
-`Heuristic`
+### Repeats, endings, and closing bars
 
-The current importer splits `footnote` into:
+**Confirmed by binary/PDF comparison.** The observed flags are:
 
-- source
-- editor
-- comment
-
-using multi-space separators.
-
-This works for the local corpus, but is not guaranteed to be official FT3
-structure.
-
-## 4. Bar Stream and `CBar`
-
-### 4.1 Bar body start
-
-`Confirmed`
-
-Real bar parsing starts at the first `CBar` marker, not from the earlier file
-bytes. This avoids CPiece bytes polluting the first bar.
-
-### 4.2 Mixed-score body layout
-
-`Confirmed`
-
-In some FT3 files, the `CBar` stream is not only tablature bars. It may contain:
-
-- raw non-tab bars first
-- tab bars after that
-
-When the stream matches:
-
-```text
-raw raw raw ... tab tab tab ...
-```
-
-with equal prefix/suffix lengths, `oud` treats it as:
-
-- raw mixed-score prefix
-- parallel tab suffix
-
-This is how duet/mixed vocal files like `now_o_now` are aligned.
-
-See:
-
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_parallel_mixed_score_prefix_count()`
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_parallel_raw_bar_targets()`
-
-## 5. Tablature Bar Binary Layout
-
-### 5.1 Bar header region
-
-`Confirmed`
-
-Current tablature bar parsing assumes:
-
-- the first 32 bytes are bar header / control area
-- note/chord scan begins at offset `32`
-
-Compact view:
-
-| Offset | Meaning | Status |
+| Location | Bit | Meaning |
 | --- | --- | --- |
-| `0` | time-signature / repeat / barline / system-break bits | Confirmed subset |
-| `1` | repeat / barline bits | Confirmed subset |
-| `8` | denominator for explicit `n/d` meter when byte0 says custom meter | Confirmed |
-| `9` | numerator for explicit `n/d` meter when byte0 says custom meter | Confirmed |
-| `32..` | chord + note stream | Confirmed |
+| byte 0 | `10` | right repeat |
+| byte 0 | `20` | first ending |
+| byte 0 | `40` | second ending |
+| byte 0 | `80` | double/closing bar |
+| byte 1 | `01` | double/closing bar |
+| byte 1 | `02` | right repeat on structural boundary |
+| byte 1 | `10` | left repeat |
 
-### 5.2 Chord record layout
+The `20`/`40` interpretation is visible in Unquiet Thoughts, Czarna Krowa, and
+La Corambona: `b0 01` closes the first ending and `c0 01` closes the second.
+Earlier `oud` versions incorrectly treated `40` as a system break.
 
-`Confirmed`
+No per-system line-break flag occurs in the bundled logical bar stream.
 
-At scan position `ptr`, a chord header is recognized when:
+### Object count and object type
 
-- `bar_data[ptr + 4]` / `bar_data[ptr + 5]` look like a note starter
-- and `note_type = bar_data[ptr] + 2` maps to a known denominator
+For ordinary tab records, bytes `28..29` plus one give the top-level object
+count used to stop scanning before trailing text/layout data. Standard-note
+records use a marker `01 31` through `01 35` at bytes `30..31`.
 
-Decoded chord fields:
+## 5. Tablature Objects
 
-- `note_type = bar_data[ptr] + 2`
-- dotted if `bar_data[ptr + 1] & 0x10`
-- grid flags:
-  - `0x02` -> `start`
-  - `0x04` -> `mid`
-  - `0x08` -> `end`
+### Chord header
 
-Chord header width currently assumed: `4` bytes.
-
-Compact layout:
+**Confirmed subset.** A chord header is four bytes:
 
 | Relative byte | Meaning |
 | --- | --- |
-| `0` | rhythm code; `note_type = byte + 2` |
-| `1` | dotted + grid flags |
-| `2..3` | currently unused by tab chord import |
+| 0 | rhythm code; internal `note_type = value + 2` |
+| 1 | dotted (`10`) and beam/grid (`02` start, `04` middle, `08` end) |
+| 2..3 | object metadata not needed after item-count framing |
 
-### 5.3 Note record layout
+The preceding two-byte item count bounds the following notes. This prevents
+standard-note rows and trailing edition text from becoming false tab notes.
 
-`Confirmed`
+### Note object
 
-Each following note is read in `5`-byte groups.
-
-For main-course notes:
-
-- byte 0: string byte
-- byte 1: fret byte
-- bytes 2-3: FT3 extras bitfield
-- byte 4: additional note flags / bass discriminator
-
-Main-course decoding:
-
-- strings `0x02..0x07` map to strings `1..6`
-- fret byte:
-  - ASCII `0..E` style digits for numeric frets
-  - ASCII `a..z` for French letter frets
-
-See:
-
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `parse_bar()`
-
-Compact layout:
+**Confirmed.** A tablature note is five bytes:
 
 | Relative byte | Meaning |
 | --- | --- |
-| `0` | string/course byte |
-| `1` | fret / bass-course discriminator |
-| `2` | FT3 extras low byte |
-| `3` | FT3 extras high byte |
-| `4` | extra flags / bass discriminator |
+| 0 | string/course code |
+| 1 | fret or bass-course discriminator |
+| 2..3 | little-endian extras field |
+| 4 | additional bass-course discriminator bits |
 
-### 5.4 Bass-course decoding
+Main courses use string codes `02..07`. Numeric and French letter frets are
+accepted. Observed `08` forms select courses 7 and higher.
 
-`Inferred`
+## 6. Structured Standard-Note Records
 
-Observed special handling for byte 0 == `0x08`:
+### Vocal event layout
 
-- one pattern maps to string `7`
-- another maps to strings `8+` with numeric course bytes
-- another pattern maps to string `8`
+**Confirmed for the corpus.** A structured vocal row starts with:
 
-Current decoder handles several corpus-backed bass encodings, but this part is
-still not fully generalized.
+| Bytes | Meaning |
+| --- | --- |
+| 0 | first pitch-row value |
+| 1..4 | first-event flags, little-endian |
+| following 7-byte records | additional events |
+| final 2 bytes | event count plus one |
 
-## 6. Bar Header Markers
+An additional event record is:
 
-### 6.1 Repeats and double bars
+| Relative byte | Meaning |
+| --- | --- |
+| 0 | `01` marker |
+| 1 | duration code |
+| 2 | pitch-row value |
+| 3..4 | event flags |
+| 5..6 | zero/reserved in observed records |
 
-`Confirmed`
+Duration codes map as follows:
 
-Current reverse-engineering of header bytes:
-
-- byte1 bit `0x10` -> left repeat dots
-- byte0 bit `0x10` and/or byte1 bit `0x02` -> right repeat dots
-- byte0 bit `0x80` and/or byte1 bit `0x01` -> explicit double barline
-
-Current mapping:
-
-- left only -> `.:`
-- right only -> `:.`
-- both -> `:|:`
-- double barline -> `||`
-
-Bit summary:
-
-| Byte | Bit | Meaning |
+| Code | Internal note type | Duration |
 | --- | --- | --- |
-| `0` | `0x10` | right repeat dots |
-| `0` | `0x40` | forced system break |
-| `0` | `0x80` | explicit double/closing bar |
-| `1` | `0x01` | explicit double/closing bar |
-| `1` | `0x02` | right repeat dots |
-| `1` | `0x10` | left repeat dots |
+| `32` | 3 | half |
+| `33` | 4 | quarter |
+| `34` | 5 | eighth |
+| `35` | 6 | sixteenth |
 
-See:
+The first event omits its duration. `oud` derives it from the active meter and
+the remaining event durations.
 
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `_parse_bar_markers()`
+### Vocal flags
 
-### 6.2 System break hint
+**Confirmed by corpus sequences and PDF output.** All vocal bits used by the
+bundled corpus are decoded:
 
-`Confirmed`
-
-Header byte0 bit `0x40` currently acts as a forced system break hint.
-
-Current mapping:
-
-- `bar.system_break = True`
-
-This feeds current layout/reflow logic.
-
-### 6.3 Additional header bits
-
-`Unknown`
-
-Byte0 bit `0x20` is known to exist in the corpus but is not yet decoded.
-
-Current behavior:
-
-- importer warns that additional bar header markers exist
-- only repeats, double bars, and system breaks are currently decoded
-
-## 7. Time Signature Encoding
-
-### 7.1 Explicit FT3 time signature decoding
-
-`Confirmed subset`
-
-`parse_time_signature(bar_data)` decodes explicit meter from bar header bytes.
-
-Supported current symbolic outputs include:
-
-- `C`
-- `C|`
-- `O`
-- fractions like `3/4`
-
-Current byte mapping:
-
-| `bar_data[0] & 0x7f` | Meter |
+| Bit | Meaning |
 | --- | --- |
-| `0x01` | `C` |
-| `0x02` | `C|` |
-| `0x03` | explicit triple meter; current parser stores `3/4` |
-| `0x06` | custom fraction using bytes `9/8` as `num/den` |
+| `0002` | sharp |
+| `0004` | middle event in a beam group |
+| `0008` | end event in a beam group |
+| `0010` | dotted |
+| `0040` | rest |
+| `0100` | fermata |
+| `1000` | flat |
+| `2000` | explicit natural/key-default control |
 
-See:
+The first beam event has no beam bit. It is inferred by walking backward from
+`0008` over any `0004` middle events. Beams and fermatas survive projection,
+terminal rendering, and LilyPond export.
 
-- [oud/core/ft3.py](oud/core/ft3.py)
-  `parse_time_signature()`
+### Pitch and key handling
 
-Important nuance:
+Pitch rows repeat `d e f g a b c` across octaves. Explicit flat/sharp flags take
+precedence. Otherwise the imported key signature supplies the tonal default.
 
-- older reverse-engineering notes disagree on whether this code is “single
-  number 3” or mensural triple.
-- current parser stores it as `3/4`, because that is the clearest internal
-  representation and matches the local corpus behavior better than symbolic `O`.
+### Lyrics and editorial rows
 
-### 7.2 Filling missing meters
+**Confirmed for the corpus.** Carriage returns split rows. Printable runs are
+tokens; low control bytes are horizontal anchors. Rows are typed as vocal,
+lyrics, editorial, font, control, or unknown. Lyric anchors become verse-aware
+`LyricEvent` objects. Font/control rows remain inspectable but are not displayed
+as lyrics.
 
-`Heuristic`
+## 7. Edition Text and Sections
 
-If bars have no explicit time signature, `oud` fills it from:
+Length-prefixed text objects become dynamics or editorial annotations. Embedded
+RTF titles inside a tab record introduce the following section. In the bundled
+Passacaglia this recovers:
 
-- explicit neighboring bars
-- bar duration sums
+- the note “Original 2 bars seem too discordant. For originals see Appendix.”
+- a page break after the main piece
+- section title `Appendix`
+- subtitle `Original bars 14-15`
 
-Current sum-based inference:
+Terminal layout forces a new system there; LilyPond emits `\pageBreak` and the
+section marks.
 
-- `1.5 quarter beats` -> `O`
-- `2.0` -> `C|`
-- `4.0` -> `C`
+Exact PDF line wrapping and page composition are Fronimo engraving output, not
+logical score records observed in this corpus. `oud` therefore reflows ordinary
+systems for the current terminal width.
 
-This is corpus-based recovery, not confirmed FT3 structure.
+## 8. Per-Note Extras
 
-## 8. FT3 Text Records
+**Confirmed for every value used by the corpus.** The extras field composes
+low-byte fingering bits with one high-byte mark:
 
-FT3 text records are the hardest part of the format.
-
-Two major classes are currently handled:
-
-- `ascii fallback`
-- `structured text records`
-
-### 8.1 Row splitting
-
-`Confirmed`
-
-Structured FT3 text records use:
-
-- `CR` (`0x0d`) as logical row separator
-
-Rows may contain:
-
-- printable ASCII text
-- control bytes `0x01..0x1f` that act as horizontal anchors
-
-Practical rule:
-
-- split row on `CR`
-- within a row, printable bytes build a token
-- control bytes reset x-position / anchor
-
-### 8.2 Structured row kinds
-
-`Confirmed`
-
-Current classifier recognizes:
-
-- `vocal`
-- `lyrics`
-- `editorial`
-- `font`
-- `control`
-- `unknown`
-
-This classification is stored in `ImportedTextRow`.
-
-### 8.3 ASCII fallback
-
-`Heuristic`
-
-When text does not decode as a structured record, importer falls back to line
-heuristics:
-
-- melody-like line detection
-- lyric-like line detection
-
-This path is intentionally marked approximate and emits warnings.
-
-### 8.4 Structured vocal row
-
-`Inferred`
-
-The first structured row may encode explicit vocal melody.
-
-Current decoder assumes:
-
-- first byte encodes first pitch row value
-- next 4 bytes encode first-event flags
-- subsequent `7`-byte note records may follow:
-  - `0x01`
-  - note-type code
-  - row value
-  - flags
-  - additional bytes
-
-Current note-type code mapping:
-
-- `0x33` -> half
-- `0x34` -> quarter
-- `0x35` -> eighth
-
-This is still not a full FT3 vocal-note spec, but it is stable enough for
-current corpus import.
-
-Compact layout for the currently decoded subset:
-
-| Byte range | Meaning |
+| Value | Meaning |
 | --- | --- |
-| `0` | first note row value |
-| `1..4` | first note flags |
-| repeated `7`-byte groups | more note events |
-| trailing `2` bytes | event-count-like value, used as a sanity check |
+| `0002` | right thumb |
+| `0004`, `0008`, `0010` | right-hand dots 1, 2, 3 |
+| `0020`, `0040`, `0080`, `0100` | left fingers 1, 2, 3, 4 |
+| `0400`, `0800`, `0c00` | left `#`, `+`, `x` ornaments |
+| `0600`, `0e00` | right `#`, `x` ornaments |
+| `3400` | barre; composes with low-byte fingering |
+| `0200` | single arpeggio mark |
+| `4a00`, `4e00`, `5200` | bottom, middle, top arpeggio segments |
 
-Supported subsequent event group:
+These marks render in the terminal and are exported where LilyPond/MusicXML has
+an equivalent. The original integer remains on `Note.ft3_extras`; any unconsumed
+bit would appear in `ft3_extra_residual` and fail the corpus audit.
 
-| Relative byte | Meaning |
-| --- | --- |
-| `0` | must be `0x01` |
-| `1` | note-type code (`0x33`, `0x34`, `0x35`) |
-| `2` | row value |
-| `3..4` | flags |
-| `5..6` | currently opaque |
+## 9. Imported Score Model
 
-### 8.5 Vocal pitch mapping
+`Piece.bars` is the tablature/editing projection. `Piece.imported_score` stores
+decoded note, lyric, comment, layout, and future unknown staffs.
 
-`Inferred`
-
-Vocal pitch rows map to letter pitches using:
+Source provenance is separate from musical bars:
 
 ```text
-d e f g a b c
+ImportedScore.source_records[]
+  source_bar_index
+  source_staff_index
+  kind
+  size
 ```
 
-with octave suffixes added by row count.
+Current semantic source kinds are `note`, `note-lyrics`, `annotation-group`,
+`barline`, `comment`, `text`, `score-terminator`, and `unknown`. A record is
+listed once even when it contributes both note and lyric content.
 
-Current implementation:
+The viewer can focus each imported voice independently. LilyPond emits every
+mapped standard staff rather than only the first voice.
 
-- [oud/core/ft3_text.py](oud/core/ft3_text.py)
-  `_vocal_pitch_token()`
+## 10. Audit Contract
 
-### 8.6 Lyric rows with control-byte anchors
+Run:
 
-`Confirmed`
+```bash
+uv run python scripts/ft3_audit.py lutemusic
+```
 
-Control bytes in structured lyric rows act as x-position anchors.
-
-Current importer tokenizes these rows by:
-
-- treating printable bytes as token text
-- treating low control bytes as horizontal anchor resets
-
-This is the basis for multi-verse reconstruction in raw vocal files.
-
-## 9. Raw Mixed-Score Record Kinds
-
-`Confirmed`
-
-Non-tab `CBar` chunks are currently classified as:
-
-- `barline-raw`
-- `note-staff-raw`
-- `note-lyric-raw`
-- `text-score-raw`
-- `comment-rtf-raw`
-- `score-settings-raw`
-- `unknown`
-
-Current meaning:
-
-- `barline-raw`: mostly meter/repeat/system metadata
-- `note-staff-raw`: note-staff-like chunk with little/no text
-- `note-lyric-raw`: note-staff plus lyric payload
-- `text-score-raw`: text-heavy raw score record
-- `score-settings-raw`: non-musical score settings record found after the final bar
-
-These feed `ImportedScore` rather than the tab editor core.
-
-Classifier rule of thumb:
-
-| Kind | Trigger |
-| --- | --- |
-| `barline-raw` | parsed bar has meter/barline/repeat but no tab notes |
-| `note-lyric-raw` | raw payload has note markers and text |
-| `note-staff-raw` | raw record has note markers but little/no text; marker search includes bytes 28+ because some markers cross the 32-byte header boundary |
-| `text-score-raw` | raw payload has text but no note markers |
-| `comment-rtf-raw` | raw payload contains RTF/font data |
-| `score-settings-raw` | settings signature `00 11 00 00 ff` with no text or note markers |
-
-## 10. Imported Score Model
-
-`Confirmed`
-
-Mixed/non-tab FT3 data is preserved in:
-
-- `ImportedScore`
-- `ImportedStaff`
-- `ImportedBarContent`
-
-Current imported staff kinds:
-
-- `note`
-- `lyrics`
-- `comment`
-- `barline`
-- `layout`
-- `unknown`
-
-This is the read-only representation used for non-tab FT3 viewing and the
-staging area for richer proprietary score semantics.
-
-The bundled corpus currently produces no `unknown` staffs. Unrecognized future
-records still retain that type so unsupported bytes are never silently dropped.
-
-## 11. Vocal Accidental Handling
-
-### 11.1 Explicit accidental bits
-
-`Confirmed`
-
-Current vocal accidental flag handling:
-
-- `0x1000` -> flat
-- `0x0002` -> sharp
-- `0x2000` -> natural, except in raw fallback mode
-
-### 11.2 Tonal defaults
-
-`Confirmed`
-
-Default vocal accidentals are normalized from key signature using:
-
-- [oud/core/key_signature.py](oud/core/key_signature.py)
-
-Examples:
-
-- `GM` -> `f#`
-- `DM` -> `f#, c#`
-- `Fm` -> `bb, eb, ab, db`
-
-### 11.3 Raw fallback special case
-
-`Heuristic`
-
-In raw vocal fallback FT3, `0x2000` is currently not trusted as explicit natural.
-
-Instead, default tonal accidental is preserved.
-
-This was added because several raw mixed-score files sounded wrong otherwise.
-
-## 12. FT3 Note Extras Bitfield
-
-`Confirmed for current subset`
-
-Per-note FT3 extras are decoded compositionally in:
-
-- [oud/core/ft3_extras.py](oud/core/ft3_extras.py)
-
-Currently recognized fingering bits:
-
-- right hand:
-  - `0x0002` -> thumb
-  - `0x0004` -> dot1
-  - `0x0008` -> dot2
-  - `0x0010` -> dot3
-- left hand:
-  - `0x0020` -> `1`
-  - `0x0040` -> `2`
-  - `0x0080` -> `3`
-  - `0x0100` -> `4`
-
-Currently recognized ornament patterns:
-
-- `0x4A00` -> left ornament `dot-left`
-- `0x3400` -> left ornament `brackets`
-- `0x0600` -> right ornament `#`
-- `0x0C00` -> left ornament `x`
-- `0x0800` -> left ornament `+`
-- `0x0400` -> left ornament `#`
-
-Unconsumed bits are stored as `residual`.
-
-This decoder was rewritten as a compositional bitfield model rather than exact
-whole-value matching.
-
-Compact matrix:
-
-| Bits | Meaning |
-| --- | --- |
-| `0x0002` | RH thumb |
-| `0x0004` | RH dot1 |
-| `0x0008` | RH dot2 |
-| `0x0010` | RH dot3 |
-| `0x0020` | LH 1 |
-| `0x0040` | LH 2 |
-| `0x0080` | LH 3 |
-| `0x0100` | LH 4 |
-| `0x0400` | LH ornament `#` |
-| `0x0600` | RH ornament `#` |
-| `0x0800` | LH ornament `+` |
-| `0x0c00` | LH ornament `x` |
-| `0x3400` | LH ornament `brackets` |
-| `0x4a00` | LH ornament `dot-left` |
-
-## 13. Duration Encoding and Legacy Normalization
-
-### 13.1 Tablature note types
-
-`Confirmed`
-
-Current denominator mapping:
-
-- `2 -> whole`
-- `3 -> half`
-- `4 -> quarter`
-- `5 -> eighth`
-- `6 -> sixteenth`
-- `7 -> thirty-second`
-
-See tests around `note_type_to_denominator()`.
-
-### 13.2 Legacy rhythm shift
-
-`Heuristic`
-
-Some FT3 files in the corpus encode durations one step too fast.
-
-Current repair:
-
-- detect bars whose duration median implies a shifted encoding
-- shift note types one step longer
-
-This is not format structure, but a compatibility heuristic needed for real
-corpus playback/rendering.
-
-## 14. Current Unknowns
-
-These are not yet decoded well enough to call specified.
-
-### 14.1 Remaining bar header bits
-
-- byte0 bit `0x20` is classified as a redundant boundary modifier when paired
-  with the explicit closing bar and right repeat bits (`0x80 | 0x10`), matching
-  every occurrence in the bundled corpus
-- isolated `0x20` and any still-unclassified combinations beyond
-  repeats/double bars/system breaks remain unknown and produce a warning
-- possible volta / first-ending / second-ending markers, if FT3 stores them in
-  the same 32-byte bar header region
-
-`oud` now has manual bar-level ending semantics (`ending_numbers`) for
-playback/rendering, but FT3 import does not yet fill them automatically.
-
-Current corpus evidence confirms `byte0 & 0x20` is not a simple standalone
-repeat/volta flag:
-
-- it often appears on otherwise empty bars
-- it often appears immediately before a bar that already carries the explicit
-  closing/repeat markers we do decode
-
-In the observed `0xb0` combination it behaves as a redundant boundary/meta
-modifier rather than a directly playable repeat instruction.
-
-### 14.2 Ties / slurs / holds in binary FT3
-
-Current editor supports these semantically, but FT3 binary import does not yet
-decode a confirmed encoding for them from bar records.
-
-### 14.3 System/stave break hints beyond current `0x40`
-
-We only decode one confirmed system-break hint today.
-
-### 14.4 Raw mixed-score note-staff binary semantics
-
-We still do not have a complete note-staff specification for:
-
-- non-tab voices
-- vocal note-staff layout data
-- possible articulation/style flags in raw score records
-
-### 14.5 Multi-verse raw vocal text semantics
-
-This remains heuristic parser territory rather than a confirmed format rule.
-
-We currently reconstruct many bars successfully, but not yet with a guaranteed
-general rule for all 3-verse raw files.
-
-The `now_o_now.ft3` and `felice` variants retain their recovered rows and render
-without warnings; exact edition-quality spacing is not guaranteed.
-
-### 14.6 FT3 instrument/style/tuning fields outside current metadata extraction
-
-Every metadata key observed in the bundled corpus maps to a canonical field or
-a key-signature alias. Future fields remain available in `raw_metadata` even
-when no canonical field exists yet.
-
-### 14.7 Additional FT3 extras patterns
-
-Several extras values remain only partially understood. Current decoder keeps
-unknown residual bits rather than pretending full understanding.
-
-## 15. Worked Examples
-
-Keep these as sanity anchors when reimplementing.
-
-### 15.1 Minimal tab bar with one quarter note
-
-From test fixture shape:
+For the bundled corpus, the required result is:
 
 ```text
-00..1f  = 32-byte header
-20..23  = 02 00 00 00
-24..28  = 02 61 00 00 00
+Scanned 36 file(s): 0 with unresolved values or records.
 ```
 
-Interpretation:
+“Unresolved” means an unconsumed note-extra bit, unknown vocal flag, unknown
+source record, or import warning. Typed source records are inventory, not debt.
 
-- chord header `02 00 00 00`
-  - rhythm code `0x02` -> `note_type = 4` -> quarter
-- note record `02 61 00 00 00`
-  - string byte `0x02` -> string 1
-  - fret byte `0x61` -> `a` -> fret 0
-  - extras `0x0000`
+## 11. Limits
 
-### 15.2 Header marker examples
-
-```text
-80 01 -> ||               (double barline)
-00 10 -> .:               (left repeat)
-90 01 -> || + :.          (double barline + right repeat)
-90 12 -> || + :|:         (double barline + both repeats)
-40 00 -> system break     (forced layout break)
-```
-
-### 15.3 Explicit structured vocal row
-
-This fixture decodes to `d a d'`:
-
-```text
-010000000001330500000000013308000000000400
-a338d7bf610bd63f0000004000000040040000000000000000000000010003000843616e
-```
-
-Current importer interpretation:
-
-- first note from row/flag prefix -> `d`
-- next `0x01 0x33 ...` group -> `a`
-- next `0x01 0x33 ...` group -> `d'`
-- trailing text token -> lyric anchor text (`Can`)
-
-### 15.4 Structured lyric control rows
-
-Fixture:
-
-```text
-01 00 03 00 08 43 61 6e
-57 61 73 06 73 68 65
-49 07 65 78 2d
-73 6f
-```
-
-Current result:
-
-- verse 1: `Can she ex-`
-- verse 2: `Was I so`
-
-Meaning:
-
-- low bytes like `0x06`, `0x07`, `0x08` act as x-anchors
-- tokens are reconstructed in visual order into verse rows
-
-### 15.5 Raw 3-verse mixed vocal example
-
-Observed rows in `now_o_now`-like material:
-
-```text
-vocal:  ... 12 Now,
-lyric:  Dear,
-lyric:  Dear, 0b O
-lyric:  when
-lyric:  if
-```
-
-Current reconstructed result:
-
-- verse 1: `Now O`
-- verse 2: `Dear when`
-- verse 3: `Dear if`
-
-This is currently a reconstruction rule, not a fully confirmed FT3 semantic
-spec.
-
-## 16. Corpus Feature Matrix
-
-Compact practical matrix for the local corpus:
-
-| Feature | Status |
-| --- | --- |
-| gzipped FT3 | decoded |
-| RTF `CPiece` title blocks | decoded |
-| plain `CPiece` short text | decoded |
-| tab bars / chord stream | decoded |
-| French fret letters `a..z` | decoded |
-| several bass-course encodings | partially decoded |
-| explicit bar repeats | decoded |
-| explicit double bars | decoded |
-| system-break hint `0x40` | decoded |
-| explicit structured vocal melody | decoded subset |
-| structured lyric rows | decoded subset |
-| editorial prose text rows | decoded subset |
-| score-settings/layout record | classified and preserved |
-| raw mixed note/text bars | partially decoded |
-| 2-verse raw lyric recovery | heuristic |
-| 3-verse raw lyric recovery | heuristic |
-| tonal vocal accidental normalization | decoded subset |
-| FT3 note extras fingering subset | decoded |
-| FT3 note extras ornament subset | decoded subset |
-| ties/slurs/holds in FT3 binary | unknown |
-| bundled bar-header combinations | decoded |
-| full non-tab score semantics | read-only decoded subset |
-| bundled imported staffs | no unknown records |
-
-## 17. Reimplementation Checklist
-
-If another person is recreating the parser from scratch, the minimum useful
-implementation order is:
-
-1. read gzip/plain FT3
-2. split on `03 80`
-3. parse `CPiece` title/RTF blocks
-4. start bar parsing only after first `CBar`
-5. implement 32-byte bar header + chord/note stream parser
-6. implement header bits:
-   - repeats
-   - double barline
-   - system break
-7. implement explicit meter decoding
-8. implement FT3 extras subset
-9. implement structured vocal row decoding
-10. implement structured lyric control-row tokenization
-11. add mixed raw-prefix + tab-suffix mapping
-12. only then add raw multi-verse lyric reconstruction heuristics
-
-Rule of thumb:
-
-- first make the confirmed subset work
-- then layer heuristics explicitly
-- never silently mix heuristic repairs into the confirmed binary model
-
-## 18. Deliberate Boundaries
-
-- FT3 is import-only; `oud` does not write the proprietary format.
-- Unconfirmed tie/slur/hold, volta, extras, and raw score flags are preserved
-  but not assigned semantics without a verified fixture or format reference.
-- The corpus feature matrix above is the release contract for the supported
-  subset.
-
-## 19. Practical Reading Rule
-
-For now, treat FT3 as three overlapping practical subsets:
-
-- `tab bars`: fairly well understood
-- `structured vocal text`: moderately well understood
-- `raw mixed score`: partially reconstructed, not fully deciphered
-
-That model matches the actual current parser architecture and the local FT3
-corpus behavior better than pretending FT3 is one uniform simple format.
+- FT3 is import-only; `oud` never overwrites or writes proprietary FT3 data.
+- The contract is the bundled corpus, not every historical Fronimo version.
+- Exact glyph shapes, coordinates, braces, proportional spacing, and automatic
+  PDF pagination belong to the engraving layer and are approximated/reflowed.
+- Future unknown records remain typed as `unknown` and trigger the audit; they
+  are never silently discarded or advertised as supported.

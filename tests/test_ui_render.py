@@ -210,10 +210,7 @@ def test_playback_scaled_col_for_chords_prefers_event_index_mapping() -> None:
     )
     positions, grid_width = _chord_positions_distinct(bar, bar_width=8, default_duration=4)
     content_width = 18
-    src_to_dest = {
-        raw_col: min(content_width - 1, idx * 3)
-        for idx, (raw_col, _denom, _dot) in enumerate(positions)
-    }
+    src_to_dest = {raw_col: min(content_width - 1, idx * 3) for idx, (raw_col, _denom, _dot) in enumerate(positions)}
     playback_col = 3
     scaled = _playback_scaled_col_for_chords(
         playback_col=playback_col,

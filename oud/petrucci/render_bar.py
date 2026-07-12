@@ -20,10 +20,7 @@ def build_flag_rows(
 ) -> tuple[list[str], list[str]]:
     stem, flag = flag_symbols(flagstyle, flaglean)
     if spacing_mode == "fixed":
-        clamped = [
-            (max(0, min(bar_width - 1, pos)), denom, dotted)
-            for (pos, denom, dotted) in positions
-        ]
+        clamped = [(max(0, min(bar_width - 1, pos)), denom, dotted) for (pos, denom, dotted) in positions]
         flag_cells = flag_row_style(
             clamped,
             bar_width,
@@ -36,10 +33,7 @@ def build_flag_rows(
         return flag_cells, stem_cells
     if spacing_mode == "auto":
         content_width = max(1, display_width - barpad * 2)
-        scaled_positions = [
-            (_scale_col(pos, bar_width, content_width), denom, dot)
-            for (pos, denom, dot) in positions
-        ]
+        scaled_positions = [(_scale_col(pos, bar_width, content_width), denom, dot) for (pos, denom, dot) in positions]
         scaled_positions = spread_flag_positions(
             scaled_positions,
             content_width,

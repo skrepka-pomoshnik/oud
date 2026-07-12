@@ -139,7 +139,9 @@ def _dispatch(state: EditorState, key: int) -> bool:
         handle_insert=handle_insert,
         handle_normal=handle_normal,
         handle_command=lambda s, k: handle_command_input(
-            s, k, lambda st, cmd: apply_command(st, cmd, state.config_path),
+            s,
+            k,
+            lambda st, cmd: apply_command(st, cmd, state.config_path),
         ),
         handle_search=handle_search_input,
     )
@@ -217,6 +219,7 @@ def test_app_main_smoke(monkeypatch) -> None:
     monkeypatch.setattr(curses, "KEY_IC", -1)
     monkeypatch.setattr(curses, "KEY_DC", -1)
     monkeypatch.setattr(curses, "ERR", -1)
+
     class FakeWindow:
         def __init__(self) -> None:
             self._calls = 0
@@ -245,14 +248,17 @@ def test_app_main_smoke(monkeypatch) -> None:
                 return ord("q")
             return -1
 
-    assert run_loop(
-        cast(curses.window, FakeWindow()),
-        None,
-        config_path="config.toml",
-        handle_insert=handle_insert,
-        handle_normal=handle_normal,
-        apply_command=apply_command,
-    ) == 0
+    assert (
+        run_loop(
+            cast(curses.window, FakeWindow()),
+            None,
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=handle_normal,
+            apply_command=apply_command,
+        )
+        == 0
+    )
 
 
 def test_app_main_smoke_with_path(monkeypatch) -> None:
@@ -273,6 +279,7 @@ def test_app_main_smoke_with_path(monkeypatch) -> None:
     monkeypatch.setattr(curses, "KEY_IC", -1)
     monkeypatch.setattr(curses, "KEY_DC", -1)
     monkeypatch.setattr(curses, "ERR", -1)
+
     class FakeWindow:
         def __init__(self) -> None:
             self._calls = 0
@@ -301,14 +308,17 @@ def test_app_main_smoke_with_path(monkeypatch) -> None:
                 return ord("q")
             return -1
 
-    assert run_loop(
-        cast(curses.window, FakeWindow()),
-        "missing.ft3",
-        config_path="config.toml",
-        handle_insert=handle_insert,
-        handle_normal=handle_normal,
-        apply_command=apply_command,
-    ) == 0
+    assert (
+        run_loop(
+            cast(curses.window, FakeWindow()),
+            "missing.ft3",
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=handle_normal,
+            apply_command=apply_command,
+        )
+        == 0
+    )
 
 
 def test_app_main_smoke_interactions(monkeypatch) -> None:
@@ -372,14 +382,17 @@ def test_app_main_smoke_interactions(monkeypatch) -> None:
             return -1
 
     window = FakeWindow()
-    assert run_loop(
-        cast(curses.window, window),
-        None,
-        config_path="config.toml",
-        handle_insert=handle_insert,
-        handle_normal=handle_normal,
-        apply_command=apply_command,
-    ) == 0
+    assert (
+        run_loop(
+            cast(curses.window, window),
+            None,
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=handle_normal,
+            apply_command=apply_command,
+        )
+        == 0
+    )
     assert window.added > 0
 
 
@@ -458,13 +471,16 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
     monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
     monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
 
-    assert run_loop(
-        cast(curses.window, _PlaybackScrollFakeWindow()),
-        None,
-        config_path="config.toml",
-        handle_insert=handle_insert,
-        handle_normal=handle_normal,
-        apply_command=apply_command,
-    ) == 0
+    assert (
+        run_loop(
+            cast(curses.window, _PlaybackScrollFakeWindow()),
+            None,
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=handle_normal,
+            apply_command=apply_command,
+        )
+        == 0
+    )
     assert render_bar_offsets
     assert render_bar_offsets[0] > 0

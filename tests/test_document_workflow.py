@@ -7,7 +7,10 @@ import pytest
 from oud.editor.document import DocumentMode
 from oud.editor.file_ops import cmd_write_ascii
 from oud.editor.init import init_state
+from oud.editor.messages import MessageLevel, infer_message_level
 from oud.editor.status import status_line
+from oud.petrucci.framebuffer import FrameBuffer
+from oud.petrucci.render_helpers import render_help
 from oud.tui.commands import apply_command
 from oud.tui.input import handle_command
 from tests.helpers_keyscript import press_keys
@@ -40,7 +43,8 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     mixed = init_state(MIXED_FT3, config_path=config)
     assert mixed.document_mode is DocumentMode.IMPORTED_READ_ONLY
     assert mixed.read_only is True
-    assert mixed.visible_message == "non-TAB layers"
+    assert mixed.visible_message == "non-TAB; j/k focus"
+    assert mixed.visible_message_level is MessageLevel.WARNING
 
     duet = init_state(DUET_FT3, config_path=config)
     assert duet.document_mode is DocumentMode.IMPORTED_READ_ONLY
@@ -185,13 +189,50 @@ def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: P
     assert len(line) <= 80
 
 
+def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None:
+    screen = FrameBuffer(24, 80)
+    render_help(screen, "help  j/k scroll  q close", 0, 0)
+    visible_help = "\n".join(line.rstrip() for line in screen.snapshot().lines[:-1])
+
+    assert "Open/create  oud [FILE] / oud" in visible_help
+    assert "Open here  :e FILE" in visible_help
+    assert "Enter note   i, type fret a-t or 0-9, then Esc" in visible_help
+    assert "Undo         u" in visible_help
+    assert "Save       :w [FILE.tab]" in visible_help
+    assert "Quit         :q" in visible_help
+    assert "Discard    :q!" in visible_help
+
+    config = str(tmp_path / "config.toml")
+    target = tmp_path / "first-score.tab"
+    state = init_state(None, config_path=config)
+    press_keys(state, ["i", "a", 27])
+    assert state.overrides == {(0, 0, 0): "a"}
+    press_keys(state, ["u"])
+    assert state.overrides == {}
+
+    apply_command(state, f"w {target}", config)
+    assert target.exists()
+    assert state.write_path == str(target)
+    assert state.modified is False
+    with pytest.raises(SystemExit):
+        apply_command(state, "q", config)
+
+
 def test_persistent_notice_requires_acknowledgement(tmp_path: Path) -> None:
     state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
     assert state.persistent_notice
 
     state.message = ""
-    assert state.visible_message == "non-TAB layers"
+    assert state.visible_message == "non-TAB; j/k focus"
 
     apply_command(state, "ack", state.config_path)
     assert state.persistent_notice == ""
     assert state.message == "Notice acknowledged"
+
+
+def test_message_levels_classify_user_facing_results() -> None:
+    assert infer_message_level("Wrote TAB score.tab") is MessageLevel.SUCCESS
+    assert infer_message_level("Import warning: unsupported record") is MessageLevel.WARNING
+    assert infer_message_level("Write failed: permission denied") is MessageLevel.ERROR
+    assert infer_message_level("Save As .tab; source unchanged") is MessageLevel.CONFIRM
+    assert infer_message_level("Focus: Melody") is MessageLevel.INFO

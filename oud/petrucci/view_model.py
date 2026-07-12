@@ -88,10 +88,10 @@ def _bar_compact_width(
     dotted: set[tuple[int, int]] | None = None,
 ) -> int:
     max_string = 5
-    for (b, s, _c) in overrides:
+    for b, s, _c in overrides:
         if b == bar_index:
             max_string = max(max_string, s)
-    for (b, s, _c) in durations:
+    for b, s, _c in durations:
         if b == bar_index:
             max_string = max(max_string, s)
     strings = max_string + 1
@@ -294,10 +294,10 @@ def _bar_note_columns(
     bar_index: int,
 ) -> set[int]:
     cols: set[int] = set()
-    for (b, _s, col) in overrides:
+    for b, _s, col in overrides:
         if b == bar_index:
             cols.add(col)
-    for (b, _s, col) in durations:
+    for b, _s, col in durations:
         if b == bar_index:
             cols.add(col)
     return cols
@@ -313,10 +313,10 @@ def _bar_display_width(
     dotted: set[tuple[int, int]] | None = None,
 ) -> int:
     max_string = 5
-    for (b, s, _c) in overrides:
+    for b, s, _c in overrides:
         if b == bar_index:
             max_string = max(max_string, s)
-    for (b, s, _c) in durations:
+    for b, s, _c in durations:
         if b == bar_index:
             max_string = max(max_string, s)
     strings = max_string + 1
@@ -455,11 +455,7 @@ def _bars_fit(
             durations,
             default_duration,
         )
-        if (
-            chord_wrap_limit > 0
-            and count > 0
-            and (chords_total + chord_count) > chord_wrap_limit
-        ):
+        if chord_wrap_limit > 0 and count > 0 and (chords_total + chord_count) > chord_wrap_limit:
             break
         if compact:
             display = _bar_compact_width(
@@ -617,12 +613,7 @@ def _beamified_chord_flag_positions(  # noqa: C901, PLR0912
         else:
             if in_group:
                 in_group = False
-            if (
-                idx == 0
-                or not hide_redundant
-                or denom != prev_global_denom
-                or dot != prev_global_dot
-            ):
+            if idx == 0 or not hide_redundant or denom != prev_global_denom or dot != prev_global_dot:
                 show = True
 
         if show:
@@ -772,7 +763,7 @@ def _ft3_fingering_glyph(value: str | None) -> str | None:
     if value == "dot2":
         return "\u0324"  # combining diaeresis below
     if value == "dot3":
-        return "\u20E8"  # combining triple underdot
+        return "\u20e8"  # combining triple underdot
     return value[0]
 
 
@@ -788,11 +779,7 @@ def _ft3_display_fingering_for_note(note: Note, *, fingering_mode: str) -> str |
     right_enabled = fingering_mode in {"right", "both"}
     left_glyph = _ft3_fingering_glyph(left_value) if left_enabled else None
     right_glyph = _ft3_fingering_glyph(right_value) if right_enabled else None
-    if (
-        right_enabled
-        and right_value in {"dot1", "dot2", "dot3"}
-        and right_glyph is not None
-    ):
+    if right_enabled and right_value in {"dot1", "dot2", "dot3"} and right_glyph is not None:
         if left_glyph:
             # RH dotted-finger cue attaches to the fingering mark itself (e.g. 2̈).
             return left_glyph + right_glyph
@@ -904,8 +891,10 @@ def _bar_imported_ft3_ornaments(
         col = positions[idx][0]
         if not (0 <= col < bar_width):
             continue
-        glyph = None
+        glyph = ":" if any(note.arpeggio for note in chord.notes) else None
         for note in chord.notes:
+            if glyph:
+                break
             picked = _pick_side_value(
                 left=note.left_ornament,
                 right=note.right_ornament,
@@ -1050,9 +1039,7 @@ def build_bar_view(  # noqa: C901
         default_duration,
     )
     if not any(b == bar_index for (b, _s, _c) in durations):
-        override_cols = {
-            col for (b, _s, col) in overrides if b == bar_index and col < bar_width
-        }
+        override_cols = {col for (b, _s, col) in overrides if b == bar_index and col < bar_width}
         for col in override_cols:
             dur_cells[col] = duration_display(default_duration)
     imported_ann = [" " for _ in range(bar_width)]
@@ -1075,9 +1062,7 @@ def build_bar_view(  # noqa: C901
         )
     ann_cells = _merge_mark_rows(imported_ann, _bar_annotations(annotations, bar_index, bar_width))
     local_orn_cells = (
-        _bar_ornaments(ornaments, bar_index, bar_width)
-        if show_ornaments_value
-        else [" " for _ in range(bar_width)]
+        _bar_ornaments(ornaments, bar_index, bar_width) if show_ornaments_value else [" " for _ in range(bar_width)]
     )
     orn_cells = _merge_mark_rows(imported_orn, local_orn_cells)
     slur_chars = slur_span_chars(slurcuestyle)
@@ -1088,9 +1073,7 @@ def build_bar_view(  # noqa: C901
     )
     tie_chars = tie_span_chars(tiecuestyle)
     tie_cells = (
-        [" " for _ in range(bar_width)]
-        if tie_chars is None
-        else _bar_span_row(ties, bar_index, bar_width, *tie_chars)
+        [" " for _ in range(bar_width)] if tie_chars is None else _bar_span_row(ties, bar_index, bar_width, *tie_chars)
     )
     hold_chars = hold_span_chars(holdcuestyle)
     hold_cells = (

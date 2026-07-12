@@ -16,7 +16,7 @@ def is_casual(state: EditorState) -> bool:
 
 def _bass_strings_used(state: EditorState) -> set[int]:
     used: set[int] = set()
-    for (bar, string, _col) in state.overrides:
+    for bar, string, _col in state.overrides:
         if bar < len(state.piece.bars) and string >= 6:
             used.add(string)
     for bar in state.piece.bars:
@@ -45,8 +45,7 @@ def visible_string_indices(state: EditorState) -> list[int]:
 
 def _reverse_view(state: EditorState) -> bool:
     return state.settings.get("viewinvert", "off") == "on" or (
-        state.settings.get("style") == "italian"
-        and state.settings.get("italianorient") == "reverse"
+        state.settings.get("style") == "italian" and state.settings.get("italianorient") == "reverse"
     )
 
 

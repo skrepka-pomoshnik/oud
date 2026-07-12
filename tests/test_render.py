@@ -156,7 +156,6 @@ def test_chord_positions_spread() -> None:
     assert positions[1][0] > positions[0][0]
 
 
-
 def test_flag_row_marks_positions() -> None:
     positions = [(0, 4, False), (3, 8, False)]
     flags = flag_row(positions, bar_width=6)
@@ -290,14 +289,14 @@ def test_build_bar_view_shows_imported_ft3_extras_and_user_overrides_win() -> No
 def test_build_bar_view_can_hide_imported_ft3_extras() -> None:
     bar = Bar(
         chords=[
-                Chord(
-                    note_type=4,
-                    dotted=False,
-                    grid=None,
-                    notes=[Note(1, 1, 0, left_fingering="1", left_ornament="#")],
-                ),
-            ],
-        )
+            Chord(
+                note_type=4,
+                dotted=False,
+                grid=None,
+                notes=[Note(1, 1, 0, left_fingering="1", left_ornament="#")],
+            ),
+        ],
+    )
     shown = build_bar_view(
         bar=bar,
         overrides={},

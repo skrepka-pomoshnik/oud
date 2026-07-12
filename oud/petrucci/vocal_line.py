@@ -16,6 +16,8 @@ class VocalEvent:
     dotted: bool
     text: str = ""
     is_rest: bool = False
+    beam: str | None = None
+    fermata: bool = False
 
 
 def token_pitch_value(token: str) -> int | None:
@@ -50,8 +52,6 @@ def infer_vocal_events(
     *,
     tuning_pitches: list[int] | None,
 ) -> list[VocalEvent]:
-    if not bar.chords:
-        return []
     anchor_events = _anchor_melody_events(bar)
     if anchor_events:
         out: list[VocalEvent] = []
@@ -67,6 +67,8 @@ def infer_vocal_events(
                 out.append(event)
         if out:
             return out
+    if not bar.chords:
+        return []
     out = []
     for onset_index, chord in enumerate(bar.chords):
         pitch = chord_top_pitch(chord, tuning_pitches)
@@ -111,6 +113,8 @@ def _explicit_vocal_event(
             dotted=dotted,
             text=token,
             is_rest=True,
+            beam=source.beam if isinstance(source, MelodyEvent) else None,
+            fermata=source.fermata if isinstance(source, MelodyEvent) else False,
         )
     pitch = token_pitch_value(token)
     if pitch is None and chord is not None:
@@ -130,6 +134,8 @@ def _explicit_vocal_event(
         dotted=dotted,
         text=token,
         is_rest=False,
+        beam=source.beam if isinstance(source, MelodyEvent) else None,
+        fermata=source.fermata if isinstance(source, MelodyEvent) else False,
     )
 
 
@@ -149,11 +155,7 @@ def lyric_anchor_onsets(bar: Bar) -> list[int]:
 
 
 def _anchor_melody_events(bar: Bar) -> list[tuple[int, int, MelodyEvent | str]]:
-    explicit = [
-        ev
-        for ev in getattr(bar, "melody_events", None) or []
-        if (ev.text or "").strip() or ev.is_rest
-    ]
+    explicit = [ev for ev in getattr(bar, "melody_events", None) or [] if (ev.text or "").strip() or ev.is_rest]
     if explicit:
         return [(ev.onset_index, ev.onset_index, ev) for ev in explicit]
     # Structured FT3 lyrics are often available without an explicit melody lane.

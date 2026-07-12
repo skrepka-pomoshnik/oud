@@ -85,7 +85,7 @@ from oud.editor.commands import (
     cmd_subtitle,
     cmd_title,
 )
-from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT_CMD
+from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT_CMD, MessageLevel
 from oud.editor.state import EditorState
 
 READ_ONLY_BLOCKED_COMMANDS = frozenset(
@@ -191,6 +191,7 @@ def cmd_info(state: EditorState, _args: str) -> None:
 
 def cmd_ack(state: EditorState, _args: str) -> None:
     state.persistent_notice = ""
+    state.persistent_notice_level = MessageLevel.INFO
     state.message = "Notice acknowledged"
 
 

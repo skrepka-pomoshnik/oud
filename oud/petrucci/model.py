@@ -14,6 +14,7 @@ class Note:
     left_fingering: str | None = None
     right_ornament: str | None = None
     left_ornament: str | None = None
+    arpeggio: str | None = None
     ft3_extras: int | None = None
     ft3_extra_residual: int | None = None
 
@@ -35,13 +36,13 @@ class ImportedBarContent:
     repeat: str | None = None
     ending_numbers: tuple[int, ...] = ()
     system_break: bool = False
+    dynamic: str | None = None
+    fermata: bool = False
     lyrics: list[str] = field(default_factory=list)
     melody_events: list[MelodyEvent] = field(default_factory=list)
     lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
     editorial_text: list[str] = field(default_factory=list)
     text_rows: list[ImportedTextRow] = field(default_factory=list)
-    raw_kind: str | None = None
-    raw_size: int = 0
 
 
 @dataclass
@@ -51,10 +52,19 @@ class ImportedStaff:
     bars: list[ImportedBarContent] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ImportedSourceRecord:
+    source_bar_index: int
+    source_staff_index: int
+    kind: str
+    size: int
+
+
 @dataclass
 class ImportedScore:
     source_format: str
     staffs: list[ImportedStaff] = field(default_factory=list)
+    source_records: list[ImportedSourceRecord] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -66,6 +76,8 @@ class MelodyEvent:
     dotted: bool = False
     accidental_flags: int | None = None
     is_rest: bool = False
+    beam: str | None = None
+    fermata: bool = False
 
 
 @dataclass(frozen=True)
@@ -86,6 +98,9 @@ class Bar:
     ending_numbers: tuple[int, ...] = ()
     time_sig: str | None = None
     system_break: bool = False
+    page_break_before: bool = False
+    section_title: str | None = None
+    section_subtitle: str | None = None
     dynamic: str | None = None
     fermata: bool = False
     chords: list[Chord] = field(default_factory=list)

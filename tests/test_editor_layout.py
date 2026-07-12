@@ -130,10 +130,7 @@ def test_dynamic_system_starts_respect_imported_system_break_hint() -> None:
 def test_jump_system_row_dynamic_prefers_visual_x_alignment() -> None:
     bars = [Bar() for _ in range(6)]
     bars[0] = Bar(
-        chords=[
-            Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
-            for _ in range(20)
-        ],
+        chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]) for _ in range(20)],
     )
     state = EditorState(
         Piece(bars=bars, strings=6),

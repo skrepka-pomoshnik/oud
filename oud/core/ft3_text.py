@@ -44,7 +44,7 @@ class _LineFeatures:
 
 
 MELODY_SYMBOL_CHARS = set("#'\";:<>?@-+=./()[]{}!|")
-LYRIC_WEIRD_CHARS = set("@?><=|[]{}?!\"")
+LYRIC_WEIRD_CHARS = set('@?><=|[]{}?!"')
 MELODY_SCORE_RULES: tuple[tuple[str, int], ...] = (
     ("digits", 3),
     ("symbols", 2),
@@ -63,9 +63,7 @@ def is_ft3_text_record(chunk: bytes) -> bool:
     newline_count = tail.count(b"\r") + tail.count(b"\n")
     if newline_count < 2:
         return False
-    letter_count = sum(
-        1 for b in tail if (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A)
-    )
+    letter_count = sum(1 for b in tail if (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A))
     return letter_count >= 6
 
 
@@ -225,12 +223,7 @@ def _clean_lyric_token(token: str) -> str:
 
 def _trim_leading_single_letter_lyric_noise(tokens: list[str]) -> list[str]:
     trimmed = list(tokens)
-    while (
-        len(trimmed) > 1
-        and len(trimmed[0]) == 1
-        and trimmed[0].islower()
-        and trimmed[0] not in {"i", "o"}
-    ):
+    while len(trimmed) > 1 and len(trimmed[0]) == 1 and trimmed[0].islower() and trimmed[0] not in {"i", "o"}:
         trimmed = trimmed[1:]
     return trimmed
 
@@ -321,13 +314,11 @@ def _likely_non_lyric_token(token: str) -> bool:
         return True
     if all(ch.isdigit() or ch == "." for ch in lower):
         return True
-    if re.fullmatch(r"[a-gh](?:[#b]|[',])*", lower) and not (
-        len(lower) == 1 and lower in {"i", "a", "o"}
-    ):
+    if re.fullmatch(r"[a-gh](?:[#b]|[',])*", lower) and not (len(lower) == 1 and lower in {"i", "a", "o"}):
         return True
     if lower in {"times", "new", "roman", "timesnewroman"}:
         return True
-    return bool(any(ch in "@?><=|[]{}!\";:" for ch in token))
+    return bool(any(ch in '@?><=|[]{}!";:' for ch in token))
 
 
 def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
@@ -352,9 +343,7 @@ def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
             return []
         return out
     fallback = [
-        tok
-        for tok in tokens
-        if (_keep_lyric_token(tok) or set(tok) <= {"_"}) and not _likely_non_lyric_token(tok)
+        tok for tok in tokens if (_keep_lyric_token(tok) or set(tok) <= {"_"}) and not _likely_non_lyric_token(tok)
     ]
     fallback = _trim_leading_single_letter_lyric_noise(fallback)
     if " ".join(tok.lower() for tok in fallback) in {"times new roman", "new roman"}:
@@ -379,11 +368,7 @@ def _structured_row_text(row: bytes) -> str:
 
 def _is_font_noise_text(text: str) -> bool:
     compact = re.sub(r"\s+", "", text).lower()
-    return (
-        compact in {"timesnewroman", "newroman", "}"}
-        or compact.startswith(r"{\rtf")
-        or r"\fonttbl" in compact
-    )
+    return compact in {"timesnewroman", "newroman", "}"} or compact.startswith(r"{\rtf") or r"\fonttbl" in compact
 
 
 def _normalized_legacy_lyric_text(text: str) -> str:
@@ -573,11 +558,7 @@ def _structured_lyric_rows_from_positioned_rows(
     )
     if prefer_cluster and len(lane_rows) >= 2:
         return lane_rows
-    if (
-        len(positioned_rows) >= 4
-        and mostly_singletons
-        and (not prefer_cluster or len(lane_rows) < 3)
-    ):
+    if len(positioned_rows) >= 4 and mostly_singletons and (not prefer_cluster or len(lane_rows) < 3):
         return [[tok for _pos, tok in row] for row in positioned_rows if row]
     if lane_rows:
         return lane_rows
@@ -723,17 +704,9 @@ def _looks_like_editorial_tokens(tokens: list[str]) -> bool:
     joined = " ".join(tokens)
     alpha = sum(ch.isalpha() for ch in joined)
     long_tokens = sum(len(tok) >= 4 for tok in tokens)
-    pitch_like = sum(
-        bool(re.fullmatch(r"[a-gh](?:[#b]|[',])*", tok.lower()))
-        for tok in tokens
-    )
+    pitch_like = sum(bool(re.fullmatch(r"[a-gh](?:[#b]|[',])*", tok.lower())) for tok in tokens)
     has_prose_punct = any(ch in joined for ch in ":;(),./")
-    return (
-        alpha >= 10
-        and long_tokens >= 2
-        and pitch_like == 0
-        and (has_prose_punct or len(tokens) >= 4)
-    )
+    return alpha >= 10 and long_tokens >= 2 and pitch_like == 0 and (has_prose_punct or len(tokens) >= 4)
 
 
 def _structured_vocal_row_prefix(row: bytes) -> bytes:
@@ -771,6 +744,21 @@ def _vocal_note_type_from_code(code: int) -> int | None:
     return mapping.get(code)
 
 
+def _decode_vocal_beams(events: list[MelodyEvent]) -> list[MelodyEvent]:
+    beams: list[str | None] = [None] * len(events)
+    for end_index, event in enumerate(events):
+        if not (event.accidental_flags or 0) & 0x0008:
+            continue
+        beams[end_index] = "end"
+        start_index = end_index - 1
+        while start_index >= 0 and (events[start_index].accidental_flags or 0) & 0x0004:
+            beams[start_index] = "continue"
+            start_index -= 1
+        if start_index >= 0:
+            beams[start_index] = "start"
+    return [replace(event, beam=beam) for event, beam in zip(events, beams, strict=True)]
+
+
 def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
     prefix = _structured_vocal_row_prefix(row)
     if len(prefix) < 7:
@@ -785,6 +773,7 @@ def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
             note_type=None,
             dotted=bool(first_flags & 0x10),
             accidental_flags=first_flags,
+            fermata=bool(first_flags & 0x0100),
         ),
     ]
     idx = 5
@@ -803,6 +792,7 @@ def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
                 dotted=bool(flags & 0x10),
                 accidental_flags=flags,
                 is_rest=is_rest,
+                fermata=bool(flags & 0x0100),
             ),
         )
         idx += 7
@@ -811,11 +801,29 @@ def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
     count = int.from_bytes(prefix[idx : idx + 2], "little") if idx + 2 <= len(prefix) else 0
     if count and count != len(events) + 1:
         return []
-    return events
+    return _decode_vocal_beams(events)
 
 
 def decode_ft3_vocal_events(row: bytes) -> list[MelodyEvent]:
     return _structured_vocal_events(row)
+
+
+def decode_ft3_annotation_group(data: bytes) -> FT3TextRecord:
+    texts: list[str] = []
+    index = 32
+    while index < len(data):
+        size = data[index]
+        end = index + 1 + size
+        if 0 < size <= 64 and end <= len(data):
+            raw = data[index + 1 : end]
+            if all(32 <= value <= 126 for value in raw):
+                text = raw.decode("latin1").strip()
+                if any(char.isalpha() for char in text) and text not in texts:
+                    texts.append(text)
+                index = end
+                continue
+        index += 1
+    return replace(_empty_text_record(), editorial_text=texts, parse_mode="structured")
 
 
 def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
@@ -850,8 +858,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
         if classified.kind not in {"font", "control", "editorial"}
         if (
             tokens := (
-                _lyric_tokens_from_control_row(row)
-                or _fallback_lyric_tokens_from_text(_structured_row_text(row))
+                _lyric_tokens_from_control_row(row) or _fallback_lyric_tokens_from_text(_structured_row_text(row))
             )
         )
         if (filtered := _filtered_structured_lyric_tokens(tokens))

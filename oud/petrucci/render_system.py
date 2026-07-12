@@ -381,11 +381,7 @@ def _merge_span_rows_with_cue_priority(  # noqa: C901
         if "(" in chars:
             out[idx] = "("
             continue
-        if (
-            tuplet_row is not None
-            and idx < len(tuplet_row)
-            and tuplet_row[idx] != " "
-        ):
+        if tuplet_row is not None and idx < len(tuplet_row) and tuplet_row[idx] != " ":
             out[idx] = tuplet_row[idx]
             continue
         if tie_row is not None and idx < len(tie_row) and tie_row[idx] != " ":
@@ -428,10 +424,7 @@ def _build_chord_scale_map(
     *,
     min_gap: int = 2,
 ) -> tuple[list[tuple[int, int, bool]], dict[int, int]]:
-    scaled_positions = [
-        (_scale_col(pos, bar_width, content_width), denom, dot)
-        for (pos, denom, dot) in positions
-    ]
+    scaled_positions = [(_scale_col(pos, bar_width, content_width), denom, dot) for (pos, denom, dot) in positions]
     spread_positions = spread_flag_positions(
         scaled_positions,
         content_width,
@@ -441,7 +434,9 @@ def _build_chord_scale_map(
     src_to_dest = {
         raw_col: scaled_col
         for (raw_col, _raw_denom, _raw_dot), (scaled_col, _denom, _dot) in zip(
-            ordered_raw, spread_positions, strict=False,
+            ordered_raw,
+            spread_positions,
+            strict=False,
         )
     }
     return spread_positions, src_to_dest
@@ -501,7 +496,7 @@ def _imported_ft3_mark_target_rows(  # noqa: C901, PLR0912
                     picked = left or right
                 else:
                     picked = None
-                if _ft3_ornament_glyph(picked):
+                if note.arpeggio or _ft3_ornament_glyph(picked):
                     orn_targets[col] = note.string - 1
                     break
     return ann_targets, orn_targets
@@ -890,11 +885,7 @@ def _tab_playback_highlight_ops(
     for display_idx in range(system_display_strings):
         actual = system_visual_indices[display_idx]
         y = row_start + (rows["staff"] or 0) + display_idx
-        row_text = (
-            rendered_staff_rows[display_idx]
-            if display_idx < len(rendered_staff_rows)
-            else ""
-        )
+        row_text = rendered_staff_rows[display_idx] if display_idx < len(rendered_staff_rows) else ""
         row_clusters = _split_display_clusters(row_text)
         if not (0 <= playback_cell_idx < len(row_clusters)):
             continue
@@ -951,14 +942,9 @@ def _playback_marker_ops(
             if 0 <= melody_col < len(melody_row) and melody_row[melody_col] == " ":
                 ops.append((melody_row_base + rel_y, melody_x, "v", A_BOLD))
                 return ops
-    ops.append(
-        (
-            melody_row_base,
-            max(0, bar_x - 2),
-            "v",
-            A_BOLD,
-        ),
-    )
+    fallback = (melody_row_base, max(0, bar_x - 2))
+    if fallback != (marker_y, marker_x):
+        ops.append((*fallback, "v", A_BOLD))
     return ops
 
 
@@ -1093,11 +1079,7 @@ def render_systems(  # noqa: C901, PLR0912
     if glisses is None:
         glisses = []
     effective_playback_markers = list(playback_markers or [])
-    if (
-        not effective_playback_markers
-        and playback_bar is not None
-        and playback_col is not None
-    ):
+    if not effective_playback_markers and playback_bar is not None and playback_col is not None:
         effective_playback_markers = [(playback_bar, playback_col)]
     style_policy = resolve_tab_style_policy(settings)
     total_bars = len(piece.bars)
@@ -1152,7 +1134,10 @@ def render_systems(  # noqa: C901, PLR0912
             min_widths: list[int] = []
             for abs_bar in bar_indices:
                 current_time = _resolved_bar_time_value(
-                    piece, abs_bar, time_setting, default_duration,
+                    piece,
+                    abs_bar,
+                    time_setting,
+                    default_duration,
                 )
                 _beats, _unit, sig_label = _parse_time_signature(current_time)
                 prev_time = (
@@ -1333,6 +1318,10 @@ def render_systems(  # noqa: C901, PLR0912
             repeat_left = repeat in {".:", ":|:", "."}
             repeat_right = repeat in {":.", ":|:", "."}
             sign_cues: list[str] = []
+            if bar.section_title:
+                sign_cues.append(bar.section_title)
+            if bar.section_subtitle:
+                sign_cues.append(bar.section_subtitle)
             if bar.fermata:
                 sign_cues.append("^")
             if bar.dynamic:
@@ -1375,9 +1364,7 @@ def render_systems(  # noqa: C901, PLR0912
                 show_tuplets=show_tuplets,
             )
             local_orn = (
-                _bar_ornaments(ornaments, abs_bar, grid_width)
-                if show_ornaments
-                else [" " for _ in range(grid_width)]
+                _bar_ornaments(ornaments, abs_bar, grid_width) if show_ornaments else [" " for _ in range(grid_width)]
             )
             orn_cells = _merge_mark_rows(
                 imported_orn,
@@ -1447,9 +1434,7 @@ def render_systems(  # noqa: C901, PLR0912
             scale_bar = spacing_mode == "auto"
             if bar.chords:
                 preview_flags = (
-                    _filter_redundant_positions(chord_positions_all)
-                    if hide_redundant
-                    else chord_positions_all
+                    _filter_redundant_positions(chord_positions_all) if hide_redundant else chord_positions_all
                 )
                 smart_gap = 2 if spacing_fill == "smart" else 1
                 min_content = _required_flag_content_width(preview_flags, min_gap=smart_gap)
@@ -1466,9 +1451,7 @@ def render_systems(  # noqa: C901, PLR0912
                     scale_bar = True
             pad = barpad if scale_bar else 0
             prev_time = (
-                _resolved_bar_time_value(piece, abs_bar - 1, time_setting, default_duration)
-                if abs_bar > 0
-                else None
+                _resolved_bar_time_value(piece, abs_bar - 1, time_setting, default_duration) if abs_bar > 0 else None
             )
             show_time_sig_here = show_time_cue_for_bar(
                 bar_index=abs_bar,
@@ -1588,9 +1571,7 @@ def render_systems(  # noqa: C901, PLR0912
                     scaled_gliss_row = pad_row(scaled_gliss_row, display_width, draw_pad)
             if bar.chords:
                 visible_note_cols = set(_note_event_columns(cells, total_strings, grid_width))
-                positions = [
-                    item for item in chord_positions_all if item[0] in visible_note_cols
-                ]
+                positions = [item for item in chord_positions_all if item[0] in visible_note_cols]
                 flag_positions = _beamified_chord_flag_positions(
                     bar,
                     positions,
@@ -1606,13 +1587,13 @@ def render_systems(  # noqa: C901, PLR0912
                     event_min_gap = multifret_event_gap(
                         style=style,
                         policy=settings.get("multifretspacing", "collision-safe"),
-                            has_multifret=bar_has_multifret_tokens(
-                                bar,
-                                style=style,
-                                french_c_shape=french_c,
-                                label_mode=fretlabelmode,
-                            ),
-                        )
+                        has_multifret=bar_has_multifret_tokens(
+                            bar,
+                            style=style,
+                            french_c_shape=french_c,
+                            label_mode=fretlabelmode,
+                        ),
+                    )
                     if spacing_fill == "compact":
                         event_min_gap = max(1, event_min_gap - 1)
                     unit_anchor_min_gap = max(1, event_min_gap - 1)
@@ -1911,9 +1892,7 @@ def render_systems(  # noqa: C901, PLR0912
                             keep=sparse_cues,
                         )
                     tie_row_is_distinct = (
-                        rows["tie"] is not None
-                        and rows["tie"] != rows["slur"]
-                        and rows["tie"] != rows["hold"]
+                        rows["tie"] is not None and rows["tie"] != rows["slur"] and rows["tie"] != rows["hold"]
                     )
                     if tie_row_is_distinct:
                         _overlay_sparse_mark_chars(
@@ -1926,9 +1905,7 @@ def render_systems(  # noqa: C901, PLR0912
                             keep=sparse_cues,
                         )
                     slur_row_is_distinct = (
-                        rows["slur"] is not None
-                        and rows["slur"] != rows["tie"]
-                        and rows["slur"] != rows["hold"]
+                        rows["slur"] is not None and rows["slur"] != rows["tie"] and rows["slur"] != rows["hold"]
                     )
                     if slur_row_is_distinct:
                         _overlay_sparse_mark_chars(
@@ -1941,9 +1918,7 @@ def render_systems(  # noqa: C901, PLR0912
                             keep=sparse_cues,
                         )
                     hold_row_is_distinct = (
-                        rows["hold"] is not None
-                        and rows["hold"] != rows["slur"]
-                        and rows["hold"] != rows["tie"]
+                        rows["hold"] is not None and rows["hold"] != rows["slur"] and rows["hold"] != rows["tie"]
                     )
                     if hold_row_is_distinct:
                         _overlay_sparse_mark_chars(
@@ -1956,10 +1931,11 @@ def render_systems(  # noqa: C901, PLR0912
                             keep=sparse_cues,
                         )
                     gliss_row = rows.get("gliss")
-                    gliss_row_is_distinct = (
-                        gliss_row is not None
-                        and gliss_row not in {rows["slur"], rows["tie"], rows["hold"]}
-                    )
+                    gliss_row_is_distinct = gliss_row is not None and gliss_row not in {
+                        rows["slur"],
+                        rows["tie"],
+                        rows["hold"],
+                    }
                     if gliss_row_is_distinct:
                         _overlay_sparse_mark_chars(
                             stdscr,
@@ -1972,15 +1948,12 @@ def render_systems(  # noqa: C901, PLR0912
                         )
                     tuplet_row = rows.get("tuplet")
                     gliss_row_idx = rows.get("gliss")
-                    tuplet_row_is_distinct = (
-                        tuplet_row is not None
-                        and tuplet_row not in {
-                            rows["slur"],
-                            rows["tie"],
-                            rows["hold"],
-                            gliss_row_idx,
-                        }
-                    )
+                    tuplet_row_is_distinct = tuplet_row is not None and tuplet_row not in {
+                        rows["slur"],
+                        rows["tie"],
+                        rows["hold"],
+                        gliss_row_idx,
+                    }
                     if tuplet_row_is_distinct:
                         _overlay_sparse_mark_chars(
                             stdscr,
@@ -1999,19 +1972,13 @@ def render_systems(  # noqa: C901, PLR0912
                 }
                 for y in span_y_values:
                     row_slur = (
-                        scaled_slur_row
-                        if rows["slur"] is not None and y == row_start + (rows["slur"] or 0)
-                        else None
+                        scaled_slur_row if rows["slur"] is not None and y == row_start + (rows["slur"] or 0) else None
                     )
                     row_hold = (
-                        scaled_hold_row
-                        if rows["hold"] is not None and y == row_start + (rows["hold"] or 0)
-                        else None
+                        scaled_hold_row if rows["hold"] is not None and y == row_start + (rows["hold"] or 0) else None
                     )
                     row_tie = (
-                        scaled_tie_row
-                        if rows["tie"] is not None and y == row_start + (rows["tie"] or 0)
-                        else None
+                        scaled_tie_row if rows["tie"] is not None and y == row_start + (rows["tie"] or 0) else None
                     )
                     row_gliss = (
                         scaled_gliss_row
@@ -2050,8 +2017,7 @@ def render_systems(  # noqa: C901, PLR0912
                         ),
                         (
                             gliss_cells
-                            if rows.get("gliss") is not None
-                            and y == row_start + (rows["gliss"] or 0)
+                            if rows.get("gliss") is not None and y == row_start + (rows["gliss"] or 0)
                             else [" " for _ in range(grid_width)]
                         ),
                         (
@@ -2061,8 +2027,7 @@ def render_systems(  # noqa: C901, PLR0912
                         ),
                         (
                             tuplet_cells
-                            if rows.get("tuplet") is not None
-                            and y == row_start + (rows["tuplet"] or 0)
+                            if rows.get("tuplet") is not None and y == row_start + (rows["tuplet"] or 0)
                             else [" " for _ in range(grid_width)]
                         ),
                     )
@@ -2163,19 +2128,13 @@ def render_systems(  # noqa: C901, PLR0912
                 }
                 for y in span_y_values:
                     row_slur = (
-                        scaled_slur_row
-                        if rows["slur"] is not None and y == row_start + (rows["slur"] or 0)
-                        else None
+                        scaled_slur_row if rows["slur"] is not None and y == row_start + (rows["slur"] or 0) else None
                     )
                     row_hold = (
-                        scaled_hold_row
-                        if rows["hold"] is not None and y == row_start + (rows["hold"] or 0)
-                        else None
+                        scaled_hold_row if rows["hold"] is not None and y == row_start + (rows["hold"] or 0) else None
                     )
                     row_tie = (
-                        scaled_tie_row
-                        if rows["tie"] is not None and y == row_start + (rows["tie"] or 0)
-                        else None
+                        scaled_tie_row if rows["tie"] is not None and y == row_start + (rows["tie"] or 0) else None
                     )
                     row_gliss = (
                         scaled_gliss_row
@@ -2199,8 +2158,7 @@ def render_systems(  # noqa: C901, PLR0912
                 has_explicit_content = bool(bar.notes)
                 if not has_explicit_content:
                     has_explicit_content = any(
-                        b == abs_bar and value not in ("", "-", " ")
-                        for (b, _s, _c), value in overrides.items()
+                        b == abs_bar and value not in ("", "-", " ") for (b, _s, _c), value in overrides.items()
                     ) or any(b == abs_bar for (b, _s, _c) in durations)
                 visible_note_cols = _note_event_columns(cells, total_strings, grid_width)
                 if hide_redundant:
@@ -2323,9 +2281,7 @@ def render_systems(  # noqa: C901, PLR0912
                     if draw_pad:
                         flag_cells = pad_row(flag_cells, display_width, draw_pad)
                         stem_cells = pad_row(stem_cells, display_width, draw_pad)
-                    dur_source_positions = [
-                        (raw_col, raw_col) for (raw_col, _d, _dot) in flag_positions
-                    ]
+                    dur_source_positions = [(raw_col, raw_col) for (raw_col, _d, _dot) in flag_positions]
                 safe_addstr(stdscr, row_start + (rows["flag"] or 0), bar_x, "".join(flag_cells))
                 if rows.get("flag2") is not None:
                     safe_addstr(
@@ -2364,15 +2320,11 @@ def render_systems(  # noqa: C901, PLR0912
             if cursor_display_maps is not None and grid_map:
                 if bar.chords:
                     cursor_display_maps[abs_bar] = [
-                        grid_map[
-                            min(len(grid_map) - 1, _scale_col(col, bar_width, grid_width))
-                        ]
+                        grid_map[min(len(grid_map) - 1, _scale_col(col, bar_width, grid_width))]
                         for col in range(bar_width)
                     ]
                 else:
-                    cursor_display_maps[abs_bar] = [
-                        grid_map[min(len(grid_map) - 1, col)] for col in range(bar_width)
-                    ]
+                    cursor_display_maps[abs_bar] = [grid_map[min(len(grid_map) - 1, col)] for col in range(bar_width)]
             cursor_display_index = cursor_string if cursor_string < system_display_strings else None
             rendered_staff_rows: list[str] = []
             for display_idx in range(system_display_strings):
@@ -2561,11 +2513,7 @@ def render_systems(  # noqa: C901, PLR0912
                     lyric_rows_count=len(lyric_row_offsets),
                 )
                 for lyric_idx, lyric_row in enumerate(lyric_row_offsets):
-                    lyric_cells = (
-                        lyric_rows[lyric_idx]
-                        if lyric_idx < len(lyric_rows)
-                        else [" "] * display_width
-                    )
+                    lyric_cells = lyric_rows[lyric_idx] if lyric_idx < len(lyric_rows) else [" "] * display_width
                     safe_addstr(stdscr, row_start + lyric_row, bar_x - 1, "|")
                     safe_addstr(stdscr, row_start + lyric_row, bar_x, "".join(lyric_cells))
                     safe_addstr(
@@ -2599,9 +2547,7 @@ def render_systems(  # noqa: C901, PLR0912
                         rendered_melody_rows=rendered_melody_rows,
                     )
             playback_cols = [
-                marker_col
-                for marker_bar, marker_col in effective_playback_markers
-                if marker_bar == abs_bar
+                marker_col for marker_bar, marker_col in effective_playback_markers if marker_bar == abs_bar
             ]
             for marker_col in playback_cols:
                 playback_ops = _playback_overlay_ops_for_bar(

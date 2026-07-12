@@ -150,8 +150,7 @@ def download_remote_corpus(
     downloaded: list[Path] = []
     with ThreadPoolExecutor(max_workers=max(1, jobs)) as executor:
         futures = {
-            executor.submit(download_tab, item, destination / f"{index:04d}"): item
-            for index, item in enumerate(items)
+            executor.submit(download_tab, item, destination / f"{index:04d}"): item for index, item in enumerate(items)
         }
         for future in as_completed(futures):
             item = futures[future]
@@ -177,11 +176,7 @@ def report_results(
     loaded = [result for result in results if result.error is None]
     errors = [result for result in results if result.error is not None]
     warned = [result for result in loaded if result.warnings]
-    warning_counts = Counter(
-        warning_class
-        for result in loaded
-        for warning_class in result.warning_classes
-    )
+    warning_counts = Counter(warning_class for result in loaded for warning_class in result.warning_classes)
     if json_output:
         payload = {
             "attempted": len(results),
@@ -194,8 +189,7 @@ def report_results(
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(
-            f"Scanned {len(results)} file(s): {len(loaded)} loaded, "
-            f"{len(errors)} errors, {len(warned)} with warnings.",
+            f"Scanned {len(results)} file(s): {len(loaded)} loaded, {len(errors)} errors, {len(warned)} with warnings.",
         )
         if warning_counts:
             print("Warning classes:")

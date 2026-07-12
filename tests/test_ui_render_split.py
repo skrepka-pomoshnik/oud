@@ -15,6 +15,7 @@ from oud.petrucci.duet_score import (
 from oud.petrucci.framebuffer import FrameBuffer
 from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from oud.petrucci.render import _apply_overrides, render_piece
+from oud.petrucci.render_status import status_attr_for_message
 from oud.petrucci.render_text_lanes import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from oud.petrucci.render_vocal import melody_row_count
 from oud.ui.adapter import Screen
@@ -109,6 +110,17 @@ def _render_lines(kwargs: dict) -> list[str]:
     return fb.snapshot().lines
 
 
+def test_render_piece_applies_message_severity_to_status_row() -> None:
+    kwargs = _args()
+    kwargs["message"] = "Write failed"
+    kwargs["message_level"] = "error"
+    render_piece(**kwargs)
+
+    status_calls = [call for call in kwargs["stdscr"].calls if call[0] == kwargs["stdscr"].h - 1]
+    assert status_calls
+    assert status_calls[-1][3] == status_attr_for_message("error")
+
+
 def _first_melody_row_idx(lines: list[str]) -> int:
     notehead_glyphs = (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)
     block_rows = melody_row_count()
@@ -122,7 +134,10 @@ def _first_melody_row_idx(lines: list[str]) -> int:
             continue
         if not all(line.startswith("  |") for line in block):
             continue
-        if any(("\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line) for line in block):
+        if any(
+            ("\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line)
+            for line in block
+        ):
             return idx
     anchor = next(
         i
@@ -144,9 +159,7 @@ def _first_lyric_row(lines: list[str]) -> str:
     return next(
         line
         for idx, line in enumerate(lines)
-        if idx >= melody_start + melody_row_count()
-        and line.startswith("  |")
-        and re.search(r"[A-Za-z]{2,}", line)
+        if idx >= melody_start + melody_row_count() and line.startswith("  |") and re.search(r"[A-Za-z]{2,}", line)
     )
 
 
@@ -717,10 +730,7 @@ def test_playback_markers_do_not_mutate_vocal_text_geometry() -> None:
 def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
     def _dense_bar() -> Bar:
         return Bar(
-            chords=[
-                Chord(note_type=8, dotted=(idx % 2 == 0), grid=None, notes=[Note(1, 1, 0)])
-                for idx in range(6)
-            ],
+            chords=[Chord(note_type=8, dotted=(idx % 2 == 0), grid=None, notes=[Note(1, 1, 0)]) for idx in range(6)],
         )
 
     kwargs = _args("normal")
@@ -849,8 +859,8 @@ def test_duet_staff_labels_and_time_fill_are_derived_from_ensemble_and_pair() ->
     assert duet_staff_labels(piece) == ("Prime lute", "Bass lute")
     top = split_duet_piece_staff(piece, 0)
     bottom = split_duet_piece_staff(piece, 1)
-    assert top.bars[0].time_sig == "O"      # filled from paired staff
-    assert bottom.bars[1].time_sig == "C|"   # filled from paired staff
+    assert top.bars[0].time_sig == "O"  # filled from paired staff
+    assert bottom.bars[1].time_sig == "C|"  # filled from paired staff
 
 
 def test_duet_mapping_uses_odd_raw_bars_for_top_staff() -> None:
@@ -885,11 +895,7 @@ def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None
     kwargs = _args("normal")
     kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="3/4"), Bar()], strings=6)
     render_piece(**kwargs)
-    numeric_calls = [
-        (y, x, text)
-        for (y, x, text, _a) in kwargs["stdscr"].calls
-        if text.strip() == "3"
-    ]
+    numeric_calls = [(y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text.strip() == "3"]
     assert numeric_calls
     # In-staff / auftact placement, not over left labels.
     assert any(x >= 3 for (_y, x, _text) in numeric_calls)
@@ -905,14 +911,10 @@ def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
     kwargs["settings"]["timesigstyle"] = "numeric"
     render_piece(**kwargs)
     numeric_calls = [
-        (y, x, text)
-        for (y, x, text, _a) in kwargs["stdscr"].calls
-        if text.strip() == "3" and y >= 2 and x >= 3
+        (y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text.strip() == "3" and y >= 2 and x >= 3
     ]
     symbol_calls = [
-        (y, x, text)
-        for (y, x, text, _a) in kwargs["stdscr"].calls
-        if text.strip() == "O" and y >= 2 and x >= 3
+        (y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text.strip() == "O" and y >= 2 and x >= 3
     ]
     assert numeric_calls
     assert not symbol_calls
@@ -940,9 +942,7 @@ def test_render_common_triple_cue_keeps_gap_before_first_melody_note() -> None:
     melody_block = lines[melody_start : melody_start + melody_row_count()]
     cue_row = next(line for line in melody_block if "3" in line)
     note_row = next(
-        line
-        for line in melody_block
-        if any(ch in {MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH} for ch in line)
+        line for line in melody_block if any(ch in {MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH} for ch in line)
     )
     cue_x = cue_row.index("3")
     first_note = min(
@@ -956,9 +956,7 @@ def test_render_cut_time_signature_cue_is_visible_in_first_bar() -> None:
     kwargs["piece"] = Piece(title="Cut", bars=[Bar(time_sig="C|"), Bar()], strings=6)
     render_piece(**kwargs)
     calls = [
-        (y, x, text)
-        for (y, x, text, _a) in kwargs["stdscr"].calls
-        if y >= 2 and x >= 3 and text.strip() in {"C|", "2"}
+        (y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if y >= 2 and x >= 3 and text.strip() in {"C|", "2"}
     ]
     assert calls
 
@@ -1074,9 +1072,7 @@ def test_render_shows_time_signature_on_mid_system_change() -> None:
     kwargs["settings"]["barsperline"] = "3"
     render_piece(**kwargs)
     numeric_calls = [
-        (y, x, text)
-        for (y, x, text, _a) in kwargs["stdscr"].calls
-        if text.strip() == "3" and y >= 2 and x >= 3
+        (y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text.strip() == "3" and y >= 2 and x >= 3
     ]
     assert numeric_calls
 
@@ -1084,11 +1080,7 @@ def test_render_shows_time_signature_on_mid_system_change() -> None:
 def test_render_draws_left_staff_barline() -> None:
     kwargs = _args("normal")
     render_piece(**kwargs)
-    left_bar_calls = [
-        (y, x, text)
-        for (y, x, text, _a) in kwargs["stdscr"].calls
-        if text == "|" and x == 2 and y >= 2
-    ]
+    left_bar_calls = [(y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text == "|" and x == 2 and y >= 2]
     assert left_bar_calls
 
 
@@ -1119,19 +1111,12 @@ def test_render_new_sheet_first_note_flag_does_not_overlap_time_cue_lane() -> No
                 canvas[y][tx] = ch
     lines = ["".join(row) for row in canvas]
 
-    cue_cells = [
-        (y, x)
-        for y, row in enumerate(lines)
-        for x, ch in enumerate(row)
-        if ch == "O"
-    ]
+    cue_cells = [(y, x) for y, row in enumerate(lines) for x, ch in enumerate(row) if ch == "O"]
     assert cue_cells
     cue_y, cue_x = cue_cells[0]
     # Find a flag row above the staff with visible rhythm glyphs.
     flag_row_y = next(
-        y
-        for y in range(max(0, cue_y - 4), cue_y)
-        if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
+        y for y in range(max(0, cue_y - 4), cue_y) if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
     )
     assert lines[flag_row_y][cue_x] == " "
 
@@ -1156,18 +1141,11 @@ def test_render_override_first_note_flag_does_not_overlap_time_cue_lane() -> Non
                 canvas[y][tx] = ch
     lines = ["".join(row) for row in canvas]
 
-    cue_cells = [
-        (y, x)
-        for y, row in enumerate(lines)
-        for x, ch in enumerate(row)
-        if ch == "O"
-    ]
+    cue_cells = [(y, x) for y, row in enumerate(lines) for x, ch in enumerate(row) if ch == "O"]
     assert cue_cells
     cue_y, cue_x = cue_cells[0]
     flag_row_y = next(
-        y
-        for y in range(max(0, cue_y - 4), cue_y)
-        if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
+        y for y in range(max(0, cue_y - 4), cue_y) if "|" in lines[y] and any(ch in "\\/=-" for ch in lines[y])
     )
     assert lines[flag_row_y][cue_x] == " "
 
@@ -1414,6 +1392,28 @@ def test_imported_dot_left_ornament_renders_inline_as_unicode_dot(
     assert f"{base}\u0307" in text
 
 
+def test_imported_arpeggio_renders_as_inline_colon() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="Arpeggio",
+        bars=[
+            Bar(
+                chords=[
+                    Chord(
+                        note_type=4,
+                        dotted=False,
+                        grid=None,
+                        notes=[Note(1, 1, 0, arpeggio="top"), Note(2, 2, 0, arpeggio="bottom")],
+                    ),
+                ],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["showornaments"] = "on"
+    assert ":" in "\n".join(_render_lines(kwargs))
+
+
 @pytest.mark.parametrize(
     ("style", "italian_orient", "base"),
     [
@@ -1574,8 +1574,7 @@ def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
     lines = _render_lines(kwargs)
     text = "\n".join(lines)
     assert any(
-        line.startswith("  |")
-        and any(glyph in line for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
+        line.startswith("  |") and any(glyph in line for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
         for line in lines
     )
     assert any(line.startswith("  |") and re.search(r"[A-Za-z]", line) for line in lines)
@@ -1606,8 +1605,7 @@ def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
     melody_block = lines[melody_start : melody_start + melody_row_count()]
     assert len(melody_block) == melody_row_count()
     assert any(
-        any(glyph in row for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
-        for row in melody_block
+        any(glyph in row for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)) for row in melody_block
     )
 
 
@@ -1635,10 +1633,7 @@ def test_inferred_melody_is_not_clipped_by_sparse_lyrics() -> None:
     lines = _render_lines(kwargs)
     melody_start = _first_melody_row_idx(lines)
     melody_block = lines[melody_start : melody_start + melody_row_count()]
-    noteheads = sum(
-        row.count(MELODY_NOTEHEAD_GLYPH) + row.count(MELODY_FILLED_NOTEHEAD_GLYPH)
-        for row in melody_block
-    )
+    noteheads = sum(row.count(MELODY_NOTEHEAD_GLYPH) + row.count(MELODY_FILLED_NOTEHEAD_GLYPH) for row in melody_block)
     assert noteheads >= 5
 
 
@@ -1671,8 +1666,7 @@ def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
     lyric_inner = lyric_line[first_barline + 1 : second_barline]
     assert not any("Can" in row for row in melody_block)
     assert any(
-        any(glyph in row for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH))
-        for row in melody_block
+        any(glyph in row for glyph in (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)) for row in melody_block
     )
     assert lyric_inner.find("Was") < lyric_inner.find("I") < lyric_inner.find("so")
 

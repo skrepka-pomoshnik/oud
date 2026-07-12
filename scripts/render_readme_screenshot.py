@@ -28,8 +28,7 @@ def _svg(lines: list[str], *, title: str) -> str:
         y = title_height + (index + 1) * row_height
         text = html.escape(line.rstrip()) or "&#160;"
         rows.append(
-            f'  <text class="{css_class}" x="{padding}" y="{y}" '
-            f'xml:space="preserve">{text}</text>',
+            f'  <text class="{css_class}" x="{padding}" y="{y}" xml:space="preserve">{text}</text>',
         )
     body = "\n".join(rows)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"

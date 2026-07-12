@@ -218,9 +218,13 @@ def assign_chord_pitches(  # noqa: C901
                 ),
             )
             break
-        return AssignmentResult(notes=[], diagnostics=diagnostics or [
-            AssignmentDiagnostic("assignment_failed", "No valid chord assignment found."),
-        ])
+        return AssignmentResult(
+            notes=[],
+            diagnostics=diagnostics
+            or [
+                AssignmentDiagnostic("assignment_failed", "No valid chord assignment found."),
+            ],
+        )
 
     # Return in original pitch-item order for stable caller mapping.
     by_pitch_occurrence: dict[tuple[int, int], AssignedTabNote] = {}

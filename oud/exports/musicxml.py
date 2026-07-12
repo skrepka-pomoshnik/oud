@@ -284,6 +284,8 @@ def _add_note(  # noqa: C901
         if right_f and right_f not in {"dot1", "dot2", "dot3"}:
             pluck = "p" if right_f == "thumb" else str(right_f)
             SubElement(technical, "pluck").text = pluck
+        if getattr(note_model, "arpeggio", None) in {"single", "top"}:
+            SubElement(notations, "arpeggiate")
 
 
 def _add_barline(measure: Element, *, location: str, style: str, repeat: str | None = None) -> None:
@@ -463,15 +465,9 @@ def export_mxl(
     container_xml = "".join(
         (
             '<?xml version="1.0" encoding="UTF-8"?>\n',
-            (
-                "<container version=\"1.0\" "
-                "xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n"
-            ),
+            ('<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n'),
             "  <rootfiles>\n",
-            (
-                f"    <rootfile full-path=\"{inner_name}\" "
-                "media-type=\"application/vnd.recordare.musicxml+xml\"/>\n"
-            ),
+            (f'    <rootfile full-path="{inner_name}" media-type="application/vnd.recordare.musicxml+xml"/>\n'),
             "  </rootfiles>\n",
             "</container>\n",
         ),
@@ -628,10 +624,4 @@ def _musicxml_text(  # noqa: C901, PLR0912
             _add_barline(measure, location="right", style=bar_style, repeat=right_repeat)
 
     xml_bytes = tostring(root, encoding="utf-8")
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        + MUSICXML_DOCTYPE
-        + "\n"
-        + xml_bytes.decode("utf-8")
-        + "\n"
-    )
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + MUSICXML_DOCTYPE + "\n" + xml_bytes.decode("utf-8") + "\n"

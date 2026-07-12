@@ -240,7 +240,7 @@ def test_scrollmode_smooth_vs_page_use_same_fixture_with_different_offsets() -> 
             state.settings[key] = "off"
         state.screen_height = 24  # 2 rows on this fixture
         state.bar_offset = 0
-        state.cursor_bar = 3      # third auto system row on the same fixture
+        state.cursor_bar = 3  # third auto system row on the same fixture
 
     ensure_cursor_visible(smooth, smooth.screen_width, smooth.screen_height)
     ensure_cursor_visible(page, page.screen_width, page.screen_height)

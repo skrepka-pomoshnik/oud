@@ -6,6 +6,7 @@ from oud.editor.init import init_state
 from oud.editor.playback import update_playback_animation
 from oud.editor.status import status_line
 from oud.editor.transient_message import decay_transient_message
+from oud.editor.view_focus import current_view_staff
 from oud.editor.view_state import view_commit_frame, view_merge_dirty, view_resize
 from oud.exports.export_tab import export_ascii
 from oud.petrucci.duet_score import is_duet_score_piece
@@ -81,16 +82,10 @@ def run_loop(
         playback_changed = update_playback_animation(state)
         resized = view_resize(state, height=height, width=width)
         playback_only = (
-            playback_changed
-            and not needs_render
-            and not message_changed
-            and not resized
-            and not state.dirty_rows
+            playback_changed and not needs_render and not message_changed and not resized and not state.dirty_rows
         )
         can_overlay_playback = (
-            playback_only
-            and state.last_base_frame is not None
-            and state.playback_overlay_cache is not None
+            playback_only and state.last_base_frame is not None and state.playback_overlay_cache is not None
         )
         if needs_render or message_changed or playback_changed or resized or state.dirty_rows:
             prev_bar_offset = state.bar_offset
@@ -139,11 +134,10 @@ def run_loop(
                 else None
             )
             frame_buffer = FrameBuffer(height, width)
+            focused_staff = current_view_staff(state)
             state.display_cursor_maps.clear()
             playback_cache: dict[tuple[int, int], list[tuple[int, int, str, int]]] | None = (
-                {}
-                if not is_duet_score_piece(state.piece)
-                else None
+                {} if not is_duet_score_piece(state.piece) else None
             )
             render_piece(
                 frame_buffer,
@@ -176,12 +170,18 @@ def run_loop(
                 state.plugin_offset,
                 state.info_offset
                 if state.mode == "info"
-                else state.notes_offset if state.mode == "notes" else state.help_offset,
+                else state.notes_offset
+                if state.mode == "notes"
+                else state.help_offset,
                 None if playback_cache is not None else state.playback_bar,
                 None if playback_cache is not None else state.playback_col,
                 playback_markers=state.playback.markers,
                 playback_cache=playback_cache,
                 cursor_display_maps=state.display_cursor_maps,
+                message_level=state.visible_message_level.value,
+                focused_imported_staff_index=(
+                    focused_staff.source_index if not focused_staff.key.startswith("duet-") else None
+                ),
             )
             base_frame = frame_buffer.snapshot()
             state.last_base_frame = base_frame

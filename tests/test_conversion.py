@@ -48,9 +48,7 @@ def test_tab_export_matches_golden(tmp_path) -> None:
     source = (Path(__file__).parent / "fixtures" / "roundtrip_basic.tab").read_text(
         encoding="utf-8",
     )
-    expected = (
-        Path(__file__).parent / "fixtures" / "roundtrip_basic_expected.tab"
-    ).read_text(encoding="utf-8")
+    expected = (Path(__file__).parent / "fixtures" / "roundtrip_basic_expected.tab").read_text(encoding="utf-8")
     src_path = base / "roundtrip_basic.tab"
     src_path.write_text(source, encoding="utf-8")
 

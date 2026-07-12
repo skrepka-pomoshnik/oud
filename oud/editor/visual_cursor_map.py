@@ -116,9 +116,7 @@ def cursor_display_map_for_bar(
     beats, _unit, _label = _parse_time_signature(time_value)
     if beatsnap_mode == "soft" and beats > 1:
         visible_positions = (
-            _filter_redundant_positions(positions)
-            if state.settings.get("flagredundant", "on") == "on"
-            else positions
+            _filter_redundant_positions(positions) if state.settings.get("flagredundant", "on") == "on" else positions
         )
         src_to_dest = soft_beat_snap_map(
             positions,
@@ -137,10 +135,7 @@ def cursor_display_map_for_bar(
         groups = spread_flag_positions(positions, grid_width, min_gap=0)
         src_to_dest = smart_group_map(positions, groups, content_width, min_gap=event_min_gap)
     else:
-        scaled_positions = [
-            (_scale_col(pos, grid_width, content_width), denom, dot)
-            for (pos, denom, dot) in positions
-        ]
+        scaled_positions = [(_scale_col(pos, grid_width, content_width), denom, dot) for (pos, denom, dot) in positions]
         spread_positions = spread_flag_positions(
             scaled_positions,
             content_width,
@@ -160,10 +155,7 @@ def cursor_display_map_for_bar(
         content_width=content_width,
         src_to_dest=src_to_dest,
     )
-    return [
-        grid_map[_scale_col(col, state.bar_width, grid_width)]
-        for col in range(state.bar_width)
-    ]
+    return [grid_map[_scale_col(col, state.bar_width, grid_width)] for col in range(state.bar_width)]
 
 
 def system_display_indices_for_bar(state: EditorState, bar_index: int) -> list[int]:

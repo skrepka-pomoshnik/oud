@@ -297,9 +297,7 @@ def cmd_transpose(state: EditorState, value: str) -> None:
     if report.total == 0:
         return
     diag = f" ({report.first_diagnostic})" if report.skipped and report.first_diagnostic else ""
-    state.message = (
-        f"Transposed {semitones:+d}: changed {report.changed}, skipped {report.skipped}{diag}"
-    )
+    state.message = f"Transposed {semitones:+d}: changed {report.changed}, skipped {report.skipped}{diag}"
 
 
 def cmd_retune(state: EditorState, value: str) -> None:
@@ -425,7 +423,7 @@ def _grid_column_pitches(
     source_tuning: list[int],
 ) -> list[int] | None:
     pitches: list[int] = []
-    for (key, fret, _value) in entries:
+    for key, fret, _value in entries:
         _bar, s_idx, _col = key
         if s_idx < 0 or s_idx >= len(source_tuning):
             return None
@@ -441,10 +439,7 @@ def _grid_shift_has_nonfret_collision(
     style: str,
 ) -> bool:
     source_keys = {key for (key, _fret, _value) in entries}
-    dest_keys = {
-        (entries[i][0][0], assigned.string - 1, entries[i][0][2])
-        for i, assigned in enumerate(assigned_notes)
-    }
+    dest_keys = {(entries[i][0][0], assigned.string - 1, entries[i][0][2]) for i, assigned in enumerate(assigned_notes)}
     for dest_key in dest_keys:
         existing = state.overrides.get(dest_key)
         if existing is None or dest_key in source_keys:

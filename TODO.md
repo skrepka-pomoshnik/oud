@@ -1,13 +1,8 @@
 # TODO
 
-## P0: Release usability
+## Low priority: Release operations
 
-Persistent workflow context
-- [ ] Give errors, destructive confirmations, and successful writes distinct terminal attributes while retaining explicit text labels.
-- [ ] Make the cursor's current staff or voice explicit in every mixed-score view; duet staff identity is covered, but imported vocal/note staves still need a precise cursor contract.
-- [ ] Add a real curses resize regression at 80x24 and larger sizes that preserves the score cursor, filename, modified marker, document mode, and write target without overlap.
 - [ ] Add a macOS terminal interaction pass covering first run, open failure, edit/undo, modified quit, first Save As, overwrite refusal, read-only navigation, resize, and reopen.
-- [ ] Verify from visible help alone that a first-time user can open or create a score, enter one note, undo it, save safely, and quit.
 - [ ] Confirm GitHub Actions green on macOS.
 
 ## Later: Manual page

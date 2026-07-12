@@ -42,6 +42,7 @@ from oud.editor.search_ops import (
     set_mark,
 )
 from oud.editor.state import EditorState
+from oud.editor.view_focus import cycle_view_staff, visible_view_staffs
 from oud.editor.visual_ops import (
     clear_visual_mode,
     delete_visual_rows,
@@ -486,10 +487,18 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
             apply_motion_target(state, target)
         return True
     if key in keys.up:
+        if state.read_only and len(visible_view_staffs(state.piece)) > 1:
+            for _ in range(count):
+                cycle_view_staff(state, -1)
+            return True
         state.cursor_string -= count
         state.clamp()
         return True
     if key in keys.down:
+        if state.read_only and len(visible_view_staffs(state.piece)) > 1:
+            for _ in range(count):
+                cycle_view_staff(state, 1)
+            return True
         state.cursor_string += count
         state.clamp()
         return True

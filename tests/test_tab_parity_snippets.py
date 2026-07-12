@@ -126,10 +126,7 @@ def test_tab_snippet_inline_fingering_uses_compact_superscript() -> None:
     state.annotations = {(0, 0): "1"}
     lines = _render_state_lines(state, height=18)
     staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
-    assert any(
-        any(pair in row for pair in ("0¹", "¹0", "1¹", "¹1", "2¹", "¹2"))
-        for row in staff_rows
-    )
+    assert any(any(pair in row for pair in ("0¹", "¹0", "1¹", "¹1", "2¹", "¹2")) for row in staff_rows)
 
 
 def test_tab_snippet_letter_tablature_formatting_analogue() -> None:
@@ -185,9 +182,7 @@ def test_tab_snippet_stem_beam_analogue_flagshape_and_stem_rows_matrix(
     stem_like_rows = [
         line
         for line in head
-        if "|" in line
-        and "-" not in line
-        and any(ch in line for ch in ("|", "\\", "/", "=", "Γ", "F"))
+        if "|" in line and "-" not in line and any(ch in line for ch in ("|", "\\", "/", "=", "Γ", "F"))
     ]
     assert stem_like_rows, (flagstyle, flagstems, flaglean)
     if flagstems == "double" and flagstyle == "standard":
@@ -213,10 +208,7 @@ def test_tab_snippet_polyphony_in_tablature_analogue_two_voice_texture_stays_ali
     # Mixed durations should produce visible flag/tail rows.
     assert any(("\\" in line or "=" in line) for line in lines[:12])
     # Two-voice-like texture should preserve multiple independent note rows.
-    note_rows = [
-        row for row in staff_rows
-        if any(ch.isalnum() for ch in row if ch not in {"|"})
-    ]
+    note_rows = [row for row in staff_rows if any(ch.isalnum() for ch in row if ch not in {"|"})]
     assert len(note_rows) >= 3
     # No obvious split gaps or glued repeated noteheads in dense areas.
     assert all("|  |" not in row for row in staff_rows)
@@ -708,8 +700,7 @@ def test_tab_snippet_slur_gliss_parenthesize_cues_do_not_clobber_dense_frets() -
     assert any(any(ch in cue_chars for ch in line) for line in lines)
     disallowed_staff_cues = set("()[]<>~\\")
     assert not any(
-        any(ch in disallowed_staff_cues for ch in row.replace("|", "").replace("-", ""))
-        for row in staff_rows
+        any(ch in disallowed_staff_cues for ch in row.replace("|", "").replace("-", "")) for row in staff_rows
     )
 
 

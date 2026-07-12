@@ -5,7 +5,9 @@ from oud.petrucci.render_status import (
     bar_meter_integrity_marker,
     build_status_lines,
     resolve_duration_text,
+    status_attr_for_message,
 )
+from oud.petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 
 
 def test_resolve_duration_text_manual_and_dotted() -> None:
@@ -86,6 +88,18 @@ def test_build_status_lines_integrity_marker_separate_from_message() -> None:
     )
     assert line.startswith("bar:1 beat:1/4 M")
     assert "warn" in line
+
+
+def test_status_message_levels_have_distinct_portable_attributes() -> None:
+    attrs = {level: status_attr_for_message(level) for level in ("info", "success", "warning", "error", "confirm")}
+    assert len(set(attrs.values())) == len(attrs)
+    assert attrs == {
+        "info": A_REVERSE,
+        "success": A_REVERSE | A_BOLD,
+        "warning": A_REVERSE | A_UNDERLINE,
+        "error": A_REVERSE | A_BOLD | A_UNDERLINE,
+        "confirm": A_REVERSE | A_DIM,
+    }
 
 
 def test_bar_meter_integrity_marker_shows_m_on_mismatch_and_hides_on_match() -> None:

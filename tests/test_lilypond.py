@@ -192,7 +192,7 @@ def test_export_lilypond_repeat_cue_marks(tmp_path) -> None:
         settings={"tuning": "g4d4a3f3c3g2"},
     )
     text = path.read_text(encoding="utf-8")
-    assert 'D.C. al Fine' in text
+    assert "D.C. al Fine" in text
 
 
 def test_export_lilypond_bar_dynamic_and_fermata_marks(tmp_path) -> None:
@@ -211,7 +211,7 @@ def test_export_lilypond_bar_dynamic_and_fermata_marks(tmp_path) -> None:
     )
     text = path.read_text(encoding="utf-8")
     assert '\\mark \\markup { "mf" }' in text
-    assert 'scripts.ufermata' in text
+    assert "scripts.ufermata" in text
 
 
 def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -> None:
@@ -229,6 +229,7 @@ def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -
                         left_fingering="4",
                         right_fingering="thumb",
                         left_ornament="#",
+                        arpeggio="single",
                     ),
                 ],
             ),
@@ -267,6 +268,7 @@ def test_export_lilypond_ft3_extras_markups_only_in_full_tabnotation(tmp_path) -
     assert '"#"' in text
     assert "-4" in text
     assert r'\rightHandFinger \markup { "t" }' in text
+    assert r"\arpeggio" in text
 
 
 def test_export_lilypond_uses_native_fingering_attachments_for_numeric_ft3_fingerings(
@@ -374,7 +376,7 @@ def test_export_lilypond_ft3_extras_collects_multiple_notes_and_suppresses_open_
     text = path.read_text(encoding="utf-8")
     # Open-string LH "1" is suppressed; chord-level export aggregates/dedups remaining cues.
     assert '"1"' not in text
-    assert '-4\\rightHandFinger #2' in text or '-4 \\rightHandFinger #2' in text
+    assert "-4\\rightHandFinger #2" in text or "-4 \\rightHandFinger #2" in text
     assert '"# ."' in text or '". #"' in text
     # Thumb stays as fallback markup; numeric RH fingering is exported natively.
     assert '"t"' in text
@@ -714,6 +716,51 @@ def test_export_lilypond_emits_imported_vocal_only_staffgroup(tmp_path) -> None:
     assert "\\break" in text
 
 
+def test_export_lilypond_emits_every_imported_polyphonic_staff(tmp_path) -> None:
+    piece = load_ft3("lutemusic/05_can_she_excuse/can_she_excuse_4_part.ft3")
+    path = tmp_path / "four_part.ly"
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"showmelody": "on", "showlyrics": "on"},
+    )
+    text = path.read_text(encoding="utf-8")
+    assert text.count('\\new Staff = "melody') == 4
+    for label in ("soprano", "alto", "tenor", "bass"):
+        assert f'instrumentName = "{label}"' in text
+
+
+def test_export_lilypond_preserves_imported_beams_and_fermata(tmp_path) -> None:
+    piece = Piece(
+        imported_score=ImportedScore(
+            source_format="ft3",
+            staffs=[
+                ImportedStaff(
+                    kind="note",
+                    bars=[
+                        ImportedBarContent(
+                            source_bar_index=0,
+                            melody_events=[
+                                MelodyEvent("c", 0, note_type=5, beam="start"),
+                                MelodyEvent("d", 1, note_type=5, beam="end", fermata=True),
+                            ],
+                            fermata=True,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
+    path = tmp_path / "beam_fermata.ly"
+    export_lilypond(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
+    text = path.read_text(encoding="utf-8")
+    assert "c8[" in text
+    assert "d8]\\fermata" in text
+
+
 def test_export_lilypond_uses_imported_vocal_staff_over_bar_fallback_when_present(tmp_path) -> None:
     piece = Piece(
         title="Mixed",
@@ -814,7 +861,7 @@ def test_export_lilypond_aligns_sparse_imported_lyrics_by_source_bar(tmp_path) -
     assert "  c4" not in text
     assert text.count("  b4") == 1
     assert text.count("  a4") == 1
-    assert "_ _ _ \"late\"" in text
+    assert '_ _ _ "late"' in text
 
 
 def test_export_lilypond_emits_barline_only_imported_score(tmp_path) -> None:

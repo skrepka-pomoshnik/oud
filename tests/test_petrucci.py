@@ -50,9 +50,7 @@ def test_petrucci_has_no_core_or_ui_imports() -> None:
                     forbidden.append((path.name, node.module))
             elif isinstance(node, ast.Import):
                 forbidden.extend(
-                    (path.name, alias.name)
-                    for alias in node.names
-                    if alias.name.startswith(("oud.core", "oud.ui"))
+                    (path.name, alias.name) for alias in node.names if alias.name.startswith(("oud.core", "oud.ui"))
                 )
     assert forbidden == []
 

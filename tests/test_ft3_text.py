@@ -1,5 +1,6 @@
 from oud.core.ft3_text import (
     _structured_lyric_rows_from_positioned_rows,
+    decode_ft3_annotation_group,
     decode_ft3_vocal_events,
     is_ft3_text_record,
     parse_ft3_text_record,
@@ -25,7 +26,7 @@ def test_is_ft3_text_record_detects_multiline_ascii_payload() -> None:
 def test_parse_ft3_text_record_extracts_melody_and_lyrics_and_drops_noise() -> None:
     chunk = _text_chunk(
         "      3      3        8  a  ?   @   @      Can",
-        "      4      3       H    8 ?\"\" @   ?      cuse",
+        '      4      3       H    8 ?"" @   ?      cuse',
         "Was she ex-",
         "!    @@",
     )
@@ -130,6 +131,19 @@ def test_decode_ft3_vocal_events_treats_0x40_flag_as_rest() -> None:
     row = bytes.fromhex("0500000000013306400000000300")
     events = decode_ft3_vocal_events(row)
     assert [(ev.text, ev.note_type, ev.is_rest) for ev in events] == [("a", None, False), ("r", 4, True)]
+
+
+def test_decode_ft3_vocal_events_decodes_beam_chain_and_fermata() -> None:
+    row = bytes.fromhex("050001000001350604000000013507080000000400")
+    events = decode_ft3_vocal_events(row)
+    assert [event.beam for event in events] == ["start", "continue", "end"]
+    assert [event.fermata for event in events] == [True, False, False]
+
+
+def test_decode_ft3_annotation_group_extracts_length_prefixed_edition_text() -> None:
+    chunk = bytes(32) + b"\x01p\x0fcresc. - - - ->" + bytes(16)
+    record = decode_ft3_annotation_group(chunk)
+    assert record.editorial_text == ["p", "cresc. - - - ->"]
 
 
 def test_parse_ft3_structured_text_record_keeps_explicit_extender_tokens() -> None:

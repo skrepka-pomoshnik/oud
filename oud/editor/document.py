@@ -4,6 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from oud.editor.messages import MessageLevel
 from oud.petrucci.duet_score import is_duet_score_piece
 from oud.petrucci.model import Piece
 
@@ -57,17 +58,23 @@ def configure_document(
     state.forced_read_only = forced_read_only
     state.read_only = forced_read_only or state.document_mode is DocumentMode.IMPORTED_READ_ONLY
     state.pending_overwrite_path = None
+    state.view_staff_index = 0
 
     if forced_read_only:
         state.persistent_notice = "Read-only viewer"
+        state.persistent_notice_level = MessageLevel.WARNING
     elif state.document_mode is DocumentMode.IMPORTED_READ_ONLY:
-        state.persistent_notice = "non-TAB layers"
+        state.persistent_notice = "non-TAB; j/k focus"
+        state.persistent_notice_level = MessageLevel.WARNING
     elif state.document_mode is DocumentMode.IMPORTED_PROJECTION:
         state.persistent_notice = "source unchanged"
+        state.persistent_notice_level = MessageLevel.INFO
     elif path is None:
         state.persistent_notice = "i edit  :e open  ? help"
+        state.persistent_notice_level = MessageLevel.INFO
     else:
         state.persistent_notice = ""
+        state.persistent_notice_level = MessageLevel.INFO
 
     state.settings["filepath"] = path or ""
     _sync_document_settings(state)

@@ -419,11 +419,7 @@ def test_synthetic_final_frame_smart_stem_anchors_have_notes_under() -> None:
     state = regression_state(multi_bar_spacing_piece(), justify="smart", width=120, bar_width=12)
     lines = _render_state_lines(state, height=26)
     # Find the first rendered staff row dynamically (layout rows vary with settings).
-    staff_start = next(
-        idx
-        for idx, line in enumerate(lines)
-        if line.count("|") >= 2 and line.count("-") >= 8
-    )
+    staff_start = next(idx for idx, line in enumerate(lines) if line.count("|") >= 2 and line.count("-") >= 8)
     flag_row = lines[staff_start - 2]
     staff_rows = lines[staff_start : staff_start + 6]
     assert len(staff_rows) == 6
@@ -471,11 +467,7 @@ def test_nonchord_duration_flags_anchor_only_to_visible_note_columns() -> None:
         state.durations[(0, 0, col)] = denom
 
     lines = _render_state_lines(state, height=18)
-    staff_start = next(
-        idx
-        for idx, line in enumerate(lines)
-        if line.count("|") >= 2 and line.count("-") >= 8
-    )
+    staff_start = next(idx for idx, line in enumerate(lines) if line.count("|") >= 2 and line.count("-") >= 8)
     flag_row = lines[staff_start - 2]
     staff_rows = lines[staff_start : staff_start + 6]
     barlines = [idx for idx, ch in enumerate(staff_rows[0]) if ch == "|"]
@@ -515,9 +507,7 @@ def test_geometry_double_stem_rows_anchor_to_dense_chords() -> None:
     state.settings["showtactus"] = "off"
     state.settings["flagstems"] = "double"
     lines = _render_state_lines(state, height=18)
-    staff_start = next(
-        idx for idx, line in enumerate(lines) if line.count("|") >= 2 and line.count("-") >= 8
-    )
+    staff_start = next(idx for idx, line in enumerate(lines) if line.count("|") >= 2 and line.count("-") >= 8)
     flag_row = lines[staff_start - 2]
     stem_row = lines[staff_start - 1]
     staff_rows = lines[staff_start : staff_start + 6]

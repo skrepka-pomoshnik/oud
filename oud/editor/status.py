@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from oud.editor.document import display_path, document_status_label
 from oud.editor.state import EditorState
+from oud.editor.view_focus import current_view_staff, visible_view_staffs
 from oud.petrucci.duet_score import duet_bar_mapping, is_duet_score_piece
 from oud.petrucci.time_utils import parse_time_signature_value
 
@@ -32,7 +33,9 @@ def status_line(state: EditorState) -> str:
         )
         beat_text = f"beat:{beat_index}/{beats}"
     location = f"str:{state.cursor_string + 1}"
-    if is_duet_score_piece(state.piece):
+    if state.read_only and len(visible_view_staffs(state.piece)) > 1:
+        location = f"focus:{current_view_staff(state).label}"
+    elif is_duet_score_piece(state.piece):
         staff, _logical_bar = duet_bar_mapping(state.cursor_bar, piece=state.piece)
         location = f"staff:{staff + 1}"
     return f"{identity} bar:{bar} {beat_text} {location}"
