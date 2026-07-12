@@ -10,7 +10,9 @@ from oud.core.ft3_extras import decode_ft3_extras
 from oud.core.ft3_text import (
     FT3TextRecord,
     decode_ft3_annotation_group,
+    decode_ft3_note_record,
     decode_ft3_vocal_events,
+    ft3_note_record_group_count,
     is_ft3_text_record,
     parse_ft3_text_record,
     refine_ft3_raw_text_record,
@@ -76,6 +78,7 @@ class _MappedScoreEntry:
     bar_index: int
     staff_index: int
     entry: _BodyEntry
+    voice_index: int = 0
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,7 @@ class _ImportedScoreChunk:
     raw_size: int
     record_kind: str
     chunk: bytes
+    voice_index: int = 0
 
 
 _SOURCE_RECORD_KINDS = {
@@ -160,6 +164,56 @@ def _map_body_with_tab(entries: list[_BodyEntry]) -> tuple[list[_BodyEntry], lis
 def _ensemble_staff_labels(annotations: dict[str, str]) -> list[str]:
     ensemble = annotations.get("ensemble", "")
     return [part.split(":", 1)[0].strip() for part in ensemble.split(",") if part.strip()]
+
+
+def _notation_staff_labels(annotations: dict[str, str]) -> list[str]:
+    labels = list(reversed(_ensemble_staff_labels(annotations)[1:]))
+    selected = annotations.get("part", "").strip()
+    if not selected or selected.lower() == "score":
+        return labels
+    selected_labels = {part.strip().lower() for part in selected.split(",") if part.strip()}
+    matched = [label for label in labels if label.lower() in selected_labels]
+    return matched or labels
+
+
+def _is_note_score_entry(entry: _BodyEntry) -> bool:
+    return entry.score_kind in {"note-staff-raw", "note-lyric-raw"}
+
+
+def _parallel_note_tab_plan(
+    entries: list[_BodyEntry],
+    annotations: dict[str, str],
+) -> tuple[list[_BodyEntry], list[_MappedScoreEntry], list[str]] | None:
+    tab_start = len(entries)
+    while tab_start > 0 and entries[tab_start - 1].kind == "tab":
+        tab_start -= 1
+    tab_entries = entries[tab_start:]
+    prefix = entries[:tab_start]
+    if not prefix or not tab_entries:
+        return None
+    note_entries = [entry for entry in prefix if _is_note_score_entry(entry)]
+    if not note_entries or len(note_entries) % len(tab_entries):
+        return None
+    if any(entry.kind != "other" and not _is_note_score_entry(entry) for entry in prefix):
+        return None
+    if any(entry.kind == "other" and len(entry.chunk) > 32 for entry in prefix):
+        return None
+
+    labels = _notation_staff_labels(annotations)
+    lane_count = len(note_entries) // len(tab_entries)
+    if not labels or lane_count % len(labels):
+        return None
+    voices_per_staff = lane_count // len(labels)
+    mapped: list[_MappedScoreEntry] = []
+    for lane_index in range(lane_count):
+        start = lane_index * len(tab_entries)
+        lane = note_entries[start : start + len(tab_entries)]
+        staff_index = lane_index // voices_per_staff
+        voice_index = lane_index % voices_per_staff
+        mapped.extend(
+            _MappedScoreEntry(bar_index, staff_index, entry, voice_index) for bar_index, entry in enumerate(lane)
+        )
+    return tab_entries, mapped, labels
 
 
 def _map_score_only_body(
@@ -699,20 +753,7 @@ def _append_text_rows(existing: list[str], incoming: list[str]) -> list[str]:
 def _shift_melody_events(events: list[MelodyEvent], offset: int) -> list[MelodyEvent]:
     if offset <= 0:
         return list(events)
-    return [
-        MelodyEvent(
-            text=event.text,
-            onset_index=event.onset_index + offset,
-            src_pos=event.src_pos,
-            note_type=event.note_type,
-            dotted=event.dotted,
-            accidental_flags=event.accidental_flags,
-            is_rest=event.is_rest,
-            beam=event.beam,
-            fermata=event.fermata,
-        )
-        for event in events
-    ]
+    return [replace(event, onset_index=event.onset_index + offset) for event in events]
 
 
 def _shift_lyric_rows(
@@ -822,6 +863,11 @@ def _score_record_kind(chunk: bytes) -> str | None:
     return None
 
 
+def _decoded_note_record_kind(chunk: bytes) -> str:
+    decoded = parse_ft3_text_record(chunk)
+    return "note-lyric-raw" if decoded.lyrics or decoded.lyric_event_rows else "note-staff-raw"
+
+
 def _has_structural_score_marker(bar: Bar) -> bool:
     return bool(bar.time_sig or bar.barline or bar.repeat or bar.ending_numbers)
 
@@ -850,6 +896,9 @@ def _classify_score_payload(chunk: bytes) -> str | None:
 
 
 def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
+    note_group_count = ft3_note_record_group_count(chunk)
+    if note_group_count and (not _is_tab_bar(bar) or note_group_count >= 2):
+        return _decoded_note_record_kind(chunk)
     if score_kind := _score_record_kind(chunk):
         return score_kind
     if _has_structural_score_marker(bar):
@@ -859,7 +908,12 @@ def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
     return _classify_score_payload(chunk) if len(chunk) > 32 else None
 
 
-def _decode_raw_score_record(raw_kind: str, chunk: bytes) -> FT3TextRecord | None:
+def _decode_raw_score_record(
+    raw_kind: str,
+    chunk: bytes,
+    *,
+    voice_index: int | None = None,
+) -> FT3TextRecord | None:
     if raw_kind == "annotation-group-raw":
         return decode_ft3_annotation_group(chunk)
     if raw_kind not in {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}:
@@ -868,6 +922,11 @@ def _decode_raw_score_record(raw_kind: str, chunk: bytes) -> FT3TextRecord | Non
     record = parse_ft3_text_record(bytes(32) + payload)
     if raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"} and record.parse_mode != "structured":
         record = refine_ft3_raw_text_record(record, bytes(32) + payload)
+    note_events = decode_ft3_note_record(chunk, voice=voice_index)
+    legacy_events = decode_ft3_vocal_events(payload)
+    preferred_events = legacy_events if len(legacy_events) > len(note_events) else note_events
+    if preferred_events:
+        record = replace(record, melody_events=preferred_events)
     if record and _record_has_content(record):
         return record
     melody_events = decode_ft3_vocal_events(payload)
@@ -964,6 +1023,17 @@ def _decoded_note_content(
     )
 
 
+def _append_or_merge_note_bar(staff: ImportedStaff, incoming: ImportedBarContent) -> None:
+    existing = next((bar for bar in staff.bars if bar.source_bar_index == incoming.source_bar_index), None)
+    if existing is None:
+        staff.bars.append(incoming)
+        return
+    existing.melody_grid = existing.melody_grid or incoming.melody_grid
+    existing.melody_events.extend(incoming.melody_events)
+    existing.text_rows.extend(incoming.text_rows)
+    existing.fermata = existing.fermata or incoming.fermata
+
+
 def _append_raw_imported_bar(
     *,
     note_staff: ImportedStaff,
@@ -984,7 +1054,7 @@ def _append_raw_imported_bar(
     if raw_kind == "barline-raw":
         barline_staff.bars.append(base)
     if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (decoded is not None and decoded.melody_events):
-        note_staff.bars.append(_decoded_note_content(base, decoded))
+        _append_or_merge_note_bar(note_staff, _decoded_note_content(base, decoded))
     if (
         raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"}
         and decoded is not None
@@ -1013,6 +1083,8 @@ def _append_raw_imported_bar(
         comment_staff.bars.append(base)
         return
     raw_text_kinds = {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}
+    if raw_kind == "barline-raw":
+        return
     if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (decoded is not None and raw_kind in raw_text_kinds):
         return
     unknown_staff.bars.append(base)
@@ -1048,7 +1120,11 @@ def _build_imported_score(
         note_staff = note_staffs.setdefault(imported.staff_index, ImportedStaff(kind="note", label=label))
         lyric_staff = lyric_staffs.setdefault(imported.staff_index, ImportedStaff(kind="lyrics", label=label))
         source_bar = piece.bars[imported.bar_index] if 0 <= imported.bar_index < len(piece.bars) else Bar()
-        decoded = _decode_raw_score_record(imported.record_kind, imported.chunk)
+        decoded = _decode_raw_score_record(
+            imported.record_kind,
+            imported.chunk,
+            voice_index=imported.voice_index,
+        )
         _append_raw_imported_bar(
             note_staff=note_staff,
             lyric_staff=lyric_staff,
@@ -1072,6 +1148,7 @@ def _build_imported_score(
             source_staff_index=imported.staff_index,
             kind=_SOURCE_RECORD_KINDS.get(imported.record_kind, imported.record_kind),
             size=imported.raw_size,
+            source_voice_index=imported.voice_index,
         )
         for imported in imported_chunks
     ]
@@ -1112,16 +1189,22 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
             parsed = parse_bar(chunk)
             raw_kind = _classify_unknown_score_chunk(chunk, parsed)
             kind = "other"
-            if _is_tab_bar(parsed):
+            if raw_kind in {"note-staff-raw", "note-lyric-raw"}:
+                kind = "raw"
+            elif _is_tab_bar(parsed):
                 kind = "tab"
             elif raw_kind is not None:
                 kind = "raw"
             body_entries.append(_BodyEntry(kind, chunk, parsed, raw_kind))
         if any(entry.kind == "tab" for entry in body_entries):
-            tab_entries, mapped_score_entries = _map_body_with_tab(body_entries)
-            max_staff_index = max((mapped.staff_index for mapped in mapped_score_entries), default=-1)
-            ensemble_labels = _ensemble_staff_labels(annotations)
-            imported_staff_labels = list(reversed(ensemble_labels[-max_staff_index - 1 :]))
+            parallel_plan = _parallel_note_tab_plan(body_entries, annotations)
+            if parallel_plan is not None:
+                tab_entries, mapped_score_entries, imported_staff_labels = parallel_plan
+            else:
+                tab_entries, mapped_score_entries = _map_body_with_tab(body_entries)
+                max_staff_index = max((mapped.staff_index for mapped in mapped_score_entries), default=-1)
+                ensemble_labels = _ensemble_staff_labels(annotations)
+                imported_staff_labels = list(reversed(ensemble_labels[-max_staff_index - 1 :]))
             bar_chunks = [entry.chunk for entry in tab_entries]
             bar_text_records = [[] for _ in tab_entries]
             for mapped in mapped_score_entries:
@@ -1132,9 +1215,16 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
                 if raw_kind is None:
                     continue
                 imported_chunks.append(
-                    _ImportedScoreChunk(target_index, mapped.staff_index, len(chunk), raw_kind, chunk),
+                    _ImportedScoreChunk(
+                        target_index,
+                        mapped.staff_index,
+                        len(chunk),
+                        raw_kind,
+                        chunk,
+                        mapped.voice_index,
+                    ),
                 )
-                decoded = _decode_raw_score_record(raw_kind, chunk)
+                decoded = _decode_raw_score_record(raw_kind, chunk, voice_index=mapped.voice_index)
                 if decoded is not None and _record_has_content(decoded):
                     parsed_text_records.append(decoded)
                     bar_text_records[target_index].append(decoded)
@@ -1156,9 +1246,14 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
                         len(mapped.entry.chunk),
                         raw_kind,
                         mapped.entry.chunk,
+                        mapped.voice_index,
                     ),
                 )
-                decoded = _decode_raw_score_record(raw_kind, mapped.entry.chunk)
+                decoded = _decode_raw_score_record(
+                    raw_kind,
+                    mapped.entry.chunk,
+                    voice_index=mapped.voice_index,
+                )
                 if mapped.staff_index == 0 and decoded is not None and _record_has_content(decoded):
                     parsed_text_records.append(decoded)
                     bar_text_records[mapped.bar_index].append(decoded)
@@ -1301,17 +1396,7 @@ def _event_from_units(event: MelodyEvent, units: int) -> MelodyEvent:
         1: (6, False),
     }
     note_type, dotted = mapping.get(units, (4, event.dotted))
-    return MelodyEvent(
-        text=event.text,
-        onset_index=event.onset_index,
-        src_pos=event.src_pos,
-        note_type=note_type,
-        dotted=dotted,
-        accidental_flags=event.accidental_flags,
-        is_rest=event.is_rest,
-        beam=event.beam,
-        fermata=event.fermata,
-    )
+    return replace(event, note_type=note_type, dotted=dotted)
 
 
 def _finalize_explicit_vocal_melody(bar: Bar) -> None:
@@ -1374,19 +1459,7 @@ def _normalize_vocal_event_accidentals(
             accidental = defaults.get(name, "") if raw_fallback else ""
         else:
             accidental = defaults.get(name, "")
-        normalized.append(
-            MelodyEvent(
-                text=f"{name}{accidental}{octave}",
-                onset_index=event.onset_index,
-                src_pos=event.src_pos,
-                note_type=event.note_type,
-                dotted=event.dotted,
-                accidental_flags=event.accidental_flags,
-                is_rest=event.is_rest,
-                beam=event.beam,
-                fermata=event.fermata,
-            ),
-        )
+        normalized.append(replace(event, text=f"{name}{accidental}{octave}"))
     bar.melody_events = normalized
 
 

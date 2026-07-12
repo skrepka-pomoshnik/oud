@@ -41,6 +41,32 @@ def test_export_lilypond_writes_tabstaff(tmp_path) -> None:
     assert "\\override ClefModifier.stencil = ##f" in text
 
 
+def test_export_lilypond_emits_source_pitches_without_exhaustive_tab_assignment(tmp_path, monkeypatch) -> None:
+    def fail_assignment(*_args, **_kwargs):
+        raise AssertionError
+
+    monkeypatch.setattr(lp, "assign_chord_pitches", fail_assignment, raising=False)
+    notes = [Note(string, fret, 0) for string, fret in enumerate((0, 2, 4, 5, 7, 9), start=1)]
+    piece = Piece(
+        title="Dense chord",
+        bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=notes)])],
+        strings=6,
+        tuning="g2c3f3a3d4g4",
+    )
+    path = tmp_path / "dense.ly"
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations={},
+        bar_width=8,
+        settings={"tuning": "g2c3f3a3d4g4"},
+    )
+
+    assert "<" in path.read_text(encoding="utf-8")
+
+
 def test_export_lilypond_tabnotation_full_emits_tab_full_notation(tmp_path) -> None:
     bar = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
     piece = Piece(title="T", bars=[bar], strings=6)
@@ -669,7 +695,7 @@ def test_export_lilypond_emits_imported_vocal_only_staffgroup(tmp_path) -> None:
                             source_bar_index=0,
                             time_sig="3/4",
                             melody_events=[
-                                MelodyEvent("b", 0, note_type=3),
+                                MelodyEvent("b", 0, note_type=3, ornament="+"),
                                 MelodyEvent("a", 1, note_type=4),
                             ],
                         ),
@@ -714,6 +740,7 @@ def test_export_lilypond_emits_imported_vocal_only_staffgroup(tmp_path) -> None:
     assert '"Now" "O"' in text
     assert "\\key g \\major" in text
     assert "\\break" in text
+    assert '\\tiny "+"' in text
 
 
 def test_export_lilypond_emits_every_imported_polyphonic_staff(tmp_path) -> None:

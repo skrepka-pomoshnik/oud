@@ -41,7 +41,11 @@ def test_duet_view_staff_focus_moves_cursor_to_matching_raw_staff(tmp_path: Path
 
 
 def test_forced_single_staff_view_keeps_string_navigation(tmp_path: Path) -> None:
-    state = init_state("examples/example.ft3", config_path=str(tmp_path / "config.toml"), read_only=True)
+    state = init_state(
+        "examples/02_forlorne_hope_8C.ft3",
+        config_path=str(tmp_path / "config.toml"),
+        read_only=True,
+    )
     assert len(visible_view_staffs(state.piece)) == 1
 
     press_keys(state, ["j"])

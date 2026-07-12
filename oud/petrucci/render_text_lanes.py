@@ -400,6 +400,15 @@ def _resampled_onset_cols(
     return out
 
 
+def _draw_vocal_ornament(rows: list[list[str]], *, row: int, col: int, ornament: str | None) -> None:
+    if not ornament:
+        return
+    for ornament_row in range(max(0, row - 1), -1, -1):
+        if rows[ornament_row][col] in {" ", "-"}:
+            rows[ornament_row][col] = ornament[:1]
+            return
+
+
 def melody_staff_rows(  # noqa: C901
     events: list[MelodyEvent] | None,
     *,
@@ -473,6 +482,7 @@ def melody_staff_rows(  # noqa: C901
         if accidental:
             _draw_vocal_accidental(rows, row=row, col=col, accidental=accidental, floor=floor)
         rows[row][col] = _melody_notehead_glyph(event.note_type)
+        _draw_vocal_ornament(rows, row=row, col=col, ornament=getattr(event, "ornament", None))
         if beam := getattr(event, "beam", None):
             beam_points.append((beam, row, col))
     _draw_vocal_beams(rows, beam_points)

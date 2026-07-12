@@ -66,3 +66,9 @@ refs/
 /test.tab
 !examples/*.mid
 !examples/*.ly
+
+# External FT3 corpora are local-only. Keep manifests and attribution in Git,
+# never Gerbode or other third-party FT3 payloads/decoded dumps.
+*.ft3
+*.ft3.gz
+*.ft3.txt

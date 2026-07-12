@@ -62,6 +62,11 @@ is parallel notation, not extra bars. A multiple of the tab-run length maps to
 multiple standard staffs. This covers the bundled vocal/lute and three-voice
 plus lute scores.
 
+**Confirmed for polyphonic notation.** A visible standard staff can use multiple
+parallel voice lanes. La Couperin stores two 77-record musical lanes, each with
+one short non-bar padding record, followed by 77 tablature bars. Both voices map
+to one labeled imported staff and retain separate source-voice provenance.
+
 ### Score-only polyphony
 
 **Confirmed for the corpus.** When every body record is a standard-note record,
@@ -164,7 +169,8 @@ accepted. Observed `08` forms select courses 7 and higher.
 | Bytes | Meaning |
 | --- | --- |
 | 0 | first pitch-row value |
-| 1..4 | first-event flags, little-endian |
+| 1..2 | first-event musical flags, little-endian |
+| 3..4 | source layout flags, little-endian |
 | following 7-byte records | additional events |
 | final 2 bytes | event count plus one |
 
@@ -176,7 +182,13 @@ An additional event record is:
 | 1 | duration code |
 | 2 | pitch-row value |
 | 3..4 | event flags |
-| 5..6 | zero/reserved in observed records |
+| 5..6 | source layout flags |
+
+Full standard-note records use grouped objects. A group starts with a one-byte
+note count; each note then occupies six bytes: duration, signed pitch row,
+two-byte musical flags, and two-byte layout flags. Notes in one group share an
+onset, so chords and independent source voices remain typed rather than being
+flattened into successive notes.
 
 Duration codes map as follows:
 
@@ -186,6 +198,7 @@ Duration codes map as follows:
 | `33` | 4 | quarter |
 | `34` | 5 | eighth |
 | `35` | 6 | sixteenth |
+| `36` | 7 | thirty-second |
 
 The first event omits its duration. `oud` derives it from the active meter and
 the remaining event durations.
@@ -197,6 +210,7 @@ bundled corpus are decoded:
 
 | Bit | Meaning |
 | --- | --- |
+| `0001` | secondary source voice selector |
 | `0002` | sharp |
 | `0004` | middle event in a beam group |
 | `0008` | end event in a beam group |
@@ -209,6 +223,10 @@ bundled corpus are decoded:
 The first beam event has no beam bit. It is inferred by walking backward from
 `0008` over any `0004` middle events. Beams and fermatas survive projection,
 terminal rendering, and LilyPond export.
+
+Layout values are not accidental flags. Their raw 16-bit value remains on the
+event; the observed low selector `0a` is the printed `+` ornament, including its
+`400a` and `408a` placement variants.
 
 ### Pitch and key handling
 
@@ -253,6 +271,9 @@ low-byte fingering bits with one high-byte mark:
 | `0020`, `0040`, `0080`, `0100` | left fingers 1, 2, 3, 4 |
 | `0400`, `0800`, `0c00` | left `#`, `+`, `x` ornaments |
 | `0600`, `0e00` | right `#`, `x` ornaments |
+| `1000`, `1400` | right comma and apostrophe ornaments |
+| `1800` | under-note smile ornament |
+| `2000`, `2200` | right and left caret ornaments |
 | `3400` | barre; composes with low-byte fingering |
 | `0200` | single arpeggio mark |
 | `4a00`, `4e00`, `5200` | bottom, middle, top arpeggio segments |
@@ -272,6 +293,7 @@ Source provenance is separate from musical bars:
 ImportedScore.source_records[]
   source_bar_index
   source_staff_index
+  source_voice_index
   kind
   size
 ```
@@ -291,10 +313,10 @@ Run:
 uv run python scripts/ft3_audit.py lutemusic
 ```
 
-For the bundled corpus, the required result is:
+For the fixed 75-file expansion, the required result is:
 
 ```text
-Scanned 36 file(s): 0 with unresolved values or records.
+Scanned 75 file(s): 0 with unresolved values or records.
 ```
 
 “Unresolved” means an unconsumed note-extra bit, unknown vocal flag, unknown

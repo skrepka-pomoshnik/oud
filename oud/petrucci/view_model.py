@@ -795,6 +795,8 @@ def _ft3_ornament_glyph(value: str | None) -> str | None:
     mapping = {
         "dot-left": "\u0307",
         "brackets": "[",
+        "caret": "^",
+        "smile": "\u2323",
     }
     return mapping.get(value, value[0])
 

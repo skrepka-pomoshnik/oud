@@ -4,8 +4,9 @@ Manual comparison with Sarge Gerbode's published PDFs, 2026-07-11 through
 2026-07-12. Reference PDFs are not copied into the repository.
 
 ```bash
+uv run python scripts/fetch_ft3_corpus.py corpus/ft3-regression.json
 uv run oud ascii FILE.ft3 --bars 1:10
-uv run python scripts/ft3_audit.py lutemusic
+uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 ```
 
 | Shape | Local FT3 | Published PDF | Result |
@@ -18,11 +19,13 @@ uv run python scripts/ft3_audit.py lutemusic
 | Edition marks | `lutemusic/ich_bin_eine_blume_zu_saron_T.ft3` | [Ich bin eine Blume zu Saron](https://www.lutemusic.org/composers/Buxtehude/ich_bin_eine_blume_zu_saron/pdf/ich_bin_eine_blume_zu_saron_T.pdf) | Three large records are annotation groups, not bars: `p`, `cresc.`, `BI`, `BII`, and `BIV` attach to following bars. Segmented arpeggios use `4a00/4e00/5200`. |
 | Section/page | `lutemusic/32_passacaglia.ft3` | [32. Passacaglia](https://browse.lutemusic.org/sources/Piccinini/v.2_1639/pdf/32_passacaglia.pdf) | Embedded prose and RTF recover the editorial note, appendix page break, title, subtitle, and two original appendix bars. |
 | Ornament | `lutemusic/ricercar_galileiG.ft3` | [Ricercar](https://www.lutemusic.org/composers/GalileiG/pdf/ricercar_galileiG.pdf) | Five right-side `x` ornaments correspond to `0x0e00`. |
+| Standard notation | `lutemusic/random-75/039/grounds17.ft3` | [17th Century Grounds](https://browse.lutemusic.org/composers/Exercises/pdf/grounds17.pdf) | Four named ground sections agree. The first-event bytes split into 16-bit musical flags plus 16-bit layout data; section labels no longer create phantom high vocal flags. |
+| Polyphonic mixed | `lutemusic/random-75/054/la_couperin_duet.ft3` | [La Couperin](https://browse.lutemusic.org/composers/Forqueray/pdf/la_couperin_duet.pdf) | The PDF confirms one polyphonic bass-viol staff above archlute tablature for 77 measures. Two notation voice lanes map to that one labeled staff; their two padding records are not bars. |
 
 ## Findings
 
-- `scripts/ft3_audit.py lutemusic` reports zero residual note bits, vocal bits,
-  unknown source records, or import warnings across 36 files.
+- The focused `corpus/ft3-regression.json` fixtures report zero residual note
+  bits, vocal bits, unknown source records, or import warnings.
 - Standard-note source records are semantic `note`/`note-lyrics` records. They
   are no longer duplicated as raw bars in each imported lane.
 - Exact glyphs, braces, coordinates, proportional spacing, ordinary system
@@ -30,5 +33,12 @@ uv run python scripts/ft3_audit.py lutemusic
   approximated or reflowed for the terminal width. Explicit section/page data
   present in FT3 is preserved.
 
-The supported corpus therefore has semantic import parity, not pixel-identical
-engraving parity.
+The focused matrix therefore has semantic import parity, not pixel-identical
+engraving parity. It does not establish general FT3 or Fronimo parity.
+
+## Fixed 75-file expansion
+
+`corpus/ft3-random-75.json` records a one-time selection made on 2026-07-12.
+Tests fetch those exact URLs and hashes; they never repeat the random choice.
+All 75 files load without crashing or warnings and pass the semantic audit with
+zero residual note bits, vocal bits, or unknown source records.

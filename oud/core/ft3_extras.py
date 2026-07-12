@@ -27,8 +27,20 @@ _LEFT_FINGERING_BITS: tuple[tuple[int, str], ...] = (
     (0x0080, "3"),
     (0x0100, "4"),
 )
-_LEFT_ORNAMENT_HIGH_BYTES = {0x0400: "#", 0x0800: "+", 0x0C00: "x"}
-_RIGHT_ORNAMENT_HIGH_BYTES = {0x0600: "#", 0x0E00: "x"}
+_LEFT_ORNAMENT_HIGH_BYTES = {
+    0x0400: "#",
+    0x0800: "+",
+    0x0C00: "x",
+    0x2200: "caret",
+}
+_RIGHT_ORNAMENT_HIGH_BYTES = {
+    0x0600: "#",
+    0x0E00: "x",
+    0x1000: ",",
+    0x1400: "'",
+    0x1800: "smile",
+    0x2000: "caret",
+}
 _ARPEGGIO_HIGH_BYTE_PATTERNS = {
     0x0200: "single",
     0x4A00: "bottom",

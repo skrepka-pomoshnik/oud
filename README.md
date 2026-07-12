@@ -26,7 +26,7 @@ Current import/export focus:
 
 FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target and never changes the source. FT3 scores containing non-TAB or duet layers open read-only so visible material cannot disappear on save.
 
-![oud editing a real FT3 score in the terminal](https://raw.githubusercontent.com/skrepka-pomoshnik/oud/main/docs/oud-tui.svg)
+![oud editing a tablature score in the terminal](https://raw.githubusercontent.com/skrepka-pomoshnik/oud/main/docs/oud-tui.svg)
 
 ## Docs
 
@@ -45,21 +45,21 @@ Requires Python 3.11+. This installs the `oud` command. No runtime
 dependencies beyond the standard library; MIDI playback optionally uses
 `fluidsynth` or `timidity` if installed.
 
-Importer release smoke tests can scan a local tree or a bounded temporary
-sample from lutemusic.org:
+FT3 integration payloads are external. Fetch the fixed, checksum-verified
+manifests, then scan the local cache:
 
 ```
+python3 scripts/fetch_ft3_corpus.py \
+  corpus/ft3-regression.json corpus/ft3-random-75.json
 python3 scripts/corpus_smoke.py lutemusic
-python3 scripts/corpus_smoke.py --fetch-lutemusic 250 \
-  --lutemusic-url https://browse.lutemusic.org/tabs/composers/
 ```
 
 ## Run
 
 ```
-oud examples/example.ft3
+oud examples/si_par_souffrir.tab
 # or straight from a checkout:
-uv run oud examples/example.ft3
+uv run oud examples/si_par_souffrir.tab
 ```
 
 ## Controls (vim)
@@ -137,10 +137,11 @@ Entry point: `oud` -> `oud.app:main`.
 
 Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
 
-The tablature files in `lutemusic/` and most files in `examples/` are typesettings
-by Sarge Gerbode from [lutemusic.org](https://www.lutemusic.org), licensed
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see
-`lutemusic/README.md`. They are not covered by this project's GPL-3.0 license.
+The external FT3 test manifests reference typesettings by Sarge Gerbode from
+[lutemusic.org](https://www.lutemusic.org), licensed
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/); see
+`lutemusic/README.md`. Their payloads are ignored by Git and are not covered by
+this project's GPL-3.0 license.
 
 ## FILES
 

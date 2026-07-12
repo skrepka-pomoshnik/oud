@@ -103,12 +103,12 @@ def _opened(path: str) -> EditorState:
 
 
 def test_drawn_cursor_moves_on_every_l_press_in_chord_bars() -> None:
-    state = _opened("examples/example.ft3")
+    state = _opened("examples/02_forlorne_hope_8C.ft3")
     assert _count_stalls(state, "l", 40) == 0
 
 
 def test_drawn_cursor_moves_on_every_h_press_in_chord_bars() -> None:
-    state = _opened("examples/example.ft3")
+    state = _opened("examples/02_forlorne_hope_8C.ft3")
     for _ in range(40):
         _press(state, "l")
     assert _count_stalls(state, "h", 40) == 0
@@ -127,7 +127,7 @@ def test_drawn_cursor_moves_in_vocal_piece_with_scrolling() -> None:
 
 
 def test_renderer_publishes_cursor_maps_for_rendered_bars() -> None:
-    state = _opened("examples/example.ft3")
+    state = _opened("examples/02_forlorne_hope_8C.ft3")
     assert state.display_cursor_maps
     for bar_index, mapping in state.display_cursor_maps.items():
         assert len(mapping) == state.bar_width, bar_index

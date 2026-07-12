@@ -22,6 +22,17 @@ run_check() {
   echo
 }
 
+check_no_tracked_ft3() {
+  local tracked
+  tracked="$(git ls-files -- '*.ft3' '*.ft3.gz' '*.ft3.txt')" || return
+  if [[ -n "$tracked" ]]; then
+    echo "Tracked external FT3 payloads:" >&2
+    echo "$tracked" >&2
+    return 1
+  fi
+}
+
+run_check "No tracked FT3 payloads" check_no_tracked_ft3
 run_check "Ruff" uv run ruff check .
 run_check "Ruff format" uv run ruff format --check .
 run_check "Ty" uv run ty check oud tests

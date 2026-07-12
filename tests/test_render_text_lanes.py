@@ -353,6 +353,17 @@ def test_melody_staff_rows_draws_explicit_ft3_beam_group_without_tab_chords() ->
     assert any("=" in "".join(row) for row in rows)
 
 
+def test_melody_staff_rows_draws_imported_standard_note_ornament() -> None:
+    event = MelodyEvent("d", 0, note_type=4, ornament="+")
+    rows = melody_staff_rows(
+        [event],
+        onset_cols=[4],
+        width=10,
+        bar=Bar(melody_events=[event]),
+    )
+    assert any(row[4] == "+" for row in rows)
+
+
 def test_melody_staff_rows_use_consistent_stem_length_for_different_pitches() -> None:
     rows = melody_staff_rows(
         [MelodyEvent("d", 0), MelodyEvent("a", 1), MelodyEvent("d'", 2)],

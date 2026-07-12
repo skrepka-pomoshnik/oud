@@ -58,6 +58,7 @@ class ImportedSourceRecord:
     source_staff_index: int
     kind: str
     size: int
+    source_voice_index: int = 0
 
 
 @dataclass
@@ -78,6 +79,9 @@ class MelodyEvent:
     is_rest: bool = False
     beam: str | None = None
     fermata: bool = False
+    voice: int = 0
+    ornament: str | None = None
+    ft3_layout_flags: int | None = None
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,7 @@
 from oud.core.ft3_text import (
     _structured_lyric_rows_from_positioned_rows,
     decode_ft3_annotation_group,
+    decode_ft3_note_record,
     decode_ft3_vocal_events,
     is_ft3_text_record,
     parse_ft3_text_record,
@@ -138,6 +139,19 @@ def test_decode_ft3_vocal_events_decodes_beam_chain_and_fermata() -> None:
     events = decode_ft3_vocal_events(row)
     assert [event.beam for event in events] == ["start", "continue", "end"]
     assert [event.fermata for event in events] == [True, False, False]
+
+
+def test_decode_ft3_note_record_preserves_chords_voices_and_layout_ornaments() -> None:
+    data = bytes(30) + bytes.fromhex("0233fa0000000033f30000000001340103000a40")
+    events = decode_ft3_note_record(data)
+
+    assert [event.text for event in events] == ["d,", "d,,", "d#"]
+    assert [event.onset_index for event in events] == [0, 0, 1]
+    assert [event.note_type for event in events] == [4, 4, 5]
+    assert events[2].voice == 1
+    assert events[2].accidental_flags == 0x0002
+    assert events[2].ornament == "+"
+    assert events[2].ft3_layout_flags == 0x400A
 
 
 def test_decode_ft3_annotation_group_extracts_length_prefixed_edition_text() -> None:

@@ -148,6 +148,22 @@ def test_parse_bar_decodes_ft3_confirmed_exact_extras_subset() -> None:
     assert note.right_ornament == "x"
 
 
+def test_parse_bar_decodes_ft3_postfix_and_under_note_ornaments() -> None:
+    comma = parse_bar(_ft3_bar_with_one_note(extras=0x1000)).notes[0]
+    apostrophe = parse_bar(_ft3_bar_with_one_note(extras=0x1404)).notes[0]
+    smile = parse_bar(_ft3_bar_with_one_note(extras=0x1800)).notes[0]
+    right_caret = parse_bar(_ft3_bar_with_one_note(extras=0x2000)).notes[0]
+    left_caret = parse_bar(_ft3_bar_with_one_note(extras=0x2200)).notes[0]
+
+    assert comma.right_ornament == ","
+    assert apostrophe.right_ornament == "'"
+    assert apostrophe.right_fingering == "dot1"
+    assert smile.right_ornament == "smile"
+    assert right_caret.right_ornament == "caret"
+    assert left_caret.left_ornament == "caret"
+    assert all(note.ft3_extra_residual is None for note in (comma, apostrophe, smile, right_caret, left_caret))
+
+
 def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
     note = bar.notes[0]
@@ -746,7 +762,7 @@ def test_load_ft3_extracts_preamble_notes_from_prefix(tmp_path) -> None:
 
 def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
     paths = [
-        "examples/example.ft3",
+        "examples/02_forlorne_hope_8C.ft3",
         "examples/26_lachrimae_galliard_in_G.ft3",
         "lutemusic/23a_frogg_galliard_2.ft3",
     ]

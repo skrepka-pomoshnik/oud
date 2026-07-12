@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1041" height="606"
      viewBox="0 0 1041 606" role="img" aria-labelledby="title description">
   <title id="title">oud terminal tablature editor</title>
-  <desc id="description">A real oud renderer frame showing pavan_01_8C.ft3.</desc>
+  <desc id="description">A real oud renderer frame showing si_par_souffrir.tab.</desc>
   <style>
     .screen, .status {
       font-family: "DejaVu Sans Mono", "SFMono-Regular", Consolas, monospace;
@@ -22,31 +22,31 @@
   <rect x="16" y="15" width="12" height="12" rx="2" fill="#e56b6f"/>
   <rect x="34" y="15" width="12" height="12" rx="2" fill="#e8b65a"/>
   <rect x="52" y="15" width="12" height="12" rx="2" fill="#70c58b"/>
-  <text class="window-title" x="76" y="25">oud - pavan_01_8C.ft3</text>
-  <text class="screen" x="24" y="60" xml:space="preserve">                                          Pavan 1                                           Daniel Bacheler</text>
+  <text class="window-title" x="76" y="25">oud - si_par_souffrir.tab</text>
+  <text class="screen" x="24" y="60" xml:space="preserve">                                              Si par souffrir</text>
   <text class="screen" x="24" y="78" xml:space="preserve">&#160;</text>
-  <text class="screen" x="24" y="96" xml:space="preserve">       |\. |\\        |\\   |\         |\\          |\\     |\\ |\\\  |\\ |\\\          |\\          |\\</text>
-  <text class="screen" x="24" y="114" xml:space="preserve">       |   |          |     |          |            |       |   |     |   |             |            |</text>
-  <text class="screen" x="24" y="132" xml:space="preserve">       4.  8          8      4    8            8            8   16    8   16       8            8</text>
-  <text class="screen" x="24" y="150" xml:space="preserve"> g|----c---a--------|-----------|------------|------------|-d------c--a----------|---c-a------|---f-f--f--|</text>
-  <text class="screen" x="24" y="168" xml:space="preserve"> d|----a------------|-d--a---d--|---c-a------|-a-d-f--d---|---------------d------|-c-d-d--c---|-d------d--|</text>
-  <text class="screen" x="24" y="186" xml:space="preserve"> a|- --a------------|-a---------|--------e---|-f----------|-----------b------a---|-d-d-d------|-d------d--|</text>
-  <text class="screen" x="24" y="204" xml:space="preserve"> f|-C|--------------|--------e--|---c-a------|--------e---|-c---a----------------|-c-a--------|-e------a--|</text>
-  <text class="screen" x="24" y="222" xml:space="preserve"> c|- ---------------|-----------|--------e---|------------|----------------------|-a---a------|-f---------|</text>
-  <text class="screen" x="24" y="240" xml:space="preserve"> g|-----------------|-----------|------------|------------|-d--------------------|------------|-----------|</text>
-  <text class="screen" x="24" y="258" xml:space="preserve"> d|    a            | a         | a          | a          |                      |            |           |</text>
-  <text class="screen" x="24" y="276" xml:space="preserve">&#160;</text>
-  <text class="screen" x="24" y="294" xml:space="preserve">  |-----------------|-----------|------------|------------|----------------------|------------|---|\|\-|\-|</text>
-  <text class="screen" x="24" y="312" xml:space="preserve">                                                                                              |   | |  |  |</text>
-  <text class="screen" x="24" y="330" xml:space="preserve">  |--------|.-------|-----------|------------|------------|-|\-----|\\-----------|---|\-------|---|-|--|--|</text>
-  <text class="screen" x="24" y="348" xml:space="preserve">  |        |\       |                        |     |\     | |      |  |\         |   | |\     |   ◆ ◆  ◆  |</text>
-  <text class="screen" x="24" y="366" xml:space="preserve">  |-------b|--------|-|\-----|--|------------|---|\|--|\--|-|------|--|---|\\----|---|-|------|-|\--------|</text>
-  <text class="screen" x="24" y="384" xml:space="preserve">  |        |        | |      |  |   |\       |   | |  |   | ◆      ◆  |   |      | |\◆ |  |\  | |         |</text>
-  <text class="screen" x="24" y="402" xml:space="preserve">  |--------◆--------|-|--|\--|--|---|-|\-|\--|-|\|-◆--|---|-----|\\---◆---|--|\\-|-|---◆--|---|-|---------|</text>
-  <text class="screen" x="24" y="420" xml:space="preserve">                    | ◆  |   ◆  |   | |  |   | | ◆    ◆   |     |         ◆  |   | |      |   | ◆         |</text>
-  <text class="screen" x="24" y="438" xml:space="preserve">  |-----------------|----|------|---◆-|--|---|-|----------|-----|------------|---|-◆------◆---|-----------|</text>
-  <text class="screen" x="24" y="456" xml:space="preserve">                    |    ◆      |     ◆ -◆-  | ◆          |    -◆-          -◆-  |</text>
-  <text class="screen" x="24" y="474" xml:space="preserve">  |                 |           |            |            |                      |            |           |</text>
+  <text class="screen" x="24" y="96" xml:space="preserve">      |\ |\\       |\  |\\      |\  |\\      |\        |\\          |\        |\\          |\\   |\\\|\\</text>
+  <text class="screen" x="24" y="114" xml:space="preserve">      |  |         |   |        |   |        |         |            |         |            |     |   |</text>
+  <text class="screen" x="24" y="132" xml:space="preserve">      4  8         4   8        4   8        4         8            4         8            8     16  8</text>
+  <text class="screen" x="24" y="150" xml:space="preserve"> g|---c--c-------|-a----------|------------|---------|------------|---------|------------|-------c---h--h-|</text>
+  <text class="screen" x="24" y="168" xml:space="preserve"> d|- -a--a--d----|-----c------|-d---d------|-a----c--|------c-----|-a----a--|------c-----|----------------|</text>
+  <text class="screen" x="24" y="186" xml:space="preserve"> a|-C------------|-b---d---d--|-a-------a--|-b-------|-a--d-a--d--|-b----b--|-d----d-----|-b-----a--------|</text>
+  <text class="screen" x="24" y="204" xml:space="preserve"> f|- ------------|------------|------------|------c--|------------|-a----c--|-e--e-------|-a---------a----|</text>
+  <text class="screen" x="24" y="222" xml:space="preserve"> c|--------------|------------|-c---c------|------a--|------------|---------|-e-------e--|-c-------a----h-|</text>
+  <text class="screen" x="24" y="240" xml:space="preserve"> g|--------------|------------|------------|-d-------|-c-------c--|-d----a--|-c-------c--|-----------d----|</text>
+  <text class="screen" x="24" y="258" xml:space="preserve">&#160;</text>
+  <text class="screen" x="24" y="276" xml:space="preserve">                            [10]</text>
+  <text class="screen" x="24" y="294" xml:space="preserve">    |\\|\\\    |\\ |\\\      |\\\                 |\\\     |\\     |\    |\\      |\          |\\</text>
+  <text class="screen" x="24" y="312" xml:space="preserve">    |  |       |   |         |                    |        |       |     |        |           |</text>
+  <text class="screen" x="24" y="330" xml:space="preserve">    8  16      8   16        16                   16       8       4     8        4           8</text>
+  <text class="screen" x="24" y="348" xml:space="preserve">  |-f------d---c-------a---|-------------a------|----------------|--------------|-----------|------c-c----|</text>
+  <text class="screen" x="24" y="366" xml:space="preserve">  |------------------------|-c-a---a-c-d----d---|-c-a--a---------|-a-----a------|-----------|-----------a-|</text>
+  <text class="screen" x="24" y="384" xml:space="preserve">  |------------d---d-------|-d---d-------b------|-b--------a--e--|-a---------a--|-a------b--|-a-----------|</text>
+  <text class="screen" x="24" y="402" xml:space="preserve">  |-e--e-------e---e-------|-c---e-a-c------a---|-c-a--c---------|-----------a--|-a------c--|-a---------a-|</text>
+  <text class="screen" x="24" y="420" xml:space="preserve">  |-e--e-------f---f-------|-a---f---e-c--------|------e-c-e-----|-c---------c--|-c---------|-c---------c-|</text>
+  <text class="screen" x="24" y="438" xml:space="preserve">  |-c--c-------------------|---------f---d--c---|-a----d---c-----|--------------|--------a--|-------------|</text>
+  <text class="screen" x="24" y="456" xml:space="preserve">&#160;</text>
+  <text class="screen" x="24" y="474" xml:space="preserve">&#160;</text>
   <text class="screen" x="24" y="492" xml:space="preserve">&#160;</text>
   <text class="screen" x="24" y="510" xml:space="preserve">&#160;</text>
   <text class="screen" x="24" y="528" xml:space="preserve">&#160;</text>

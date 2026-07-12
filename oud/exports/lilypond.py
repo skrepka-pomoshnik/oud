@@ -6,7 +6,6 @@ import subprocess
 from dataclasses import replace
 from pathlib import Path
 
-from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 from oud.petrucci.duet_score import (
     duet_staff_labels,
     is_duet_score_piece,
@@ -191,18 +190,6 @@ def _duration_token(denom: int, dotted: bool) -> str:
     return token
 
 
-def _assignment_policy_from_settings(settings: dict[str, str]) -> AssignmentPolicy:
-    minimum_fret = int(settings.get("minimumfret", "0") or "0")
-    max_stretch_raw = int(settings.get("maxstretch", "0") or "0")
-    max_stretch = max_stretch_raw if max_stretch_raw > 0 else None
-    restrain_open = settings.get("restrainopenstrings", "off") == "on"
-    return AssignmentPolicy(
-        minimum_fret=minimum_fret,
-        max_stretch=max_stretch,
-        restrain_open_strings=restrain_open,
-    )
-
-
 def _normalize_tuning_length(pitches: list[int], strings: int) -> list[int]:
     if len(pitches) >= strings:
         return pitches[:]
@@ -222,7 +209,6 @@ def _lily_pitches_for_chord_notes(
     notes: list,
     *,
     source_tuning_lookup: list[int],
-    target_tuning_pitches: list[int],
     settings: dict[str, str],
 ) -> list[str]:
     pitch_notes: list[tuple[object, int]] = []
@@ -232,21 +218,8 @@ def _lily_pitches_for_chord_notes(
             pitch_notes.append((note, pitch))
     if not pitch_notes:
         return []
-    pitches = [pitch for _note, pitch in pitch_notes]
-    # LilyPond performs final TabStaff assignment, but we validate/routinely check
-    # assignability through the same core policy used by editor transforms so
-    # pitch->string fallback behavior stays deterministic across formats.
-    policy = _assignment_policy_from_settings(settings)
-    result = assign_chord_pitches(pitches, target_tuning_pitches, policy=policy)
-    if not result.ok:
-        # Export should degrade gracefully; keep pitches if policy is too strict.
-        result = assign_chord_pitches(pitches, target_tuning_pitches)
-    # Final fallback keeps source-derived pitches even if assignment policy rejects them.
-    keep = [True] * len(pitches)
     out: list[str] = []
-    for (note, pitch), keep_note in zip(pitch_notes, keep, strict=False):
-        if not keep_note:
-            continue
+    for note, pitch in pitch_notes:
         base = _midi_to_lilypond(pitch)
         native = _note_native_lh_fingering_suffix(note, settings) + _note_native_rh_fingering_suffix(note, settings)
         out.append(base + native)
@@ -257,8 +230,6 @@ def _lily_pitches_for_override_event(
     notes: list[tuple[int, int]],
     *,
     target_tuning_lookup: list[int],
-    target_tuning_pitches: list[int],
-    settings: dict[str, str],
 ) -> list[str]:
     pitches: list[int] = []
     for s_idx, fret in notes:
@@ -266,11 +237,6 @@ def _lily_pitches_for_override_event(
             pitches.append(target_tuning_lookup[s_idx] + fret)
     if not pitches:
         return []
-    policy = _assignment_policy_from_settings(settings)
-    result = assign_chord_pitches(pitches, target_tuning_pitches, policy=policy)
-    if not result.ok:
-        result = assign_chord_pitches(pitches, target_tuning_pitches)
-    _ = result
     return [_midi_to_lilypond(pitch) for pitch in pitches]
 
 
@@ -388,7 +354,7 @@ def _ft3_fingering_text(value: str | None) -> str | None:
 def _ft3_ornament_text(value: str | None) -> str | None:
     if not value:
         return None
-    mapping = {"dot-left": "."}
+    mapping = {"dot-left": ".", "caret": "^", "smile": "u"}
     return mapping.get(value, value[:1])
 
 
@@ -778,7 +744,6 @@ def _build_tab_body(  # noqa: C901, PLR0912
                 pitches = _lily_pitches_for_chord_notes(
                     chord.notes,
                     source_tuning_lookup=source_tuning_lookup,
-                    target_tuning_pitches=tuning_pitches,
                     settings=settings,
                 )
                 suffix = ""
@@ -814,8 +779,6 @@ def _build_tab_body(  # noqa: C901, PLR0912
                 pitches = _lily_pitches_for_override_event(
                     notes,
                     target_tuning_lookup=tuning_lookup,
-                    target_tuning_pitches=tuning_pitches,
-                    settings=settings,
                 )
                 suffix = ""
                 if col in tie_starts:
@@ -941,6 +904,9 @@ def _append_imported_melody_bar(
             suffix += "]"
         if event.fermata:
             suffix += r"\fermata"
+        if event.ornament:
+            ornament = _escape_lilypond(_ft3_ornament_text(event.ornament) or event.ornament)
+            suffix += f'^\\markup {{ \\tiny "{ornament}" }}'
         if event_count == 0 and note_bar.dynamic:
             suffix += f"\\{note_bar.dynamic}"
         melody_body.append(f"  {(lily or 'r')}{duration}{suffix}")

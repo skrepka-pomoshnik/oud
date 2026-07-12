@@ -63,7 +63,7 @@ def _svg(lines: list[str], *, title: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Render the README TUI screenshot as SVG.")
-    parser.add_argument("--source", default="lutemusic/pavan_01_8C.ft3")
+    parser.add_argument("--source", default="examples/si_par_souffrir.tab")
     parser.add_argument("--output", default="docs/oud-tui.svg")
     parser.add_argument("--width", type=int, default=108)
     parser.add_argument("--height", type=int, default=30)

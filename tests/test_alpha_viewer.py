@@ -6,6 +6,7 @@ from oud.core.ft3 import load_ft3
 from oud.exports.lilypond import export_lilypond
 from oud.petrucci.model import Piece
 from oud.petrucci.typeset import TypesetOptions, typeset_piece
+from scripts.fetch_ft3_corpus import load_manifest, manifest_paths
 
 CORPUS = Path("lutemusic")
 VIEWER_CASES = (
@@ -18,7 +19,12 @@ VIEWER_CASES = (
 
 @pytest.fixture(scope="module")
 def loaded_corpus() -> list[tuple[Path, Piece]]:
-    return [(path, load_ft3(str(path))) for path in sorted(CORPUS.rglob("*.ft3"))]
+    manifest = load_manifest(Path("corpus/ft3-regression.json"))
+    paths = [path for path in manifest_paths(manifest) if path.is_relative_to(CORPUS.resolve())]
+    missing = [path for path in paths if not path.is_file()]
+    if missing:
+        pytest.skip("fetch corpus/ft3-regression.json before running external corpus tests")
+    return [(path, load_ft3(str(path))) for path in paths]
 
 
 def _typeset(path: str, *, playback: tuple[int, int] | None = None):
@@ -34,7 +40,7 @@ def _typeset(path: str, *, playback: tuple[int, int] | None = None):
 def test_local_ft3_corpus_has_no_unresolved_viewer_warnings(
     loaded_corpus: list[tuple[Path, Piece]],
 ) -> None:
-    assert len(loaded_corpus) >= 35
+    assert len(loaded_corpus) == 17
     warned: dict[str, list[str]] = {}
     for path, piece in loaded_corpus:
         warnings = piece.import_warnings

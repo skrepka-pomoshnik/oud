@@ -19,5 +19,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install
         run: uv sync
+      - name: Fetch fixed external FT3 corpora
+        run: >-
+          uv run python scripts/fetch_ft3_corpus.py
+          corpus/ft3-regression.json
+          corpus/ft3-random-75.json
       - name: Quality gate
         run: ./scripts/quality.sh

@@ -3,6 +3,12 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-07-12
+- Closed all five semantic failures in the fixed 75-file expansion. Decoded comma, apostrophe, smile, and caret ornaments; separated standard-note musical/layout fields; preserved chord onsets and source voices; and mapped La Couperin's two notation voices to one 77-bar bass-viol staff. The 75-file audit now has zero residuals, unknown records, or warnings.
+- Manually compared 17th Century Grounds and La Couperin with their published PDFs, bringing the documented FT3/PDF matrix to ten files.
+- Removed all Gerbode FT3 payloads and decoded dumps from the Git index, ignored FT3 suffixes repository-wide, added a CI publication guard, and retained only attribution plus URL/SHA-256 manifests. Added a deterministic fetcher that refuses unsafe URLs, path traversal, checksum drift, and implicit replacement.
+- Expanded FT3 compatibility coverage with a one-time 75-file selection fixed in `corpus/ft3-random-75.json`. All 75 load without crashing; the five semantic failures and Couperin structural warning are bounded by regression tests and recorded in `TODO.md`/`docs/ft3-parity.md`.
+- Removed discarded exponential string-assignment searches from LilyPond pitch emission. The 226-bar Buxtehude fixture exports in about 0.02 seconds instead of 15.1 seconds with byte-identical output; the full coverage gate fell from 7:06 to 3:43.
+- Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, 1,157 passed with one Darwin-only test skipped on Linux, 85.33% coverage, and 112/112 local corpus files loaded without warnings.
 - Closed the remaining release-usability P0 items: the first 80x24 help page now gives a complete open/create, note entry, undo, safe save, and quit path, backed by an executable first-score regression.
 - Added a macOS-only PTY regression around the real curses loop. It verifies 80x24 -> 120x40 resize preserves the score cursor, source filename, modified marker, imported-projection mode, and TAB write target while keeping cursor and status on separate rows.
 - Raised the enforced line/branch coverage floor to 85%, removed the unreachable partial preset converter superseded by the canonical pitch-preserving transform, and covered screenshot/snapshot release tools, corpus failures, the FT3 audit CLI, and plugin error workflows.

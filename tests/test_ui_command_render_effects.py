@@ -188,7 +188,7 @@ def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
     [
         ("examples/26_lachrimae_galliard_in_G.ft3", 0),
         ("examples/02_forlorne_hope_8C.ft3", 9),
-        ("lutemusic/17_galliard_3_earl_of_essex_galliard_dowlandJ.ft3", 28),
+        ("lutemusic/23a_frogg_galliard_2.ft3", 28),
     ],
 )
 def test_playback_marker_is_monotonic_on_real_fixture_bars(

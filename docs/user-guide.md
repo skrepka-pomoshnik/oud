@@ -20,15 +20,14 @@ Run from project root:
 
 ```bash
 python3 -m oud.app
-python3 -m oud.app examples/example.ft3
-python3 -m oud.app examples/example.tab
+python3 -m oud.app examples/si_par_souffrir.tab
 ```
 
 From a checkout:
 
 ```bash
 uv run oud
-uv run oud examples/example.ft3
+uv run oud examples/si_par_souffrir.tab
 ```
 
 ## 3) Modes
@@ -241,8 +240,8 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 - Primary UI is TUI/curses only (Qt backend is future work).
 - Some advanced historical symbols/layouts are partial or pending.
-- FT3/JT* are proprietary import formats; support is validated against the bundled corpus rather than every historical producer version.
-- All bundled mixed/non-tab FT3 files have usable read-only views and pass the unresolved-semantics audit. Exact Fronimo engraving coordinates are reflowed.
+- FT3/JT* are proprietary import formats; support is validated against fixed external manifests rather than every historical producer version.
+- The focused regression manifest passes the unresolved-semantics audit. The broader 75-file sample has five explicit gaps tracked in `TODO.md`. Exact Fronimo engraving coordinates are reflowed.
 - FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
 - The status line always distinguishes the source document from its confirmed TAB write target.
 - Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
