@@ -73,8 +73,12 @@ Set with:
 ### Casual profile (core)
 
 - Move: arrows or `w a s d`
+- Row jump: `W` / `S` (previous/next rendered row)
 - Bar step: `,` / `.`
+- Bar edge: `Home` / `End`; viewport scroll: `PgUp` / `PgDn`
 - Insert/delete bar: `Insert` / `Delete`
+- Undo/redo: `Ctrl-Z` / `Ctrl-Y` (`u` / `Ctrl-R` remain available)
+- Char-find repeat: `]` forward / `[` reverse
 - Help: `F1`
 
 ## 5) Entering Notes
@@ -179,6 +183,7 @@ Durations are tracked per onset column and rendered according to current flag st
 Notes:
 - `barsperline=0` means auto.
 - `barpad` controls left/right inner padding inside bars.
+- `measures=system` labels the first bar of each displayed system; `every` uses `measuresstep`.
 
 ## 7.1 Tonality and Accidentals
 
@@ -241,15 +246,16 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - Primary UI is TUI/curses only (Qt backend is future work).
 - Some advanced historical symbols/layouts are partial or pending.
 - FT3/JT* are proprietary import formats; support is validated against fixed external manifests rather than every historical producer version.
-- The focused regression manifest passes the unresolved-semantics audit. The broader 75-file sample has five explicit gaps tracked in `TODO.md`. Exact Fronimo engraving coordinates are reflowed.
+- The focused regression manifest and fixed 75-file sample pass the unresolved-semantics audit without warnings. This is not general FT3 or Fronimo parity; exact source engraving coordinates are reflowed.
 - FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
 - The status line always distinguishes the source document from its confirmed TAB write target.
-- Horizontal fit is actively tuned; some edge spacing/render scenarios are still under refinement.
+- Auto layout applies collision widths before justifying, keeps final/manual/capped systems at readable natural widths, and shows a clipped preview only when at least half of the next system fits.
 
 ## 12) Status and Info Split
 
 - Main status bar keeps the short filename, modified marker, document/write mode, cursor location, and editing mode visible.
 - `:info` retains full source and write-target paths plus detailed file metadata.
+- For FT3 imports, `:info` also lists source format/page metadata and every imported staff; `:notes` includes editorial comments from non-focused staffs.
 - Import warnings remain listed in `:info` after their transient status message fades.
 - Important import and document notices remain in the status area until `:ack`; the document classification itself is always visible.
 - In read-only mixed and duet scores, `j/k` (or `w/s` with casual keys) cycles the visible staff focus shown in the status line.

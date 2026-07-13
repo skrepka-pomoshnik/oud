@@ -12,6 +12,7 @@ DEFAULT_TYPESET_SETTINGS: dict[str, str] = {
     "tuning": "",
     "layout": "auto",
     "justify": "smart",
+    "measures": "system",
     "bargap": "1",
     "barpad": "1",
     "showdur": "off",

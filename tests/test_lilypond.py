@@ -760,6 +760,50 @@ def test_export_lilypond_emits_every_imported_polyphonic_staff(tmp_path) -> None
         assert f'instrumentName = "{label}"' in text
 
 
+def test_export_lilypond_preserves_ft3_metadata_and_editorial_comments(tmp_path) -> None:
+    piece = Piece(
+        title="Title",
+        subtitle="Subtitle",
+        author="Poet",
+        composer="Composer",
+        arranger="Arranger",
+        footnote="Footnote",
+        source="Source Book",
+        publisher="Publisher",
+        volume="Volume I",
+        page="12v",
+        piece_type="fantasia",
+        part="score",
+        ensemble="8-course, alto",
+        section_annotations={"section": "Performance"},
+        bars=[Bar()],
+        imported_score=ImportedScore(
+            source_format="ft3",
+            staffs=[
+                ImportedStaff(
+                    kind="comment",
+                    label="editorial",
+                    bars=[ImportedBarContent(source_bar_index=0, editorial_text=["Source comment"])],
+                ),
+            ],
+        ),
+    )
+    path = tmp_path / "metadata.ly"
+    export_lilypond(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
+    text = path.read_text(encoding="utf-8")
+    assert 'subtitle = "Subtitle"' in text
+    assert 'poet = "Poet"' in text
+    assert 'arranger = "Arranger"' in text
+    assert 'piece = "fantasia | score"' in text
+    assert 'opus = "Volume I"' in text
+    assert 'source = "Source Book, page 12v"' in text
+    assert 'copyright = "Publisher"' in text
+    assert 'tagline = "Footnote"' in text
+    assert "% oud metadata section: Performance" in text
+    assert "% oud staff 1: comment | editorial | 1 bars" in text
+    assert "% oud bar 1 comment: Source comment" in text
+
+
 def test_export_lilypond_preserves_imported_beams_and_fermata(tmp_path) -> None:
     piece = Piece(
         imported_score=ImportedScore(

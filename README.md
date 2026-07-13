@@ -74,9 +74,12 @@ uv run oud examples/si_par_souffrir.tab
 
 ## Controls (casual)
 
-- `w/a/s/d` move
+- `w/a/s/d` or arrows move
+- `W/S` jump to the previous/next rendered row
 - `,` / `.` prev/next bar
+- `Home/End` move to the bar edges; `PgUp/PgDn` scroll
 - `Insert` add bar, `Delete` delete bar
+- `Ctrl-Z/Ctrl-Y` undo/redo
 - `F1` help
 
 ## ASCII preview
@@ -107,6 +110,7 @@ ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 :midicmd [path] show midi command
 :source [path]  view file with less
 :set maxbars=.. limit bars per system
+:set measures=system   number each displayed system
 :set measures=every measuresstep=10
 :set barsperline=0   auto bars/row
 :set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart

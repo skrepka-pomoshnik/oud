@@ -1,3 +1,6 @@
+from dataclasses import fields
+
+from oud.editor.keymap import insert_bindings, normal_action_bindings, normal_bindings
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 from oud.editor.undo_ops import undo
@@ -19,6 +22,65 @@ def _state() -> EditorState:
     state.screen_width = 120
     state.bar_width = 8
     return state
+
+
+def test_casual_profile_has_every_vim_normal_and_insert_action() -> None:
+    vim = _state()
+    casual = _state()
+    casual.settings["keys"] = "casual"
+
+    for binding_factory in (normal_bindings, normal_action_bindings, insert_bindings):
+        vim_bindings = binding_factory(vim)
+        casual_bindings = binding_factory(casual)
+        for field in fields(vim_bindings):
+            if getattr(vim_bindings, field.name):
+                assert getattr(casual_bindings, field.name), field.name
+
+
+def test_casual_movement_and_bar_step_keys_are_not_shadowed_by_vim_actions() -> None:
+    state = _state()
+    state.settings["keys"] = "casual"
+    state.cursor_bar = 1
+
+    handle_normal(state, ord("d"))
+    assert state.cursor_col == 1
+    assert state.pending_key == ""
+
+    handle_normal(state, ord(","))
+    assert state.cursor_bar == 0
+
+
+def test_casual_shift_ws_jump_rendered_rows() -> None:
+    state = _state()
+    state.settings["keys"] = "casual"
+    state.cursor_bar = 1
+    state.cursor_col = 5
+
+    handle_normal(state, ord("S"))
+    assert (state.cursor_bar, state.cursor_col) == (4, 5)
+    handle_normal(state, ord("W"))
+    assert (state.cursor_bar, state.cursor_col) == (1, 5)
+
+
+def test_casual_visual_d_moves_instead_of_deleting_selection() -> None:
+    state = _state()
+    state.settings["keys"] = "casual"
+    state.mode = "visual"
+    state.visual_anchor = (0, 0, 0)
+
+    handle_normal(state, ord("d"))
+
+    assert state.cursor_col == 1
+    assert state.mode == "visual"
+
+
+def test_casual_bindings_add_standard_undo_redo_aliases() -> None:
+    state = _state()
+    state.settings["keys"] = "casual"
+    bindings = normal_bindings(state)
+
+    assert 26 in bindings.undo  # Ctrl-Z
+    assert 25 in bindings.redo  # Ctrl-Y
 
 
 def test_upper_jumps_to_same_offset_in_next_system() -> None:

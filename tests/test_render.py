@@ -650,6 +650,8 @@ def test_bar_number_for_index() -> None:
     assert _bar_number_for_index(piece, 1, "every", "on", 1) == "[3]"
     assert _bar_number_for_index(piece, 3, "every", "off", 2) == "[4]"
     assert _bar_number_for_index(piece, 2, "every", "off", 2) is None
+    assert _bar_number_for_index(piece, 3, "system", "off", 1, system_start=True) == "4"
+    assert _bar_number_for_index(piece, 3, "system", "off", 1) is None
 
 
 def test_layout_rows_compacts_when_short() -> None:

@@ -19,7 +19,7 @@ def _resolve_config_path(path: str) -> Path:
 
 DEFAULT_SETTINGS: dict[str, str] = {
     "style": "french",
-    "measures": "every",
+    "measures": "system",
     "measuresstep": "10",
     "tuning": "g2c3f3a3d4g4",
     "tuninglabels": "relative",

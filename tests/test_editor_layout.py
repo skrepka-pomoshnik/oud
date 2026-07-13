@@ -1,3 +1,4 @@
+from oud.editor import layout as layout_module
 from oud.editor.layout import (
     auto_system_bar_plan_with_gaps,
     bars_per_line,
@@ -125,6 +126,35 @@ def test_dynamic_system_starts_respect_imported_system_break_hint() -> None:
     )
     state.bar_width = 10
     assert dynamic_system_starts(state, width=200) == [0, 2]
+
+
+def test_dynamic_system_starts_caches_only_clean_geometry(monkeypatch) -> None:
+    state = _state({"layout": "auto", "justify": "smart", "linelen": "0"})
+    calls = 0
+
+    original = layout_module.auto_system_bar_plan_with_gaps
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(layout_module, "auto_system_bar_plan_with_gaps", counted)
+    first = dynamic_system_starts(state, width=120)
+    first_calls = calls
+    assert first_calls > 0
+    assert dynamic_system_starts(state, width=120) == first
+    assert calls == first_calls
+
+    state.modified = True
+    dynamic_system_starts(state, width=120)
+    assert calls > first_calls
+
+    state.modified = False
+    calls_before_setting_change = calls
+    state.settings["barpad"] = "2"
+    dynamic_system_starts(state, width=120)
+    assert calls > calls_before_setting_change
 
 
 def test_jump_system_row_dynamic_prefers_visual_x_alignment() -> None:

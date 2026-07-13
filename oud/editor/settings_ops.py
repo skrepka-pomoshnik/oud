@@ -88,7 +88,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "style": ({"french", "italian"}, "Style must be french or italian"),
     "contrast": ({"normal", "high"}, "Contrast must be normal/high"),
     "theme": ({"auto", "dark", "light"}, "Theme must be auto/dark/light"),
-    "measures": ({"start", "every", "five"}, "Measures must be start/every/five"),
+    "measures": (
+        {"start", "system", "every", "five"},
+        "Measures must be start/system/every/five",
+    ),
     "flagstyle": (
         {"standard", "italian", "thin", "board", "capirola", "englishgrid", "continental"},
         "Flagstyle must be standard/italian/thin/board/capirola/englishgrid/continental",

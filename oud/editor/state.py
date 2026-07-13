@@ -82,6 +82,8 @@ class EditorState:
         # Per-bar logical-col -> display-col maps published by the renderer each
         # frame; motion uses them so the cursor moves exactly as drawn.
         self.display_cursor_maps: dict[int, list[int]] = {}
+        self.system_layout_cache_key: tuple[object, ...] | None = None
+        self.system_layout_cache_starts: tuple[int, ...] = ()
         self.midi_proc: subprocess.Popen[bytes] | None = None
         self.playback = PlaybackState()
         self.count_prefix = ""

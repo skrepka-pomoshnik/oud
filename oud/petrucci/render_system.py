@@ -3,6 +3,7 @@ from __future__ import annotations
 import unicodedata
 
 from oud.petrucci.framebuffer import _split_display_clusters
+from oud.petrucci.layout_map import block_height as _block_height
 from oud.petrucci.layout_map import layout_block_rows as _layout_block_rows
 from oud.petrucci.render_bar import build_flag_rows
 from oud.petrucci.render_helpers import apply_overrides, pad_row, safe_addstr
@@ -23,7 +24,12 @@ from oud.petrucci.render_vocal import (
     vocal_onset_cols_for_bar,
 )
 from oud.petrucci.screen import A_BOLD, A_REVERSE, Screen
-from oud.petrucci.spacing import auto_bar_plan
+from oud.petrucci.spacing import (
+    auto_bar_plan,
+    collision_base_bar_widths,
+    justified_extra_width,
+    short_system_bar_floor,
+)
 from oud.petrucci.tab_policy import (
     bar_has_multifret_tokens,
     gliss_span_chars,
@@ -717,6 +723,8 @@ def _redistribute_extra_width(  # noqa: C901, PLR0912
     if not widths or extra <= 0:
         return
     if len(widths) == 1:
+        # A collision pass can reduce an otherwise width-limited system to one
+        # dense bar. Keep that staff aligned with the surrounding systems.
         widths[0] += extra
         return
     if spacing_fill == "stretch":
@@ -911,7 +919,6 @@ def _playback_marker_ops(
     scaled_play_col: int,
     row_start: int,
     rows: dict[str, int | None],
-    system_display_strings: int,
     draw_pad: int,
     bar_x: int,
     display_width: int,
@@ -920,7 +927,10 @@ def _playback_marker_ops(
     vocal_onset_cols: list[int],
     rendered_melody_rows: list[str] | None,
 ) -> list[tuple[int, int, str, int]]:
-    marker_y = row_start + (rows["staff"] or 0) + system_display_strings
+    marker_row = rows.get("meta")
+    if marker_row is None:
+        marker_row = rows.get("flag") or 0
+    marker_y = row_start + marker_row
     marker_x = bar_x + draw_pad + scaled_play_col
     if melody_row_base is not None and marker_y >= melody_row_base:
         marker_y = melody_row_base
@@ -993,7 +1003,6 @@ def _playback_overlay_ops_for_bar(
         scaled_play_col=scaled_play_col,
         row_start=row_start,
         rows=rows,
-        system_display_strings=system_display_strings,
         draw_pad=draw_pad,
         bar_x=bar_x,
         display_width=display_width,
@@ -1024,7 +1033,6 @@ def render_systems(  # noqa: C901, PLR0912
     width: int,
     header_row: int,
     left_margin: int,
-    block_h: int,
     systems: int,
     total_strings: int,
     display_indices: list[int],  # noqa: ARG001
@@ -1087,8 +1095,8 @@ def render_systems(  # noqa: C901, PLR0912
     tuning_pitches = parse_tuning_pitches(settings.get("tuning", ""))
     duet_width_lock = settings.get("duetwidthlock", "off") == "on"
     current_bar_start = bar_offset
+    row_start = header_row + 1
     for sys_idx in range(systems):
-        row_start = header_row + 1 + sys_idx * block_h
         rows_proto = _layout_block_rows(
             display_strings,
             include_meta,
@@ -1103,9 +1111,6 @@ def render_systems(  # noqa: C901, PLR0912
             lyric_rows_count=lyric_rows_count,
             vocal_pos=vocal_pos,
         )
-        # Clear the system block to avoid stale characters after reflow/resizes.
-        for clear_row in range(row_start, row_start + block_h):
-            safe_addstr(stdscr, clear_row, 0, " " * width)
         bar_start = current_bar_start
         if bar_start >= total_bars:
             break
@@ -1127,6 +1132,21 @@ def render_systems(  # noqa: C901, PLR0912
                 bars_per_line_limit=bars_per_line_limit,
                 max_chords=max_chords,
                 chord_wrap_limit=chord_wrap_limit,
+            )
+            justify_system = sum(bar_widths) + sum(gaps_after) == usable_width
+            # Fit first, enforce collision widths second, and justify once.
+            # Reusing already-expanded widths here can drop valid bars and
+            # then stretch the sparse remainder across the whole system.
+            bar_widths = collision_base_bar_widths(
+                should_justify=justify_system,
+                planned_widths=bar_widths,
+                bars=piece.bars,
+                bar_indices=bar_indices,
+                bar_width=bar_width,
+                overrides=overrides,
+                durations=durations,
+                default_duration=default_duration,
+                dotted=dotted,
             )
             # Enforce per-bar minimums up-front so later rendering never expands
             # bars after fit (which can visually split bars in stretch modes).
@@ -1157,25 +1177,45 @@ def render_systems(  # noqa: C901, PLR0912
                 if show_cue and current_time in {"O", "o", "3/4"}:
                     cue_pad_extra = max(cue_pad_extra, 3)
                 compact_fill = spacing_fill == "compact"
-                auto_event_gap = 1 if compact_fill else 2
+                auto_event_gap = multifret_event_gap(
+                    style=settings.get("style", "french"),
+                    policy=settings.get("multifretspacing", "collision-safe"),
+                    has_multifret=bar_has_multifret_tokens(
+                        piece.bars[abs_bar],
+                        style=settings.get("style", "french"),
+                        french_c_shape=settings.get("frenchc", "normal"),
+                        label_mode=settings.get("fretlabelmode", "auto"),
+                    ),
+                )
+                if compact_fill:
+                    auto_event_gap = max(1, auto_event_gap - 1)
                 auto_flag_gap = 0 if compact_fill else (2 if spacing_fill == "smart" else 1)
+                readable_short_floor = short_system_bar_floor(
+                    should_justify=justify_system,
+                    bar_width=bar_width,
+                    barpad=barpad,
+                    usable_width=usable_width,
+                )
                 min_widths.append(
                     min(
                         max(1, usable_width),
-                        _required_auto_display_width_for_bar(
-                            piece.bars[abs_bar],
-                            total_strings=total_strings,
-                            bar_width=bar_width,
-                            default_duration=default_duration,
-                            style=settings.get("style", "french"),
-                            french_c=settings.get("frenchc", "normal"),
-                            fretlabelmode=settings.get("fretlabelmode", "auto"),
-                            show_dur=show_dur and rows_proto["dur"] is not None,
-                            hide_redundant=hide_redundant,
-                            barpad=barpad,
-                            flag_gap=auto_flag_gap,
-                            event_gap=auto_event_gap,
-                            cue_pad_total=cue_pad_extra * 2,
+                        max(
+                            readable_short_floor,
+                            _required_auto_display_width_for_bar(
+                                piece.bars[abs_bar],
+                                total_strings=total_strings,
+                                bar_width=bar_width,
+                                default_duration=default_duration,
+                                style=settings.get("style", "french"),
+                                french_c=settings.get("frenchc", "normal"),
+                                fretlabelmode=settings.get("fretlabelmode", "auto"),
+                                show_dur=show_dur and rows_proto["dur"] is not None,
+                                hide_redundant=hide_redundant,
+                                barpad=barpad,
+                                flag_gap=auto_flag_gap,
+                                event_gap=auto_event_gap,
+                                cue_pad_total=cue_pad_extra * 2,
+                            ),
                         ),
                     ),
                 )
@@ -1188,7 +1228,12 @@ def render_systems(  # noqa: C901, PLR0912
                 bar_widths.pop()
                 bar_indices = bar_indices[: len(bar_widths)]
                 gaps_after = gaps_after[: max(0, len(bar_widths) - 1)]
-            extra = max(0, usable_width - (sum(bar_widths) + sum(gaps_after)))
+            extra = justified_extra_width(
+                should_justify=justify_system,
+                usable_width=usable_width,
+                widths=bar_widths,
+                gaps=gaps_after,
+            )
             _redistribute_extra_width(
                 bar_widths,
                 gaps_after,
@@ -1226,6 +1271,24 @@ def render_systems(  # noqa: C901, PLR0912
             lyric_rows_count=lyric_rows_count,
             vocal_pos=vocal_pos,
         )
+        system_block_h = _block_height(
+            include_meta,
+            system_display_strings,
+            show_dur,
+            show_extras,
+            show_tuplets,
+            show_tactus,
+            double_stems,
+            show_melody=show_melody,
+            melody_rows_count=melody_rows_count,
+            show_lyrics=show_lyrics,
+            lyric_rows_count=lyric_rows_count,
+            vocal_pos=vocal_pos,
+        )
+        # Clear only the rows this system owns. Bass courses that appear later
+        # must not create blank spacer rows in otherwise six-course systems.
+        for clear_row in range(row_start, row_start + system_block_h):
+            safe_addstr(stdscr, clear_row, 0, " " * width)
         for display_idx in range(system_display_strings):
             label = "  "
             if sys_idx == 0:
@@ -1300,6 +1363,7 @@ def render_systems(  # noqa: C901, PLR0912
                 measures,
                 countdots,
                 step_value,
+                system_start=local_idx == 0,
             )
             time_setting = settings.get("time", "C")
             time_value = _resolved_bar_time_value(piece, abs_bar, time_setting, default_duration)
@@ -2363,7 +2427,7 @@ def render_systems(  # noqa: C901, PLR0912
                         ann_cells=ann_cells,
                         orn_cells=orn_cells,
                         draw_pad=draw_pad,
-                        grid_map=grid_map,
+                        grid_map=src_to_dest if scale_bar else grid_map,
                         style=style,
                         source_row_index=actual,
                         ann_target_rows=ann_target_rows,
@@ -2579,3 +2643,4 @@ def render_systems(  # noqa: C901, PLR0912
             else:
                 bar_x += display_width + bar_gap
         current_bar_start = bar_end
+        row_start += system_block_h

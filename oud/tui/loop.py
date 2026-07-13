@@ -25,6 +25,23 @@ from oud.tui.keycodes import keycodes_from_curses
 from oud.tui.viewport import ensure_cursor_visible
 from oud.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
 
+_MAX_INPUT_BATCH = 64
+
+
+def _read_input_batch(stdscr: curses.window, timeout_ms: int) -> tuple[int, ...]:
+    stdscr.timeout(timeout_ms)
+    first = stdscr.getch()
+    if first == -1:
+        return ()
+    keys = [first]
+    stdscr.timeout(0)
+    for _ in range(_MAX_INPUT_BATCH - 1):
+        key = stdscr.getch()
+        if key == -1:
+            break
+        keys.append(key)
+    return tuple(keys)
+
 
 def run_loop(
     stdscr: curses.window,
@@ -57,9 +74,8 @@ def run_loop(
     running = True
     needs_render = True
     while running:
-        stdscr.timeout(20 if state.midi_proc is not None else 50)
-        key = stdscr.getch()
-        if key != -1:
+        keys = _read_input_batch(stdscr, 10 if state.midi_proc is not None else 50)
+        for key in keys:
             running = handle_key_impl(
                 state,
                 key,
@@ -73,6 +89,8 @@ def run_loop(
                 handle_search=handle_search_input,
             )
             needs_render = True
+            if not running:
+                break
 
         message_changed = decay_transient_message(state)
         height, width = stdscr.getmaxyx()
@@ -175,7 +193,7 @@ def run_loop(
                 else state.help_offset,
                 None if playback_cache is not None else state.playback_bar,
                 None if playback_cache is not None else state.playback_col,
-                playback_markers=state.playback.markers,
+                playback_markers=None if playback_cache is not None else state.playback.markers,
                 playback_cache=playback_cache,
                 cursor_display_maps=state.display_cursor_maps,
                 message_level=state.visible_message_level.value,
@@ -187,6 +205,9 @@ def run_loop(
             state.last_base_frame = base_frame
             state.playback_overlay_cache = playback_cache
             if playback_cache is not None:
+                # Full score rendering can take longer than a short note. Sample
+                # the clock again so the overlay drawn now is not one frame old.
+                update_playback_animation(state)
                 playback_key = (
                     state.playback_bar if state.playback_bar is not None else -1,
                     state.playback_col if state.playback_col is not None else -1,

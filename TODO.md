@@ -35,7 +35,6 @@ artifact.
 - [ ] Build a representative PDF acceptance matrix for solo, mixed, four-part, duet, and multi-section scores.
   - Verify staff order, lyrics, annotations, repeats/endings, section/page boundaries, system count, and absence of clipping or overlap.
   - Document intentional LilyPond differences from Fronimo instead of claiming pixel-identical output.
-- [ ] Make every imported title, subtitle, staff name, footnote, editorial comment, section annotation, and source page discoverable in `:info`/`:notes` and preserved in LilyPond output.
 - [ ] Make `:pdf` a complete printable workflow: deterministic output path, explicit compiler command, actionable failure diagnostics, overwrite behavior, and success message containing the resulting file.
 
 ### Playback and interaction

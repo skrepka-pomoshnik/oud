@@ -632,6 +632,8 @@ def _bar_number_for_index(
     measures: str,
     countdots: str,
     step: int,
+    *,
+    system_start: bool = False,
 ) -> str | None:
     extra = 0
     if countdots == "on":
@@ -639,6 +641,8 @@ def _bar_number_for_index(
             if piece.bars[idx].repeat == ".":
                 extra += 1
     number = bar_index + 1 + extra
+    if measures == "system":
+        return str(number) if system_start else None
     if measures == "every":
         if step <= 0:
             step = 1

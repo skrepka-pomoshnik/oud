@@ -96,6 +96,17 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Author:", piece.author),
         line("Composer:", piece.composer),
         line("Arranger:", piece.arranger),
+        line("Source key:", piece.key),
+        line("Type:", piece.piece_type),
+        line("Difficulty:", piece.difficulty),
+        line("Ensemble:", piece.ensemble),
+        line("Part:", piece.part),
+        line("Instrumentation:", piece.instrumentation),
+        line("Source:", piece.source),
+        line("Editor:", piece.editor),
+        line("Publisher:", piece.publisher),
+        line("Volume:", piece.volume),
+        line("Source page:", piece.page),
         line("Footnote:", piece.footnote),
         line("FootSrc:", piece.footnote_source),
         line("FootEd:", piece.footnote_editor),
@@ -137,6 +148,17 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("French c:", settings.get("frenchc")),
         line("FlagRedundant:", settings.get("flagredundant")),
     ]
+    imported: list[str] = []
+    if piece.imported_score is not None:
+        imported = ["", f"Imported score: {piece.imported_score.source_format}"]
+        imported.extend(
+            f"Staff {index}: {staff.kind} | {staff.label or '(unlabeled)'} | {len(staff.bars)} bars"
+            for index, staff in enumerate(piece.imported_score.staffs, start=1)
+        )
+    source_metadata: list[str] = []
+    if piece.section_annotations:
+        source_metadata = ["", "Source metadata"]
+        source_metadata.extend(f"{key}: {value}" for key, value in sorted(piece.section_annotations.items()))
     warnings: list[str] = []
     if piece.import_warnings:
         warnings = [
@@ -144,7 +166,22 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
             "Import warnings",
             *[f"{index}. {warning}" for index, warning in enumerate(piece.import_warnings, start=1)],
         ]
-    return ["INFO", "", *fields, *warnings, "", "q/esc to close"]
+    return ["INFO", "", *fields, *imported, *source_metadata, *warnings, "", "q/esc to close"]
+
+
+def _editorial_entries(piece: Piece) -> list[tuple[int, str]]:
+    entries = {
+        (idx + 1, text.strip()) for idx, bar in enumerate(piece.bars) for text in bar.editorial_text if text.strip()
+    }
+    if piece.imported_score is not None:
+        entries.update(
+            (bar.source_bar_index + 1, text.strip())
+            for staff in piece.imported_score.staffs
+            for bar in staff.bars
+            for text in bar.editorial_text
+            if text.strip()
+        )
+    return sorted(entries)
 
 
 def notes_lines(piece: Piece) -> list[str]:
@@ -161,7 +198,7 @@ def notes_lines(piece: Piece) -> list[str]:
         lines.append(f"Editor: {piece.editor}")
     if piece.comment:
         lines.append(f"Comment: {piece.comment}")
-    editorial = [(idx + 1, text) for idx, bar in enumerate(piece.bars) for text in bar.editorial_text if text.strip()]
+    editorial = _editorial_entries(piece)
     if editorial:
         lines.append("")
         lines.append("Bar Comments")

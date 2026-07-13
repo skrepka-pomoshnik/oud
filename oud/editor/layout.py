@@ -1,10 +1,65 @@
 from __future__ import annotations
 
 from oud.editor.state import EditorState
-from oud.petrucci.spacing import auto_bar_plan
-from oud.petrucci.view_model import (
-    _next_system_start,
+from oud.petrucci.spacing import (
+    auto_bar_plan,
+    collision_base_bar_widths,
+    justified_extra_width,
+    short_system_bar_floor,
 )
+from oud.petrucci.view_model import _next_system_start
+
+_SYSTEM_LAYOUT_SETTING_KEYS = (
+    "layout",
+    "justify",
+    "linelen",
+    "bargap",
+    "barpad",
+    "barsperline",
+    "maxbars",
+    "maxchords",
+    "chordwrap",
+    "showdur",
+    "flagredundant",
+    "style",
+    "frenchc",
+    "fretlabelmode",
+    "multifretspacing",
+    "time",
+)
+
+
+def _system_layout_cache_key(state: EditorState, width: int) -> tuple[object, ...] | None:
+    if state.modified:
+        return None
+    bar_shapes = tuple(
+        (
+            id(bar),
+            id(bar.chords),
+            len(bar.chords),
+            id(bar.notes),
+            len(bar.notes),
+            bar.system_break,
+            bar.time_sig,
+        )
+        for bar in state.piece.bars
+    )
+    return (
+        id(state.piece),
+        id(state.piece.bars),
+        len(state.piece.bars),
+        state.piece.strings,
+        width,
+        state.bar_width,
+        len(state.undo_stack),
+        state.clean_undo_depth,
+        tuple((key, state.settings.get(key, "")) for key in _SYSTEM_LAYOUT_SETTING_KEYS),
+        tuple(sorted(state.stave_breaks)),
+        tuple(sorted(state.overrides.items())),
+        tuple(sorted(state.durations.items())),
+        tuple(sorted(state.dotted)),
+        bar_shapes,
+    )
 
 
 def bar_gap(state: EditorState) -> int:
@@ -104,6 +159,9 @@ def jump_system_row(state: EditorState, bar_index: int, delta: int, per_line: in
 
 
 def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa: C901, PLR0912
+    cache_key = _system_layout_cache_key(state, width)
+    if cache_key is not None and state.system_layout_cache_key == cache_key:
+        return list(state.system_layout_cache_starts)
     bars = state.piece.bars
     total = len(bars)
     if total <= 0:
@@ -161,6 +219,9 @@ def dynamic_system_starts(state: EditorState, width: int) -> list[int]:  # noqa:
         if next_start < total:
             starts.append(next_start)
         current = next_start
+    if cache_key is not None:
+        state.system_layout_cache_key = cache_key
+        state.system_layout_cache_starts = tuple(starts)
     return starts
 
 
@@ -226,11 +287,30 @@ def auto_system_bar_plan_with_gaps(
         chord_wrap_limit=chord_wrap_limit,
     )
     if state.settings.get("layout", "packed") == "auto" and bar_indices:
+        justify_system = sum(bar_widths) + sum(gaps) == usable_width
+        bar_widths = collision_base_bar_widths(
+            should_justify=justify_system,
+            planned_widths=bar_widths,
+            bars=bars,
+            bar_indices=bar_indices,
+            bar_width=state.bar_width,
+            overrides=state.overrides,
+            durations=state.durations,
+            default_duration=4,
+            dotted=state.dotted,
+        )
         # Match renderer's final width normalization so navigation and viewport
         # operate on the same system breaks the user actually sees.
         from oud.petrucci.render_system import _redistribute_extra_width  # noqa: PLC0415
 
         min_widths = _renderer_min_bar_widths(state, bar_indices)
+        readable_floor = short_system_bar_floor(
+            should_justify=justify_system,
+            bar_width=state.bar_width,
+            barpad=int(state.settings.get("barpad", "1")) if state.settings.get("barpad", "1").isdigit() else 1,
+            usable_width=usable_width,
+        )
+        min_widths = [max(width, readable_floor) for width in min_widths]
         bar_widths = [
             min(max(1, usable_width), max(width, min_width))
             for width, min_width in zip(bar_widths, min_widths, strict=False)
@@ -239,7 +319,12 @@ def auto_system_bar_plan_with_gaps(
             bar_widths.pop()
             bar_indices = bar_indices[: len(bar_widths)]
             gaps = gaps[: max(0, len(bar_widths) - 1)]
-        extra = max(0, usable_width - (sum(bar_widths) + sum(gaps)))
+        extra = justified_extra_width(
+            should_justify=justify_system,
+            usable_width=usable_width,
+            widths=bar_widths,
+            gaps=gaps,
+        )
         _redistribute_extra_width(
             bar_widths,
             gaps,
@@ -256,6 +341,8 @@ def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list
         _resolved_bar_time_value,
     )
     from oud.petrucci.tab_policy import (  # noqa: PLC0415
+        bar_has_multifret_tokens,
+        multifret_event_gap,
         show_time_cue_for_bar,
         time_cue_side_pad,
     )
@@ -272,10 +359,21 @@ def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list
     spacing_fill = state.settings.get("justify", "stretch")
     time_setting = state.settings.get("time", "C")
     compact_fill = spacing_fill == "compact"
-    auto_event_gap = 1 if compact_fill else 2
     auto_flag_gap = 0 if compact_fill else (2 if spacing_fill == "smart" else 1)
     min_widths: list[int] = []
     for abs_bar in bar_indices:
+        auto_event_gap = multifret_event_gap(
+            style=style,
+            policy=state.settings.get("multifretspacing", "collision-safe"),
+            has_multifret=bar_has_multifret_tokens(
+                bars[abs_bar],
+                style=style,
+                french_c_shape=french_c,
+                label_mode=fretlabelmode,
+            ),
+        )
+        if compact_fill:
+            auto_event_gap = max(1, auto_event_gap - 1)
         current_time = _resolved_bar_time_value(state.piece, abs_bar, time_setting, 4)
         _beats, _unit, sig_label = _parse_time_signature(current_time)
         prev_time = _resolved_bar_time_value(state.piece, abs_bar - 1, time_setting, 4) if abs_bar > 0 else None

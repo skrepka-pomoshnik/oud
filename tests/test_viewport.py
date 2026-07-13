@@ -73,9 +73,9 @@ def test_ensure_cursor_visible_smooth_scrolls_minimally() -> None:
     state.bar_offset = 0
     state.cursor_bar = 8  # row index 4 with 2 bars/row
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
-    # The renderer always reserves the second stem row, so 3 systems fit at
-    # height 40: scroll to row 2 (bar 4) so row 4 becomes the last visible row.
-    assert state.bar_offset == 4
+    # Four compact systems fit at height 40 after removing the playback-only
+    # spacer: scroll one row so row 4 becomes the last fully visible row.
+    assert state.bar_offset == 2
 
 
 def test_ensure_cursor_visible_page_scrolls_by_page_rows() -> None:
@@ -84,8 +84,8 @@ def test_ensure_cursor_visible_page_scrolls_by_page_rows() -> None:
     state.bar_offset = 0
     state.cursor_bar = 8  # row index 4 with 2 bars/row
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
-    # In page mode, offset aligns to the page start row (row 3 of 3-row pages).
-    assert state.bar_offset == 6
+    # In page mode, offset aligns to the next four-row page.
+    assert state.bar_offset == 8
 
 
 def test_ensure_cursor_visible_can_follow_playback_when_enabled() -> None:
@@ -95,7 +95,7 @@ def test_ensure_cursor_visible_can_follow_playback_when_enabled() -> None:
     state.cursor_bar = 0
     state.playback_bar = 8
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
-    assert state.bar_offset == 4
+    assert state.bar_offset == 2
 
 
 def test_ensure_cursor_visible_ignores_playback_when_disabled() -> None:

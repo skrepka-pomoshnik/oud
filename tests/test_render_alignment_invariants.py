@@ -99,7 +99,7 @@ def _flag_cols_and_rows(state, bar_index: int) -> tuple[list[int], list[str]]:
 
 
 @pytest.mark.parametrize("justify", ["stretch", "smart", "edge"])
-def test_auto_system_plan_width_accounting_matches_usable_width_for_fill_modes(justify: str) -> None:
+def test_auto_system_plan_only_fills_nonfinal_width_limited_systems(justify: str) -> None:
     state = regression_state(multi_bar_spacing_piece(), justify=justify, width=121, bar_width=12)
     state.settings["layout"] = "auto"
     state.settings["justify"] = justify
@@ -112,7 +112,10 @@ def test_auto_system_plan_width_accounting_matches_usable_width_for_fill_modes(j
             continue
         assert len(bar_indices) == len(bar_widths)
         assert len(gaps) == max(0, len(bar_widths) - 1)
-        assert sum(bar_widths) + sum(gaps) == usable_width
+        planned_width = sum(bar_widths) + sum(gaps)
+        assert planned_width <= usable_width
+        if bar_indices[-1] + 1 < len(state.piece.bars):
+            assert planned_width == usable_width
 
 
 def test_auto_system_plan_compact_does_not_exceed_usable_width() -> None:
@@ -393,13 +396,49 @@ def test_synthetic_multi_bar_no_broken_bar_seams(justify: str) -> None:
 
 
 @pytest.mark.parametrize("justify", ["smart", "stretch"])
-def test_synthetic_multi_bar_staff_rows_reach_right_edge(justify: str) -> None:
+def test_synthetic_short_score_keeps_natural_right_edge(justify: str) -> None:
     width = 120
     state = regression_state(multi_bar_spacing_piece(), justify=justify, width=width, bar_width=12)
     lines = _render_state_lines(state, height=26)
     staff_rows = [line for line in lines if "-" in line and "|" in line]
     assert staff_rows
-    assert all(row.rfind("|") == width - 2 for row in staff_rows)
+    assert all(0 < row.rfind("|") < width - 2 for row in staff_rows)
+
+
+def test_collision_limited_dense_bar_system_reaches_right_edge() -> None:
+    dense_bar = Bar(
+        chords=[
+            Chord(
+                note_type=note_type,
+                dotted=dotted,
+                grid=grid,
+                notes=[Note(string, fret, 0) for string, fret in notes],
+            )
+            for note_type, dotted, grid, notes in (
+                (6, True, None, ((2, 2), (3, 3))),
+                (7, False, None, ((2, 4),)),
+                (6, False, None, ((1, 0), (3, 2))),
+                (7, False, "start", ((2, 4),)),
+                (7, False, "end", ((1, 0),)),
+                (6, True, None, ((1, 2), (3, 0))),
+                (7, False, None, ((1, 4),)),
+                (6, False, None, ((1, 5),)),
+                (7, False, "start", ((1, 4),)),
+                (7, False, "end", ((1, 2),)),
+            )
+        ],
+    )
+    piece = Piece(
+        bars=[dense_bar, *[mk_bar([mk_chord(4, [(1, 0)])]) for _ in range(20)]],
+        strings=6,
+    )
+    width = 80
+    state = regression_state(piece, justify="smart", width=width, bar_width=12)
+
+    lines = _render_state_lines(state, height=20)
+    first_system_staff = next(line for line in lines if "-" in line and "|" in line)
+
+    assert first_system_staff.rfind("|") == width - 2
 
 
 def test_synthetic_staff_rows_keep_dash_before_right_barline() -> None:

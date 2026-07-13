@@ -2,6 +2,17 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-07-13
+- Prevented orphaned rhythm/staff rows by requiring a meaningful half-system before drawing a clipped preview; duet score view only adds complete paired systems. Dense bars forced onto their own system still fill the staff width. The TUI now drains up to 64 queued keys before one render, preventing delayed repeated movement after key release.
+- Cached clean dynamic system plans across cursor-only frames while bypassing the cache for modified documents. Cursor-display regressions fell from about 95 seconds to 25 seconds locally, and representative frame time dropped from 0.20 seconds to 0.03-0.09 seconds.
+- Made imported FT3 provenance complete and inspectable: `:info` lists bibliographic fields, source page/metadata, format, and every staff; `:notes` includes editorial text from all imported staffs; LilyPond headers/comments preserve the same metadata and source comments.
+- Tightened FT3 score presentation against the published Dowland *A Fantasy*: systems use only their visible course height, the playback caret no longer reserves a row, opening systems retain more naturally sized bars, and every displayed system can carry an unbracketed source bar number.
+- Removed stale playback highlights from cached base frames, reduced active playback polling to 10 ms, and resampled the MIDI clock after full score renders before drawing the current-note overlay.
+- Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, 1,174 passed with one Darwin-only test skipped on Linux, 85.55% coverage, and 112/112 local corpus files loaded without warnings.
+- Made casual controls functionally equivalent without key collisions: `d` moves right, `,` moves to the previous bar, `W/S` jump rendered rows, `Ctrl-Z/Ctrl-Y` undo/redo, and visual-mode movement no longer triggers Vim deletion.
+- Rendered the next score system into any remaining terminal rows instead of hiding every system that does not fit completely; the status line and cursor-safe full-system viewport remain intact.
+- Stopped stretching sparse final, manual-break, and explicitly capped systems across empty width. Width-limited systems still justify, configured editing grids remain stable, and multi-digit frets plus inline source marks retain collision-safe spacing.
+
 ## 2026-07-12
 - Closed all five semantic failures in the fixed 75-file expansion. Decoded comma, apostrophe, smile, and caret ornaments; separated standard-note musical/layout fields; preserved chord onsets and source voices; and mapped La Couperin's two notation voices to one 77-bar bass-viol staff. The 75-file audit now has zero residuals, unknown records, or warnings.
 - Manually compared 17th Century Grounds and La Couperin with their published PDFs, bringing the documented FT3/PDF matrix to ten files.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from oud.editor.controller_utils import consume_count, string_index
+from oud.editor.controller_utils import consume_count, is_casual, string_index
 from oud.editor.edit_ops import clear_cell, undo_group
 from oud.editor.edit_range import bar_range_from_cursor, deletable_bar_range_from_cursor
 from oud.editor.find_ops import perform_find, repeat_find
@@ -451,7 +451,10 @@ def _handle_visual_mode(state: EditorState, key: int) -> bool:  # noqa: C901, PL
             loop_count=2,
         )
         return True
-    if key in (ord("d"), ord("D"), ord("x"), ord("X")):
+    delete_keys = (ord("D"), ord("x"), ord("X"), keycodes.dc)
+    if not is_casual(state):
+        delete_keys = (ord("d"), *delete_keys)
+    if key in delete_keys:
         if state.read_only:
             state.message = READ_ONLY_VIEWER
             return True

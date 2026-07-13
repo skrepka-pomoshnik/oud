@@ -162,7 +162,7 @@ def block_height(
     vocal_pos: str = "bottom",
 ) -> int:
     _ = vocal_pos
-    height = strings + 1
+    height = strings
     if include_meta:
         height += 1
     if show_tactus:

@@ -550,7 +550,7 @@ def test_render_matrix_smart_fill_stretches_early_bars_uniformly() -> None:
     assert all(len(bar.strip()) > 3 for bar in bars[:3])
 
 
-def test_render_matrix_edge_prefers_edge_gaps() -> None:
+def test_render_matrix_edge_keeps_short_final_system_natural() -> None:
     piece = Piece(title="StretchEdge", bars=[Bar() for _ in range(4)], strings=6)
     overrides = {
         (0, 0, 0): "a",
@@ -593,11 +593,8 @@ def test_render_matrix_edge_prefers_edge_gaps() -> None:
     )
     bars = [idx for idx, ch in enumerate(row) if ch == "|"]
     diffs = [b - a for a, b in pairwise(bars)]
-    # Large edge gaps should dominate; middle gap should stay compact.
-    large = sorted(diffs)[-2:]
-    assert len(large) == 2
-    assert large[0] > 10 and large[1] > 10
-    assert min(diffs) < 10
+    assert max(diffs) - min(diffs) <= 1
+    assert bars[-1] < 78
 
 
 def test_render_matrix_stretch_keeps_gaps_uniform() -> None:

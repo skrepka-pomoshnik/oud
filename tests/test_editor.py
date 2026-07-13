@@ -1178,6 +1178,6 @@ def test_keypress_insert_aaaa_then_l_moves_one_cell_per_press_on_grid_bar() -> N
     for _ in range(10):
         _press(state, ord("l"))
         cols.append(state.cursor_col)
-    # One press per *rendered* cell: the filled bar advances column by column,
-    # the following empty bar collapses to its three visible display cells.
-    assert cols == [5, 6, 7, 8, 9, 10, 11, 0, 6, 11]
+    # One press per rendered cell. Short systems retain the configured grid width
+    # instead of collapsing an empty bar or stretching it to the full terminal.
+    assert cols == [5, 6, 7, 8, 9, 10, 11, 0, 1, 2]

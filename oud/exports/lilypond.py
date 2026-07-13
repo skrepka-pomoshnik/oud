@@ -22,6 +22,75 @@ def _escape_lilypond(text: str) -> str:
     return text.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _single_line(text: str | None) -> str:
+    return " ".join((text or "").split())
+
+
+def _metadata_comments(piece: Piece) -> list[str]:
+    fields = (
+        ("source format", piece.imported_score.source_format if piece.imported_score is not None else None),
+        ("source", piece.source),
+        ("editor", piece.editor),
+        ("publisher", piece.publisher),
+        ("volume", piece.volume),
+        ("page", piece.page),
+        ("type", piece.piece_type),
+        ("difficulty", piece.difficulty),
+        ("ensemble", piece.ensemble),
+        ("part", piece.part),
+        ("instrumentation", piece.instrumentation),
+        ("comment", piece.comment),
+    )
+    comments = [f"% oud {label}: {_single_line(value)}" for label, value in fields if _single_line(value)]
+    comments.extend(
+        f"% oud metadata {key}: {_single_line(value)}"
+        for key, value in sorted(piece.section_annotations.items())
+        if _single_line(value)
+    )
+    if piece.imported_score is not None:
+        comments.extend(
+            f"% oud staff {index}: {staff.kind} | {_single_line(staff.label) or '(unlabeled)'} | {len(staff.bars)} bars"
+            for index, staff in enumerate(piece.imported_score.staffs, start=1)
+        )
+        comments.extend(
+            f"% oud bar {bar.source_bar_index + 1} comment: {_single_line(text)}"
+            for staff in piece.imported_score.staffs
+            for bar in staff.bars
+            for text in bar.editorial_text
+            if _single_line(text)
+        )
+    return comments
+
+
+def _lilypond_header(piece: Piece) -> list[str]:
+    title = piece.title or "Untitled"
+    composer = piece.composer or piece.author or ""
+    header = [r'\version "2.24.0"', *_metadata_comments(piece), r"\header {"]
+    header.append(f'  title = "{_escape_lilypond(title)}"')
+    if piece.subtitle:
+        header.append(f'  subtitle = "{_escape_lilypond(_single_line(piece.subtitle))}"')
+    if composer:
+        header.append(f'  composer = "{_escape_lilypond(composer)}"')
+    if piece.author and piece.author != composer:
+        header.append(f'  poet = "{_escape_lilypond(_single_line(piece.author))}"')
+    if piece.arranger:
+        header.append(f'  arranger = "{_escape_lilypond(_single_line(piece.arranger))}"')
+    if piece.piece_type or piece.part:
+        description = " | ".join(value for value in (piece.piece_type, piece.part) if value)
+        header.append(f'  piece = "{_escape_lilypond(_single_line(description))}"')
+    if piece.volume:
+        header.append(f'  opus = "{_escape_lilypond(_single_line(piece.volume))}"')
+    source = ", page ".join(value for value in (piece.source, piece.page) if value)
+    if source:
+        header.append(f'  source = "{_escape_lilypond(_single_line(source))}"')
+    if piece.publisher:
+        header.append(f'  copyright = "{_escape_lilypond(_single_line(piece.publisher))}"')
+    if piece.footnote:
+        header.append(f'  tagline = "{_escape_lilypond(_single_line(piece.footnote))}"')
+    header.append("}")
+    return header
+
+
 def _parse_tuning(tuning: str) -> list[int]:
     pitches: list[int] = []
     idx = 0
@@ -1245,13 +1314,7 @@ def export_lilypond(
 ) -> str:
     _ = (bar_width, ornaments, annotations, slurs, ties, holds)
     settings = settings or {}
-    title = piece.title or "Untitled"
-    composer = piece.composer or piece.author or ""
-    header = [r'\version "2.24.0"', r"\header {"]
-    header.append(f'  title = "{_escape_lilypond(title)}"')
-    if composer:
-        header.append(f'  composer = "{_escape_lilypond(composer)}"')
-    header.append("}")
+    header = _lilypond_header(piece)
 
     layout: list[str] = [r"\layout {", r"  \context {", r"    \Score"]
     style = settings.get("style") or "french"

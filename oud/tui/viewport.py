@@ -14,7 +14,6 @@ from oud.petrucci.duet_score import (
 )
 from oud.petrucci.layout_map import block_height as _block_height
 from oud.petrucci.render import (
-    _bass_strings_used,
     _piece_has_lyrics,
     _piece_has_melody_grid,
     _piece_lyric_row_count,
@@ -40,12 +39,9 @@ def rows_per_screen(state: EditorState, height: int) -> int:
         state.piece,
     )
     lyric_rows_count = _piece_lyric_row_count(state.piece, max_rows=99) if show_lyrics else 0
-    used_bass = _bass_strings_used(state.piece, state.overrides)
     total_strings = state.piece.strings
     base_strings = min(6, total_strings)
-    display_indices = list(range(base_strings))
-    display_indices.extend(idx for idx in sorted(used_bass) if base_strings <= idx < total_strings)
-    display_strings = len(display_indices)
+    display_strings = base_strings
     block_h = _block_height(
         include_meta,
         display_strings,

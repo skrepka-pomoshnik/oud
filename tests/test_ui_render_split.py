@@ -210,6 +210,44 @@ def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:
     assert kwargs["stdscr"].refreshes == 1
 
 
+def test_render_piece_draws_partial_next_system_above_status() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=19, w=80)
+    kwargs["piece"] = Piece(
+        title="Partial",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 1, 0)])]),
+        ],
+        strings=6,
+    )
+    kwargs["settings"]["barsperline"] = "1"
+    kwargs["settings"]["maxbars"] = "0"
+
+    lines = _render_lines(kwargs)
+
+    assert any("b" in line for line in lines[11:-1])
+    assert "status" in lines[-1]
+
+
+def test_render_piece_hides_orphaned_one_line_system_preview() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=24, w=80)
+    kwargs["piece"] = Piece(
+        title="No orphan",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, fret, 0)])]) for fret in (0, 1, 2)
+        ],
+        strings=6,
+    )
+    kwargs["settings"].update({"barsperline": "1", "maxbars": "1", "measures": "system"})
+
+    lines = _render_lines(kwargs)
+
+    assert not any(line.strip() == "3" for line in lines)
+    assert not any("c" in line for line in lines[19:-1])
+
+
 def test_render_piece_passes_explicit_barsperline_limit(monkeypatch) -> None:
     called = {}
 
@@ -659,6 +697,24 @@ def test_playback_highlights_active_note_cell_with_attribute() -> None:
     kwargs["playback_col"] = 0
     render_piece(**kwargs)
     assert any(text == "a" and attr != 0 for (_y, _x, text, attr) in kwargs["stdscr"].calls)
+
+
+def test_system_height_only_reserves_bass_course_where_used() -> None:
+    kwargs = _args("normal")
+    kwargs["stdscr"] = _Screen(h=28, w=80)
+    kwargs["piece"] = Piece(
+        title="Local bass height",
+        bars=[
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]),
+            Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(7, 0, 0)])]),
+        ],
+        strings=7,
+        style="french",
+    )
+    kwargs["settings"].update({"barsperline": "1", "maxbars": "1", "measures": "system"})
+    lines = _render_lines(kwargs)
+    number_rows = [idx for idx, line in enumerate(lines) if line.strip() in {"1", "2"}]
+    assert number_rows == [1, 10]
 
 
 def test_playback_renders_separate_melody_marker_when_melody_visible() -> None:

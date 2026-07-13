@@ -43,6 +43,29 @@ def test_block_height_with_extras_is_reduced_for_inline_local_marks() -> None:
     assert with_extras == without_extras + 1
 
 
+def test_block_height_ends_at_last_staff_row_without_playback_spacer() -> None:
+    rows = layout_block_rows(
+        strings=6,
+        include_meta=True,
+        show_dur=False,
+        show_extras=False,
+        show_tuplets=False,
+        show_tactus=False,
+        double_stems=True,
+    )
+    height = block_height(
+        include_meta=True,
+        strings=6,
+        show_dur=False,
+        show_extras=False,
+        show_tuplets=False,
+        show_tactus=False,
+        double_stems=True,
+    )
+    assert rows["staff"] is not None
+    assert height == rows["staff"] + 6
+
+
 def test_layout_block_rows_show_tuplets_reserves_shared_cue_row() -> None:
     rows = layout_block_rows(
         strings=6,

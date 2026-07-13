@@ -37,18 +37,18 @@ def _profile(state) -> KeyProfile:
             bar_delete_extra=(keycodes.dc,),
             bar_next=(ord("."),),
             bar_prev=(ord(","),),
-            page_up=(),
-            page_down=(),
+            page_up=(ord("W"),),
+            page_down=(ord("S"),),
             scroll_up=(keycodes.ppage,),
             scroll_down=(keycodes.npage,),
             col_start=(keycodes.home,),
             col_end=(keycodes.end,),
         )
     return KeyProfile(
-        move_left=(ord("h"),),
-        move_right=(ord("l"),),
-        move_up=(ord("k"),),
-        move_down=(ord("j"),),
+        move_left=(ord("h"), 2),  # h, Ctrl-B
+        move_right=(ord("l"), 6),  # l, Ctrl-F
+        move_up=(ord("k"), 16),  # k, Ctrl-P
+        move_down=(ord("j"), 14),  # j, Ctrl-N
         help_extra=(),
         bar_after_extra=(),
         bar_delete_extra=(),
@@ -272,6 +272,8 @@ def normal_bindings(state) -> NormalBindings:
     help_keys: tuple[int, ...] = (ord("?"), *profile.help_extra)
     bar_after: tuple[int, ...] = (ord("o"), ord("+"), *profile.bar_after_extra)
     bar_delete: tuple[int, ...] = (ord("X"), ord("-"), *profile.bar_delete_extra)
+    undo = (ord("u"), 26) if is_casual(state) else (ord("u"),)
+    redo = (18, 25) if is_casual(state) else (18,)
     return NormalBindings(
         quit=_remap_tuple(state, "remap_quit", (ord("q"), ord("Q"), 3)),
         command=_remap_tuple(state, "remap_command", (ord(":"),)),
@@ -285,8 +287,8 @@ def normal_bindings(state) -> NormalBindings:
         bar_delete=_remap_tuple(state, "remap_bar_delete", bar_delete),
         print_pdf=_remap_tuple(state, "remap_print_pdf", (ord("P"),)),
         play=_remap_tuple(state, "remap_play", (ord("M"),)),
-        undo=_remap_tuple(state, "remap_undo", (ord("u"),)),
-        redo=_remap_tuple(state, "remap_redo", (18,)),
+        undo=_remap_tuple(state, "remap_undo", undo),
+        redo=_remap_tuple(state, "remap_redo", redo),
     )
 
 
@@ -349,11 +351,14 @@ def normal_action_bindings(state) -> NormalActionBindings:
     scroll_down = profile.scroll_down
     col_start = profile.col_start
     col_end = profile.col_end
+    pending = (ord("g"), ord("y")) if is_casual(state) else (ord("g"), ord("d"), ord("y"))
+    find_repeat = (ord(";"), ord("]")) if is_casual(state) else (ord(";"),)
+    find_repeat_reverse = (ord("["),) if is_casual(state) else (ord(","),)
     return NormalActionBindings(
         row_first=_remap_tuple(state, "remap_row_first", (ord("^"),)),
         delete_cell=_remap_tuple(state, "remap_delete_cell", (ord("x"),)),
         paste=_remap_tuple(state, "remap_paste", (ord("p"),)),
-        pending=_remap_tuple(state, "remap_pending", (ord("g"), ord("d"), ord("y"))),
+        pending=_remap_tuple(state, "remap_pending", pending),
         bar_next=bar_next,
         bar_prev=bar_prev,
         page_up=_remap_tuple(state, "remap_page_up", page_up),
@@ -367,8 +372,8 @@ def normal_action_bindings(state) -> NormalActionBindings:
         find_backward=_remap_tuple(state, "remap_find_backward", (ord("F"),)),
         till_forward=_remap_tuple(state, "remap_till_forward", (ord("t"),)),
         till_backward=_remap_tuple(state, "remap_till_backward", (ord("T"),)),
-        find_repeat=_remap_tuple(state, "remap_find_repeat", (ord(";"),)),
-        find_repeat_reverse=_remap_tuple(state, "remap_find_repeat_reverse", (ord(","),)),
+        find_repeat=_remap_tuple(state, "remap_find_repeat", find_repeat),
+        find_repeat_reverse=_remap_tuple(state, "remap_find_repeat_reverse", find_repeat_reverse),
         word_search_forward=_remap_tuple(state, "remap_word_search_forward", (ord("*"),)),
         word_search_backward=_remap_tuple(state, "remap_word_search_backward", (ord("#"),)),
         word_search_next=_remap_tuple(state, "remap_word_search_next", (ord("n"),)),

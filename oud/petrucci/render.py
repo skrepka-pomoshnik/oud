@@ -53,6 +53,20 @@ from oud.petrucci.tuning_utils import default_bass_strings, parse_bass_strings, 
 from oud.petrucci.view_model import _block_height, _next_system_start, _tuning_labels
 
 
+def _system_slots_with_partial(
+    available: int,
+    block_height: int,
+    *,
+    allow_partial: bool = True,
+) -> int:
+    height = max(1, block_height)
+    full_systems, remaining = divmod(max(0, available), height)
+    if full_systems == 0:
+        return 1
+    meaningful_preview = allow_partial and remaining >= (height + 1) // 2
+    return full_systems + int(meaningful_preview)
+
+
 def _duet_score_hint(piece: Piece) -> str | None:
     ensemble = (piece.ensemble or "").strip()
     part = (piece.part or "").strip().lower()
@@ -243,7 +257,7 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
 
     if selected_staff is not None:
         payload = _split_payload(selected_staff)
-        label_row = header_row + 2
+        label_row = header_row + 1
         _safe_addstr(stdscr, label_row, 0, " " * max(0, width - 1))
         single_label = f"{staff_labels[selected_staff]} only"[: max(0, width - 1)]
         _safe_addstr(stdscr, label_row, max(0, left_margin + 1), single_label)
@@ -258,11 +272,9 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             double_stems,
             lyric_rows_count=0,
         )
-        # Reserve one extra row per system for the playback marker (`^`) so it
-        # does not collide with the next system/label in duet view.
-        block_h = content_block_h + 1
+        block_h = content_block_h
         available = max(0, height - 2 - (header_row + 2))
-        systems = max(1, available // block_h)
+        systems = _system_slots_with_partial(available, block_h)
         mapped_cursor_bar = -1
         if cursor_bar >= 0:
             cur_staff, cur_logical = duet_bar_mapping(cursor_bar, piece=piece)
@@ -287,7 +299,6 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
             width=width,
             header_row=header_row + 1,
             left_margin=left_margin,
-            block_h=block_h,
             systems=systems,
             total_strings=total_strings,
             display_indices=[],
@@ -361,12 +372,11 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
         double_stems,
         lyric_rows_count=0,
     )
-    # Reserve one playback-marker row per staff block in duet mode.
     block_h = content_block_h + 1
     pair_block_h = block_h * 2
     base_header = header_row + 1  # keep the global title/header row intact
     available = max(0, height - 2 - base_header)
-    pair_systems = max(1, available // max(1, pair_block_h))
+    pair_systems = _system_slots_with_partial(available, pair_block_h, allow_partial=False)
     current_logical = max(0, duet_logical_offset)
     total_logical = max(len(top_piece.bars), len(bottom_piece.bars))
     logical_breaks = _duet_logical_stave_breaks(piece, stave_breaks)
@@ -415,7 +425,6 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
                 width=width,
                 header_row=sub_header,
                 left_margin=left_margin,
-                block_h=block_h,
                 systems=1,
                 total_strings=subpiece.strings,
                 display_indices=[],
@@ -474,8 +483,8 @@ def _render_duet_score_view(  # noqa: C901, PLR0912
         bottom_row_start = bottom_header + 1
         label_x = max(0, left_margin + 1)
         label_w = max(0, width - label_x - 1)
-        _safe_addstr(stdscr, top_header + 1, label_x, staff_labels[0][:label_w])
-        _safe_addstr(stdscr, bottom_header + 1, label_x, staff_labels[1][:label_w])
+        _safe_addstr(stdscr, top_header, label_x, staff_labels[0][:label_w])
+        _safe_addstr(stdscr, bottom_header, label_x, staff_labels[1][:label_w])
         _duet_brace(
             stdscr,
             x=max(0, left_margin - 1),
@@ -747,9 +756,9 @@ def render_piece(  # noqa: C901, PLR0912
         bass=bass_tokens or None if used_bass else None,
     )
     basslabels = policy.basslabels
-    block_h = _block_height(
+    minimum_block_h = _block_height(
         include_meta,
-        display_strings,
+        base_strings,
         show_dur,
         show_extras,
         show_tuplets,
@@ -762,7 +771,7 @@ def render_piece(  # noqa: C901, PLR0912
         vocal_pos=vocal_pos,
     )
     available = max(0, height - 2 - (header_row + 1))
-    systems = max(1, available // block_h)
+    systems = _system_slots_with_partial(available, minimum_block_h)
     max_chords = 0
     max_chords_text = settings.get("maxchords", "")
     if max_chords_text.isdigit():
@@ -837,7 +846,6 @@ def render_piece(  # noqa: C901, PLR0912
             width=width,
             header_row=header_row,
             left_margin=left_margin,
-            block_h=block_h,
             systems=systems,
             total_strings=total_strings,
             display_indices=display_indices,

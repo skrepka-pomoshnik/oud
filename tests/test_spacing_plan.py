@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from oud.petrucci.model import Bar, Note
-from oud.petrucci.spacing import auto_bar_plan
+from oud.petrucci.spacing import auto_bar_plan, collision_base_bar_widths
 
 
 def _bars(count: int) -> list[Bar]:
@@ -13,7 +13,7 @@ def _total(widths: list[int], gaps: list[int]) -> int:
 
 
 def test_auto_bar_plan_stretch_fills_usable_width() -> None:
-    bars = _bars(8)
+    bars = _bars(20)
     indices, widths, gaps = auto_bar_plan(
         bars=bars,
         bar_start=0,
@@ -38,7 +38,7 @@ def test_auto_bar_plan_stretch_fills_usable_width() -> None:
 
 
 def test_auto_bar_plan_smart_expands_bar_content_width() -> None:
-    bars = _bars(8)
+    bars = _bars(20)
     indices, widths, gaps = auto_bar_plan(
         bars=bars,
         bar_start=0,
@@ -59,7 +59,7 @@ def test_auto_bar_plan_smart_expands_bar_content_width() -> None:
 
 
 def test_auto_bar_plan_edge_fills_usable_width_with_gaps() -> None:
-    bars = _bars(8)
+    bars = _bars(20)
     indices, widths, gaps = auto_bar_plan(
         bars=bars,
         bar_start=0,
@@ -115,3 +115,59 @@ def test_auto_bar_plan_does_not_stretch_single_bar_system_to_full_width() -> Non
     assert indices == [0]
     assert gaps == []
     assert widths == [4]
+
+
+def test_auto_bar_plan_keeps_sparse_final_system_at_natural_width() -> None:
+    indices, widths, gaps = auto_bar_plan(
+        bars=_bars(2),
+        bar_start=0,
+        usable_width=60,
+        bar_width=8,
+        overrides={},
+        durations={},
+        default_duration=4,
+        dotted=set(),
+        bar_gap=1,
+        spacing_fill="stretch",
+        stave_breaks=set(),
+    )
+
+    assert indices == [0, 1]
+    assert widths == [4, 4]
+    assert gaps == [1]
+
+
+def test_auto_bar_plan_keeps_manual_short_system_at_natural_width() -> None:
+    indices, widths, gaps = auto_bar_plan(
+        bars=_bars(20),
+        bar_start=0,
+        usable_width=60,
+        bar_width=8,
+        overrides={},
+        durations={},
+        default_duration=4,
+        dotted=set(),
+        bar_gap=1,
+        spacing_fill="smart",
+        stave_breaks={2},
+    )
+
+    assert indices == [0, 1]
+    assert widths == [4, 4]
+    assert gaps == [1]
+
+
+def test_collision_pass_discards_preexpanded_widths_before_justifying() -> None:
+    bars = _bars(2)
+    widths = collision_base_bar_widths(
+        should_justify=True,
+        planned_widths=[30, 29],
+        bars=bars,
+        bar_indices=[0, 1],
+        bar_width=8,
+        overrides={},
+        durations={},
+        default_duration=4,
+        dotted=set(),
+    )
+    assert widths == [4, 4]

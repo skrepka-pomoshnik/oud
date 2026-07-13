@@ -1,4 +1,5 @@
 import curses
+import subprocess
 from typing import cast
 
 from oud.editor.actions import handle_insert, handle_normal
@@ -14,7 +15,7 @@ from oud.tui.controller import handle_key
 from oud.tui.input import handle_command as handle_command_input
 from oud.tui.input import handle_search as handle_search_input
 from oud.tui.input import history_next, history_prev, parse_search
-from oud.tui.loop import run_loop
+from oud.tui.loop import _read_input_batch, run_loop
 
 
 def _state() -> EditorState:
@@ -261,6 +262,25 @@ def test_app_main_smoke(monkeypatch) -> None:
     )
 
 
+def test_read_input_batch_drains_queued_repeat_keys_before_render() -> None:
+    class _QueuedWindow:
+        def __init__(self) -> None:
+            self.keys = [ord("h"), ord("h"), ord("h"), -1]
+            self.timeouts: list[int] = []
+
+        def timeout(self, delay: int) -> None:
+            self.timeouts.append(delay)
+
+        def getch(self) -> int:
+            return self.keys.pop(0)
+
+    window = _QueuedWindow()
+    keys = _read_input_batch(cast(curses.window, window), 50)
+
+    assert keys == (ord("h"), ord("h"), ord("h"))
+    assert window.timeouts == [50, 0]
+
+
 def test_app_main_smoke_with_path(monkeypatch) -> None:
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
     monkeypatch.setattr(curses, "napms", lambda *_args: None)
@@ -484,3 +504,52 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
     )
     assert render_bar_offsets
     assert render_bar_offsets[0] > 0
+
+
+def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    state = _playback_scroll_state()
+    state.settings["playbackscroll"] = "off"
+    state.midi_proc = cast(subprocess.Popen[bytes], object())
+    updates = 0
+    rendered_markers: list[object] = []
+
+    class _OneFrameWindow(_PlaybackScrollFakeWindow):
+        def getch(self):
+            return ord("q")
+
+    def _fake_init_state(*_args, **_kwargs):
+        return state
+
+    def _fake_update_playback_animation(updated_state: EditorState) -> bool:
+        nonlocal updates
+        updates += 1
+        updated_state.playback.bar = 0
+        updated_state.playback.col = min(1, updates - 1)
+        updated_state.playback.markers = [(0, updated_state.playback.col)]
+        return True
+
+    def _fake_render_piece(*_args, **kwargs):
+        rendered_markers.append(kwargs["playback_markers"])
+        cache = kwargs["playback_cache"]
+        cache[(0, 0)] = [(2, 2, "a", 1)]
+        cache[(0, 1)] = [(2, 3, "b", 1)]
+
+    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
+    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+
+    assert (
+        run_loop(
+            cast(curses.window, _OneFrameWindow()),
+            None,
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=lambda *_args: False,
+            apply_command=apply_command,
+        )
+        == 0
+    )
+    assert updates == 2
+    assert rendered_markers == [None]
+    assert state.playback_overlay_key == (0, 1)
