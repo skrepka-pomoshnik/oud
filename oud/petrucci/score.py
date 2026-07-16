@@ -165,6 +165,7 @@ class NotationEvent:
     fermata: bool = False
     dynamic: str | None = None
     ornament: OrnamentKind | None = None
+    editorial_brackets: bool = False
 
     def __post_init__(self) -> None:
         _validate_id(self.id, "event")
@@ -188,6 +189,7 @@ class NotationEvent:
             _fail("event beam must be a BeamKind")
         if self.tuplet is not None and not isinstance(self.tuplet, TupletRatio):
             _fail("event tuplet must be a TupletRatio")
+        _validate_editorial_brackets(self)
         _validate_event_ornament(self)
 
 
@@ -413,6 +415,13 @@ def _validate_event_ornament(event: NotationEvent) -> None:
         _fail("event ornament must be an OrnamentKind")
     if event.kind is EventKind.REST and event.ornament is not None:
         _fail(f"rest event {event.id!r} cannot contain an ornament")
+
+
+def _validate_editorial_brackets(event: NotationEvent) -> None:
+    if not isinstance(event.editorial_brackets, bool):
+        _fail("event editorial_brackets must be a bool")
+    if event.kind is EventKind.REST and event.editorial_brackets:
+        _fail(f"rest event {event.id!r} cannot have editorial brackets")
 
 
 def _validate_fraction(value: Fraction, label: str, *, allow_zero: bool) -> None:

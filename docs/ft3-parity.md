@@ -21,6 +21,12 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 | Ornament | `lutemusic/ricercar_galileiG.ft3` | [Ricercar](https://www.lutemusic.org/composers/GalileiG/pdf/ricercar_galileiG.pdf) | Five right-side `x` ornaments correspond to `0x0e00`. |
 | Standard notation | `lutemusic/random-75/039/grounds17.ft3` | [17th Century Grounds](https://browse.lutemusic.org/composers/Exercises/pdf/grounds17.pdf) | Four named ground sections agree. The first-event bytes split into 16-bit musical flags plus 16-bit layout data; section labels no longer create phantom high vocal flags. |
 | Polyphonic mixed | `lutemusic/random-75/054/la_couperin_duet.ft3` | [La Couperin](https://browse.lutemusic.org/composers/Forqueray/pdf/la_couperin_duet.pdf) | The PDF confirms one polyphonic bass-viol staff above archlute tablature for 77 measures. Two notation voice lanes map to that one labeled staff; their two padding records are not bars. Petrucci's note-only adapter preserves all 459 canonical events and lays them out without clipping at 60, 80, and 120 columns. |
+| Mixed score | `lutemusic/random-75-v2/013/13_o_sio_potesi_donna.ft3` | [O s'io potessi donna](https://browse.lutemusic.org/composers/Berchem/pdf/13_o_sio_potesi_donna.pdf) | The 59-bar lane-major body is two standard-note lanes plus tablature. Empty `0130` records remain notation bars; lyric bytes no longer become fake high-fret notes. |
+| Courtesy accidentals | `lutemusic/random-75-v2/020/douce_memoire_song_sandrin.ft3` | [Douce memoire](https://browse.lutemusic.org/composers/Sandrin/pdf/douce_memoire_song_sandrin.pdf) | All 15 `a000` events are printed parenthesized naturals. `8000` therefore changes an explicit accidental to courtesy display. |
+| Editorial notes | `lutemusic/random-75-v2/060/recit_de_la_beaute_double.ft3` | [Recit de la Beaute](https://browse.lutemusic.org/composers/Lully/pdf/recit_de_la_beaute_double.pdf) | Two `4000` notes use square editorial brackets. The standalone `8000` event continues the preceding same-pitch note as a tie. |
+| Legacy bass | `lutemusic/random-75-v2/072/mozart_variations.ft3` | [Mozart theme variations](https://browse.lutemusic.org/composers/Mozart/pdf/mozart_variations.pdf) | The `3c00` note prints as the same double-slashed open ninth course used by the normal numeric-diapason encoding. |
+| Ornament | `lutemusic/random-75-v2/074/praeludium_02.ft3` | [Praeludium 2](https://browse.lutemusic.org/composers/Mace/pdf/praeludium_02.pdf) | The sole `1600` mark is an apostrophe printed to the left of the tablature letter. |
+| Layout | `lutemusic/random-75-v2/004/courant_duet_T.ft3` | [De France courant](https://browse.lutemusic.org/composers/Van_eyck/pdf/courant_duet_T.pdf) | Two 64-byte empty records change source layout coordinates and print no music; they are typed layout records rather than unknown staffs or bars. |
 
 ## Findings
 
@@ -44,9 +50,14 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 The focused matrix therefore has semantic import parity, not pixel-identical
 engraving parity. It does not establish general FT3 or Fronimo parity.
 
-## Fixed 75-file expansion
+## Fixed 150-file expansion
 
 `corpus/ft3-random-75.json` records a one-time selection made on 2026-07-12.
 Tests fetch those exact URLs and hashes; they never repeat the random choice.
 All 75 files load without crashing or warnings and pass the semantic audit with
 zero residual note bits, vocal bits, or unknown source records.
+
+`corpus/ft3-random-75-v2.json` adds a second one-time selection made on
+2026-07-17: one file from each of 75 previously unseen composer directories,
+with no URL or digest overlap with the first sample. All 75 additional files
+also load without warnings and pass the semantic audit.

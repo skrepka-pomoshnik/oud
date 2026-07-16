@@ -279,11 +279,12 @@ def _event_width(event: NotationEvent, *, accidental_pitches: frozenset[WrittenP
         notation_width = 1 + dots
     else:
         accidental = max(
-            (max(1, abs(pitch.alter)) for pitch in event.pitches if pitch in accidental_pitches),
+            (_accidental_width(pitch) for pitch in event.pitches if pitch in accidental_pitches),
             default=0,
         )
         chord_offset = 1 if _chord_has_second(event.pitches) else 0
-        notation_width = accidental + 1 + chord_offset + dots
+        editorial_width = 2 if event.editorial_brackets else 0
+        notation_width = accidental + editorial_width + 1 + chord_offset + dots
     return max(notation_width, display_width(event.dynamic or ""))
 
 
@@ -872,8 +873,9 @@ def _note_elements(
         y = min(rows.notation_bottom, max(rows.notation_top, raw_y))
         clipped = clipped or y != raw_y
         show_accidental = pitch in accidental_pitches
-        accidental_width = max(1, abs(pitch.alter)) if show_accidental else 0
-        head_x = x + offset + accidental_width
+        accidental_width = _accidental_width(pitch) if show_accidental else 0
+        bracket_offset = 1 if event.editorial_brackets else 0
+        head_x = x + offset + accidental_width + bracket_offset
         head_points.append((head_x, y))
         elements.extend(
             _pitch_elements(
@@ -887,6 +889,7 @@ def _note_elements(
                 denominator=denominator,
                 dots=dots,
                 show_accidental=show_accidental,
+                editorial_brackets=event.editorial_brackets,
             )
         )
     stems = _stem_elements(event, head_points=head_points, positions=positions, rows=rows, denominator=denominator)
@@ -917,6 +920,7 @@ def _pitch_elements(
     denominator: int,
     dots: int,
     show_accidental: bool,
+    editorial_brackets: bool,
 ) -> tuple[LayoutElement, ...]:
     elements = [
         LayoutElement(
@@ -925,25 +929,46 @@ def _pitch_elements(
             str(denominator),
         ),
     ]
+    if editorial_brackets:
+        elements.extend(
+            (
+                LayoutElement(
+                    ElementKey(event.id, ElementRole.EDITORIAL_BRACKET, pitch_index * 2),
+                    Rect(head_x - 1, y),
+                    "[",
+                ),
+                LayoutElement(
+                    ElementKey(event.id, ElementRole.EDITORIAL_BRACKET, pitch_index * 2 + 1),
+                    Rect(head_x + 1, y),
+                    "]",
+                ),
+            ),
+        )
     if show_accidental:
-        accidental_width = max(1, abs(pitch.alter))
+        accidental_width = _accidental_width(pitch)
+        bracket_offset = 1 if editorial_brackets else 0
         elements.append(
             LayoutElement(
                 ElementKey(event.id, ElementRole.ACCIDENTAL, pitch_index),
-                Rect(max(0, head_x - accidental_width), y, accidental_width),
-                str(pitch.alter),
+                Rect(max(0, head_x - bracket_offset - accidental_width), y, accidental_width),
+                (f"{pitch.alter}:courtesy" if pitch.accidental is AccidentalDisplay.COURTESY else str(pitch.alter)),
             ),
         )
     if dots:
+        dot_offset = 2 if editorial_brackets else 1
         elements.append(
             LayoutElement(
                 ElementKey(event.id, ElementRole.DOT, pitch_index),
-                Rect(head_x + 1, y, dots),
+                Rect(head_x + dot_offset, y, dots),
                 str(dots),
             ),
         )
     elements.extend(_ledger_elements(event.id, pitch_index=pitch_index, x=head_x, position=position, rows=rows))
     return tuple(elements)
+
+
+def _accidental_width(pitch: WrittenPitch) -> int:
+    return max(1, abs(pitch.alter)) + (2 if pitch.accidental is AccidentalDisplay.COURTESY else 0)
 
 
 def _ledger_elements(

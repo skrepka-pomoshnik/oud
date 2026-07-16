@@ -95,6 +95,7 @@ _SOURCE_RECORD_KINDS = {
     "annotation-group-raw": "annotation-group",
     "barline-raw": "barline",
     "comment-rtf-raw": "comment",
+    "layout-raw": "layout",
     "note-lyric-raw": "note-lyrics",
     "note-staff-raw": "note",
     "score-settings-raw": "score-terminator",
@@ -167,13 +168,24 @@ def _ensemble_staff_labels(annotations: dict[str, str]) -> list[str]:
 
 
 def _notation_staff_labels(annotations: dict[str, str]) -> list[str]:
-    labels = list(reversed(_ensemble_staff_labels(annotations)[1:]))
+    labels = [
+        label for label in reversed(_ensemble_staff_labels(annotations)) if not _is_tablature_instrument_label(label)
+    ]
     selected = annotations.get("part", "").strip()
     if not selected or selected.lower() == "score":
         return labels
     selected_labels = {part.strip().lower() for part in selected.split(",") if part.strip()}
     matched = [label for label in labels if label.lower() in selected_labels]
     return matched or labels
+
+
+def _is_tablature_instrument_label(label: str) -> bool:
+    normalized = label.lower()
+    if "viol" in normalized:
+        return False
+    return "course" in normalized or any(
+        instrument in normalized for instrument in ("archlute", "guitar", "lute", "theorbo", "vihuela")
+    )
 
 
 def _is_note_score_entry(entry: _BodyEntry) -> bool:
@@ -554,7 +566,7 @@ def _decode_ft3_note_position(
     return None
 
 
-_STANDARD_STAFF_MARKERS = {bytes((0x01, row)) for row in range(0x31, 0x36)}
+_STANDARD_STAFF_MARKERS = {bytes((0x01, row)) for row in range(0x30, 0x36)}
 _DYNAMIC_TEXT = {"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"}
 
 
@@ -610,12 +622,14 @@ def _grid_kind(flags: int) -> str | None:
 
 
 def _append_ft3_note(bar: Bar, chord: Chord, data: bytes, ptr: int) -> None:
+    extras = (data[ptr + 3] << 8) | data[ptr + 2]
+    decoded = decode_ft3_extras(extras)
     decoded_position = _decode_ft3_note_position(data[ptr], data[ptr + 1], data[ptr + 4])
     if decoded_position is None:
         return
     string, fret = decoded_position
-    extras = (data[ptr + 3] << 8) | data[ptr + 2]
-    decoded = decode_ft3_extras(extras)
+    if decoded.bass_course is not None:
+        string, fret = decoded.bass_course, 0
     note = Note(
         string=string,
         fret=fret,
@@ -854,6 +868,8 @@ def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
 
 
 def _score_record_kind(chunk: bytes) -> str | None:
+    if _is_tab_layout_record(chunk):
+        return "layout-raw"
     if _is_standard_staff_record(chunk):
         decoded = parse_ft3_text_record(chunk)
         return "note-lyric-raw" if decoded.lyrics or decoded.lyric_event_rows else "note-staff-raw"
@@ -874,7 +890,7 @@ def _has_structural_score_marker(bar: Bar) -> bool:
 
 def _classify_score_payload(chunk: bytes) -> str | None:
     payload = chunk[32:]
-    note_staff_markers = tuple(bytes((0x01, row)) for row in range(0x31, 0x36))
+    note_staff_markers = tuple(bytes((0x01, row)) for row in range(0x30, 0x36))
     marker_region = chunk[28:]
     has_note_staff_markers = any(marker in marker_region for marker in note_staff_markers)
     is_score_settings = chunk[2:7] == b"\x00\x11\x00\x00\xff" and b"\r\n" not in payload
@@ -895,16 +911,24 @@ def _classify_score_payload(chunk: bytes) -> str | None:
     return "text-score-raw" if has_text else "unknown"
 
 
+def _is_tab_layout_record(chunk: bytes) -> bool:
+    return (
+        len(chunk) == 64
+        and chunk[2:7] == b"\x04\x11\x00\x00\xff"
+        and chunk[28:38] == b"\x00\x00\x01\x00\x03\x00\x00\x00\x02\x00"
+    )
+
+
 def _classify_unknown_score_chunk(chunk: bytes, bar: Bar) -> str | None:
     note_group_count = ft3_note_record_group_count(chunk)
     if note_group_count and (not _is_tab_bar(bar) or note_group_count >= 2):
         return _decoded_note_record_kind(chunk)
     if score_kind := _score_record_kind(chunk):
         return score_kind
-    if _has_structural_score_marker(bar):
-        return "barline-raw"
     if bar.chords or bar.notes:
         return None
+    if _has_structural_score_marker(bar):
+        return "barline-raw"
     return _classify_score_payload(chunk) if len(chunk) > 32 else None
 
 
@@ -1058,7 +1082,7 @@ def _append_raw_imported_bar(
     decoded: FT3TextRecord | None,
 ) -> None:
     base = _imported_bar_base(bar_index, source_bar)
-    if raw_kind == "score-settings-raw":
+    if raw_kind in {"layout-raw", "score-settings-raw"}:
         layout_staff.bars.append(base)
         return
     if raw_kind == "barline-raw":

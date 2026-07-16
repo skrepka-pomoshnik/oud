@@ -12,6 +12,7 @@ class DecodedFT3Extras:
     right_ornament: str | None = None
     left_ornament: str | None = None
     arpeggio: str | None = None
+    bass_course: int | None = None
     residual: int | None = None
 
 
@@ -31,6 +32,7 @@ _LEFT_ORNAMENT_HIGH_BYTES = {
     0x0400: "#",
     0x0800: "+",
     0x0C00: "x",
+    0x1600: "'",
     0x2200: "caret",
 }
 _RIGHT_ORNAMENT_HIGH_BYTES = {
@@ -77,6 +79,9 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
     consumed |= used
 
     high_byte = extras & 0xFE00
+    bass_course = 9 if high_byte == 0x3C00 else None
+    if bass_course is not None:
+        consumed |= high_byte
     arpeggio = _ARPEGGIO_HIGH_BYTE_PATTERNS.get(high_byte)
     if arpeggio is not None:
         consumed |= high_byte
@@ -93,5 +98,6 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         right_ornament=right_ornament,
         left_ornament=left_ornament,
         arpeggio=arpeggio,
+        bass_course=bass_course,
         residual=residual or None,
     )

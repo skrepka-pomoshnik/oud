@@ -154,6 +154,21 @@ def test_decode_ft3_note_record_preserves_chords_voices_and_layout_ornaments() -
     assert events[2].ft3_layout_flags == 0x400A
 
 
+def test_decode_ft3_note_record_types_editorial_courtesy_and_tie_flags() -> None:
+    def group(pitch_row: int, flags: int) -> bytes:
+        return bytes((1, 0x33, pitch_row)) + flags.to_bytes(2, "little") + b"\x00\x00"
+
+    events = decode_ft3_note_record(
+        bytes(30) + group(5, 0xA000) + group(6, 0x4000) + group(5, 0x8000),
+    )
+
+    assert events[0].courtesy_accidental is True
+    assert events[0].tie_from_previous is False
+    assert events[1].editorial_brackets is True
+    assert events[2].tie_from_previous is True
+    assert events[2].courtesy_accidental is False
+
+
 def test_decode_ft3_annotation_group_extracts_length_prefixed_edition_text() -> None:
     chunk = bytes(32) + b"\x01p\x0fcresc. - - - ->" + bytes(16)
     record = decode_ft3_annotation_group(chunk)

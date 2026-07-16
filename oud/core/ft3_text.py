@@ -752,8 +752,11 @@ def _structured_pitch_row(value: bytes) -> int:
 
 
 _FT3_VOICE_FLAG = 0x0001
+_FT3_ACCIDENTAL_FLAGS = 0x2000 | 0x1000 | 0x0002
 _FT3_NOTE_DURATION_CODES = frozenset((0x32, 0x33, 0x34, 0x35, 0x36))
-_FT3_EVENT_FLAG_MASK = 0x2000 | 0x1000 | 0x0100 | 0x0040 | 0x0010 | 0x0008 | 0x0004 | 0x0002 | _FT3_VOICE_FLAG
+_FT3_EVENT_FLAG_MASK = (
+    0x8000 | 0x4000 | 0x2000 | 0x1000 | 0x0100 | 0x0040 | 0x0010 | 0x0008 | 0x0004 | 0x0002 | _FT3_VOICE_FLAG
+)
 
 
 @dataclass(frozen=True)
@@ -804,6 +807,9 @@ def _melody_event_from_ft3(
         fermata=bool(event_flags & 0x0100),
         voice=source_voice,
         ornament=_ft3_standard_ornament(layout_flags),
+        courtesy_accidental=bool(event_flags & 0x8000 and event_flags & _FT3_ACCIDENTAL_FLAGS),
+        editorial_brackets=bool(event_flags & 0x4000),
+        tie_from_previous=bool(event_flags & 0x8000 and not event_flags & _FT3_ACCIDENTAL_FLAGS),
         ft3_layout_flags=layout_flags or None,
     )
 

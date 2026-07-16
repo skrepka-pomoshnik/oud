@@ -164,6 +164,16 @@ def test_parse_bar_decodes_ft3_postfix_and_under_note_ornaments() -> None:
     assert all(note.ft3_extra_residual is None for note in (comma, apostrophe, smile, right_caret, left_caret))
 
 
+def test_parse_bar_decodes_left_apostrophe_and_legacy_open_bass_course() -> None:
+    apostrophe = parse_bar(_ft3_bar_with_one_note(extras=0x1600)).notes[0]
+    legacy_bass = parse_bar(_ft3_bar_with_one_note(extras=0x3C00)).notes[0]
+
+    assert apostrophe.left_ornament == "'"
+    assert apostrophe.ft3_extra_residual is None
+    assert (legacy_bass.string, legacy_bass.fret) == (9, 0)
+    assert legacy_bass.ft3_extra_residual is None
+
+
 def test_parse_bar_decodes_ft3_left_bracket_ornament() -> None:
     bar = parse_bar(_ft3_bar_with_one_note(extras=0x3400))
     note = bar.notes[0]
@@ -535,6 +545,21 @@ def test_load_ft3_classifies_note_marker_crossing_header_boundary(tmp_path) -> N
     assert "note" in staffs
     assert "unknown" not in staffs
     assert piece.imported_score.source_records[0].kind == "note"
+
+
+def test_load_ft3_classifies_empty_row_zero_note_staff_marker(tmp_path) -> None:
+    chunk = bytearray(69)
+    chunk[2:7] = b"\x04\x11\x00\x00\xff"
+    chunk[30:32] = b"\x01\x30"
+    payload = b"CPiece\x04Test\x03\x80CBar" + bytes(chunk) + b"\x03\x80"
+    path = tmp_path / "empty_note_staff.ft3"
+    path.write_bytes(payload)
+
+    piece = load_ft3(str(path))
+
+    assert piece.imported_score is not None
+    assert piece.imported_score.source_records[0].kind == "note"
+    assert all(staff.kind != "unknown" for staff in piece.imported_score.staffs)
 
 
 def test_load_ft3_preserves_score_settings_record_as_layout_staff() -> None:

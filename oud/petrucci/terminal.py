@@ -528,12 +528,15 @@ def _rest_text(value: str, glyphs: _GlyphInventory) -> str:
 
 
 def _accidental_text(value: str, glyphs: _GlyphInventory) -> str:
-    alter = int(value or "0")
+    alter_text, separator, display = (value or "0").partition(":")
+    alter = int(alter_text)
     if alter > 0:
-        return glyphs.sharp * alter
-    if alter < 0:
-        return glyphs.flat * abs(alter)
-    return glyphs.natural
+        text = glyphs.sharp * alter
+    elif alter < 0:
+        text = glyphs.flat * abs(alter)
+    else:
+        text = glyphs.natural
+    return f"({text})" if separator and display == "courtesy" else text
 
 
 def _element_style(element: LayoutElement, overlays: Mapping[str, EventOverlay]) -> CellStyle:
@@ -583,6 +586,7 @@ def _priority(role: ElementRole) -> int:
         ElementRole.TIME_SIGNATURE: 40,
         ElementRole.ACCIDENTAL: 45,
         ElementRole.DOT: 48,
+        ElementRole.EDITORIAL_BRACKET: 49,
         ElementRole.NOTEHEAD: 50,
         ElementRole.REST: 50,
         ElementRole.FERMATA: 52,

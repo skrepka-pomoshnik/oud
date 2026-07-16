@@ -13,6 +13,7 @@ from scripts.fetch_ft3_corpus import fetch_manifest, load_manifest, manifest_pat
 from scripts.ft3_audit import audit_file
 
 RANDOM_MANIFEST = Path("corpus/ft3-random-75.json")
+EXPANDED_RANDOM_MANIFEST = Path("corpus/ft3-random-75-v2.json")
 
 
 def _relative(path: Path) -> str:
@@ -49,17 +50,34 @@ def test_random_75_manifest_is_a_fixed_one_time_selection() -> None:
     assert all(path.is_relative_to((Path.cwd() / "lutemusic").resolve()) for path in manifest_paths(manifest))
 
 
+def test_expanded_random_75_manifest_is_new_composer_stratified_selection() -> None:
+    raw = json.loads(EXPANDED_RANDOM_MANIFEST.read_text(encoding="utf-8"))
+    expanded = load_manifest(EXPANDED_RANDOM_MANIFEST)
+    original = load_manifest(RANDOM_MANIFEST)
+
+    assert raw["selection"]["selected"] == 75
+    assert raw["selection"]["unique_composers"] == 75
+    assert raw["selection"]["seed"] == 20260717
+    assert "one-time" in raw["selection"]["method"]
+    assert "never repeated" in raw["selection"]["method"]
+    assert len(expanded.files) == 75
+    assert len({entry["composer"] for entry in raw["files"]}) == 75
+    assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in original.files)
+    assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in original.files)
+
+
 def test_ft3_payload_suffixes_are_ignored() -> None:
     patterns = set(Path(".gitignore").read_text(encoding="utf-8").splitlines())
     assert {"*.ft3", "*.ft3.gz", "*.ft3.txt"} <= patterns
 
 
-def test_random_75_payloads_load_without_semantic_audit_failures() -> None:
-    manifest = load_manifest(RANDOM_MANIFEST)
+@pytest.mark.parametrize("manifest_path", (RANDOM_MANIFEST, EXPANDED_RANDOM_MANIFEST))
+def test_random_75_payloads_load_without_semantic_audit_failures(manifest_path: Path) -> None:
+    manifest = load_manifest(manifest_path)
     paths = manifest_paths(manifest)
     missing = [_relative(path) for path in paths if not path.is_file()]
     if missing:
-        pytest.skip("fetch corpus/ft3-random-75.json before running external corpus tests")
+        pytest.skip(f"fetch {manifest_path} before running external corpus tests")
 
     bad_hashes = [
         _relative(path)
@@ -83,6 +101,45 @@ def test_random_75_payloads_load_without_semantic_audit_failures() -> None:
         ):
             unresolved.add(_relative(path))
     assert unresolved == set()
+
+
+def test_expanded_corpus_preserves_newly_decoded_score_semantics() -> None:
+    paths = manifest_paths(load_manifest(EXPANDED_RANDOM_MANIFEST))
+    missing = [path for path in paths if not path.is_file()]
+    if missing:
+        pytest.skip(f"fetch {EXPANDED_RANDOM_MANIFEST} before running external corpus tests")
+
+    by_name = {path.name: load_ft3(str(path)) for path in paths}
+    berchem = by_name["13_o_sio_potesi_donna.ft3"]
+    assert len(berchem.bars) == 59
+    assert berchem.imported_score is not None
+    berchem_notes = [staff for staff in berchem.imported_score.staffs if staff.kind == "note"]
+    assert [(staff.label, len(staff.bars)) for staff in berchem_notes] == [("alto", 59), ("bass", 59)]
+
+    sandrin_events = [event for bar in by_name["douce_memoire_song_sandrin.ft3"].bars for event in bar.melody_events]
+    assert sum(event.courtesy_accidental for event in sandrin_events) == 15
+
+    lully_events = [event for bar in by_name["recit_de_la_beaute_double.ft3"].bars for event in bar.melody_events]
+    assert sum(event.editorial_brackets for event in lully_events) == 2
+    assert sum(event.tie_from_previous for event in lully_events) == 1
+
+    mozart_notes = [
+        note
+        for bar in by_name["mozart_variations.ft3"].bars
+        for chord in bar.chords
+        for note in chord.notes
+        if note.ft3_extras == 0x3C00
+    ]
+    assert [(note.string, note.fret, note.ft3_extra_residual) for note in mozart_notes] == [(9, 0, None)]
+
+    mace_notes = [
+        note
+        for bar in by_name["praeludium_02.ft3"].bars
+        for chord in bar.chords
+        for note in chord.notes
+        if note.ft3_extras == 0x1600
+    ]
+    assert [(note.left_ornament, note.ft3_extra_residual) for note in mace_notes] == [("'", None)]
 
 
 def test_couperin_duet_maps_two_note_voices_to_one_77_bar_staff() -> None:

@@ -38,7 +38,8 @@ live grading.
 
 The FT3 adapter now normalizes same-onset chords and independent voices with
 per-voice clocks, and carries meter, repeat/endings, beams, fermatas, dynamics,
-and observed `+` ornaments. It remains strict about inconsistent durations,
+observed `+` ornaments, courtesy accidentals, square editorial brackets, and
+confirmed tie continuations. It remains strict about inconsistent durations,
 ornaments, pitches, meter overflow, and lyric onsets. `include_lyrics=False` is
 an explicit note-only migration mode, not a fallback.
 

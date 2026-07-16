@@ -21,9 +21,11 @@ from oud.petrucci.score import (
     NotationEvent,
     NotationMeasure,
     NotationScore,
+    NotationSpan,
     NotationStaff,
     OrnamentKind,
     PitchStep,
+    SpanKind,
     StemDirection,
     Syllabic,
     TimeSignature,
@@ -83,7 +85,12 @@ def notation_score_from_piece(
     )
 
 
-def written_pitch_from_token(token: str, accidental_flags: int | None = None) -> WrittenPitch:
+def written_pitch_from_token(
+    token: str,
+    accidental_flags: int | None = None,
+    *,
+    courtesy: bool = False,
+) -> WrittenPitch:
     """Decode an Oud/FT3 vocal pitch token without retaining source flags."""
 
     match = re.search(r"(?i)([a-h])([#b]*)(-?\d+|[',]*)", token.strip())
@@ -101,7 +108,9 @@ def written_pitch_from_token(token: str, accidental_flags: int | None = None) ->
         alter = 1
     octave = _token_octave(octave_text)
     explicit = bool(accidental_text or flags & (0x2000 | 0x1000 | 0x0002))
-    accidental = AccidentalDisplay.EXPLICIT if explicit else AccidentalDisplay.AUTO
+    accidental = AccidentalDisplay.COURTESY if explicit and courtesy else AccidentalDisplay.EXPLICIT
+    if not explicit:
+        accidental = AccidentalDisplay.AUTO
     return WrittenPitch(step=step, octave=octave, alter=alter, accidental=accidental)
 
 
@@ -209,10 +218,12 @@ def _piece_bar_data(source_index: int, bar: Bar, *, include_lyrics: bool) -> _Ba
 def _notation_staff(source: _StaffSource, *, piece: Piece) -> NotationStaff:
     measures: list[NotationMeasure] = []
     lyrics: list[LyricSyllable] = []
+    tie_targets: set[str] = set()
     key = _key_signature(piece.key)
     for sequence, bar in enumerate(source.bars):
         prefix = f"oud:staff:{source.source_index}:bar:{bar.source_index}"
-        events, event_ids_by_onset = _bar_events(bar, prefix=prefix)
+        events, event_ids_by_onset, bar_tie_targets = _bar_events(bar, prefix=prefix)
+        tie_targets.update(bar_tie_targets)
         lyrics.extend(_bar_lyrics(bar, prefix=prefix, event_ids_by_onset=event_ids_by_onset))
         time_signature = _time_signature(bar.time_sig)
         if sequence == 0 and time_signature is None:
@@ -235,6 +246,7 @@ def _notation_staff(source: _StaffSource, *, piece: Piece) -> NotationStaff:
         clef=source.clef,
         measures=tuple(measures),
         lyrics=tuple(lyrics),
+        spans=_tie_spans(tuple(measures), tie_targets),
     )
 
 
@@ -242,12 +254,13 @@ def _bar_events(
     bar: _BarData,
     *,
     prefix: str,
-) -> tuple[tuple[NotationEvent, ...], dict[int, str]]:
+) -> tuple[tuple[NotationEvent, ...], dict[int, str], frozenset[str]]:
     by_voice: dict[int, dict[int, list[MelodyEvent]]] = {}
     for event in bar.melody_events:
         by_voice.setdefault(event.voice, {}).setdefault(event.onset_index, []).append(event)
     out: list[NotationEvent] = []
     event_ids_by_onset: dict[int, str] = {}
+    tie_targets: set[str] = set()
     polyphonic = len(by_voice) > 1
     for voice, voice_events in sorted(by_voice.items()):
         onset = Fraction(0)
@@ -265,9 +278,15 @@ def _bar_events(
                     polyphonic=polyphonic,
                 ),
             )
+            if any(item.tie_from_previous for item in sources):
+                tie_targets.add(event_id)
             event_ids_by_onset.setdefault(onset_index, event_id)
             onset += duration
-    return tuple(sorted(out, key=lambda event: (event.onset, event.voice, event.id))), event_ids_by_onset
+    return (
+        tuple(sorted(out, key=lambda event: (event.onset, event.voice, event.id))),
+        event_ids_by_onset,
+        frozenset(tie_targets),
+    )
 
 
 def _notation_event(
@@ -299,6 +318,7 @@ def _notation_event(
         fermata=any(item.fermata for item in sources) or bar.fermata,
         dynamic=bar.dynamic,
         ornament=_group_ornament(sources, event_id=event_id),
+        editorial_brackets=any(item.editorial_brackets for item in sources),
     )
 
 
@@ -310,10 +330,48 @@ def _group_duration(sources: tuple[MelodyEvent, ...], *, event_id: str) -> Fract
 
 
 def _group_pitches(sources: tuple[MelodyEvent, ...], *, event_id: str) -> tuple[WrittenPitch, ...]:
-    pitches = tuple(written_pitch_from_token(source.text, source.accidental_flags) for source in sources)
+    pitches = tuple(
+        written_pitch_from_token(
+            source.text,
+            source.accidental_flags,
+            courtesy=source.courtesy_accidental,
+        )
+        for source in sources
+    )
     if len(set(pitches)) != len(pitches):
         _fail(f"event group {event_id!r} contains a duplicate written pitch")
     return tuple(sorted(pitches, key=lambda pitch: (pitch.midi, pitch.step.value, pitch.alter)))
+
+
+def _tie_spans(
+    measures: tuple[NotationMeasure, ...],
+    targets: set[str],
+) -> tuple[NotationSpan, ...]:
+    previous_by_voice: dict[int, NotationEvent] = {}
+    spans: list[NotationSpan] = []
+    for measure in measures:
+        for event in sorted(measure.events, key=lambda item: (item.onset, item.voice, item.id)):
+            if event.id in targets:
+                previous = previous_by_voice.get(event.voice)
+                if previous is None or not any(
+                    _same_written_pitch(left, right) for left in previous.pitches for right in event.pitches
+                ):
+                    _fail(f"tie target {event.id!r} has no preceding event with a shared pitch")
+                spans.append(
+                    NotationSpan(
+                        id=f"{event.id}:tie",
+                        kind=SpanKind.TIE,
+                        start_event_id=previous.id,
+                        end_event_id=event.id,
+                    ),
+                )
+            if event.kind is EventKind.NOTE:
+                previous_by_voice[event.voice] = event
+    return tuple(spans)
+
+
+def _same_written_pitch(left: WrittenPitch, right: WrittenPitch) -> bool:
+    return (left.step, left.octave, left.alter) == (right.step, right.octave, right.alter)
 
 
 def _group_beam(sources: tuple[MelodyEvent, ...], *, event_id: str) -> BeamKind:

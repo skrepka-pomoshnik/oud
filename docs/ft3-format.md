@@ -219,6 +219,8 @@ bundled corpus are decoded:
 | `0100` | fermata |
 | `1000` | flat |
 | `2000` | explicit natural/key-default control |
+| `4000` | square editorial brackets around the note |
+| `8000` | courtesy accidental when combined with an accidental; otherwise tie continuation |
 
 The first beam event has no beam bit. It is inferred by walking backward from
 `0008` over any `0004` middle events. Beams and fermatas survive projection,
@@ -272,15 +274,22 @@ low-byte fingering bits with one high-byte mark:
 | `0400`, `0800`, `0c00` | left `#`, `+`, `x` ornaments |
 | `0600`, `0e00` | right `#`, `x` ornaments |
 | `1000`, `1400` | right comma and apostrophe ornaments |
+| `1600` | left apostrophe ornament |
 | `1800` | under-note smile ornament |
 | `2000`, `2200` | right and left caret ornaments |
 | `3400` | barre; composes with low-byte fingering |
+| `3c00` | legacy open ninth-course form |
 | `0200` | single arpeggio mark |
 | `4a00`, `4e00`, `5200` | bottom, middle, top arpeggio segments |
 
 These marks render in the terminal and are exported where LilyPond/MusicXML has
 an equivalent. The original integer remains on `Note.ft3_extras`; any unconsumed
 bit would appear in `ft3_extra_residual` and fail the corpus audit.
+
+An empty standard-notation record can use row marker `0130`; rows `0130` through
+`0135` are therefore notation markers. Mixed scores are lane-major: complete
+notation lanes precede the complete tablature lane, and each lane contains the
+same source-bar count.
 
 ## 9. Imported Score Model
 

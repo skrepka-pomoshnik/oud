@@ -24,5 +24,6 @@ jobs:
           uv run python scripts/fetch_ft3_corpus.py
           corpus/ft3-regression.json
           corpus/ft3-random-75.json
+          corpus/ft3-random-75-v2.json
       - name: Quality gate
         run: ./scripts/quality.sh

@@ -81,6 +81,9 @@ class MelodyEvent:
     fermata: bool = False
     voice: int = 0
     ornament: str | None = None
+    courtesy_accidental: bool = False
+    editorial_brackets: bool = False
+    tie_from_previous: bool = False
     ft3_layout_flags: int | None = None
 
 

@@ -304,7 +304,33 @@ def test_measure_accidentals_follow_key_state_naturals_repeats_and_courtesy_sign
         for event in events
     ]
 
-    assert values == [[], [], ["0"], [], ["1"], ["1"]]
+    assert values == [[], [], ["0"], [], ["1:courtesy"], ["1"]]
+
+
+def test_editorial_note_brackets_are_semantic_elements_with_reserved_width() -> None:
+    event = NotationEvent(
+        "editorial-note",
+        Fraction(0),
+        Fraction(1, 4),
+        EventKind.NOTE,
+        (WrittenPitch(PitchStep.C, 4, 0, AccidentalDisplay.COURTESY),),
+        editorial_brackets=True,
+    )
+    score = NotationScore(
+        "editorial-score",
+        (NotationStaff("editorial-staff", (NotationMeasure("editorial-measure", 1, (event,)),)),),
+    )
+
+    layout = layout_score(score)
+    elements = layout.elements_for(event.id)
+    accidental = next(element for element in elements if element.key.role is ElementRole.ACCIDENTAL)
+    brackets = [element for element in elements if element.key.role is ElementRole.EDITORIAL_BRACKET]
+    notehead = next(element for element in elements if element.key.role is ElementRole.NOTEHEAD)
+
+    assert accidental.value == "0:courtesy"
+    assert accidental.rect.width == 3
+    assert [element.value for element in brackets] == ["[", "]"]
+    assert [element.rect.x for element in brackets] == [notehead.rect.x - 1, notehead.rect.x + 1]
 
 
 def test_beams_flags_and_cross_system_spans_are_semantic_elements() -> None:

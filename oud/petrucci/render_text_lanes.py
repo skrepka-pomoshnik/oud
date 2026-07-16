@@ -303,20 +303,24 @@ def _event_accidental_map(events: list[MelodyEvent] | None) -> dict[int, str]:
             continue
         flags = ev.accidental_flags or 0
         if flags & 0x1000:
-            mapping[ev.onset_index] = "b"
+            mapping[ev.onset_index] = _display_accidental("b", ev)
             continue
         if flags & 0x0002:
-            mapping[ev.onset_index] = "#"
+            mapping[ev.onset_index] = _display_accidental("#", ev)
             continue
         if flags & 0x2000:
-            mapping[ev.onset_index] = "n"
+            mapping[ev.onset_index] = _display_accidental("n", ev)
             continue
         token = ev.text.strip()
         if "#" in token:
-            mapping[ev.onset_index] = "#"
+            mapping[ev.onset_index] = _display_accidental("#", ev)
         elif "b" in token[1:]:
-            mapping[ev.onset_index] = "b"
+            mapping[ev.onset_index] = _display_accidental("b", ev)
     return mapping
+
+
+def _display_accidental(value: str, event: MelodyEvent) -> str:
+    return f"({value})" if event.courtesy_accidental else value
 
 
 def _bar_uses_raw_vocal_fallback(bar: Bar | None) -> bool:
@@ -480,8 +484,11 @@ def melody_staff_rows(  # noqa: C901
         _draw_vocal_ledger(rows, raw_row=raw_row, row=row, col=col)
         accidental = onset_accidental.get(onset_idx, "")
         if accidental:
-            _draw_vocal_accidental(rows, row=row, col=col, accidental=accidental, floor=floor)
+            accidental_edge = col - 1 if getattr(event, "editorial_brackets", False) else col
+            _draw_vocal_accidental(rows, row=row, col=accidental_edge, accidental=accidental, floor=floor)
         rows[row][col] = _melody_notehead_glyph(event.note_type)
+        if getattr(event, "editorial_brackets", False):
+            _draw_editorial_brackets(rows, row=row, col=col, floor=floor)
         _draw_vocal_ornament(rows, row=row, col=col, ornament=getattr(event, "ornament", None))
         if beam := getattr(event, "beam", None):
             beam_points.append((beam, row, col))
@@ -636,12 +643,25 @@ def _draw_vocal_accidental(
 ) -> None:
     if not accidental or not rows or not (0 <= row < len(rows)):
         return
+    start = col - len(accidental)
+    if start >= floor and all(rows[row][target] in {" ", "-"} for target in range(start, col)):
+        rows[row][start:col] = accidental
+        return
     for target in (col - 1, col - 2):
-        if target < floor or target < 0:
-            continue
-        if rows[row][target] in {" ", "-"}:
-            rows[row][target] = accidental
+        if target >= floor and rows[row][target] in {" ", "-"}:
+            rows[row][target] = accidental.strip("()")[:1]
             return
+
+
+def _draw_editorial_brackets(rows: list[list[str]], *, row: int, col: int, floor: int) -> None:
+    if not rows or not (0 <= row < len(rows)):
+        return
+    left = col - 1
+    right = col + 1
+    if left >= floor and rows[row][left] in {" ", "-"}:
+        rows[row][left] = "["
+    if right < len(rows[row]) and rows[row][right] in {" ", "-"}:
+        rows[row][right] = "]"
 
 
 def lyric_event_cells(

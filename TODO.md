@@ -72,10 +72,10 @@ artifact.
 
 - [ ] Run a deterministic, stratified remote compatibility audit over at least 1,000 public FT3 files.
   - Record a checked-in manifest of URLs and expected metadata, not downloaded third-party files.
-  - Initial fixed expansion: 75/75 files in `corpus/ft3-random-75.json` load without crashing; selection happened once and is never repeated by tests.
+  - Fixed expansions: 150/150 files in the two `corpus/ft3-random-75*.json` manifests load without warnings or semantic-audit failures. The second sample adds 75 previously unseen composer directories; selection happened once and is never repeated by tests.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section, German, Italian, French, and Spanish/Neapolitan examples.
   - Report format/version and staff-kind counts; require zero crashes and make every warning or unknown record actionable.
-  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md`.
+  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (16 PDF comparisons recorded; MIDI remains incomplete).
 - [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real fixtures, or reject each unsupported style with a precise visible diagnostic.
 - [ ] Close the remaining notation gaps with real-file evidence: polyphonic TabVoice collision precedence, partial beams, tuplets, harmonics, glissandi, ties/slurs across systems, fingerings, ornaments, fermatas, endings, and barline/repeat variants.
   - Each decoded construct needs a typed model field, importer regression, terminal rendering regression, and LilyPond/PDF assertion.

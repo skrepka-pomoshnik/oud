@@ -19,6 +19,9 @@ class VocalEvent:
     beam: str | None = None
     fermata: bool = False
     ornament: str | None = None
+    courtesy_accidental: bool = False
+    editorial_brackets: bool = False
+    tie_from_previous: bool = False
 
 
 def token_pitch_value(token: str) -> int | None:
@@ -117,6 +120,9 @@ def _explicit_vocal_event(
             beam=source.beam if isinstance(source, MelodyEvent) else None,
             fermata=source.fermata if isinstance(source, MelodyEvent) else False,
             ornament=source.ornament if isinstance(source, MelodyEvent) else None,
+            courtesy_accidental=source.courtesy_accidental if isinstance(source, MelodyEvent) else False,
+            editorial_brackets=source.editorial_brackets if isinstance(source, MelodyEvent) else False,
+            tie_from_previous=source.tie_from_previous if isinstance(source, MelodyEvent) else False,
         )
     pitch = token_pitch_value(token)
     if pitch is None and chord is not None:
@@ -139,6 +145,9 @@ def _explicit_vocal_event(
         beam=source.beam if isinstance(source, MelodyEvent) else None,
         fermata=source.fermata if isinstance(source, MelodyEvent) else False,
         ornament=source.ornament if isinstance(source, MelodyEvent) else None,
+        courtesy_accidental=source.courtesy_accidental if isinstance(source, MelodyEvent) else False,
+        editorial_brackets=source.editorial_brackets if isinstance(source, MelodyEvent) else False,
+        tie_from_previous=source.tie_from_previous if isinstance(source, MelodyEvent) else False,
     )
 
 

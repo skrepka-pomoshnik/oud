@@ -364,6 +364,27 @@ def test_melody_staff_rows_draws_imported_standard_note_ornament() -> None:
     assert any(row[4] == "+" for row in rows)
 
 
+def test_melody_staff_rows_draws_courtesy_accidental_and_editorial_brackets() -> None:
+    event = MelodyEvent(
+        "f",
+        0,
+        note_type=4,
+        accidental_flags=0x2000,
+        courtesy_accidental=True,
+        editorial_brackets=True,
+    )
+    rows = melody_staff_rows(
+        [event],
+        onset_cols=[8],
+        width=16,
+        bar=Bar(melody_events=[event]),
+    )
+    text = "\n".join("".join(row) for row in rows)
+
+    assert "(n)[" in text
+    assert "]" in text
+
+
 def test_melody_staff_rows_use_consistent_stem_length_for_different_pitches() -> None:
     rows = melody_staff_rows(
         [MelodyEvent("d", 0), MelodyEvent("a", 1), MelodyEvent("d'", 2)],

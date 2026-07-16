@@ -27,6 +27,7 @@ class ElementRole(StrEnum):
     ENDING = "ending"
     BARLINE = "barline"
     NOTEHEAD = "notehead"
+    EDITORIAL_BRACKET = "editorial-bracket"
     REST = "rest"
     ACCIDENTAL = "accidental"
     DOT = "dot"

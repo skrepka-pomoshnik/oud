@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from oud.petrucci import (
+    AccidentalDisplay,
     BarlineKind,
     BeamKind,
     CellStyle,
@@ -21,9 +22,11 @@ from oud.petrucci import (
     NotationStaff,
     OrnamentKind,
     OverlayRole,
+    PitchStep,
     ScoreTypesetOptions,
     SpanKind,
     TimeSignature,
+    WrittenPitch,
     pitch_from_midi,
     typeset_score,
 )
@@ -374,3 +377,28 @@ def test_terminal_paints_endings_ornaments_and_fermatas_in_reserved_rows() -> No
     assert rows.ornament_row is not None
     assert rows.fermata_row is not None
     assert len({rows.ending_row, rows.ornament_row, rows.fermata_row}) == 3
+
+
+def test_terminal_paints_courtesy_accidental_and_editorial_brackets() -> None:
+    note = NotationEvent(
+        "editorial-note",
+        Fraction(0),
+        Fraction(1, 4),
+        EventKind.NOTE,
+        (WrittenPitch(PitchStep.C, 4, 0, AccidentalDisplay.COURTESY),),
+        editorial_brackets=True,
+    )
+    score = NotationScore(
+        "editorial-score",
+        (NotationStaff("editorial-staff", (NotationMeasure("editorial-measure", 1, (note,)),)),),
+    )
+
+    result = typeset_score(
+        score,
+        options=ScoreTypesetOptions(width=48, height=18, glyph_mode=GlyphMode.SAFE),
+    )
+
+    assert "(n)[" in result.text
+    assert "]" in result.text
+    roles = {role for row in result.semantic_frame.roles for role in row if role is not None}
+    assert ElementRole.EDITORIAL_BRACKET in roles

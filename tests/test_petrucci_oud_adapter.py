@@ -23,6 +23,7 @@ from oud.petrucci import (
     Piece,
     PitchStep,
     ScoreTypesetOptions,
+    SpanKind,
     StemDirection,
     WrittenPitch,
     notation_score_from_piece,
@@ -159,6 +160,40 @@ def test_oud_adapter_preserves_ft3_chords_voices_ornaments_endings_and_cut_time(
     assert chord.ornament is OrnamentKind.PLUS
     assert chord.fermata
     assert score.staffs[0].lyrics[0].event_id == second.id
+
+
+def test_oud_adapter_preserves_editorial_courtesy_and_tie_semantics() -> None:
+    piece = Piece(
+        bars=[
+            Bar(
+                melody_events=[
+                    MelodyEvent("a4", 0, note_type=4, editorial_brackets=True),
+                ],
+            ),
+            Bar(
+                melody_events=[
+                    MelodyEvent(
+                        "a4",
+                        0,
+                        note_type=4,
+                        accidental_flags=0x2000,
+                        courtesy_accidental=True,
+                        tie_from_previous=True,
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    staff = notation_score_from_piece(piece).staffs[0]
+    first = staff.measures[0].events[0]
+    second = staff.measures[1].events[0]
+
+    assert first.editorial_brackets is True
+    assert second.pitches[0].accidental is AccidentalDisplay.COURTESY
+    assert [(span.kind, span.start_event_id, span.end_event_id) for span in staff.spans] == [
+        (SpanKind.TIE, first.id, second.id),
+    ]
 
 
 @pytest.mark.parametrize(
