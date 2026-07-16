@@ -318,11 +318,95 @@ Status values:
 
 ## 15) Petrucci Embedding API
 
-`oud.petrucci` can typeset a score without constructing an editor or curses
-window. `typeset_text(...)` returns clean terminal text; `typeset_piece(...)`
-returns a `TypesetResult` containing the fixed-size `Frame` and cursor display
-maps. `TypesetOptions` controls viewport size, bar width, settings, cursor, and
-whether an editor-like status row is included.
+Petrucci has two explicit entry paths:
+
+- `typeset_piece(...)` preserves Oud's existing tablature-oriented renderer.
+- `typeset_score(...)` renders the source-independent standard-notation model
+  without constructing an Oud editor, FT3 parser, or curses window.
+
+The score path accepts immutable `NotationScore` records with caller-owned
+string IDs and exact `Fraction` timing. `ScoreTypesetResult` exposes terminal
+text, an immutable `ScoreLayout`, a semantic glyph/style/role/ID frame, and
+`cells_for(id)` lookup. Repeated equal pitches remain distinct because overlays
+use event IDs rather than pitch values. Canonical IDs remain valid when a narrow
+viewport cannot place their glyphs; such overlays stay off-screen instead of
+being misreported as unknown events. Resolving and using the complete public
+Petrucci API does not import curses; `CursesScreen` translates portable text
+attributes only at Oud's terminal boundary.
+
+```python
+from fractions import Fraction
+
+from oud.petrucci import (
+    EventKind,
+    EventOverlay,
+    GlyphMode,
+    NotationEvent,
+    NotationMeasure,
+    NotationScore,
+    NotationStaff,
+    OverlayRole,
+    ScoreTypesetOptions,
+    pitch_from_midi,
+    typeset_score,
+)
+
+note = NotationEvent(
+    "voice:bar:1:note:1",
+    Fraction(0),
+    Fraction(1, 4),
+    EventKind.NOTE,
+    (pitch_from_midi(60),),
+)
+score = NotationScore(
+    "practice",
+    (NotationStaff("voice", (NotationMeasure("bar:1", 1, (note,)),)),),
+)
+result = typeset_score(
+    score,
+    options=ScoreTypesetOptions(width=80, height=24, glyph_mode=GlyphMode.SAFE),
+    overlays={note.id: EventOverlay(OverlayRole.CURRENT)},
+)
+print(result.text)
+```
+
+Use `notation_score_from_piece(piece)` only at Oud's boundary. Another program
+such as Voce should convert its own events directly to canonical records and
+retain ownership of grading, playback clocks, and renderer lifecycle.
+
+An external painter can consume `ScoreLayout`, `ScoreSystem`, `StaffRows`,
+`LayoutElement`, `ElementKey`, and `Rect` directly. `EventLocation` is complete
+for every canonical event, including events whose glyphs are clipped. This lets
+a host select the active system without parsing terminal cells:
+
+```python
+from dataclasses import replace
+
+from oud.petrucci import LayoutViewport, ScoreTypesetOptions, layout_score
+
+options = ScoreTypesetOptions(width=80, height=24)
+layout = layout_score(score, viewport=LayoutViewport(width=options.width, height=options.height))
+active = layout.location_for(note.id)
+result = typeset_score(score, options=replace(options, system_offset=active.system_index))
+```
+
+The Oud adapter validates lyric-to-note onset matching by default. Use
+`notation_score_from_piece(piece, include_lyrics=False)` only when a consumer
+explicitly wants the trustworthy note layer from a source whose lyrics cannot
+yet be aligned; Petrucci does not truncate or spread lyric text to make it fit.
+
+The current score path supports treble/bass staffs, chords and rests, ledger
+lines, whole through 64th durations, dots, stems, flags/beams, key-aware
+accidentals, signatures and changes, distinct repeat barlines, endings, tuplets,
+ties/slurs with system continuations, fermatas, dynamics, ornaments, lyrics,
+measured wrapping, system scrolling, and typed result overlays. Measure numbers,
+endings, spans, ornaments, fermatas, dynamics, numeric result feedback, and
+lyrics receive reserved semantic lanes before terminal painting.
+Feedback rows are content-derived by default; set
+`NotationLayoutPolicy(reserve_feedback_lane=True)` when a live consumer needs
+stable result-row geometry across every system.
+Dense independent-voice collision handling and Oud's TUI migration remain
+release work in `TODO.md`.
 
 The package is the authoritative implementation home for:
 

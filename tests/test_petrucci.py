@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
+from oud import petrucci
 from oud.petrucci import (
     Bar,
     Chord,
@@ -14,6 +17,41 @@ from oud.petrucci import (
     typeset_piece,
     typeset_text,
 )
+
+_SCORE_PUBLIC_API = {
+    "AccidentalDisplay",
+    "CellStyle",
+    "ElementKey",
+    "ElementRole",
+    "EventLocation",
+    "EventKind",
+    "EventOverlay",
+    "GlyphMode",
+    "LayoutElement",
+    "LayoutError",
+    "LayoutMetrics",
+    "LayoutViewport",
+    "LyricSyllable",
+    "NotationEvent",
+    "NotationLayoutPolicy",
+    "NotationMeasure",
+    "NotationScore",
+    "NotationSpan",
+    "NotationStaff",
+    "OnsetPosition",
+    "OrnamentKind",
+    "OverlayRole",
+    "Rect",
+    "ScoreLayout",
+    "ScoreSystem",
+    "ScoreTypesetOptions",
+    "ScoreTypesetResult",
+    "SemanticFrame",
+    "StaffRows",
+    "layout_score",
+    "paint_score",
+    "typeset_score",
+}
 
 
 def _score() -> Piece:
@@ -39,20 +77,65 @@ def _score() -> Piece:
     )
 
 
-def test_petrucci_has_no_core_or_ui_imports() -> None:
+def test_petrucci_has_no_application_layer_imports() -> None:
     package = Path("oud/petrucci")
+    blocked_prefixes = ("oud.core", "oud.editor", "oud.exports", "oud.tui", "oud.ui")
     forbidden: list[tuple[str, str]] = []
-    for path in package.glob("*.py"):
+    for path in package.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.startswith(("oud.core", "oud.ui")):
+                if node.module.startswith(blocked_prefixes):
                     forbidden.append((path.name, node.module))
             elif isinstance(node, ast.Import):
                 forbidden.extend(
-                    (path.name, alias.name) for alias in node.names if alias.name.startswith(("oud.core", "oud.ui"))
+                    (path.name, alias.name) for alias in node.names if alias.name.startswith(blocked_prefixes)
                 )
     assert forbidden == []
+
+
+def test_generic_petrucci_modules_only_import_the_standard_library_and_petrucci() -> None:
+    generic = (
+        Path("oud/petrucci/display.py"),
+        Path("oud/petrucci/feedback_layout.py"),
+        Path("oud/petrucci/layout.py"),
+        Path("oud/petrucci/notation_layout.py"),
+        Path("oud/petrucci/score.py"),
+        Path("oud/petrucci/system_fitting.py"),
+    )
+    forbidden: list[tuple[str, str]] = []
+    for path in generic:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            names: list[str] = []
+            if isinstance(node, ast.ImportFrom) and node.module:
+                names.append(node.module)
+            elif isinstance(node, ast.Import):
+                names.extend(alias.name for alias in node.names)
+            forbidden.extend(
+                (path.name, name) for name in names if name.startswith("oud.") and not name.startswith("oud.petrucci")
+            )
+    assert forbidden == []
+
+
+def test_importing_public_petrucci_does_not_initialize_curses() -> None:
+    code = (
+        "import sys; import oud.petrucci as petrucci; "
+        "[getattr(petrucci, name) for name in petrucci.__all__]; "
+        "assert 'curses' not in sys.modules"
+    )
+    completed = subprocess.run(  # noqa: S603 - fixed interpreter and source string
+        [sys.executable, "-c", code],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_public_score_api_is_exported_and_resolvable() -> None:
+    assert set(petrucci.__all__) >= _SCORE_PUBLIC_API
+    assert all(getattr(petrucci, name) is not None for name in _SCORE_PUBLIC_API)
 
 
 def test_typeset_piece_returns_frame_text_and_cursor_map() -> None:

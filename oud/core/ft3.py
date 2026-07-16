@@ -828,7 +828,7 @@ def _is_meaningful_lyric_line(line: str) -> bool:
     words = re.findall(r"[A-Za-z][A-Za-z'-]*", stripped)
     if not words:
         return False
-    return not (len(words) == 1 and len(words[0]) == 1 and words[0].lower() not in {"i", "a", "o"})
+    return not all(len(word) == 1 and word.lower() not in {"i", "a", "o"} for word in words)
 
 
 def _merge_text_record_into_bar(bar: Bar, record: FT3TextRecord) -> None:
@@ -1023,6 +1023,16 @@ def _decoded_note_content(
     )
 
 
+def _decoded_lyric_content(decoded: FT3TextRecord) -> tuple[list[str], list[list[LyricEvent]]]:
+    lyrics = [line for line in decoded.lyrics if _is_meaningful_lyric_line(line)]
+    rows = [
+        list(row)
+        for row in decoded.lyric_event_rows
+        if any(event.extender for event in row) or _is_meaningful_lyric_line(" ".join(event.text for event in row))
+    ]
+    return lyrics, rows
+
+
 def _append_or_merge_note_bar(staff: ImportedStaff, incoming: ImportedBarContent) -> None:
     existing = next((bar for bar in staff.bars if bar.source_bar_index == incoming.source_bar_index), None)
     if existing is None:
@@ -1055,17 +1065,19 @@ def _append_raw_imported_bar(
         barline_staff.bars.append(base)
     if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (decoded is not None and decoded.melody_events):
         _append_or_merge_note_bar(note_staff, _decoded_note_content(base, decoded))
-    if (
-        raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"}
-        and decoded is not None
-        and (decoded.lyrics or decoded.lyric_event_rows)
-    ):
+    lyric_content = _decoded_lyric_content(decoded) if decoded is not None else ([], [])
+    if decoded is not None and raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"} and any(lyric_content):
+        lyrics, lyric_event_rows = lyric_content
         lyric_staff.bars.append(
             replace(
                 base,
-                lyrics=list(decoded.lyrics),
-                lyric_event_rows=[list(row) for row in decoded.lyric_event_rows],
-                text_rows=[row for row in decoded.structured_rows if row.kind == "lyrics"],
+                lyrics=lyrics,
+                lyric_event_rows=lyric_event_rows,
+                text_rows=[
+                    row
+                    for row in decoded.structured_rows
+                    if row.kind == "lyrics" and _is_meaningful_lyric_line(row.text or " ".join(row.tokens))
+                ],
             ),
         )
     if comment_content := _decoded_comment_content(decoded):

@@ -1,6 +1,7 @@
 # Oud Documentation
 
 - [User and developer guide](user-guide.md)
+- [Petrucci score-rendering plan](petrucci-score-plan.md)
 - [FT3 reverse-engineered specification](ft3-format.md)
 - [Release procedure](releasing.md)
 

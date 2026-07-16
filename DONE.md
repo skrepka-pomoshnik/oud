@@ -2,6 +2,21 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-07-17
+- Deepened the FT3-to-Petrucci adapter with per-voice timing, same-onset chord normalization, opposing polyphonic stems, cut time, repeats/endings, beams, fermatas, dynamics, and `+` ornaments. Meaningful lyrics remain strict; callers can explicitly select trustworthy note-only adaptation with `include_lyrics=False`.
+- Added key-aware measure accidental state with natural cancellation and explicit/courtesy policies, distinct repeat forms, reserved ending/ornament/fermata lanes, and a complete public `EventLocation` map so external consumers can follow every canonical event across clipping, system scrolling, and resize.
+- Removed Petrucci's eager curses import by keeping text attributes portable and translating them only in `CursesScreen`. An isolated wheel resolved all 64 public symbols and rendered a canonical score with `py.typed` present and no curses module loaded.
+- Audited 15 representative real FT3 files without committing source payloads: 4 adapt strictly, 11 adapt in note-only mode, and the remaining 4 fail with explicit pitch or meter diagnostics. The four supported canonical scores retain 1,382 event locations across 60, 80, and 120 columns; only two events in the narrow Folle layout are explicitly clipped.
+- Fixed Petrucci's narrow-layout overlay contract: every canonical event ID remains in `ScoreLayout` even when its glyph cannot be placed, valid off-viewport feedback no longer raises an unknown-ID error, and genuinely unknown IDs still fail explicitly.
+- Reserved disjoint semantic rows for measure numbers, cross-system slurs/ties, dynamics, singing feedback, and lyrics. Numeric pitch/timing/confidence feedback now renders by event ID in a collision-aware, content-derived lane with an explicit stable-lane policy; span endpoints and continuations use shaped ASCII-safe/Unicode glyphs instead of repeated fill characters.
+- Moved MusicXML golden scratch output to pytest's isolated `tmp_path`, so tests no longer mutate the source fixture tree. Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, 1,241 passed with one Darwin-only test skipped on Linux, 85.64% coverage, and 112/112 corpus files loaded without warnings.
+
+## 2026-07-16
+- Added Petrucci's source-independent standard-notation vertical slice: strict immutable score records with stable IDs and exact timing, measured system fitting, content-derived row budgets, semantic onset/layout elements, display-safe terminal painting, and cached layout independent of transient feedback.
+- Added treble/bass notes and chords, rests, ledger lines, dots, stems, flags and beams, accidentals, conventional key-signature positions, barlines, tuplets, ties/slurs with cross-system segments, fermatas, dynamics, lyrics, ASCII/Unicode glyph policies, and typed current/pending/hit/missed/uncertain overlays by event ID.
+- Added a strict Oud note/lyric adapter and an independent consumer fixture that imports no Oud model. Built and installed the wheel in an isolated environment; public score rendering worked, `py.typed` was present, and importing `oud.petrucci` did not initialize curses.
+- Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, 1,223 passed with one Darwin-only test skipped on Linux, 85.54% coverage, 112/112 corpus files loaded without warnings, and an isolated built-wheel consumer smoke.
+
 ## 2026-07-13
 - Prevented orphaned rhythm/staff rows by requiring a meaningful half-system before drawing a clipped preview; duet score view only adds complete paired systems. Dense bars forced onto their own system still fill the staff width. The TUI now drains up to 64 queued keys before one render, preventing delayed repeated movement after key release.
 - Cached clean dynamic system plans across cursor-only frames while bypassing the cache for modified documents. Cursor-display regressions fell from about 95 seconds to 25 seconds locally, and representative frame time dropped from 0.20 seconds to 0.03-0.09 seconds.

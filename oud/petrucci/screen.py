@@ -2,23 +2,14 @@ from __future__ import annotations
 
 from typing import Protocol
 
-try:
-    import curses as _curses
-except ImportError:  # pragma: no cover - curses exists on supported oud platforms
-    A_BOLD = 1
-    A_REVERSE = 2
-    A_DIM = 4
-    A_UNDERLINE = 8
+A_BOLD = 1 << 0
+A_REVERSE = 1 << 1
+A_DIM = 1 << 2
+A_UNDERLINE = 1 << 3
 
-    class CursesError(Exception):
-        pass
 
-else:
-    A_BOLD = _curses.A_BOLD
-    A_REVERSE = _curses.A_REVERSE
-    A_DIM = _curses.A_DIM
-    A_UNDERLINE = _curses.A_UNDERLINE
-    CursesError = _curses.error
+class CursesError(Exception):
+    """Portable screen-write failure raised by the curses adapter."""
 
 
 class Screen(Protocol):

@@ -596,6 +596,18 @@ def test_load_ft3_decodes_raw_note_lyric_bars_into_note_and_lyric_staffs(tmp_pat
     assert piece.imported_score.source_records[0].kind == "note-lyrics"
 
 
+def test_load_ft3_does_not_treat_single_letter_control_tokens_as_lyrics(tmp_path) -> None:
+    chunk = bytes(32) + bytes.fromhex("010000000001330500000000013308000000000400") + b"\x01\x00\x03\x00\x06P H @@\r\n"
+    payload = b"CPiece\x04Test\x03\x80CBar" + chunk + b"\x03\x80"
+    path = tmp_path / "raw_note_controls.ft3"
+    path.write_bytes(payload)
+
+    piece = load_ft3(str(path))
+
+    assert piece.imported_score is not None
+    assert all(staff.kind != "lyrics" for staff in piece.imported_score.staffs)
+
+
 def test_load_ft3_preserves_unclassified_text_rows_as_comments(tmp_path) -> None:
     text_record = bytes(32) + b"\x01\x00\x03\x00\x08:Fe\r\n>fu\r\nTimes\x07New\x0eRoman\r\n%%%%\r\n"
     payload = b"CPiece\x04Test\x03\x80CBar" + text_record + b"\x03\x80" + _ft3_bar_with_one_note() + b"\x03\x80"

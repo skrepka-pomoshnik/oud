@@ -25,7 +25,7 @@ def _normalize_xml_text(text: str) -> str:
     return ET.tostring(root, encoding="unicode")
 
 
-def _export_piece_subset_to_musicxml_text(src_path: str, bars: int) -> str:
+def _export_piece_subset_to_musicxml_text(src_path: str, bars: int, tmp_path: Path) -> str:
     piece, overrides, durations, dotted, bar_width = load_piece_data(src_path)
     sub_piece = Piece(
         title=piece.title,
@@ -36,7 +36,7 @@ def _export_piece_subset_to_musicxml_text(src_path: str, bars: int) -> str:
         bars=piece.bars[:bars],
         strings=piece.strings,
     )
-    tmp_out = FIXTURES / "_tmp_test_export.musicxml"
+    tmp_out = tmp_path / "export.musicxml"
     export_musicxml(
         str(tmp_out),
         sub_piece,
@@ -52,17 +52,20 @@ def _export_piece_subset_to_musicxml_text(src_path: str, bars: int) -> str:
         dotted=dotted,
     )
     text = tmp_out.read_text(encoding="utf-8")
-    tmp_out.unlink(missing_ok=True)
     return _normalize_xml_text(text)
 
 
-def test_musicxml_export_matches_local_tab_golden() -> None:
-    actual = _export_piece_subset_to_musicxml_text("examples/si_par_souffrir.tab", bars=2)
+def test_musicxml_export_matches_local_tab_golden(tmp_path: Path) -> None:
+    actual = _export_piece_subset_to_musicxml_text("examples/si_par_souffrir.tab", bars=2, tmp_path=tmp_path)
     expected = (FIXTURES / "si_par_souffrir_2bars.musicxml.norm").read_text(encoding="utf-8")
     assert actual == expected
 
 
-def test_musicxml_export_matches_local_ft3_golden() -> None:
-    actual = _export_piece_subset_to_musicxml_text("examples/26_lachrimae_galliard_in_G.ft3", bars=2)
+def test_musicxml_export_matches_local_ft3_golden(tmp_path: Path) -> None:
+    actual = _export_piece_subset_to_musicxml_text(
+        "examples/26_lachrimae_galliard_in_G.ft3",
+        bars=2,
+        tmp_path=tmp_path,
+    )
     expected = (FIXTURES / "lachrimae_2bars.musicxml.norm").read_text(encoding="utf-8")
     assert actual == expected

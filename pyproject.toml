@@ -46,3 +46,6 @@ environment.python-version = "3.11"
 [tool.setuptools.packages.find]
 include = ["oud*"]
 exclude = ["refs*", "downloads*", "lutemusic*", "examples*", "tests*"]
+
+[tool.setuptools.package-data]
+oud = ["py.typed"]

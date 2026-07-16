@@ -1,5 +1,56 @@
 # TODO
 
+## P0: Petrucci proper score renderer
+
+Target: Petrucci remains Oud's library and gains a proper standard-notation
+typesetter for Oud's imported note/vocal staffs. Its public contracts must also
+support a second application such as Voce without Oud editor, FT3, tablature, or
+curses dependencies. Detailed boundaries and sequencing are in
+`docs/petrucci-score-plan.md`.
+
+The canonical model, measured layout, semantic terminal frame, overlays, public
+API, Oud adapter, and neutral-consumer wheel smoke are implemented. The work
+below is the remaining release gate, not a restatement of completed foundation.
+
+### Engraving correctness
+
+- [ ] Resolve independent-voice and dense-chord collisions without moving the
+  shared musical onset. Cover seconds/unisons, opposing stems, overlapping
+  accidentals, rests, dots, beams, and lyrics with deterministic precedence.
+- [ ] Carry real imported tuplets, ties/slurs, mid-score clef/key changes, and
+  remaining ornament forms through the Oud adapter. Each construct needs
+  canonical, layout, semantic-frame, and text-snapshot evidence.
+- [ ] Extend the reserved-lane collision policy to multiple lyric verses,
+  simultaneous dynamics, nested spans, and tuplets; add overlap and bounds
+  invariants over every positioned semantic element.
+- [ ] Reject or visibly clip every unsupported pitch, duration, and viewport
+  case. A clipped viewport must preserve canonical event identity and emit an
+  explicit clipping marker rather than silently lose source semantics.
+
+### Oud migration and second-consumer proof
+
+- [ ] Close the remaining representative FT3 adapter failures without guessing:
+  seven strict lyric-onset mismatches and four note-only pitch/meter errors in
+  the 15-file audit. Preserve `include_lyrics=False` as an explicit note-only
+  migration mode; never truncate or spread source lyrics to force a match.
+- [ ] Migrate vocal-only, then mixed/polyphonic/duet imported staffs to the new
+  score path without changing solo tablature output; remove each legacy vocal
+  fallback only after canonical adapter coverage exists.
+- [ ] Add structural and text snapshots at 60, 80, and 120 columns for dense and
+  sparse measures, repeated pitches, rests, accidentals, ledger lines, ties,
+  lyrics, safe glyphs, clipping, forced breaks, and resize preserving active ID.
+- [ ] Add one real score-following acceptance fixture across multiple playback
+  positions. Validate the actual Voce adapter with explicit renderer ownership,
+  repeated-note feedback by event ID, and Petrucci public imports only. The
+  consumer must select `system_offset` for the active event across playback and
+  resize, and map Petrucci's semantic roles to its own color policy without
+  moving playback clocks or global renderer state into Petrucci.
+- [ ] Move internal callers off underscore helpers exported by
+  `view_model.__all__`, then shrink that legacy surface without changing
+  `typeset_piece()` output.
+- [ ] Keep Petrucci in Oud until the canonical API and snapshots pass in both Oud
+  and Voce; a separate distribution remains out of scope for this milestone.
+
 ## P1: Credible FT3 viewer
 
 Target: a mature read-only FT3 viewing workflow, not Fronimo editor parity. Native

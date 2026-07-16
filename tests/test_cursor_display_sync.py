@@ -8,13 +8,12 @@ TUI loop and assert the drawn cursor never stalls.
 
 from __future__ import annotations
 
-import curses
-
 from oud.editor import actions
 from oud.editor.controller import handle_key
 from oud.editor.state import EditorState
 from oud.petrucci.framebuffer import FrameBuffer
 from oud.petrucci.render import render_piece
+from oud.petrucci.screen import A_REVERSE
 from oud.tui.commands import apply_command
 from oud.tui.viewport import ensure_cursor_visible
 from tests.helpers_keyscript import keyscript_state
@@ -65,7 +64,7 @@ def _render(state: EditorState) -> FrameBuffer:
 def _drawn_cursor(state: EditorState) -> tuple[int, int, int] | None:
     frame = _render(state).snapshot()
     for y, row in enumerate(frame.attrs):
-        reverse_cells = [x for x, attr in enumerate(row) if attr & curses.A_REVERSE]
+        reverse_cells = [x for x, attr in enumerate(row) if attr & A_REVERSE]
         # The status bar is fully reversed; the cursor is a single cell.
         if reverse_cells and len(reverse_cells) < 20:
             return (y, reverse_cells[0], state.bar_offset)

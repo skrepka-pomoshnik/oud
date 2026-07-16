@@ -46,7 +46,7 @@ def theme_attr(theme: str) -> int:
                 curses.init_pair(pair, curses.COLOR_BLACK, curses.COLOR_WHITE)
             _initialized_theme_pairs.add(theme)
         return curses.color_pair(pair)
-    except CursesError:
+    except curses.error:
         return 0
 
 
@@ -55,8 +55,22 @@ def apply_theme_background(stdscr: curses.window, attr: int) -> None:
     bkgd = getattr(stdscr, "bkgd", None)
     if bkgd is None:
         return
-    with contextlib.suppress(CursesError):
+    with contextlib.suppress(curses.error):
         bkgd(" ", attr)
+
+
+def _curses_text_attr(attr: int) -> int:
+    portable_mask = A_BOLD | A_REVERSE | A_DIM | A_UNDERLINE
+    backend_attr = attr & ~portable_mask
+    for portable, native in (
+        (A_BOLD, curses.A_BOLD),
+        (A_REVERSE, curses.A_REVERSE),
+        (A_DIM, curses.A_DIM),
+        (A_UNDERLINE, curses.A_UNDERLINE),
+    ):
+        if attr & portable:
+            backend_attr |= native
+    return backend_attr
 
 
 @dataclass(frozen=True)
@@ -68,7 +82,10 @@ class CursesScreen:
         return self.stdscr.getmaxyx()
 
     def addstr(self, y: int, x: int, text: str, attr: int = 0) -> None:
-        self.stdscr.addstr(y, x, text, attr | self.base_attr)
+        try:
+            self.stdscr.addstr(y, x, text, _curses_text_attr(attr) | self.base_attr)
+        except curses.error as exc:
+            raise CursesError(str(exc)) from exc
 
     def erase(self) -> None:
         self.stdscr.erase()
