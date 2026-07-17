@@ -93,7 +93,7 @@ The first 32 bytes are a control/header region.
 
 ### Meter
 
-**Confirmed subset.** `byte0 & 0x7f` selects:
+**Confirmed subset.** `byte0 & 0x07` selects:
 
 | Value | Meaning |
 | --- | --- |
@@ -101,6 +101,11 @@ The first 32 bytes are a control/header region.
 | `02` | cut time (`C|`) |
 | `03` | triple meter (`3/4`) |
 | `06` | fraction using denominator byte 8 and numerator byte 9 |
+
+Byte 0 also carries bar and edition flags. In particular, `08` occurs alongside
+`01`, `02`, and `06`; it is not part of the meter code. Masking it recovers 19
+explicit meter records in 14 files in the fixed corpus, including the `3/2`
+shown in the published four-part Gesualdo PDF.
 
 An explicit meter remains active until another explicit meter appears. If a
 file has no explicit meter, duration sums provide a conservative initial guess.
@@ -129,7 +134,7 @@ No per-system line-break flag occurs in the bundled logical bar stream.
 
 For ordinary tab records, bytes `28..29` plus one give the top-level object
 count used to stop scanning before trailing text/layout data. Standard-note
-records use a marker `01 31` through `01 35` at bytes `30..31`.
+records use a marker `01 30` through `01 35` at bytes `30..31`.
 
 ## 5. Tablature Objects
 
@@ -291,6 +296,12 @@ An empty standard-notation record can use row marker `0130`; rows `0130` through
 notation lanes precede the complete tablature lane, and each lane contains the
 same source-bar count.
 
+ASCII-looking coordinate/control fragments can resemble the legacy melody-grid
+fallback. A barline or empty standard-note record is promoted to musical events
+only when its binary payload contains a valid encoded note run. Otherwise the
+text remains a typed `control` row and cannot become a pitch, playback event, or
+canonical Petrucci note.
+
 ## 9. Imported Score Model
 
 `Piece.bars` is the tablature/editing projection. `Piece.imported_score` stores
@@ -308,8 +319,8 @@ ImportedScore.source_records[]
 ```
 
 Current semantic source kinds are `note`, `note-lyrics`, `annotation-group`,
-`barline`, `comment`, `text`, `score-terminator`, and `unknown`. A record is
-listed once even when it contributes both note and lyric content.
+`barline`, `comment`, `layout`, `text`, `score-terminator`, and `unknown`. A
+record is listed once even when it contributes both note and lyric content.
 
 The viewer can focus each imported voice independently. LilyPond emits every
 mapped standard staff rather than only the first voice.
@@ -322,11 +333,14 @@ Run:
 uv run python scripts/ft3_audit.py lutemusic
 ```
 
-For the fixed 75-file expansion, the required result is:
+Each fixed 75-file directory must report:
 
 ```text
 Scanned 75 file(s): 0 with unresolved values or records.
 ```
+
+Together the two checked-in manifests cover 150 fixed external files. Tests
+verify both directories, URLs, SHA-256 digests, and the zero-unresolved result.
 
 “Unresolved” means an unconsumed note-extra bit, unknown vocal flag, unknown
 source record, or import warning. Typed source records are inventory, not debt.

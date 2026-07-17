@@ -27,6 +27,7 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 | Legacy bass | `lutemusic/random-75-v2/072/mozart_variations.ft3` | [Mozart theme variations](https://browse.lutemusic.org/composers/Mozart/pdf/mozart_variations.pdf) | The `3c00` note prints as the same double-slashed open ninth course used by the normal numeric-diapason encoding. |
 | Ornament | `lutemusic/random-75-v2/074/praeludium_02.ft3` | [Praeludium 2](https://browse.lutemusic.org/composers/Mace/pdf/praeludium_02.pdf) | The sole `1600` mark is an apostrophe printed to the left of the tablature letter. |
 | Layout | `lutemusic/random-75-v2/004/courant_duet_T.ft3` | [De France courant](https://browse.lutemusic.org/composers/Van_eyck/pdf/courant_duet_T.pdf) | Two 64-byte empty records change source layout coordinates and print no music; they are typed layout records rather than unknown staffs or bars. |
+| Four-part meter | `lutemusic/random-75-v2/065/gesualdo_gagliarda_4.ft3` | [Gagliarda](https://browse.lutemusic.org/composers/Gesualdo/pdf/gesualdo_gagliarda_4.pdf) | All four opening records use header `0e 10` with fraction bytes `02 03`. The PDF confirms a left repeat in `3/2`: `08` is a shared header flag, while low meter code `06` selects the fraction. All four staffs now adapt canonically. |
 
 ## Findings
 
@@ -34,11 +35,14 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
   bits, vocal bits, unknown source records, or import warnings.
 - Standard-note source records are semantic `note`/`note-lyrics` records. They
   are no longer duplicated as raw bars in each imported lane.
-- In a 15-file standard-notation audit, 4 files adapt strictly with lyrics and
-  11 adapt when the explicit note-only policy is selected. The other 4 are
-  rejected with concrete invalid-pitch or meter-overflow diagnostics. The
-  adapter does not guess through those records or force unmatched lyrics onto
-  note onsets.
+- Barline and empty-note ASCII control fragments remain inspectable control
+  rows instead of becoming fake pitches such as `1`, `4`, or `_6(`.
+- In the fixed 150-file corpus, 15 files contain typed notation records. Five
+  adapt strictly with lyrics, five additional files adapt only with the explicit
+  note-only policy, and five are rejected with concrete timing/capacity
+  diagnostics. Those cases require unmetered, mensural/proportional, secondary-
+  part, or grace-note semantics; the adapter does not scale durations or force
+  unmatched lyrics onto note onsets.
 - The four canonical layout cases contain 1,382 events. Every event retains a
   staff/measure/system location at 60, 80, and 120 columns; two narrow Folle
   events are explicitly clipped, and the other cases place every event.

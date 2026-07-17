@@ -246,7 +246,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - Primary UI is TUI/curses only (Qt backend is future work).
 - Some advanced historical symbols/layouts are partial or pending.
 - FT3/JT* are proprietary import formats; support is validated against fixed external manifests rather than every historical producer version.
-- The focused regression manifest and fixed 75-file sample pass the unresolved-semantics audit without warnings. This is not general FT3 or Fronimo parity; exact source engraving coordinates are reflowed.
+- The focused regression manifest and both fixed 75-file samples pass the unresolved-semantics audit without warnings (150 fixed external files total). This is not general FT3 or Fronimo parity; exact source engraving coordinates are reflowed.
 - FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
 - The status line always distinguishes the source document from its confirmed TAB write target.
 - Auto layout applies collision widths before justifying, keeps final/manual/capped systems at readable natural widths, and shows a clipped preview only when at least half of the next system fits.

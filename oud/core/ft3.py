@@ -951,6 +951,8 @@ def _decode_raw_score_record(
     preferred_events = legacy_events if len(legacy_events) > len(note_events) else note_events
     if preferred_events:
         record = replace(record, melody_events=preferred_events)
+    elif raw_kind in {"barline-raw", "note-staff-raw", "note-lyric-raw"}:
+        record = _demote_heuristic_melody(record)
     if record and _record_has_content(record):
         return record
     melody_events = decode_ft3_vocal_events(payload)
@@ -965,6 +967,20 @@ def _decode_raw_score_record(
         structured_rows=[],
         parse_mode="structured",
     )
+
+
+def _demote_heuristic_melody(record: FT3TextRecord) -> FT3TextRecord:
+    rows = list(record.structured_rows)
+    if record.melody_grid:
+        rows.append(
+            ImportedTextRow(
+                row_index=len(rows),
+                kind="control",
+                text=record.melody_grid,
+                tokens=record.melody_grid.split(),
+            ),
+        )
+    return replace(record, melody_grid=None, melody_events=[], structured_rows=rows)
 
 
 def _imported_bar_base(bar_index: int, bar: Bar) -> ImportedBarContent:
@@ -1087,7 +1103,9 @@ def _append_raw_imported_bar(
         return
     if raw_kind == "barline-raw":
         barline_staff.bars.append(base)
-    if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (decoded is not None and decoded.melody_events):
+    if raw_kind in {"note-staff-raw", "note-lyric-raw"} or (
+        raw_kind == "text-score-raw" and decoded is not None and decoded.melody_events
+    ):
         _append_or_merge_note_bar(note_staff, _decoded_note_content(base, decoded))
     lyric_content = _decoded_lyric_content(decoded) if decoded is not None else ([], [])
     if decoded is not None and raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"} and any(lyric_content):
@@ -1598,7 +1616,8 @@ def _fill_missing_time_signatures(bars: list[Bar]) -> None:
 def parse_time_signature(bar_data: bytes) -> str | None:
     if len(bar_data) < 10:
         return None
-    time_signature = bar_data[0] & 0x7F
+    # Repeats, endings, closers, and an observed 0x08 control flag share byte 0.
+    time_signature = bar_data[0] & 0x07
     if time_signature == 0x01:
         return "C"
     if time_signature == 0x02:

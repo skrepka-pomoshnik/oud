@@ -3,6 +3,9 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-07-17
+- Separated FT3 meter codes from shared header flags. Nineteen records across 14 fixed-corpus files now retain their explicit meter; the published Gesualdo score confirms `0e 10` as a repeated `3/2` opening, and all four viol staffs adapt to canonical Petrucci notation.
+- Stopped barline and empty notation records from promoting heuristic ASCII coordinate fragments into fake pitches. The original bytes remain inspectable as typed control rows, while the fixed corpus no longer exposes invalid `1`, `4`, `_6(`, or `'_6` notation events.
+- Validation: no tracked FT3 payloads, both fixed 75-file semantic audits pass, Ruff, Ruff format, Ty, and 1,254 tests pass with one Darwin-only test skipped on Linux at 85.72% coverage; 187/187 local corpus files load without warnings.
 - Added a second fixed 75-file Gerbode corpus with unique, previously unseen composer directories and no overlap with the first sample. All 150 fixed external files load without warnings and pass the semantic audit with no residual flags or unknown records; FT3 payloads remain ignored.
 - Corrected lane-major mixed-score detection and the empty `0130` notation marker, so Berchem's 59-bar score maps to one tablature lane plus labeled alto and bass staffs instead of fragmented fake staffs. Typed empty layout records no longer produce unknown-staff warnings.
 - Decoded and rendered PDF-confirmed courtesy accidentals (`8000` plus an accidental), editorial square brackets (`4000`), standalone tie continuation (`8000`), left apostrophe (`1600`), and the legacy open ninth-course form (`3c00`). Petrucci now carries courtesy, brackets, and imported ties through its public canonical model and semantic terminal frame.

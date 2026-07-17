@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from oud.core.ft3 import load_ft3
+from oud.petrucci import notation_score_from_piece
 from scripts import fetch_ft3_corpus
 from scripts.corpus_smoke import scan_files
 from scripts.fetch_ft3_corpus import fetch_manifest, load_manifest, manifest_paths
@@ -115,6 +116,12 @@ def test_expanded_corpus_preserves_newly_decoded_score_semantics() -> None:
     assert berchem.imported_score is not None
     berchem_notes = [staff for staff in berchem.imported_score.staffs if staff.kind == "note"]
     assert [(staff.label, len(staff.bars)) for staff in berchem_notes] == [("alto", 59), ("bass", 59)]
+    assert all(
+        event.accidental_flags is not None
+        for staff in berchem_notes
+        for bar in staff.bars
+        for event in bar.melody_events
+    )
 
     sandrin_events = [event for bar in by_name["douce_memoire_song_sandrin.ft3"].bars for event in bar.melody_events]
     assert sum(event.courtesy_accidental for event in sandrin_events) == 15
@@ -131,6 +138,27 @@ def test_expanded_corpus_preserves_newly_decoded_score_semantics() -> None:
         if note.ft3_extras == 0x3C00
     ]
     assert [(note.string, note.fret, note.ft3_extra_residual) for note in mozart_notes] == [(9, 0, None)]
+    mozart = by_name["mozart_variations.ft3"]
+    assert mozart.imported_score is not None
+    assert all(staff.kind != "note" for staff in mozart.imported_score.staffs)
+    assert any(
+        row.kind == "control" and row.text.strip() == "'_6"
+        for staff in mozart.imported_score.staffs
+        for bar in staff.bars
+        for row in bar.text_rows
+    )
+
+    gesualdo = by_name["gesualdo_gagliarda_4.ft3"]
+    assert gesualdo.imported_score is not None
+    gesualdo_notes = [staff for staff in gesualdo.imported_score.staffs if staff.kind == "note"]
+    assert [staff.bars[0].time_sig for staff in gesualdo_notes] == ["3/2"] * 4
+    canonical = notation_score_from_piece(gesualdo)
+    assert len(canonical.staffs) == 4
+    assert [
+        (staff.measures[0].time_signature.beats, staff.measures[0].time_signature.beat_unit)
+        for staff in canonical.staffs
+        if staff.measures[0].time_signature is not None
+    ] == [(3, 2)] * 4
 
     mace_notes = [
         note
@@ -140,6 +168,36 @@ def test_expanded_corpus_preserves_newly_decoded_score_semantics() -> None:
         if note.ft3_extras == 0x1600
     ]
     assert [(note.left_ornament, note.ft3_extra_residual) for note in mace_notes] == [("'", None)]
+
+
+def test_random_corpus_demotes_ascii_control_fragments_from_note_staffs() -> None:
+    paths = manifest_paths(load_manifest(RANDOM_MANIFEST))
+    missing = [path for path in paths if not path.is_file()]
+    if missing:
+        pytest.skip(f"fetch {RANDOM_MANIFEST} before running external corpus tests")
+    by_name = {path.name: path for path in paths}
+
+    sonata = load_ft3(str(by_name["sonata_CM_01_moderato_T.ft3"]))
+    assert sonata.imported_score is not None
+    assert all(staff.kind != "note" for staff in sonata.imported_score.staffs)
+    assert any(
+        row.kind == "control" and row.text.strip() == "4"
+        for staff in sonata.imported_score.staffs
+        for bar in staff.bars
+        for row in bar.text_rows
+    )
+
+    semper = load_ft3(str(by_name["09_semper_dowland_semper_dolens.ft3"]))
+    assert semper.imported_score is not None
+    assert all(
+        not bar.melody_events for staff in semper.imported_score.staffs if staff.kind == "note" for bar in staff.bars
+    )
+    assert any(
+        row.kind == "control" and row.text.strip() == "_6("
+        for staff in semper.imported_score.staffs
+        for bar in staff.bars
+        for row in bar.text_rows
+    )
 
 
 def test_couperin_duet_maps_two_note_voices_to_one_77_bar_staff() -> None:

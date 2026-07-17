@@ -49,6 +49,21 @@ def test_parse_bar_decodes_ft3_header_repeat_and_barline_markers() -> None:
     assert bar.repeat == ":|:"
 
 
+def test_parse_bar_decodes_meter_beneath_shared_header_flags() -> None:
+    fractional = bytearray(32)
+    fractional[0] = 0x0E
+    fractional[1] = 0x10
+    fractional[8] = 2
+    fractional[9] = 3
+    bar = parse_bar(bytes(fractional))
+    assert bar.time_sig == "3/2"
+    assert bar.repeat == ".:"
+
+    common = parse_bar(bytes([0x09, 0x10]) + bytes(30))
+    assert common.time_sig == "C"
+    assert common.repeat == ".:"
+
+
 def test_parse_bar_decodes_right_repeat_from_byte1_bit2_marker() -> None:
     bar = parse_bar(bytes([0x80, 0x03]) + bytes(30))
     assert bar.barline == "||"
@@ -513,6 +528,27 @@ def test_load_ft3_marks_unknown_non_tab_score_chunks_in_imported_score(tmp_path)
     assert piece.imported_score.source_records[0].kind == "barline"
     assert staffs["barline"].bars[0].time_sig == "3/4"
     assert not piece.import_warnings or "unknown staves" not in piece.import_warnings[-1]
+
+
+def test_load_ft3_keeps_barline_control_text_out_of_note_staff(tmp_path) -> None:
+    header = bytearray(32)
+    header[0] = 0x80
+    header[1] = 0x01
+    chunk = bytes(header) + b"  1 2 3\r\n"
+    payload = b"CPiece\x04Test\x03\x80CBar" + chunk + b"\x03\x80"
+    path = tmp_path / "barline_control_text.ft3"
+    path.write_bytes(payload)
+
+    piece = load_ft3(str(path))
+
+    assert piece.imported_score is not None
+    staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
+    assert "note" not in staffs
+    assert staffs["barline"].bars[0].barline == "||"
+    assert staffs["comment"].bars[0].text_rows == [
+        ImportedTextRow(row_index=0, kind="control", text="  1 2 3", tokens=["1", "2", "3"]),
+    ]
+    assert piece.imported_score.source_records[0].kind == "barline"
 
 
 def test_load_ft3_classifies_raw_note_staff_chunks_in_imported_score(tmp_path) -> None:

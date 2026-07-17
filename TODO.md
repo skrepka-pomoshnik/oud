@@ -30,9 +30,11 @@ below is the remaining release gate, not a restatement of completed foundation.
 ### Oud migration and second-consumer proof
 
 - [ ] Close the remaining representative FT3 adapter failures without guessing:
-  seven strict lyric-onset mismatches and four note-only pitch/meter errors in
-  the 15-file audit. Preserve `include_lyrics=False` as an explicit note-only
-  migration mode; never truncate or spread source lyrics to force a match.
+  seven strict lyric-onset mismatches and five note-only timing/capacity errors
+  in the fixed corpus's 15-file notation subset. False ASCII pitches and
+  flagged meter records are closed. Preserve `include_lyrics=False` as an
+  explicit note-only migration mode; never truncate or spread source lyrics to
+  force a match.
 - [ ] Migrate vocal-only, then mixed/polyphonic/duet imported staffs to the new
   score path without changing solo tablature output; remove each legacy vocal
   fallback only after canonical adapter coverage exists.
@@ -75,9 +77,9 @@ artifact.
   - Fixed expansions: 150/150 files in the two `corpus/ft3-random-75*.json` manifests load without warnings or semantic-audit failures. The second sample adds 75 previously unseen composer directories; selection happened once and is never repeated by tests.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section, German, Italian, French, and Spanish/Neapolitan examples.
   - Report format/version and staff-kind counts; require zero crashes and make every warning or unknown record actionable.
-  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (16 PDF comparisons recorded; MIDI remains incomplete).
+  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (17 PDF comparisons recorded; MIDI remains incomplete).
 - [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real fixtures, or reject each unsupported style with a precise visible diagnostic.
-- [ ] Close the remaining notation gaps with real-file evidence: polyphonic TabVoice collision precedence, partial beams, tuplets, harmonics, glissandi, ties/slurs across systems, fingerings, ornaments, fermatas, endings, and barline/repeat variants.
+- [ ] Close the remaining notation gaps with real-file evidence: polyphonic TabVoice collision precedence, partial beams, tuplets, grace/cue notes, mensural proportions, harmonics, glissandi, ties/slurs across systems, fingerings, ornaments, fermatas, endings, and barline/repeat variants.
   - Each decoded construct needs a typed model field, importer regression, terminal rendering regression, and LilyPond/PDF assertion.
   - Unknown values must remain visible in `:info` and fail the semantic audit rather than being silently discarded.
 
