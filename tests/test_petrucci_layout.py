@@ -27,6 +27,7 @@ from oud.petrucci.score import (
     OrnamentKind,
     PitchStep,
     SpanKind,
+    StemDirection,
     TimeSignature,
     TupletRatio,
     WrittenPitch,
@@ -465,6 +466,156 @@ def test_feedback_rows_are_content_derived_unless_stable_lane_is_requested() -> 
     assert compact.systems[1].staff_rows[0].feedback_row is None
     assert all(system.staff_rows[0].feedback_row is not None for system in stable.systems)
     assert compact.document_height < stable.document_height
+
+
+def test_compact_trainer_policy_hides_engraving_and_reserves_pitch_labels() -> None:
+    first = NotationEvent(
+        "trainer-c-sharp",
+        Fraction(0),
+        Fraction(1, 8),
+        EventKind.NOTE,
+        (pitch_from_midi(61),),
+        beam=BeamKind.START,
+    )
+    second = NotationEvent(
+        "trainer-e",
+        Fraction(1, 8),
+        Fraction(1, 8),
+        EventKind.NOTE,
+        (pitch_from_midi(64),),
+        beam=BeamKind.END,
+    )
+    score = NotationScore(
+        "trainer-score",
+        (
+            NotationStaff(
+                "trainer-staff",
+                (NotationMeasure("trainer-measure", 1, (first, second)),),
+                lyrics=(LyricSyllable("trainer-lyric", first.id, "sing"),),
+            ),
+        ),
+        title="Trainer",
+    )
+    policy = NotationLayoutPolicy(
+        show_title=False,
+        show_measure_numbers=False,
+        show_lyrics=False,
+        show_stems=False,
+        show_barlines=False,
+        show_pitch_labels=True,
+        reserve_feedback_lane=True,
+    )
+
+    layout = layout_score(score, policy=policy)
+
+    roles = {element.key.role for element in layout.elements}
+    assert not roles.intersection(
+        {
+            ElementRole.TITLE,
+            ElementRole.MEASURE_NUMBER,
+            ElementRole.LYRIC,
+            ElementRole.STEM,
+            ElementRole.FLAG,
+            ElementRole.BEAM,
+            ElementRole.BARLINE,
+        },
+    )
+    labels = [element for element in layout.elements if element.key.role is ElementRole.PITCH_LABEL]
+    assert [label.value for label in labels] == ["C#4", "E4"]
+    rows = layout.systems[0].staff_rows[0]
+    assert rows.pitch_label_row is not None
+    assert rows.feedback_row is not None
+    assert rows.pitch_label_row != rows.feedback_row
+    for event, label in zip((first, second), labels, strict=True):
+        onset = layout.onset_for(event.id)
+        assert onset is not None
+        assert label.rect.x == onset.x
+        assert label.rect.y == rows.pitch_label_row
+
+
+def test_same_onset_voices_keep_one_onset_and_use_disjoint_visual_lanes() -> None:
+    upper = NotationEvent(
+        "voice-upper",
+        Fraction(0),
+        Fraction(1, 8),
+        EventKind.NOTE,
+        (WrittenPitch(PitchStep.C, 4),),
+        voice=0,
+        stem=StemDirection.UP,
+        dynamic="f",
+    )
+    lower = NotationEvent(
+        "voice-lower",
+        Fraction(0),
+        Fraction(1, 8),
+        EventKind.NOTE,
+        (WrittenPitch(PitchStep.C, 4),),
+        voice=1,
+        stem=StemDirection.DOWN,
+        dynamic="p",
+    )
+    adjacent = NotationEvent(
+        "voice-adjacent",
+        Fraction(0),
+        Fraction(3, 16),
+        EventKind.NOTE,
+        (WrittenPitch(PitchStep.D, 4, -1, AccidentalDisplay.EXPLICIT),),
+        voice=2,
+        stem=StemDirection.UP,
+        dynamic="mf",
+    )
+    rest = NotationEvent(
+        "voice-rest",
+        Fraction(0),
+        Fraction(1, 4),
+        EventKind.REST,
+        voice=3,
+        dynamic="pp",
+    )
+    events = (upper, lower, adjacent, rest)
+    lyrics = tuple(
+        LyricSyllable(f"voice-lyric-{index}", event.id, text)
+        for index, (event, text) in enumerate(zip(events, ("one", "two", "three", "rest"), strict=True))
+    )
+    score = NotationScore(
+        "voice-collision-score",
+        (
+            NotationStaff(
+                "voice-collision-staff",
+                (NotationMeasure("voice-collision-measure", 1, events),),
+                lyrics=lyrics,
+            ),
+        ),
+    )
+
+    layout = layout_score(score, viewport=LayoutViewport(width=100, height=30))
+
+    onsets = [layout.onset_for(event.id) for event in events]
+    assert all(onset is not None for onset in onsets)
+    assert len({onset.x for onset in onsets if onset is not None}) == 1
+    event_roles = {
+        ElementRole.NOTEHEAD,
+        ElementRole.REST,
+        ElementRole.ACCIDENTAL,
+        ElementRole.DOT,
+        ElementRole.STEM,
+        ElementRole.FLAG,
+        ElementRole.DYNAMIC,
+    }
+    occupied: dict[str, set[tuple[int, int]]] = {}
+    for event in events:
+        occupied[event.id] = {
+            (x, y)
+            for element in layout.elements_for(event.id)
+            if element.key.role in event_roles
+            for y in range(element.rect.y, element.rect.bottom + 1)
+            for x in range(element.rect.x, element.rect.right + 1)
+        }
+    for index, left in enumerate(events):
+        for right in events[index + 1 :]:
+            assert occupied[left.id].isdisjoint(occupied[right.id])
+    lyric_rects = [layout.elements_for(lyric.id)[0].rect for lyric in lyrics]
+    assert len({rect.x for rect in lyric_rects}) == len(lyric_rects)
 
 
 def test_layout_rejects_unrepresentable_duration_instead_of_guessing_quarter_note() -> None:

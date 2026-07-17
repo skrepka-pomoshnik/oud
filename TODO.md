@@ -14,9 +14,12 @@ below is the remaining release gate, not a restatement of completed foundation.
 
 ### Engraving correctness
 
-- [ ] Resolve independent-voice and dense-chord collisions without moving the
-  shared musical onset. Cover seconds/unisons, opposing stems, overlapping
-  accidentals, rests, dots, beams, and lyrics with deterministic precedence.
+- [ ] Finish independent-voice and dense-chord collision handling without
+  moving the shared musical onset. Same-onset unisons/seconds, rests,
+  stem/flag footprints, simultaneous dynamics, same-verse lyrics, and trainer
+  labels now use deterministic visual lanes. Add cross-voice beam-envelope
+  handling, larger chord/accidental/dot matrices, and whole-layout overlap
+  invariants.
 - [ ] Carry real imported tuplets, ties/slurs, mid-score clef/key changes, and
   remaining ornament forms through the Oud adapter. Each construct needs
   canonical, layout, semantic-frame, and text-snapshot evidence.
@@ -41,12 +44,12 @@ below is the remaining release gate, not a restatement of completed foundation.
 - [ ] Add structural and text snapshots at 60, 80, and 120 columns for dense and
   sparse measures, repeated pitches, rests, accidentals, ledger lines, ties,
   lyrics, safe glyphs, clipping, forced breaks, and resize preserving active ID.
-- [ ] Add one real score-following acceptance fixture across multiple playback
-  positions. Validate the actual Voce adapter with explicit renderer ownership,
-  repeated-note feedback by event ID, and Petrucci public imports only. The
-  consumer must select `system_offset` for the active event across playback and
-  resize, and map Petrucci's semantic roles to its own color policy without
-  moving playback clocks or global renderer state into Petrucci.
+- [ ] Validate the actual Voce adapter with explicit renderer ownership and
+  Petrucci public imports only. Oud's neutral-host acceptance now covers
+  repeated pitches, rests, ties, lyrics, result roles, compact trainer policy,
+  playback positions, resize, and active-system selection. Voce must still map
+  its `FlowNote` records and color policy without moving playback clocks or
+  global renderer state into Petrucci.
 - [ ] Move internal callers off underscore helpers exported by
   `view_model.__all__`, then shrink that legacy surface without changing
   `typeset_piece()` output.

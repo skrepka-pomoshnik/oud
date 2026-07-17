@@ -36,6 +36,14 @@ containing annotated events reserve that row; `reserve_feedback_lane=True`
 keeps a stable row on every system for hosts that prefer fixed geometry during
 live grading.
 
+The notation policy can hide titles, measure numbers, lyrics, stems/beams, and
+barlines, and can place written pitch labels in a dedicated row. This provides
+a compact trainer view without post-render mutation. Eighth through 64th rests
+remain distinct in both safe and pretty glyph modes. Same-onset events retain a
+single musical onset while unisons/seconds, rests, stem and flag footprints,
+simultaneous dynamics, same-verse lyrics, and pitch labels receive deterministic
+visual lanes.
+
 The FT3 adapter now normalizes same-onset chords and independent voices with
 per-voice clocks, and carries meter, repeat/endings, beams, fermatas, dynamics,
 observed `+` ornaments, courtesy accidentals, square editorial brackets, and
@@ -43,10 +51,10 @@ confirmed tie continuations. It remains strict about inconsistent durations,
 ornaments, pitches, meter overflow, and lyric onsets. `include_lyrics=False` is
 an explicit note-only migration mode, not a fallback.
 
-This is not completion of the Oud migration. Dense independent voices still
-need engraving collision rules, imported tuplets/spans and mid-score clef/key
-changes remain, and the legacy vocal renderer remains active in Oud. Those
-concrete release gates are tracked in `TODO.md`.
+This is not completion of the Oud migration. Cross-voice beam envelopes and
+larger dense-chord invariants still need engraving rules, imported tuplets/spans
+and mid-score clef/key changes remain, and the legacy vocal renderer remains
+active in Oud. Those concrete release gates are tracked in `TODO.md`.
 
 ## Boundaries
 
@@ -196,8 +204,9 @@ aligned lyrics, stable IDs, no clipping, and no silent fallback.
 1. Add typed overlay state and semantic styling for current, pending, hit,
    missed, and uncertain events. Grading values are displayed but never computed
    by Petrucci.
-2. Add a score-following acceptance fixture covering repeated pitches, rests,
-   ties, lyrics, playback movement, results, and resize at several positions.
+2. Keep the neutral score-following acceptance fixture covering repeated
+   pitches, rests, ties, lyrics, playback movement, results, compact trainer
+   policy, and resize at several positions.
 3. Document a Voce adapter from `FlowNote` and renderer injection. In Voce,
    replace the global registry with an explicitly owned renderer and consume
    only Petrucci's public API.

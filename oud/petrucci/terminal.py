@@ -131,7 +131,10 @@ class _GlyphInventory:
     whole_rest: str
     half_rest: str
     quarter_rest: str
-    short_rest: str
+    eighth_rest: str
+    sixteenth_rest: str
+    thirty_second_rest: str
+    sixty_fourth_rest: str
     fermata: str
     ornament_plus: str
     clip: str
@@ -171,7 +174,10 @@ _PRETTY = _GlyphInventory(
     whole_rest="𝄻",
     half_rest="𝄼",
     quarter_rest="𝄽",
-    short_rest="𝄾",
+    eighth_rest="𝄾",
+    sixteenth_rest="𝄿",
+    thirty_second_rest="𝅀",
+    sixty_fourth_rest="𝅁",
     fermata="𝄐",
     ornament_plus="+",
     clip="»",
@@ -211,7 +217,10 @@ _SAFE = _GlyphInventory(
     whole_rest="R",
     half_rest="r",
     quarter_rest="r",
-    short_rest="r",
+    eighth_rest="e",
+    sixteenth_rest="s",
+    thirty_second_rest="t",
+    sixty_fourth_rest="x",
     fermata="^",
     ornament_plus="+",
     clip=">",
@@ -418,6 +427,7 @@ def _element_text(element: LayoutElement, glyphs: _GlyphInventory) -> str:
         ElementRole.MEASURE_NUMBER,
         ElementRole.LYRIC,
         ElementRole.DYNAMIC,
+        ElementRole.PITCH_LABEL,
         ElementRole.FEEDBACK,
     }
     if role in literal_roles:
@@ -520,11 +530,13 @@ def _rest_text(value: str, glyphs: _GlyphInventory) -> str:
     denominator = int(value or "4")
     if denominator <= 1:
         return glyphs.whole_rest
-    if denominator == 2:
-        return glyphs.half_rest
-    if denominator == 4:
-        return glyphs.quarter_rest
-    return glyphs.short_rest
+    return {
+        2: glyphs.half_rest,
+        4: glyphs.quarter_rest,
+        8: glyphs.eighth_rest,
+        16: glyphs.sixteenth_rest,
+        32: glyphs.thirty_second_rest,
+    }.get(denominator, glyphs.sixty_fourth_rest)
 
 
 def _accidental_text(value: str, glyphs: _GlyphInventory) -> str:

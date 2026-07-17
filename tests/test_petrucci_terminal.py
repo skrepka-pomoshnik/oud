@@ -344,6 +344,40 @@ def test_safe_terminal_distinguishes_repeat_barlines(barline: str, glyph: str) -
     assert {result.lines[y][x] for y, x in barline_cells} == {glyph}
 
 
+@pytest.mark.parametrize(
+    ("glyph_mode", "expected"),
+    [
+        (GlyphMode.PRETTY, ("𝄾", "𝄿", "𝅀", "𝅁")),
+        (GlyphMode.SAFE, ("e", "s", "t", "x")),
+    ],
+)
+def test_terminal_distinguishes_short_rest_durations(
+    glyph_mode: GlyphMode,
+    expected: tuple[str, str, str, str],
+) -> None:
+    rests = (
+        NotationEvent("rest-8", Fraction(0), Fraction(1, 8), EventKind.REST),
+        NotationEvent("rest-16", Fraction(1, 8), Fraction(1, 16), EventKind.REST),
+        NotationEvent("rest-32", Fraction(3, 16), Fraction(1, 32), EventKind.REST),
+        NotationEvent("rest-64", Fraction(7, 32), Fraction(1, 64), EventKind.REST),
+    )
+    score = NotationScore(
+        "rest-score",
+        (NotationStaff("rest-staff", (NotationMeasure("rest-measure", 1, rests),)),),
+    )
+
+    result = typeset_score(
+        score,
+        options=ScoreTypesetOptions(width=64, height=20, glyph_mode=glyph_mode),
+    )
+
+    for rest, glyph in zip(rests, expected, strict=True):
+        cells = [(y, x) for y, x in result.cells_for(rest.id) if result.semantic_frame.roles[y][x] is ElementRole.REST]
+        assert len(cells) == 1
+        y, x = cells[0]
+        assert result.lines[y][x] == glyph
+
+
 def test_terminal_paints_endings_ornaments_and_fermatas_in_reserved_rows() -> None:
     note = NotationEvent(
         "marked-note",

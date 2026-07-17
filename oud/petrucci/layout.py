@@ -41,6 +41,7 @@ class ElementRole(StrEnum):
     FERMATA = "fermata"
     ORNAMENT = "ornament"
     DYNAMIC = "dynamic"
+    PITCH_LABEL = "pitch-label"
     FEEDBACK = "feedback"
     LYRIC = "lyric"
     LYRIC_HYPHEN = "lyric-hyphen"
@@ -124,6 +125,7 @@ class StaffRows:
     notation_bottom: int
     tie_rows: tuple[int, ...]
     dynamic_row: int | None
+    pitch_label_row: int | None
     feedback_row: int | None
     lyric_rows: tuple[int, ...]
     bottom: int
@@ -147,6 +149,7 @@ class StaffRows:
         below = (
             *self.tie_rows,
             *((self.dynamic_row,) if self.dynamic_row is not None else ()),
+            *((self.pitch_label_row,) if self.pitch_label_row is not None else ()),
             *((self.feedback_row,) if self.feedback_row is not None else ()),
             *self.lyric_rows,
         )
@@ -228,6 +231,9 @@ class NotationLayoutPolicy:
     show_title: bool = True
     show_measure_numbers: bool = True
     show_lyrics: bool = True
+    show_stems: bool = True
+    show_barlines: bool = True
+    show_pitch_labels: bool = False
     reserve_feedback_lane: bool = False
 
 

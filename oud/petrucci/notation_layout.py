@@ -58,6 +58,7 @@ class _ScoreState:
 class _OnsetGroup:
     onset: Fraction
     events: tuple[NotationEvent, ...]
+    event_offsets: tuple[int, ...]
     width: int
 
 
@@ -88,6 +89,7 @@ class _StaffVerticalNeeds:
     has_ornament: bool
     has_fermata: bool
     has_dynamic: bool
+    has_pitch_labels: bool
     has_feedback: bool
 
 
@@ -232,7 +234,13 @@ def _measure_geometry(
     measure = staff.measures[index]
     lyrics = _lyrics_by_event(staff.lyrics) if policy.show_lyrics else {}
     visible_accidentals = _visible_accidentals(staff, index)
-    groups = _onset_groups(measure, lyrics=lyrics, visible_accidentals=visible_accidentals)
+    groups = _onset_groups(
+        measure,
+        lyrics=lyrics,
+        visible_accidentals=visible_accidentals,
+        clef=_state_at(staff, index).clef,
+        policy=policy,
+    )
     change_width = _measure_change_width(staff, index)
     token_width = sum(group.width for group in groups)
     natural_gaps = sum(
@@ -251,6 +259,8 @@ def _onset_groups(
     *,
     lyrics: dict[str, tuple[LyricSyllable, ...]],
     visible_accidentals: dict[str, frozenset[WrittenPitch]],
+    clef: Clef,
+    policy: NotationLayoutPolicy,
 ) -> tuple[_OnsetGroup, ...]:
     by_onset: dict[Fraction, list[NotationEvent]] = {}
     for event in measure.events:
@@ -258,22 +268,117 @@ def _onset_groups(
     groups: list[_OnsetGroup] = []
     for onset in sorted(by_onset):
         events = tuple(sorted(by_onset[onset], key=lambda event: (event.voice, event.id)))
-        event_width = max(
-            (
-                _event_width(event, accidental_pitches=visible_accidentals.get(event.id, frozenset()))
-                for event in events
-            ),
+        event_widths = tuple(
+            max(
+                _event_width(
+                    event,
+                    accidental_pitches=visible_accidentals.get(event.id, frozenset()),
+                    show_pitch_labels=policy.show_pitch_labels,
+                ),
+                max((display_width(lyric.text) for lyric in lyrics.get(event.id, ())), default=0),
+            )
+            for event in events
+        )
+        lane_widths = (
+            tuple(
+                _event_lane_width(event, width, show_stems=policy.show_stems)
+                for event, width in zip(events, event_widths, strict=True)
+            )
+            if len(events) > 1
+            else event_widths
+        )
+        event_offsets = _event_collision_offsets(
+            events,
+            lane_widths,
+            lyrics=lyrics,
+            clef=clef,
+            policy=policy,
+        )
+        width = max(
+            (offset + event_width for offset, event_width in zip(event_offsets, lane_widths, strict=True)),
             default=1,
         )
-        lyric_width = max(
-            (display_width(lyric.text) for event in events for lyric in lyrics.get(event.id, ())),
-            default=0,
-        )
-        groups.append(_OnsetGroup(onset=onset, events=events, width=max(event_width, lyric_width, 1)))
+        groups.append(_OnsetGroup(onset=onset, events=events, event_offsets=event_offsets, width=max(1, width)))
     return tuple(groups)
 
 
-def _event_width(event: NotationEvent, *, accidental_pitches: frozenset[WrittenPitch]) -> int:
+def _event_collision_offsets(
+    events: tuple[NotationEvent, ...],
+    widths: tuple[int, ...],
+    *,
+    lyrics: dict[str, tuple[LyricSyllable, ...]],
+    clef: Clef,
+    policy: NotationLayoutPolicy,
+) -> tuple[int, ...]:
+    lanes: list[list[NotationEvent]] = []
+    lane_widths: list[int] = []
+    assignments: list[int] = []
+    for event, width in zip(events, widths, strict=True):
+        lane_index = next(
+            (
+                index
+                for index, lane in enumerate(lanes)
+                if all(not _events_collide(event, other, lyrics=lyrics, clef=clef, policy=policy) for other in lane)
+            ),
+            len(lanes),
+        )
+        if lane_index == len(lanes):
+            lanes.append([event])
+            lane_widths.append(width)
+        else:
+            lanes[lane_index].append(event)
+            lane_widths[lane_index] = max(lane_widths[lane_index], width)
+        assignments.append(lane_index)
+    lane_offsets: list[int] = []
+    cursor = 0
+    for width in lane_widths:
+        lane_offsets.append(cursor)
+        cursor += width + 1
+    return tuple(lane_offsets[index] for index in assignments)
+
+
+def _events_collide(
+    left: NotationEvent,
+    right: NotationEvent,
+    *,
+    lyrics: dict[str, tuple[LyricSyllable, ...]],
+    clef: Clef,
+    policy: NotationLayoutPolicy,
+) -> bool:
+    if left.kind is EventKind.REST or right.kind is EventKind.REST:
+        return True
+    if policy.show_pitch_labels or (left.dynamic and right.dynamic):
+        return True
+    left_verses = {lyric.verse for lyric in lyrics.get(left.id, ())}
+    right_verses = {lyric.verse for lyric in lyrics.get(right.id, ())}
+    if left_verses.intersection(right_verses):
+        return True
+    left_positions = [_staff_position(pitch, clef=clef) for pitch in left.pitches]
+    right_positions = [_staff_position(pitch, clef=clef) for pitch in right.pitches]
+    if any(abs(left_pos - right_pos) <= 1 for left_pos in left_positions for right_pos in right_positions):
+        return True
+    return policy.show_stems and _events_have_colliding_stems(left, right, left_positions, right_positions)
+
+
+def _events_have_colliding_stems(
+    left: NotationEvent,
+    right: NotationEvent,
+    left_positions: list[int],
+    right_positions: list[int],
+) -> bool:
+    left_denominator, _left_dots = _event_notation(left)
+    right_denominator, _right_dots = _event_notation(right)
+    if left_denominator <= 1 or right_denominator <= 1:
+        return False
+    return _stem_up(left, left_positions) == _stem_up(right, right_positions)
+
+
+def _event_width(
+    event: NotationEvent,
+    *,
+    accidental_pitches: frozenset[WrittenPitch],
+    show_pitch_labels: bool,
+) -> int:
     _denominator, dots = _event_notation(event)
     if event.kind is EventKind.REST:
         notation_width = 1 + dots
@@ -285,7 +390,17 @@ def _event_width(event: NotationEvent, *, accidental_pitches: frozenset[WrittenP
         chord_offset = 1 if _chord_has_second(event.pitches) else 0
         editorial_width = 2 if event.editorial_brackets else 0
         notation_width = accidental + editorial_width + 1 + chord_offset + dots
-    return max(notation_width, display_width(event.dynamic or ""))
+    pitch_label_width = display_width(_event_pitch_label(event)) if show_pitch_labels else 0
+    return max(notation_width, display_width(event.dynamic or ""), pitch_label_width)
+
+
+def _event_lane_width(event: NotationEvent, width: int, *, show_stems: bool) -> int:
+    if not show_stems or event.kind is EventKind.REST:
+        return width
+    denominator, _dots = _event_notation(event)
+    if denominator <= 1:
+        return width
+    return max(width, 3 if denominator >= 8 and event.beam is BeamKind.NONE else 2)
 
 
 def _natural_onset_gap(left: Fraction, right: Fraction, base: int) -> int:
@@ -339,6 +454,8 @@ def _allocate_system_rows(
             measure_end=measure_end,
             metrics=metrics,
             feedback_event_ids=feedback_event_ids,
+            show_stems=policy.show_stems,
+            show_pitch_labels=policy.show_pitch_labels,
             reserve_feedback_lane=policy.reserve_feedback_lane,
         )
         allocated = _staff_rows(
@@ -391,6 +508,8 @@ def _staff_rows(
     cursor += len(tie_rows)
     dynamic_row = cursor + 1 if needs.has_dynamic else None
     cursor += int(dynamic_row is not None)
+    pitch_label_row = cursor + 1 if needs.has_pitch_labels else None
+    cursor += int(pitch_label_row is not None)
     feedback_row = cursor + 1 if needs.has_feedback else None
     cursor += int(feedback_row is not None)
     lyric_start = cursor + max(1, metrics.lyric_gap)
@@ -409,6 +528,7 @@ def _staff_rows(
         notation_bottom=notation_bottom,
         tie_rows=tie_rows,
         dynamic_row=dynamic_row,
+        pitch_label_row=pitch_label_row,
         feedback_row=feedback_row,
         lyric_rows=lyric_rows,
         bottom=bottom,
@@ -422,6 +542,8 @@ def _system_staff_needs(
     measure_end: int,
     metrics: LayoutMetrics,
     feedback_event_ids: frozenset[str],
+    show_stems: bool,
+    show_pitch_labels: bool,
     reserve_feedback_lane: bool,
 ) -> _StaffVerticalNeeds:
     line_bottom = 4 * (metrics.staff_line_gap + 1)
@@ -430,7 +552,12 @@ def _system_staff_needs(
     for measure_index in range(measure_start, measure_end):
         clef = _state_at(staff, measure_index).clef
         for event in staff.measures[measure_index].events:
-            event_upper, event_lower = _event_vertical_extent(event, clef=clef, line_bottom=line_bottom)
+            event_upper, event_lower = _event_vertical_extent(
+                event,
+                clef=clef,
+                line_bottom=line_bottom,
+                show_stems=show_stems,
+            )
             upper = min(upper, event_upper)
             lower = max(lower, event_lower)
     span_kinds = _system_span_kinds(staff, measure_start=measure_start, measure_end=measure_end)
@@ -448,6 +575,12 @@ def _system_staff_needs(
         ),
         has_dynamic=any(
             event.dynamic for measure in staff.measures[measure_start:measure_end] for event in measure.events
+        ),
+        has_pitch_labels=show_pitch_labels
+        and any(
+            event.kind is EventKind.NOTE
+            for measure in staff.measures[measure_start:measure_end]
+            for event in measure.events
         ),
         has_feedback=reserve_feedback_lane
         or any(
@@ -471,7 +604,13 @@ def _system_span_kinds(staff: NotationStaff, *, measure_start: int, measure_end:
     return kinds
 
 
-def _event_vertical_extent(event: NotationEvent, *, clef: Clef, line_bottom: int) -> tuple[int, int]:
+def _event_vertical_extent(
+    event: NotationEvent,
+    *,
+    clef: Clef,
+    line_bottom: int,
+    show_stems: bool,
+) -> tuple[int, int]:
     if event.kind is EventKind.REST:
         middle = line_bottom // 2
         return middle, middle
@@ -480,7 +619,7 @@ def _event_vertical_extent(event: NotationEvent, *, clef: Clef, line_bottom: int
     upper = min(points)
     lower = max(points)
     denominator, _dots = _event_notation(event)
-    if denominator > 1:
+    if show_stems and denominator > 1:
         if _stem_up(event, positions):
             upper -= 3
         else:
@@ -659,31 +798,35 @@ def _layout_measure(
     onsets: list[OnsetPosition] = []
     event_xs: dict[str, int] = {}
     for group, group_x in zip(geometry.groups, group_xs, strict=False):
-        for event in group.events:
+        for event, event_offset in zip(group.events, group.event_offsets, strict=True):
+            event_x = group_x + event_offset
             event_elements, event_clipped = _event_elements(
                 event,
-                x=group_x,
+                x=event_x,
                 rows=rows,
                 clef=active_clef,
                 accidental_pitches=visible_accidentals.get(event.id, frozenset()),
+                policy=policy,
             )
             elements.extend(event_elements)
             onsets.append(OnsetPosition(event.id, staff.id, measure.id, system_index, group_x))
-            event_xs[event.id] = group_x
+            event_xs[event.id] = event_x
             clipped = clipped or event_clipped
             if policy.show_lyrics:
-                elements.extend(_lyric_elements(lyrics.get(event.id, ()), x=group_x, rows=rows))
-    elements.extend(_beam_elements(measure.events, elements))
+                elements.extend(_lyric_elements(lyrics.get(event.id, ()), x=event_x, rows=rows))
+    if policy.show_stems:
+        elements.extend(_beam_elements(measure.events, elements))
     if policy.show_lyrics:
         elements.extend(_lyric_connector_elements(lyrics, event_xs=event_xs, rows=rows))
     bar_x = x + width - 1
-    elements.append(
-        LayoutElement(
-            ElementKey(measure.id, ElementRole.BARLINE),
-            Rect(bar_x, rows.line_rows[0], 1, rows.line_rows[-1] - rows.line_rows[0] + 1),
-            measure.barline.value,
-        ),
-    )
+    if policy.show_barlines:
+        elements.append(
+            LayoutElement(
+                ElementKey(measure.id, ElementRole.BARLINE),
+                Rect(bar_x, rows.line_rows[0], 1, rows.line_rows[-1] - rows.line_rows[0] + 1),
+                measure.barline.value,
+            ),
+        )
     if clipped:
         elements.append(
             LayoutElement(
@@ -788,6 +931,7 @@ def _event_elements(
     rows: StaffRows,
     clef: Clef,
     accidental_pitches: frozenset[WrittenPitch],
+    policy: NotationLayoutPolicy,
 ) -> tuple[tuple[LayoutElement, ...], bool]:
     denominator, dots = _event_notation(event)
     if event.kind is EventKind.REST:
@@ -802,7 +946,20 @@ def _event_elements(
             denominator=denominator,
             dots=dots,
             accidental_pitches=accidental_pitches,
+            show_stems=policy.show_stems,
         )
+        if policy.show_pitch_labels:
+            if rows.pitch_label_row is None:
+                _layout_fail(f"event {event.id!r} requires an unallocated pitch-label row")
+            label = _event_pitch_label(event)
+            elements = (
+                *elements,
+                LayoutElement(
+                    ElementKey(event.id, ElementRole.PITCH_LABEL),
+                    Rect(x, rows.pitch_label_row, max(1, display_width(label))),
+                    label,
+                ),
+            )
     if event.dynamic:
         if rows.dynamic_row is None:
             _layout_fail(f"event {event.id!r} requires an unallocated dynamic row")
@@ -861,6 +1018,7 @@ def _note_elements(
     denominator: int,
     dots: int,
     accidental_pitches: frozenset[WrittenPitch],
+    show_stems: bool,
 ) -> tuple[tuple[LayoutElement, ...], bool]:
     pitches = sorted(event.pitches, key=_diatonic_number)
     positions = [_staff_position(pitch, clef=clef) for pitch in pitches]
@@ -892,7 +1050,11 @@ def _note_elements(
                 editorial_brackets=event.editorial_brackets,
             )
         )
-    stems = _stem_elements(event, head_points=head_points, positions=positions, rows=rows, denominator=denominator)
+    stems = (
+        _stem_elements(event, head_points=head_points, positions=positions, rows=rows, denominator=denominator)
+        if show_stems
+        else ()
+    )
     elements.extend(stems)
     if denominator >= 8 and event.beam is BeamKind.NONE and stems:
         elements.extend(_flag_elements(event, stem=stems[0], denominator=denominator, rows=rows))
@@ -906,6 +1068,15 @@ def _note_elements(
             ),
         )
     return tuple(elements), clipped
+
+
+def _event_pitch_label(event: NotationEvent) -> str:
+    return "/".join(_written_pitch_label(pitch) for pitch in event.pitches)
+
+
+def _written_pitch_label(pitch: WrittenPitch) -> str:
+    accidental = {-2: "bb", -1: "b", 0: "", 1: "#", 2: "##"}[pitch.alter]
+    return f"{pitch.step.value}{accidental}{pitch.octave}"
 
 
 def _pitch_elements(

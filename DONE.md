@@ -3,6 +3,20 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-07-17
+- Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, and 1,262 tests
+  pass with one Darwin-only test skipped on Linux at 85.76% coverage; 187/187
+  local corpus files load without warnings.
+- Added a compact public Petrucci trainer policy that can hide stems/beams and
+  barlines, emit collision-safe written pitch labels, and reserve a separate
+  stable feedback row without mutating rendered text.
+- Preserved one logical onset for simultaneous voices while assigning
+  deterministic visual lanes to common unison/second, rest, stem/flag, dynamic,
+  same-verse lyric, and trainer-label conflicts. Monophonic score snapshots stay
+  unchanged.
+- Distinguished eighth, 16th, 32nd, and 64th rests in Unicode-pretty and
+  ASCII-safe output. Expanded the public-only neutral host acceptance through
+  repeated pitches, rests, cross-system ties, lyrics, grading states, compact
+  trainer output, resize, and active-system selection.
 - Removed redundant new-score and read-only focus key hints from the persistent status area. Playback now follows the active score system by default, retains its viewport through rests, catches positions advanced during a slow full render, and remains disableable with `:set playbackscroll=off`.
 - Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, and 1,257 tests pass with one Darwin-only test skipped on Linux at 85.73% coverage; 187/187 local corpus files load without warnings.
 - Separated FT3 meter codes from shared header flags. Nineteen records across 14 fixed-corpus files now retain their explicit meter; the published Gesualdo score confirms `0e 10` as a repeated `3/2` opening, and all four viol staffs adapt to canonical Petrucci notation.

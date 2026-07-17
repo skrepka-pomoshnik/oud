@@ -406,8 +406,29 @@ lyrics receive reserved semantic lanes before terminal painting.
 Feedback rows are content-derived by default; set
 `NotationLayoutPolicy(reserve_feedback_lane=True)` when a live consumer needs
 stable result-row geometry across every system.
-Dense independent-voice collision handling and Oud's TUI migration remain
-release work in `TODO.md`.
+For a compact trainer view, policy flags can independently hide title, measure
+numbers, lyrics, stems/beams, and barlines, show written pitch labels, and keep a
+stable result row:
+
+```python
+from oud.petrucci import NotationLayoutPolicy
+
+trainer_policy = NotationLayoutPolicy(
+    show_title=False,
+    show_measure_numbers=False,
+    show_lyrics=False,
+    show_stems=False,
+    show_barlines=False,
+    show_pitch_labels=True,
+    reserve_feedback_lane=True,
+)
+```
+
+Pretty and safe modes distinguish eighth, 16th, 32nd, and 64th rests. Events at
+one musical onset retain one onset coordinate while common notehead, rest,
+stem/flag, dynamic, same-verse lyric, and pitch-label conflicts use deterministic
+visual lanes. Cross-voice beam envelopes, larger dense chords, imported notation
+depth, and Oud's TUI migration remain release work in `TODO.md`.
 
 The package is the authoritative implementation home for:
 
