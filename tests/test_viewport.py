@@ -1,5 +1,9 @@
+import subprocess
+from typing import cast
+
 import pytest
 
+from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
@@ -106,6 +110,21 @@ def test_ensure_cursor_visible_ignores_playback_when_disabled() -> None:
     state.playback_bar = 8
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
     assert state.bar_offset == 0
+
+
+def test_ensure_cursor_visible_holds_viewport_during_playback_rest() -> None:
+    state = _state()
+    state.settings["playbackscroll"] = "on"
+    state.bar_offset = 8
+    state.cursor_bar = 0
+    state.playback_bar = None
+    state.playback.started_at = 1.0
+    state.playback.timeline = [PlaybackCursor(start=0.0, end=1.0, bar=8, col=0)]
+    state.midi_proc = cast(subprocess.Popen[bytes], object())
+
+    ensure_cursor_visible(state, state.screen_width, state.screen_height)
+
+    assert state.bar_offset == 8
 
 
 def test_ensure_cursor_visible_maps_duet_halves_playback_to_logical_rows() -> None:

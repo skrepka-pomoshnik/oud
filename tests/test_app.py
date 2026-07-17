@@ -506,6 +506,55 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
     assert render_bar_offsets[0] > 0
 
 
+def test_run_loop_follows_playback_advanced_during_full_render(monkeypatch) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    state = _playback_scroll_state()
+    state.bar_offset = 0
+    state.playback_bar = 0
+    updates = 0
+    render_bar_offsets: list[int] = []
+
+    class _DelayedQuitWindow(_PlaybackScrollFakeWindow):
+        def getch(self):
+            self._calls += 1
+            if self._calls <= 2:
+                return -1
+            return ord("q")
+
+    def _fake_init_state(*_args, **_kwargs):
+        return state
+
+    def _fake_update_playback_animation(updated_state: EditorState) -> bool:
+        nonlocal updates
+        updates += 1
+        if updates != 2:
+            return False
+        updated_state.playback.bar = 8
+        updated_state.playback.col = 0
+        updated_state.playback.markers = [(8, 0)]
+        return True
+
+    def _fake_render_piece(*args, **_kwargs):
+        render_bar_offsets.append(args[2])
+
+    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
+    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+
+    assert (
+        run_loop(
+            cast(curses.window, _DelayedQuitWindow()),
+            None,
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=handle_normal,
+            apply_command=apply_command,
+        )
+        == 0
+    )
+    assert render_bar_offsets[:2] == [0, 8]
+
+
 def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
     state = _playback_scroll_state()

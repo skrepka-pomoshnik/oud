@@ -204,10 +204,15 @@ def run_loop(
             base_frame = frame_buffer.snapshot()
             state.last_base_frame = base_frame
             state.playback_overlay_cache = playback_cache
+            rerender_for_playback_scroll = False
             if playback_cache is not None:
                 # Full score rendering can take longer than a short note. Sample
                 # the clock again so the overlay drawn now is not one frame old.
-                update_playback_animation(state)
+                playback_resampled = update_playback_animation(state)
+                if playback_resampled:
+                    resampled_bar_offset = state.bar_offset
+                    ensure_cursor_visible(state, width, height)
+                    rerender_for_playback_scroll = state.bar_offset != resampled_bar_offset
                 playback_key = (
                     state.playback_bar if state.playback_bar is not None else -1,
                     state.playback_col if state.playback_col is not None else -1,
@@ -225,6 +230,6 @@ def run_loop(
             draw_frame_rows(screen, frame, dirty)
             screen.refresh()
             view_commit_frame(state, frame)
-            needs_render = False
+            needs_render = rerender_for_playback_scroll
 
     return 0

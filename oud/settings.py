@@ -47,7 +47,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "layout": "auto",
     "justify": "stretch",
     "scrollmode": "smooth",
-    "playbackscroll": "off",
+    "playbackscroll": "on",
     "playverses": "once",
     "beatsnap": "off",
     "barpad": "1",

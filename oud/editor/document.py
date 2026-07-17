@@ -64,13 +64,13 @@ def configure_document(
         state.persistent_notice = "Read-only viewer"
         state.persistent_notice_level = MessageLevel.WARNING
     elif state.document_mode is DocumentMode.IMPORTED_READ_ONLY:
-        state.persistent_notice = "non-TAB; j/k focus"
-        state.persistent_notice_level = MessageLevel.WARNING
+        state.persistent_notice = ""
+        state.persistent_notice_level = MessageLevel.INFO
     elif state.document_mode is DocumentMode.IMPORTED_PROJECTION:
         state.persistent_notice = "source unchanged"
         state.persistent_notice_level = MessageLevel.INFO
     elif path is None:
-        state.persistent_notice = "i edit  :e open  ? help"
+        state.persistent_notice = ""
         state.persistent_notice_level = MessageLevel.INFO
     else:
         state.persistent_notice = ""

@@ -153,6 +153,7 @@ Durations are tracked per onset column and rendered according to current flag st
 - `:play [bar] [tempo]` play from bar
 - `:pause` stop active playback
 - `:midicmd [path]` show actual external playback command
+- Playback follows the active score system by default; `:set playbackscroll=off` keeps the viewport fixed.
 - `:lilypond [path]` export LilyPond
 - `:pdf` compile PDF from LilyPond
 
@@ -177,7 +178,7 @@ Durations are tracked per onset column and rendered according to current flag st
 - Rendering presets/cues: `tabnotation`, `timesigstyle`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
-- Playback: `soundfont`, `midipatch`, `midigate`, `tempo`
+- Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
 - Input profile: `keys`
 
 Notes:

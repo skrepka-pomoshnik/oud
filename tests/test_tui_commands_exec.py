@@ -603,6 +603,10 @@ def test_cmd_set_bool_shortcuts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     assert state.settings["showdur"] == "on"
     cmd.cmd_set(state, "noshowdur", str(tmp_path / "cfg.toml"))
     assert state.settings["showdur"] == "off"
+    cmd.cmd_set(state, "playbackscroll=off", str(tmp_path / "cfg.toml"))
+    assert state.settings["playbackscroll"] == "off"
+    cmd.cmd_set(state, "playbackscroll=on", str(tmp_path / "cfg.toml"))
+    assert state.settings["playbackscroll"] == "on"
 
 
 def test_cmd_ascii_and_midicmd(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3,6 +3,8 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-07-17
+- Removed redundant new-score and read-only focus key hints from the persistent status area. Playback now follows the active score system by default, retains its viewport through rests, catches positions advanced during a slow full render, and remains disableable with `:set playbackscroll=off`.
+- Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, and 1,257 tests pass with one Darwin-only test skipped on Linux at 85.73% coverage; 187/187 local corpus files load without warnings.
 - Separated FT3 meter codes from shared header flags. Nineteen records across 14 fixed-corpus files now retain their explicit meter; the published Gesualdo score confirms `0e 10` as a repeated `3/2` opening, and all four viol staffs adapt to canonical Petrucci notation.
 - Stopped barline and empty notation records from promoting heuristic ASCII coordinate fragments into fake pitches. The original bytes remain inspectable as typed control rows, while the fixed corpus no longer exposes invalid `1`, `4`, `_6(`, or `'_6` notation events.
 - Validation: no tracked FT3 payloads, both fixed 75-file semantic audits pass, Ruff, Ruff format, Ty, and 1,254 tests pass with one Darwin-only test skipped on Linux at 85.72% coverage; 187/187 local corpus files load without warnings.

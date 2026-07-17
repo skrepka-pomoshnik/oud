@@ -8,6 +8,7 @@ def test_init_state_new_file_defaults_to_8_bars(tmp_path: Path) -> None:
     cfg = tmp_path / "config.toml"
     state = init_state(None, config_path=str(cfg))
     assert len(state.piece.bars) == 8
+    assert state.visible_message == ""
 
 
 def test_init_state_missing_path_defaults_to_8_bars(tmp_path: Path) -> None:
@@ -27,7 +28,7 @@ def test_init_state_loads_represented_ft3_text_without_warning() -> None:
     assert state.message == ""
     assert state.piece.import_warnings == []
     assert state.read_only is True
-    assert state.visible_message == "non-TAB; j/k focus"
+    assert state.visible_message == ""
     assert any(bar.lyric_event_rows for bar in state.piece.bars)
 
 

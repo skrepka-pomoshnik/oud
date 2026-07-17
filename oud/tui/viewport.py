@@ -134,7 +134,7 @@ def _viewport_row_mapping(state: EditorState, width: int, height: int):
 
 
 def _playback_target_bar(state: EditorState) -> int | None:
-    if state.settings.get("playbackscroll", "off") != "on":
+    if state.settings.get("playbackscroll", "on") != "on":
         return None
     if state.playback_bar is None:
         return None
@@ -146,6 +146,25 @@ def _playback_target_bar(state: EditorState) -> int | None:
             return duet_raw_bar_index(0, logical, piece=state.piece)
         return min(marker_bar for marker_bar, _marker_col in state.playback.markers)
     return max(0, state.playback_bar)
+
+
+def _playback_is_between_events(state: EditorState) -> bool:
+    return bool(
+        state.settings.get("playbackscroll", "on") == "on"
+        and state.midi_proc is not None
+        and state.playback.started_at is not None
+        and state.playback.timeline
+        and state.playback_bar is None
+    )
+
+
+def _viewport_target_bar(state: EditorState) -> int | None:
+    playback_target = _playback_target_bar(state)
+    if playback_target is not None:
+        return playback_target
+    if _playback_is_between_events(state):
+        return None
+    return state.cursor_bar
 
 
 def scroll_viewport_page(state: EditorState, width: int, height: int, delta_pages: int) -> None:
@@ -162,10 +181,10 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
         state.viewport_scroll_hold_ticks = hold - 1
         return
     rows, _row_for_bar, _start_for_row = _viewport_row_mapping(state, width, height)
-    target_bar = state.cursor_bar
-    playback_target_bar = _playback_target_bar(state)
-    if playback_target_bar is not None:
-        target_bar = playback_target_bar
+    target_bar = _viewport_target_bar(state)
+    if target_bar is None:
+        # Keep the current score position through rests between playback events.
+        return
     if is_duet_score_piece(state.piece):
         _staff, logical = duet_bar_mapping(target_bar, piece=state.piece)
         target_bar = duet_raw_bar_index(0, logical, piece=state.piece)

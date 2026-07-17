@@ -34,6 +34,7 @@ def test_save_and_load_settings(tmp_path) -> None:
         "italianmultifret": "off",
         "viewinvert": "on",
         "frenchc": "alt",
+        "playbackscroll": "off",
     }
     save_settings(str(path), settings)
     loaded = load_settings(str(path))
@@ -67,3 +68,10 @@ def test_save_and_load_settings(tmp_path) -> None:
     assert loaded["italianmultifret"] == "off"
     assert loaded["viewinvert"] == "on"
     assert loaded["frenchc"] == "alt"
+    assert loaded["playbackscroll"] == "off"
+
+
+def test_playback_scroll_defaults_on(tmp_path) -> None:
+    loaded = load_settings(str(tmp_path / "missing.toml"))
+
+    assert loaded["playbackscroll"] == "on"

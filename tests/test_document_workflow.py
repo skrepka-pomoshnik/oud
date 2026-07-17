@@ -43,8 +43,8 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     mixed = init_state(MIXED_FT3, config_path=config)
     assert mixed.document_mode is DocumentMode.IMPORTED_READ_ONLY
     assert mixed.read_only is True
-    assert mixed.visible_message == "non-TAB; j/k focus"
-    assert mixed.visible_message_level is MessageLevel.WARNING
+    assert mixed.visible_message == ""
+    assert mixed.visible_message_level is MessageLevel.INFO
 
     duet = init_state(DUET_FT3, config_path=config)
     assert duet.document_mode is DocumentMode.IMPORTED_READ_ONLY
@@ -218,16 +218,16 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
         apply_command(state, "q", config)
 
 
-def test_persistent_notice_requires_acknowledgement(tmp_path: Path) -> None:
+def test_read_only_focus_uses_status_without_redundant_notice(tmp_path: Path) -> None:
     state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
-    assert state.persistent_notice
+    state.screen_width = 80
 
-    state.message = ""
-    assert state.visible_message == "non-TAB; j/k focus"
-
-    apply_command(state, "ack", state.config_path)
     assert state.persistent_notice == ""
-    assert state.message == "Notice acknowledged"
+    assert state.visible_message == ""
+
+    line = status_line(state)
+    assert "[FT3 VIEW]" in line
+    assert "focus:" in line
 
 
 def test_message_levels_classify_user_facing_results() -> None:

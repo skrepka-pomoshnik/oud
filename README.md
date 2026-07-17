@@ -106,6 +106,7 @@ ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 :midi [path]    export midi
 :play [bar]     play from bar (1-based)
 :play loop [n]  loop current bar or active visual range n times (default 2)
+:set playbackscroll=off  disable score following during playback (default on)
 :lilypond [path] export lilypond
 :pdf            export lilypond + compile pdf
 :midicmd [path] show midi command
