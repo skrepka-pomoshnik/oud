@@ -336,8 +336,8 @@ def auto_system_bar_plan_with_gaps(  # noqa: C901
 
 def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list[int]:
     """Per-bar minimum display widths, mirroring render_systems' computation."""
+    from petrucci.render_bar_state import resolved_bar_time_value  # noqa: PLC0415
     from petrucci.render_spacing import required_auto_display_width_for_bar  # noqa: PLC0415
-    from petrucci.render_system import _resolved_bar_time_value  # noqa: PLC0415
     from petrucci.tab_policy import (  # noqa: PLC0415
         bar_has_multifret_tokens,
         multifret_event_gap,
@@ -372,9 +372,9 @@ def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list
         )
         if compact_fill:
             auto_event_gap = max(1, auto_event_gap - 1)
-        current_time = _resolved_bar_time_value(state.piece, abs_bar, time_setting, 4)
+        current_time = resolved_bar_time_value(state.piece, abs_bar, time_setting, 4)
         _beats, _unit, sig_label = _parse_time_signature(current_time)
-        prev_time = _resolved_bar_time_value(state.piece, abs_bar - 1, time_setting, 4) if abs_bar > 0 else None
+        prev_time = resolved_bar_time_value(state.piece, abs_bar - 1, time_setting, 4) if abs_bar > 0 else None
         show_cue = show_time_cue_for_bar(
             bar_index=abs_bar,
             current_time_value=current_time,

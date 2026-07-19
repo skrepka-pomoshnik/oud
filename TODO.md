@@ -1,26 +1,17 @@
 # TODO
 
-## P0: Architecture debt retirement
+## P2: Architecture debt retirement
 
 CI now enforces complexity 7 and a 1,000-line module ceiling against the exact
 non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
 targets are in `docs/architecture-debt.md`.
 
-- [ ] Decompose the remaining high-risk dispatchers to complexity 7, starting
-  with `oud.editor.normal_actions.handle_normal` (87),
-  `petrucci.render_system.render_systems` (70),
-  `petrucci.render_rhythm_rows._render_rhythm_rows` (52), and
-  `petrucci.render_staff_rows._render_staff_and_playback` (37). Preserve the
-  existing key matrices, structural frames, and text goldens at each step.
-- [ ] Split `oud/importers/ft3.py` and `_ft3_text.py` into container scanning,
-  typed record decoding, staff assembly, text/lyric decoding, and normalization
-  while retaining one public `load_ft3` operation and all corpus evidence.
-- [ ] Split LilyPond and MIDI projection from serialization and external process
-  execution; bring both exporter modules below 1,000 lines and complexity 7.
 - [ ] Split `petrucci/view_model.py` by width planning, source projection, and
-  tuning/display records, then split the four oversized tests by behavior.
-- [ ] Retire the remaining 166 function-level C901 findings without raising limits,
-  broad per-file ignores, compatibility wrappers, or count-only helper modules.
+  tuning/display records; it is the sole module still above 1,000 lines.
+- [ ] Retire the remaining 158 function-level C901 findings without raising
+  limits, broad per-file ignores, compatibility wrappers, or count-only helper
+  modules. Start with `oud.editor.undo_ops.apply_action` (53),
+  `oud.importers.ft3.load_ft3` (44), and the remaining exporter/importer locals.
 
 ## P1: Note and tablature typing confidence
 
@@ -76,7 +67,7 @@ artifact.
 
 - [ ] Run a deterministic, stratified remote compatibility audit over at least 1,000 public FT3 files.
   - Record a checked-in manifest of URLs and expected metadata, not downloaded third-party files.
-  - Fixed expansions: 200/200 files in the three `corpus/ft3-random-*.json` manifests load without warnings or semantic-audit failures. The later samples add 125 previously unseen composer directories; each selection happened once and is never repeated by tests.
+  - Fixed expansions: 263/263 files in the four `corpus/ft3-random-*.json` manifests load without warnings or semantic-audit failures. Each selection happened once and is never repeated by tests.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section, German, Italian, French, and Spanish/Neapolitan examples.
   - Report format/version and staff-kind counts; require zero crashes and make every warning or unknown record actionable.
   - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (19 PDF comparisons recorded; MIDI remains incomplete).

@@ -26,38 +26,33 @@ restore two canonical paths and hide incomplete migrations.
 
 ## Oversized modules
 
-Five production modules remain above 1,000 physical lines:
+One production module remains above 1,000 physical lines:
 
 | Module | Baseline | Intended split |
 |---|---:|---|
-| `oud/importers/ft3.py` | 1,769 | container scan, record decode, staff assembly, normalization |
-| `oud/exports/lilypond.py` | 1,384 | document/header, tablature, notation/lyrics, subprocess workflow |
-| `oud/importers/_ft3_text.py` | 1,175 | row tokenization, classification, lyric assembly, record facade |
-| `oud/exports/midi.py` | 1,097 | event collection, SMF encoding, playback command/process |
 | `petrucci/view_model.py` | 1,068 | width planning, source projection, tuning labels, rendered bar records |
 
-Four test modules are also oversized: `tests/test_ui_render_split.py` (1,954),
-`tests/test_lilypond.py` (1,197), `tests/test_editor.py` (1,183), and
-`tests/test_tui_commands_exec.py` (1,164). Split them by public behavior as the
-corresponding production ownership is clarified; do not create numbered test
-fragments.
+FT3 import now separates metadata, tablature, note records, score assembly,
+text rows, and duration normalization. LilyPond separates common projection,
+tablature, vocal, and document/process ownership; MIDI separates projection,
+byte encoding, file assembly, and player runtime. The four former oversized
+test modules are split by behavior, with every test module below the ceiling.
 
 ## Complexity
 
-The enforced ceiling is 7. The baseline currently contains 166 over-limit
-functions, including suppressed findings. The highest-risk dispatchers are
-`oud.editor.normal_actions.handle_normal` (87),
-`petrucci.render_system.render_systems` (70),
-`oud.editor.undo_ops.apply_action` (53), `oud.importers.ft3.load_ft3` (44),
-`oud.exports.export_tab.export_tab` (35), and
-`oud.importers.tab.parse_tab_lines_data` (30).
+The enforced ceiling is 7. The baseline currently contains 158 over-limit
+functions, including suppressed findings. The former normal-mode and Petrucci
+render dispatchers now delegate to focused command, movement, system, rhythm,
+staff, and cue modules without over-limit coordinator functions. The highest
+remaining findings include `oud.editor.undo_ops.apply_action` (53),
+`oud.importers.ft3.load_ft3` (44), `oud.exports.export_tab.export_tab` (35),
+and `oud.importers.tab.parse_tab_lines_data` (30).
 
 Retirement order follows ownership and risk:
 
-1. Decompose the remaining renderer and editor dispatchers without changing output.
-2. Split FT3 scanning, decoding, assembly, and normalization behind one `load_ft3` facade.
-3. Separate LilyPond and MIDI model projection from serialization and process execution.
-4. Retire remaining local findings, lowering `architecture-debt.json` after each verified change.
+1. Split `petrucci/view_model.py` along its existing projection and display boundaries.
+2. Decompose the remaining high-complexity editor, importer, and export functions.
+3. Retire remaining local findings, lowering `architecture-debt.json` after each verified change.
 
 An entry is retired only after focused regressions and the full quality gate
 pass. Moving code without reducing ownership or complexity does not count.

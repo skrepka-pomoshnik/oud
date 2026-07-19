@@ -3,6 +3,18 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-07-19
+- Added a fourth fixed, one-time 63-file FT3 manifest with no URL or digest
+  overlap, bringing the random compatibility corpus to 263 files. All 63 new
+  files load and pass the semantic audit without warnings or unresolved values;
+  two additional published PDFs confirm under-`v` and combined fingering bits.
+- Split normal-mode dispatch, Petrucci staff/rhythm/system rendering, FT3 import,
+  LilyPond and MIDI export, and four oversized test modules by responsibility.
+  The enforced debt baseline is now 158 complex functions and one oversized
+  module; the remaining work is tracked as P2 rather than a release blocker.
+- Validation: no tracked FT3 payloads, architecture and isolated Petrucci wheel
+  gates, Ruff, Ruff format, Ty, and 1,300 tests pass with one Linux-skipped
+  Darwin test at 86.74% coverage; 300/300 local corpus files load without
+  warnings.
 - Split both 2K-line Petrucci modules by ownership. `render_system.py` is now
   671 lines and `notation_layout.py` 801; every extracted rendering/layout
   module is below 1,000 lines. The former complexity-162 renderer is now 70,
@@ -98,7 +110,7 @@ Technical change log. Keep short, append newest on top.
 - Removed redundant new-score and read-only focus key hints from the persistent status area. Playback now follows the active score system by default, retains its viewport through rests, catches positions advanced during a slow full render, and remains disableable with `:set playbackscroll=off`.
 - Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, and 1,257 tests pass with one Darwin-only test skipped on Linux at 85.73% coverage; 187/187 local corpus files load without warnings.
 - Separated FT3 meter codes from shared header flags. Nineteen records across 14 fixed-corpus files now retain their explicit meter; the published Gesualdo score confirms `0e 10` as a repeated `3/2` opening, and all four viol staffs adapt to canonical Petrucci notation.
-- Stopped barline and empty notation records from promoting heuristic ASCII coordinate fragments into fake pitches. The original bytes remain inspectable as typed control rows, while the fixed corpus no longer exposes invalid `1`, `4`, `_6(`, or `'_6` notation events.
+- Stopped barline and empty notation records from promoting heuristic ASCII coordinate fragments into fake pitches. Relevant barline fragments remain typed control rows, while tablature payload bytes such as `_6(` no longer create synthetic notation staffs.
 - Validation: no tracked FT3 payloads, both fixed 75-file semantic audits pass, Ruff, Ruff format, Ty, and 1,254 tests pass with one Darwin-only test skipped on Linux at 85.72% coverage; 187/187 local corpus files load without warnings.
 - Added a second fixed 75-file Gerbode corpus with unique, previously unseen composer directories and no overlap with the first sample. All 150 fixed external files load without warnings and pass the semantic audit with no residual flags or unknown records; FT3 payloads remain ignored.
 - Corrected lane-major mixed-score detection and the empty `0130` notation marker, so Berchem's 59-bar score maps to one tablature lane plus labeled alto and bass staffs instead of fragmented fake staffs. Typed empty layout records no longer produce unknown-staff warnings.
@@ -198,7 +210,7 @@ Technical change log. Keep short, append newest on top.
 ## 2026-02-07
 - Added reprise marker support end-to-end: `:repeat` now accepts structural + cue variants (`both`, `dc/ds`, `fine/coda`, `*alfine/*alcoda`) with normalization and limit handling in `oud/editor/notation_ops.py`.
 - Added reprise export/render coverage: repeat cue marks are emitted in LilyPond export and tested in `tests/test_lilypond.py`.
-- Finalized ASCII save parity check: `:wascii` output is validated against framebuffer snapshot in `tests/test_tui_commands_exec.py`.
+- Finalized ASCII save parity check: `:wascii` output is validated against framebuffer snapshot in `tests/test_tui_commands_media.py`.
 - Implemented and tested bars-per-line behavior (`:set barsperline=<n>`, `0=auto`) with new layout/render tests (`tests/test_editor_layout.py`, `tests/test_ui_render_split.py`).
 - Added new testing suites:
   - `tests/test_tui_prompt.py` (prompt/update behavior paths),

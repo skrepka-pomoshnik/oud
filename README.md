@@ -58,7 +58,8 @@ manifests, then scan the local cache:
 ```
 python3 scripts/fetch_ft3_corpus.py \
   corpus/ft3-regression.json corpus/ft3-random-75.json \
-  corpus/ft3-random-75-v2.json corpus/ft3-random-50-v3.json
+  corpus/ft3-random-75-v2.json corpus/ft3-random-50-v3.json \
+  corpus/ft3-random-63-v4.json
 python3 scripts/corpus_smoke.py lutemusic
 ```
 

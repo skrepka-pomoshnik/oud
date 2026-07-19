@@ -1,7 +1,7 @@
 # FT3/PDF parity matrix
 
 Manual comparison with Sarge Gerbode's published PDFs, 2026-07-11 through
-2026-07-17. Reference PDFs are not copied into the repository.
+2026-07-19. Reference PDFs are not copied into the repository.
 
 ```bash
 uv run python scripts/fetch_ft3_corpus.py corpus/ft3-regression.json
@@ -30,6 +30,8 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 | Four-part meter | `lutemusic/random-75-v2/065/gesualdo_gagliarda_4.ft3` | [Gagliarda](https://browse.lutemusic.org/composers/Gesualdo/pdf/gesualdo_gagliarda_4.pdf) | All four opening records use header `0e 10` with fraction bytes `02 03`. The PDF confirms a left repeat in `3/2`: `08` is a shared header flag, while low meter code `06` selects the fraction. All four staffs now adapt canonically. |
 | Additional ornaments | `lutemusic/random-50-v3/001/tombeau_sur_logy.ft3` | [Tombeau sur la mort de M. Compte de Logy](https://browse.lutemusic.org/composers/Weiss/pdf/tombeau_sur_logy.pdf) | Three `1c00` values print a left parenthesis before the fret; nine `2800` values print the repeated under-fret hook visible in bars 3, 26, and 27. Both now decode without residual bits. |
 | Long solo layout | `lutemusic/random-50-v3/017/hierusalem.ft3` | [Hierusalem luge](https://browse.lutemusic.org/composers/Borrono/pdf/hierusalem.pdf) | The 222 numbered bars remain continuous across three pages. The interleaved 74-byte object has no musical bar and is preserved as a typed placement-layout record rather than an unknown staff. |
+| Under-note ornament | `lutemusic/random-63-v4/019/2_suite_18_courante.ft3` | [Suite 18 in G minor, Courante](https://browse.lutemusic.org/composers/Froberger/pdf/2_suite_18_courante.pdf) | The sole `2400` value is the printed `v` below the first-course fret in bar 5; it now renders and exports as an under-`v` ornament. |
+| Combined fingering bits | `lutemusic/random-63-v4/031/Folle_cor_T.ft3` | [Folle cor](https://browse.lutemusic.org/composers/Mazzocchi/pdf/Folle_cor_T.pdf) | All 36 bars and tablature agree. The isolated `00c0` source value composes known left-finger bits 2 and 3; the PDF hides fingerings, so Oud preserves `2+3` without claiming a visible PDF mark. |
 
 ## Findings
 
@@ -37,12 +39,13 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
   bits, vocal bits, unknown source records, or import warnings.
 - Standard-note source records are semantic `note`/`note-lyrics` records. They
   are no longer duplicated as raw bars in each imported lane.
-- Barline and empty-note ASCII control fragments remain inspectable control
-  rows instead of becoming fake pitches such as `1`, `4`, or `_6(`.
-- In the fixed 200-file corpus, 22 files contain typed notation records. Twenty
-  adapt strictly with lyrics. Two are rejected with concrete inconsistent-
-  duration diagnostics; the adapter does not silently scale conflicting
-  same-onset source events.
+- Barline ASCII control fragments remain inspectable control rows instead of
+  becoming fake pitches. Tablature payload fragments such as `_6(` no longer
+  create synthetic notation staffs.
+- In the fixed 263-file corpus, 37 files contain typed notation records. Thirty
+  adapt strictly with lyrics. Seven are rejected with concrete inconsistent-
+  duration or invalid-tie diagnostics; the adapter does not silently scale
+  conflicting same-onset events or invent tie targets.
 - The four canonical layout cases contain 1,382 events. Every event retains a
   staff/measure/system location at 60, 80, and 120 columns; two narrow Folle
   events are explicitly clipped, and the other cases place every event.
@@ -54,7 +57,7 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 The focused matrix therefore has semantic import parity, not pixel-identical
 engraving parity. It does not establish general FT3 or Fronimo parity.
 
-## Fixed 200-file expansion
+## Fixed 263-file expansion
 
 `corpus/ft3-random-75.json` records a one-time selection made on 2026-07-12.
 Tests fetch those exact URLs and hashes; they never repeat the random choice.
@@ -71,3 +74,9 @@ also load without warnings and pass the semantic audit.
 or digest overlap with either earlier sample. It exposed and now covers two
 additional ornament values, a placement-layout record, and three score headings.
 All 50 files load without warnings and pass the semantic audit.
+
+`corpus/ft3-random-63-v4.json` adds a fourth one-time selection made on
+2026-07-19: 63 distinct composer buckets and no URL or digest overlap with the
+earlier manifests. It exposed empty polyphonic notation records, embedded score
+text that resembled tablature, combined fingering bits, and the under-`v`
+ornament. All 63 files load without warnings and pass the semantic audit.

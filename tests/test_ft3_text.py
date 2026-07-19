@@ -1,12 +1,13 @@
-from oud.importers._ft3_text import (
-    _structured_lyric_rows_from_positioned_rows,
+from oud.importers._ft3_note_records import (
     decode_ft3_annotation_group,
     decode_ft3_note_record,
     decode_ft3_vocal_events,
-    is_ft3_text_record,
+)
+from oud.importers._ft3_text import (
     parse_ft3_text_record,
     refine_ft3_raw_text_record,
 )
+from oud.importers._ft3_text_rows import _structured_lyric_rows_from_positioned_rows, is_ft3_text_record
 
 
 def _text_chunk(*lines: str) -> bytes:

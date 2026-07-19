@@ -12,9 +12,10 @@ Status terms:
 
 Implementation:
 
-- `oud/importers/ft3.py`: container, records, tablature, score mapping
-- `oud/importers/ft3_text.py`: vocal, lyric, editorial, and annotation records
-- `oud/importers/ft3_extras.py`: per-note fingering and ornament flags
+- `oud/importers/ft3.py`: stable `load_ft3`/duration facade and container orchestration
+- `oud/importers/_ft3_metadata.py`, `_ft3_tab.py`, `_ft3_score.py`: metadata, tablature, and score assembly
+- `oud/importers/_ft3_text*.py`, `_ft3_note_records.py`: vocal, lyric, editorial, and note records
+- `oud/importers/_ft3_duration.py`, `_ft3_extras.py`: normalization, fingering, and ornament flags
 - `scripts/ft3_audit.py`: corpus residual and unknown-record inventory
 
 ## 1. Container
@@ -283,6 +284,7 @@ low-byte fingering bits with one high-byte mark:
 | `1800` | under-note smile ornament |
 | `1c00` | left parenthesis before the fret |
 | `2000`, `2200` | right and left caret ornaments |
+| `2400` | under-note `v` ornament |
 | `2800` | under-fret hook ornament |
 | `3400` | barre; composes with low-byte fingering |
 | `3c00` | legacy open ninth-course form |
@@ -292,6 +294,8 @@ low-byte fingering bits with one high-byte mark:
 These marks render in the terminal and are exported where LilyPond/MusicXML has
 an equivalent. The original integer remains on `Note.ft3_extras`; any unconsumed
 bit would appear in `ft3_extra_residual` and fail the corpus audit.
+Multiple low-byte left-fingering bits are preserved compositionally (for
+example, `00c0` is represented as `2+3`) rather than silently dropping a mark.
 
 An empty standard-notation record can use row marker `0130`; rows `0130` through
 `0135` are therefore notation markers. Mixed scores are lane-major: complete
@@ -335,14 +339,14 @@ Run:
 uv run python scripts/ft3_audit.py lutemusic
 ```
 
-Each fixed 75-file directory must report:
+Each fixed corpus directory must report zero unresolved files, for example:
 
 ```text
 Scanned 75 file(s): 0 with unresolved values or records.
 ```
 
-Together the two checked-in manifests cover 150 fixed external files. Tests
-verify both directories, URLs, SHA-256 digests, and the zero-unresolved result.
+Together the four random manifests cover 263 fixed external files. Tests
+verify their paths, URLs, SHA-256 digests, and zero-unresolved result.
 
 “Unresolved” means an unconsumed note-extra bit, unknown vocal flag, unknown
 source record, or import warning. Typed source records are inventory, not debt.

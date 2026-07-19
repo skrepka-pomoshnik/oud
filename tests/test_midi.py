@@ -1,22 +1,38 @@
-from oud.exports.midi import (
+from oud.exports._midi_bytes import (
     BASE_NOTE_VELOCITY,
-    _accent_velocity,
+)
+from oud.exports._midi_bytes import (
+    accent_velocity as _accent_velocity,
+)
+from oud.exports._midi_bytes import (
+    meta_tempo as _meta_tempo,
+)
+from oud.exports._midi_bytes import (
+    note_off as _note_off,
+)
+from oud.exports._midi_bytes import (
+    note_on as _note_on,
+)
+from oud.exports._midi_bytes import (
+    program_change as _program_change,
+)
+from oud.exports._midi_bytes import (
+    vlq as _vlq,
+)
+from oud.exports._midi_bytes import (
+    write_track as _write_track,
+)
+from oud.exports._midi_projection import (
     _bar_chord_events,
     _chord_positions,
     _collect_manual_chords,
     _duration_ticks,
     _fret_from_override,
-    _meta_tempo,
-    _note_off,
-    _note_on,
     _parse_tuning,
-    _program_change,
     _resolved_tuning_for_piece,
-    _vlq,
-    _write_track,
     build_playback_timeline,
-    export_midi,
 )
+from oud.exports.midi import export_midi
 from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from petrucci.render_utils import chord_positions as render_chord_positions
 

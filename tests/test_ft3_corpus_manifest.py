@@ -16,7 +16,13 @@ from scripts.ft3_audit import audit_piece
 RANDOM_MANIFEST = Path("corpus/ft3-random-75.json")
 EXPANDED_RANDOM_MANIFEST = Path("corpus/ft3-random-75-v2.json")
 RANDOM_50_V3_MANIFEST = Path("corpus/ft3-random-50-v3.json")
-FIXED_RANDOM_MANIFESTS = (RANDOM_MANIFEST, EXPANDED_RANDOM_MANIFEST, RANDOM_50_V3_MANIFEST)
+RANDOM_63_V4_MANIFEST = Path("corpus/ft3-random-63-v4.json")
+FIXED_RANDOM_MANIFESTS = (
+    RANDOM_MANIFEST,
+    EXPANDED_RANDOM_MANIFEST,
+    RANDOM_50_V3_MANIFEST,
+    RANDOM_63_V4_MANIFEST,
+)
 
 
 @pytest.fixture(scope="module")
@@ -90,6 +96,22 @@ def test_random_50_v3_manifest_is_new_composer_stratified_selection() -> None:
     assert "never repeated" in raw["selection"]["method"]
     assert len(expanded.files) == 50
     assert len({entry["composer"] for entry in raw["files"]}) == 50
+    assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
+    assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
+
+
+def test_random_63_v4_manifest_is_a_new_fixed_composer_stratified_selection() -> None:
+    raw = json.loads(RANDOM_63_V4_MANIFEST.read_text(encoding="utf-8"))
+    expanded = load_manifest(RANDOM_63_V4_MANIFEST)
+    previous = [entry for path in FIXED_RANDOM_MANIFESTS[:3] for entry in load_manifest(path).files]
+
+    assert raw["selection"]["selected"] == 63
+    assert raw["selection"]["unique_composers"] == 63
+    assert raw["selection"]["seed"] == 2026071963
+    assert "one-time" in raw["selection"]["method"]
+    assert "never repeated" in raw["selection"]["method"]
+    assert len(expanded.files) == 63
+    assert len({entry["composer"] for entry in raw["files"]}) == 63
     assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
     assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
 
@@ -242,11 +264,28 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
         except PieceAdapterError as exc:
             rejected[_relative(path)] = str(exc)
 
-    assert len(notation) == 20
+    assert len(notation) == 30
     assert rejected == {
-        "lutemusic/random-50-v3/035/eau_vive.ft3": "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations",
         "lutemusic/random-50-v3/041/sonata_CM_01_moderato.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+        ),
+        "lutemusic/random-63-v4/001/sonata_CM_02_minuetto.ft3": (
+            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+        ),
+        "lutemusic/random-63-v4/012/disperate_speranze_4.ft3": (
+            "tie target 'piece:staff:0:bar:7:event:3:0' has no preceding event with a shared pitch"
+        ),
+        "lutemusic/random-63-v4/037/courant_duet.ft3": (
+            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+        ),
+        "lutemusic/random-63-v4/040/come_raggio_del_sol_G.ft3": (
+            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+        ),
+        "lutemusic/random-63-v4/043/rondeau_130.ft3": (
+            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+        ),
+        "lutemusic/random-63-v4/050/passacaille_B.ft3": (
+            "tie target 'piece:staff:0:bar:0:event:0:0' has no preceding event with a shared pitch"
         ),
     }
     assert all(score.staffs for _path, score in notation)
@@ -272,15 +311,7 @@ def test_random_corpus_demotes_ascii_control_fragments_from_note_staffs(fixed_pi
 
     semper = by_name["09_semper_dowland_semper_dolens.ft3"]
     assert semper.imported_score is not None
-    assert all(
-        not bar.melody_events for staff in semper.imported_score.staffs if staff.kind == "note" for bar in staff.bars
-    )
-    assert any(
-        row.kind == "control" and row.text.strip() == "_6("
-        for staff in semper.imported_score.staffs
-        for bar in staff.bars
-        for row in bar.text_rows
-    )
+    assert all(staff.kind != "note" for staff in semper.imported_score.staffs)
 
 
 def test_couperin_duet_maps_two_note_voices_to_one_77_bar_staff(fixed_pieces: dict[Path, Piece]) -> None:

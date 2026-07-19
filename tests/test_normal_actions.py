@@ -170,8 +170,9 @@ def test_every_terminal_key_is_bounded_after_oversized_count_prefix(
     key_profile: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("oud.editor.normal_actions.start_midi", lambda _state: None)
-    monkeypatch.setattr("oud.editor.normal_actions.stop_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.normal_commands.start_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.normal_commands.stop_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.normal_movement.start_midi", lambda _state, **_kwargs: None)
     monkeypatch.setattr("oud.editor.command_ops.print_pdf", lambda _state: None)
     terminal_keys = {*range(256), *vars(DEFAULT_KEYCODES).values()}
 
@@ -446,7 +447,7 @@ def test_visual_mode_play_loops_selected_bar_range(monkeypatch) -> None:
             },
         )
 
-    monkeypatch.setattr("oud.editor.normal_actions.start_midi", _start_midi)
+    monkeypatch.setattr("oud.editor.normal_movement.start_midi", _start_midi)
 
     state.cursor_bar = 1
     handle_normal(state, ord("v"))

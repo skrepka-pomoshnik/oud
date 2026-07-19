@@ -89,24 +89,6 @@
         "complexity": 12
       }
     ],
-    "oud/editor/normal_actions.py": [
-      {
-        "name": "_handle_normal_movement",
-        "complexity": 18
-      },
-      {
-        "name": "_handle_visual_mode",
-        "complexity": 13
-      },
-      {
-        "name": "handle_normal",
-        "complexity": 87
-      },
-      {
-        "name": "handle_pending_key",
-        "complexity": 18
-      }
-    ],
     "oud/editor/plugin_ops.py": [
       {
         "name": "_handle_plugin_search",
@@ -231,29 +213,7 @@
         "complexity": 10
       }
     ],
-    "oud/exports/export_tab.py": [
-      {
-        "name": "export_tab",
-        "complexity": 35
-      }
-    ],
-    "oud/exports/lilypond.py": [
-      {
-        "name": "_append_imported_melody_bar",
-        "complexity": 10
-      },
-      {
-        "name": "_build_main_blocks",
-        "complexity": 10
-      },
-      {
-        "name": "_build_tab_body",
-        "complexity": 22
-      },
-      {
-        "name": "_build_vocal_bodies",
-        "complexity": 10
-      },
+    "oud/exports/_lilypond_common.py": [
       {
         "name": "_chord_ft3_markup_suffix",
         "complexity": 21
@@ -273,17 +233,35 @@
       {
         "name": "_parse_tuning",
         "complexity": 8
+      }
+    ],
+    "oud/exports/_lilypond_document.py": [
+      {
+        "name": "_build_main_blocks",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/_lilypond_tab.py": [
+      {
+        "name": "_build_tab_body",
+        "complexity": 22
       },
       {
         "name": "_tab_staff_with_block",
         "complexity": 8
       }
     ],
-    "oud/exports/midi.py": [
+    "oud/exports/_lilypond_vocal.py": [
       {
-        "name": "_accent_velocity",
-        "complexity": 8
+        "name": "_append_imported_melody_bar",
+        "complexity": 10
       },
+      {
+        "name": "_build_vocal_bodies",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/_midi_projection.py": [
       {
         "name": "_append_vocal_messages",
         "complexity": 9
@@ -297,16 +275,24 @@
         "complexity": 9
       },
       {
-        "name": "_midi_command",
-        "complexity": 10
-      },
-      {
         "name": "_parse_tuning",
         "complexity": 8
       },
       {
         "name": "build_playback_timeline",
         "complexity": 9
+      }
+    ],
+    "oud/exports/_midi_runtime.py": [
+      {
+        "name": "_midi_command",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/export_tab.py": [
+      {
+        "name": "export_tab",
+        "complexity": 35
       }
     ],
     "oud/exports/musicxml.py": [
@@ -323,7 +309,55 @@
         "complexity": 8
       }
     ],
+    "oud/importers/_ft3_duration.py": [
+      {
+        "name": "_fill_missing_time_signatures",
+        "complexity": 10
+      },
+      {
+        "name": "_normalize_vocal_event_accidentals",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/_ft3_metadata.py": [
+      {
+        "name": "_embedded_plain_text",
+        "complexity": 8
+      },
+      {
+        "name": "extract_text",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/_ft3_score.py": [
+      {
+        "name": "_append_raw_imported_bar",
+        "complexity": 10
+      },
+      {
+        "name": "_decode_raw_score_record",
+        "complexity": 9
+      },
+      {
+        "name": "_parallel_note_tab_plan",
+        "complexity": 8
+      }
+    ],
     "oud/importers/_ft3_text.py": [
+      {
+        "name": "_lyric_events_from_line",
+        "complexity": 10
+      },
+      {
+        "name": "_parse_structured_text_record",
+        "complexity": 8
+      },
+      {
+        "name": "parse_ft3_text_record",
+        "complexity": 9
+      }
+    ],
+    "oud/importers/_ft3_text_rows.py": [
       {
         "name": "_classify_raw_line",
         "complexity": 9
@@ -341,16 +375,8 @@
         "complexity": 10
       },
       {
-        "name": "_lyric_events_from_line",
-        "complexity": 10
-      },
-      {
         "name": "_lyric_tokens_from_control_row",
         "complexity": 9
-      },
-      {
-        "name": "_parse_structured_text_record",
-        "complexity": 8
       },
       {
         "name": "_split_wide_gap",
@@ -359,41 +385,9 @@
       {
         "name": "_tokenize_control_row",
         "complexity": 8
-      },
-      {
-        "name": "parse_ft3_text_record",
-        "complexity": 9
       }
     ],
     "oud/importers/ft3.py": [
-      {
-        "name": "_append_raw_imported_bar",
-        "complexity": 10
-      },
-      {
-        "name": "_decode_raw_score_record",
-        "complexity": 9
-      },
-      {
-        "name": "_embedded_plain_text",
-        "complexity": 8
-      },
-      {
-        "name": "_fill_missing_time_signatures",
-        "complexity": 10
-      },
-      {
-        "name": "_normalize_vocal_event_accidentals",
-        "complexity": 8
-      },
-      {
-        "name": "_parallel_note_tab_plan",
-        "complexity": 8
-      },
-      {
-        "name": "extract_text",
-        "complexity": 8
-      },
       {
         "name": "load_ft3",
         "complexity": 44
@@ -567,18 +561,6 @@
         "complexity": 8
       }
     ],
-    "petrucci/render_rhythm_rows.py": [
-      {
-        "name": "_render_rhythm_rows",
-        "complexity": 52
-      }
-    ],
-    "petrucci/render_staff_rows.py": [
-      {
-        "name": "_render_staff_and_playback",
-        "complexity": 37
-      }
-    ],
     "petrucci/render_status.py": [
       {
         "name": "_manual_bar_sum_quarter_beats",
@@ -591,12 +573,6 @@
       {
         "name": "resolve_duration_text",
         "complexity": 9
-      }
-    ],
-    "petrucci/render_system.py": [
-      {
-        "name": "render_systems",
-        "complexity": 70
       }
     ],
     "petrucci/render_text_lanes.py": [
@@ -785,13 +761,13 @@
         "complexity": 10
       }
     ],
-    "tests/test_editor.py": [
+    "tests/test_editor_normal.py": [
       {
         "name": "test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue",
         "complexity": 9
       }
     ],
-    "tests/test_tui_commands_exec.py": [
+    "tests/test_tui_commands_media.py": [
       {
         "name": "test_apply_command_dispatch_executes_all_registered_specs",
         "complexity": 8
@@ -809,14 +785,6 @@
     ]
   },
   "large_modules": {
-    "oud/exports/lilypond.py": 1384,
-    "oud/exports/midi.py": 1097,
-    "oud/importers/_ft3_text.py": 1175,
-    "oud/importers/ft3.py": 1769,
-    "petrucci/view_model.py": 1068,
-    "tests/test_editor.py": 1183,
-    "tests/test_lilypond.py": 1197,
-    "tests/test_tui_commands_exec.py": 1164,
-    "tests/test_ui_render_split.py": 1954
+    "petrucci/view_model.py": 1068
   }
 }

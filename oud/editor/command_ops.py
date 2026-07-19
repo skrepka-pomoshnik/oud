@@ -58,8 +58,9 @@ from oud.editor.tool_ops import cmd_notes as _cmd_notes
 from oud.editor.tool_ops import cmd_plugins as _cmd_plugins
 from oud.editor.tool_ops import cmd_tool as _cmd_tool
 from oud.editor.transform_ops import cmd_courseshift, cmd_retune, cmd_transpose
+from oud.exports._midi_runtime import _midi_command
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
-from oud.exports.midi import _midi_command, export_midi
+from oud.exports.midi import export_midi
 from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.importers.ft3 import build_durations, load_ft3
 from oud.importers.tab import load_tab, load_tab_data

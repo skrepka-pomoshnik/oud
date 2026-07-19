@@ -43,6 +43,7 @@ _RIGHT_ORNAMENT_HIGH_BYTES = {
     0x1400: "'",
     0x1800: "smile",
     0x2000: "caret",
+    0x2400: "under-v",
     0x2800: "under-hook",
 }
 _ARPEGGIO_HIGH_BYTE_PATTERNS = {
@@ -58,6 +59,13 @@ def _pick_single_flag(extras: int, flags: tuple[tuple[int, str], ...]) -> tuple[
         if extras & bit:
             return value, bit
     return None, 0
+
+
+def _pick_fingering_flags(extras: int, flags: tuple[tuple[int, str], ...]) -> tuple[str | None, int]:
+    selected = [(bit, value) for bit, value in flags if extras & bit]
+    if not selected:
+        return None, 0
+    return "+".join(value for _bit, value in selected), sum(bit for bit, _value in selected)
 
 
 def _decode_ornaments(high_byte: int) -> tuple[str | None, str | None, int]:
@@ -77,7 +85,7 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         consumed |= 0x3400
     right_fingering, used = _pick_single_flag(extras, _RIGHT_FINGERING_BITS)
     consumed |= used
-    left_fingering, used = _pick_single_flag(extras, _LEFT_FINGERING_BITS)
+    left_fingering, used = _pick_fingering_flags(extras, _LEFT_FINGERING_BITS)
     consumed |= used
 
     high_byte = extras & 0xFE00

@@ -1,4 +1,4 @@
-from oud.exports.midi import _midi_command
+from oud.exports._midi_runtime import _midi_command
 
 
 def test_midi_command_fluidsynth_with_soundfont_darwin(tmp_path) -> None:

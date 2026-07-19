@@ -703,7 +703,6 @@ def _pick_side_value(
         return left
     if mode == "right":
         return right
-    # "both" still has one cell; prefer left if both exist.
     return left or right
 
 
@@ -752,6 +751,7 @@ def _ft3_ornament_glyph(value: str | None) -> str | None:
         "caret": "^",
         "parenthesis": "(",
         "smile": "\u2323",
+        "under-v": "\u032c",
         "under-hook": "\u02db",
     }
     return mapping.get(value, value[0])

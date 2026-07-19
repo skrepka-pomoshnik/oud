@@ -1,15 +1,17 @@
 import gzip
 
-from oud.importers.ft3 import (
-    _decode_ft3_note_position,
+from oud.importers._ft3_duration import (
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
+    note_type_to_denominator,
+)
+from oud.importers._ft3_score import (
+    _classify_unknown_score_chunk,
     _parallel_mixed_score_prefix_count,
     _parallel_raw_bar_targets,
-    load_ft3,
-    note_type_to_denominator,
-    parse_bar,
 )
+from oud.importers._ft3_tab import _decode_ft3_note_position, parse_bar
+from oud.importers.ft3 import load_ft3
 from petrucci.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 
@@ -191,6 +193,15 @@ def test_parse_bar_decodes_parenthesis_and_under_fret_hook() -> None:
     assert under_hook.ft3_extra_residual is None
 
 
+def test_parse_bar_decodes_under_v_and_combined_left_fingering() -> None:
+    under_v = parse_bar(_ft3_bar_with_one_note(extras=0x2400)).notes[0]
+    combined = parse_bar(_ft3_bar_with_one_note(extras=0x00C0)).notes[0]
+    assert under_v.right_ornament == "under-v"
+    assert under_v.ft3_extra_residual is None
+    assert combined.left_fingering == "2+3"
+    assert combined.ft3_extra_residual is None
+
+
 def test_parse_bar_decodes_left_apostrophe_and_legacy_open_bass_course() -> None:
     apostrophe = parse_bar(_ft3_bar_with_one_note(extras=0x1600)).notes[0]
     legacy_bass = parse_bar(_ft3_bar_with_one_note(extras=0x3C00)).notes[0]
@@ -239,6 +250,29 @@ def test_parse_bar_does_not_interpret_standard_staff_text_as_tablature() -> None
     bar = parse_bar(score_record)
     assert bar.chords == []
     assert bar.notes == []
+
+
+def test_parse_bar_does_not_scan_polyphonic_standard_staff_as_tablature() -> None:
+    score_record = bytes(28) + b"\x03\x00\x02\x33" + b"\x04\x00\x00\x00\x00\x33\x01\x00\x02aASCII"
+    bar = parse_bar(score_record)
+    assert bar.chords == []
+    assert bar.notes == []
+
+
+def test_parse_bar_does_not_scan_score_text_object_as_tablature() -> None:
+    score_text = b"\x90\x01" + bytes(28) + b"\xbc\x02\x01\x00\x00\x00\x01\x00\x0fTimes New Roman"
+    bar = parse_bar(score_text + b"\x01\x00\x04moy." + bytes(24))
+    assert bar.chords == []
+    assert bar.notes == []
+
+
+def test_classify_empty_standard_staff_record_as_note_staff() -> None:
+    chunk = bytearray(62)
+    chunk[2:7] = b"\x04\x11\x00\x00\xff"
+    chunk[28:33] = b"\x00\x00\x00\x02\x00"
+    chunk[41:54] = b"\x02\x00" + bytes(10) + b"\x01"
+    bar = parse_bar(bytes(chunk))
+    assert _classify_unknown_score_chunk(bytes(chunk), bar) == "note-staff-raw"
 
 
 def test_real_can_she_excuse_combines_barre_and_left_fingering_without_residual() -> None:
