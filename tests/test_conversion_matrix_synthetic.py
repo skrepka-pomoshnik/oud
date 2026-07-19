@@ -3,11 +3,11 @@ from __future__ import annotations
 import gzip
 from pathlib import Path
 
-from oud.core.musicxml_import import load_musicxml, load_mxl
-from oud.core.tab_parser import load_tab
 from oud.editor.load_ops import load_piece_data
 from oud.exports.export_tab import export_tab
 from oud.exports.musicxml import export_musicxml, export_mxl
+from oud.importers.musicxml import load_musicxml, load_mxl
+from oud.importers.tab import load_tab
 from tests.helpers_regression_cases import mk_bar, mk_chord, mk_piece
 
 

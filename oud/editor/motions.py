@@ -16,9 +16,9 @@ from oud.editor.visual_cursor_map import (
     cursor_display_map_for_bar,
     system_display_indices_for_bar,
 )
-from oud.petrucci.model import Bar
-from oud.petrucci.render_utils import chord_slot_positions
-from oud.petrucci.tab_policy import rows_reversed, visual_row_indices
+from petrucci.model import Bar
+from petrucci.render_utils import chord_slot_positions
+from petrucci.tab_policy import rows_reversed, visual_row_indices
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,8 @@ class CursorMotionTarget:
 
 def apply_motion_target(state: EditorState, target: CursorMotionTarget) -> None:
     if target.append_bar:
+        if state.read_only:
+            return
         state.piece.bars.append(Bar())
         state.modified = True
     state.cursor_bar = target.bar
@@ -116,6 +118,8 @@ def target_move_right(state: EditorState) -> CursorMotionTarget:
         return CursorMotionTarget(state.cursor_bar, state.cursor_col + 1)
     if state.cursor_bar < len(state.piece.bars) - 1:
         return CursorMotionTarget(state.cursor_bar + 1, 0)
+    if state.read_only:
+        return CursorMotionTarget(state.cursor_bar, state.cursor_col)
     return CursorMotionTarget(state.cursor_bar + 1, 0, append_bar=True)
 
 
@@ -127,10 +131,23 @@ def target_move_right_visual(state: EditorState) -> CursorMotionTarget:
     return _target_move_visual(state, 1)
 
 
+def apply_counted_visual_motion(state: EditorState, delta: int, count: int) -> None:
+    geometry_cache: dict[int, tuple[int, list[int]]] = {}
+    for _ in range(count):
+        before = (state.cursor_bar, state.cursor_col, state.cursor_string, len(state.piece.bars))
+        target = _target_move_visual(state, delta, geometry_cache=geometry_cache)
+        apply_motion_target(state, target)
+        after = (state.cursor_bar, state.cursor_col, state.cursor_string, len(state.piece.bars))
+        if target.append_bar or after == before:
+            break
+
+
 def _snap_bar_entry_col(
     state: EditorState,
     target: CursorMotionTarget,
     delta: int,
+    *,
+    geometry_cache: dict[int, tuple[int, list[int]]] | None = None,
 ) -> CursorMotionTarget:
     # Entering a bar at its raw edge often shares a display cell with the
     # first/last note onset; land on the note directly so the drawn cursor
@@ -140,8 +157,7 @@ def _snap_bar_entry_col(
     cols = _note_cols(state, target.bar)
     if not cols:
         return target
-    content_width = bar_content_width_for_cursor(state, target.bar)
-    mapping = cursor_display_map_for_bar(state, target.bar, content_width)
+    _content_width, mapping = _visual_geometry(state, target.bar, geometry_cache)
     cand = cols[0] if delta > 0 else cols[-1]
     if not (0 <= target.col < len(mapping) and 0 <= cand < len(mapping)):
         return target
@@ -151,7 +167,12 @@ def _snap_bar_entry_col(
     return target
 
 
-def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
+def _target_move_visual(
+    state: EditorState,
+    delta: int,
+    *,
+    geometry_cache: dict[int, tuple[int, list[int]]] | None = None,
+) -> CursorMotionTarget:
     target = CursorMotionTarget(state.cursor_bar, state.cursor_col)
     if delta not in (-1, 1):
         return target
@@ -160,12 +181,21 @@ def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
         return target
     next_col = state.cursor_col + delta
     if next_col < 0:
-        target = _snap_bar_entry_col(state, target_move_left(state), delta)
+        target = _snap_bar_entry_col(
+            state,
+            target_move_left(state),
+            delta,
+            geometry_cache=geometry_cache,
+        )
     elif next_col >= state.bar_width:
-        target = _snap_bar_entry_col(state, target_move_right(state), delta)
+        target = _snap_bar_entry_col(
+            state,
+            target_move_right(state),
+            delta,
+            geometry_cache=geometry_cache,
+        )
     else:
-        content_width = bar_content_width_for_cursor(state, bar_index)
-        mapping = cursor_display_map_for_bar(state, bar_index, content_width)
+        _content_width, mapping = _visual_geometry(state, bar_index, geometry_cache)
         if not (0 <= state.cursor_col < len(mapping) and 0 <= next_col < len(mapping)):
             target = CursorMotionTarget(bar_index, next_col)
         else:
@@ -185,6 +215,20 @@ def _target_move_visual(state: EditorState, delta: int) -> CursorMotionTarget:
                     delta=delta,
                 )
     return target
+
+
+def _visual_geometry(
+    state: EditorState,
+    bar_index: int,
+    cache: dict[int, tuple[int, list[int]]] | None,
+) -> tuple[int, list[int]]:
+    if cache is not None and bar_index in cache:
+        return cache[bar_index]
+    content_width = bar_content_width_for_cursor(state, bar_index)
+    geometry = (content_width, cursor_display_map_for_bar(state, bar_index, content_width))
+    if cache is not None:
+        cache[bar_index] = geometry
+    return geometry
 
 
 def _target_wrap_horizontal_visual(state: EditorState, delta: int) -> CursorMotionTarget:
@@ -265,6 +309,8 @@ def target_move_right_note(state: EditorState) -> CursorMotionTarget:
                 return CursorMotionTarget(state.cursor_bar, col)
         next_bar = state.cursor_bar + 1
         if state.cursor_bar >= len(state.piece.bars) - 1:
+            if state.read_only:
+                return CursorMotionTarget(state.cursor_bar, state.cursor_col)
             return CursorMotionTarget(next_bar, 0, append_bar=True)
         next_cols = _note_cols(state, next_bar)
         return CursorMotionTarget(next_bar, next_cols[0] if next_cols else 0)

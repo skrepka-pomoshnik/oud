@@ -10,9 +10,9 @@ from oud.editor.ops import (
     italian_to_fret,
 )
 from oud.editor.state import EditorState
-from oud.petrucci.tab_policy import apply_tabnotation_preset
-from oud.petrucci.tuning_utils import tuning_preset
 from oud.settings import DEFAULT_SETTINGS, save_settings
+from petrucci.tab_policy import apply_tabnotation_preset
+from petrucci.tuning_utils import tuning_preset
 
 SetHandler = Callable[[EditorState, str], bool]
 
@@ -496,7 +496,7 @@ def apply_set_command(  # noqa: C901
     save_fn(config_path, state.settings)
 
 
-def _apply_bool_token(state: EditorState, token: str) -> bool:
+def _apply_bool_token(state: EditorState, token: str) -> bool:  # noqa: C901
     if token in _BOOL_KEYS:
         return _set_bool(state, token, "on")
     if token.startswith("no"):

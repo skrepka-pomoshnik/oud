@@ -6,8 +6,8 @@ from typing import cast
 
 import pytest
 
-from oud.petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 from oud.ui.adapter import CursesError, CursesScreen
+from petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 
 
 @dataclass

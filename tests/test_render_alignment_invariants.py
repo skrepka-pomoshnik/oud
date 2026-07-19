@@ -4,15 +4,21 @@ from itertools import pairwise
 
 import pytest
 
-from oud.core.ft3 import build_durations
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
-from oud.petrucci.render_helpers import apply_overrides
-from oud.petrucci.render_system import _build_chord_scale_map, _chord_positions_distinct, _scale_chord_row
-from oud.petrucci.render_utils import bar_cells_from_chords, smart_group_map
-from oud.petrucci.view_model import _filter_redundant_positions, _scale_col
+from oud.importers.ft3 import build_durations
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
+from petrucci.render_geometry import _scale_chord_row
+from petrucci.render_helpers import apply_overrides
+from petrucci.render_spacing import (
+    build_chord_scale_map as _build_chord_scale_map,
+)
+from petrucci.render_spacing import (
+    chord_positions_distinct as _chord_positions_distinct,
+)
+from petrucci.render_utils import bar_cells_from_chords, smart_group_map
+from petrucci.view_model import _filter_redundant_positions, _scale_col
 from tests.helpers_regression_cases import (
     dense_auftact_piece,
     dense_flag_alignment_piece,

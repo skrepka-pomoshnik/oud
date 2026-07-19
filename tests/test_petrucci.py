@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-from oud import petrucci
-from oud.petrucci import (
+import petrucci
+from petrucci import (
     Bar,
     Chord,
     LyricEvent,
@@ -20,12 +21,10 @@ from oud.petrucci import (
 
 _SCORE_PUBLIC_API = {
     "AccidentalDisplay",
-    "CellStyle",
     "ElementKey",
     "ElementRole",
     "EventLocation",
     "EventKind",
-    "EventOverlay",
     "GlyphMode",
     "LayoutElement",
     "LayoutError",
@@ -40,7 +39,6 @@ _SCORE_PUBLIC_API = {
     "NotationStaff",
     "OnsetPosition",
     "OrnamentKind",
-    "OverlayRole",
     "Rect",
     "ScoreLayout",
     "ScoreSystem",
@@ -78,30 +76,37 @@ def _score() -> Piece:
 
 
 def test_petrucci_has_no_application_layer_imports() -> None:
-    package = Path("oud/petrucci")
-    blocked_prefixes = ("oud.core", "oud.editor", "oud.exports", "oud.tui", "oud.ui")
+    package = Path("petrucci")
     forbidden: list[tuple[str, str]] = []
     for path in package.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.startswith(blocked_prefixes):
+                if node.module == "oud" or node.module.startswith("oud."):
                     forbidden.append((path.name, node.module))
             elif isinstance(node, ast.Import):
                 forbidden.extend(
-                    (path.name, alias.name) for alias in node.names if alias.name.startswith(blocked_prefixes)
+                    (path.name, alias.name)
+                    for alias in node.names
+                    if alias.name == "oud" or alias.name.startswith("oud.")
                 )
     assert forbidden == []
 
 
+def test_public_petrucci_contract_has_no_result_policy_vocabulary() -> None:
+    forbidden = re.compile(r"(?:^|_)(?:hit|missed|pending|uncertain|feedback)(?:$|_)")
+    assert [name for name in petrucci.__all__ if forbidden.search(name.lower())] == []
+    for removed_name in ("CellStyle", "EventOverlay", "OverlayRole"):
+        assert not hasattr(petrucci, removed_name)
+
+
 def test_generic_petrucci_modules_only_import_the_standard_library_and_petrucci() -> None:
     generic = (
-        Path("oud/petrucci/display.py"),
-        Path("oud/petrucci/feedback_layout.py"),
-        Path("oud/petrucci/layout.py"),
-        Path("oud/petrucci/notation_layout.py"),
-        Path("oud/petrucci/score.py"),
-        Path("oud/petrucci/system_fitting.py"),
+        Path("petrucci/display.py"),
+        Path("petrucci/layout.py"),
+        Path("petrucci/notation_layout.py"),
+        Path("petrucci/score.py"),
+        Path("petrucci/system_fitting.py"),
     )
     forbidden: list[tuple[str, str]] = []
     for path in generic:
@@ -113,15 +118,16 @@ def test_generic_petrucci_modules_only_import_the_standard_library_and_petrucci(
             elif isinstance(node, ast.Import):
                 names.extend(alias.name for alias in node.names)
             forbidden.extend(
-                (path.name, name) for name in names if name.startswith("oud.") and not name.startswith("oud.petrucci")
+                (path.name, name) for name in names if name.startswith("oud.") and not name.startswith("petrucci")
             )
     assert forbidden == []
 
 
 def test_importing_public_petrucci_does_not_initialize_curses() -> None:
     code = (
-        "import sys; import oud.petrucci as petrucci; "
+        "import sys; import petrucci as petrucci; "
         "[getattr(petrucci, name) for name in petrucci.__all__]; "
+        "assert 'oud' not in sys.modules; "
         "assert 'curses' not in sys.modules"
     )
     completed = subprocess.run(  # noqa: S603 - fixed interpreter and source string

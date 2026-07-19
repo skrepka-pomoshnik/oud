@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from typing import TypeVar
 
-from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.playback import (
     prime_playback_animation,
     reset_playback_animation,
@@ -13,7 +12,8 @@ from oud.editor.playback import (
 )
 from oud.editor.state import EditorState
 from oud.exports.midi import build_playback_timeline, export_midi, play_midi
-from oud.petrucci.model import Piece
+from oud.playback.timeline import PlaybackCursor
+from petrucci.model import Piece
 
 T = TypeVar("T")
 

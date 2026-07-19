@@ -9,7 +9,7 @@ from oud.editor.command_ops import (
 )
 from oud.editor.state import EditorState
 from oud.editor.undo_ops import redo, undo
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 
 
 def _state(bars: int = 2) -> EditorState:

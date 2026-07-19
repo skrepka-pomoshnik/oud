@@ -12,9 +12,9 @@ Status terms:
 
 Implementation:
 
-- `oud/core/ft3.py`: container, records, tablature, score mapping
-- `oud/core/ft3_text.py`: vocal, lyric, editorial, and annotation records
-- `oud/core/ft3_extras.py`: per-note fingering and ornament flags
+- `oud/importers/ft3.py`: container, records, tablature, score mapping
+- `oud/importers/ft3_text.py`: vocal, lyric, editorial, and annotation records
+- `oud/importers/ft3_extras.py`: per-note fingering and ornament flags
 - `scripts/ft3_audit.py`: corpus residual and unknown-record inventory
 
 ## 1. Container
@@ -281,7 +281,9 @@ low-byte fingering bits with one high-byte mark:
 | `1000`, `1400` | right comma and apostrophe ornaments |
 | `1600` | left apostrophe ornament |
 | `1800` | under-note smile ornament |
+| `1c00` | left parenthesis before the fret |
 | `2000`, `2200` | right and left caret ornaments |
+| `2800` | under-fret hook ornament |
 | `3400` | barre; composes with low-byte fingering |
 | `3c00` | legacy open ninth-course form |
 | `0200` | single arpeggio mark |

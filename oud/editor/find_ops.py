@@ -3,7 +3,7 @@ from __future__ import annotations
 from oud.editor.controller_utils import string_index
 from oud.editor.motions import CursorMotionTarget, apply_motion_target
 from oud.editor.state import EditorState
-from oud.petrucci.render_utils import bar_cells, bar_cells_from_chords
+from petrucci.render_utils import bar_cells, bar_cells_from_chords
 
 
 def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:
@@ -38,7 +38,7 @@ def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:
     return row
 
 
-def _find_target_col(
+def _find_target_col(  # noqa: C901
     row: list[str],
     cursor_col: int,
     target: str,

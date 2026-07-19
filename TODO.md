@@ -1,60 +1,59 @@
 # TODO
 
-## P0: Petrucci proper score renderer
+## P0: Architecture debt retirement
 
-Target: Petrucci remains Oud's library and gains a proper standard-notation
-typesetter for Oud's imported note/vocal staffs. Its public contracts must also
-support a second application such as Voce without Oud editor, FT3, tablature, or
-curses dependencies. Detailed boundaries and sequencing are in
-`docs/petrucci-score-plan.md`.
+CI now enforces complexity 7 and a 1,000-line module ceiling against the exact
+non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
+targets are in `docs/architecture-debt.md`.
 
-The canonical model, measured layout, semantic terminal frame, overlays, public
-API, Oud adapter, and neutral-consumer wheel smoke are implemented. The work
-below is the remaining release gate, not a restatement of completed foundation.
+- [ ] Decompose the remaining high-risk dispatchers to complexity 7, starting
+  with `oud.editor.normal_actions.handle_normal` (87),
+  `petrucci.render_system.render_systems` (70),
+  `petrucci.render_rhythm_rows._render_rhythm_rows` (52), and
+  `petrucci.render_staff_rows._render_staff_and_playback` (37). Preserve the
+  existing key matrices, structural frames, and text goldens at each step.
+- [ ] Split `oud/importers/ft3.py` and `_ft3_text.py` into container scanning,
+  typed record decoding, staff assembly, text/lyric decoding, and normalization
+  while retaining one public `load_ft3` operation and all corpus evidence.
+- [ ] Split LilyPond and MIDI projection from serialization and external process
+  execution; bring both exporter modules below 1,000 lines and complexity 7.
+- [ ] Split `petrucci/view_model.py` by width planning, source projection, and
+  tuning/display records, then split the four oversized tests by behavior.
+- [ ] Retire the remaining 166 function-level C901 findings without raising limits,
+  broad per-file ignores, compatibility wrappers, or count-only helper modules.
 
-### Engraving correctness
+## P1: Note and tablature typing confidence
 
-- [ ] Finish independent-voice and dense-chord collision handling without
-  moving the shared musical onset. Same-onset unisons/seconds, rests,
-  stem/flag footprints, simultaneous dynamics, same-verse lyrics, and trainer
-  labels now use deterministic visual lanes. Add cross-voice beam-envelope
-  handling, larger chord/accidental/dot matrices, and whole-layout overlap
-  invariants.
-- [ ] Carry real imported tuplets, ties/slurs, mid-score clef/key changes, and
-  remaining ornament forms through the Oud adapter. Each construct needs
-  canonical, layout, semantic-frame, and text-snapshot evidence.
-- [ ] Extend the reserved-lane collision policy to multiple lyric verses,
-  simultaneous dynamics, nested spans, and tuplets; add overlap and bounds
-  invariants over every positioned semantic element.
-- [ ] Reject or visibly clip every unsupported pitch, duration, and viewport
-  case. A clipped viewport must preserve canonical event identity and emit an
-  explicit clipping marker rather than silently lose source semantics.
+Reference model: MuseScore's `note_tests.cpp` drives real note-input operations
+and compares complete score state, while its TablEdit fixtures separate normal
+and dotted notes/rests, positions, voices, ties, tuplets, grace notes, and bass
+courses. LilyPond's `input/regression` keeps one-feature tablature files for
+string assignment, letter frets, open/additional bass strings, chord repetition,
+dots beside two-digit frets, beams/slurs, ties, and grace notes.
 
-### Oud migration and second-consumer proof
+- [ ] Define a public, source-independent Petrucci typing transaction API before
+  moving editor mutation code. It must accept explicit pitch/fret, string,
+  duration, voice, onset, rest/chord intent, and return typed changes/errors
+  without importing curses, Oud editor state, FT3, or file I/O.
+- [ ] Add standard-note typing once that API exists: nearest-octave letter entry,
+  explicit accidental/natural spelling, rests, chord stacking, voices, duration
+  persistence, dots, ties, tuplets, grace notes, and out-of-range pitch errors.
+- [ ] Complete tablature typing matrices for French and Italian styles: open and
+  two-digit frets, extra bass courses, same-onset chords, rests, repeated chords,
+  string movement, full-bar overflow, invalid frets, and alternate tunings.
+- [ ] Cover edit transitions and preservation: note-to-note repitch, note/rest
+  replacement, delete, undo/redo, attachment retention, and no cross-voice or
+  cross-string mutation.
+- [ ] Add deterministic operation-sequence tests that compare canonical state,
+  rendered semantics, TAB save/reopen, and LilyPond/MIDI export. Keep compact
+  one-feature fixtures for failures; do not vendor MuseScore/LilyPond fixtures.
 
-- [ ] Close the remaining representative FT3 adapter failures without guessing:
-  seven strict lyric-onset mismatches and five note-only timing/capacity errors
-  in the fixed corpus's 15-file notation subset. False ASCII pitches and
-  flagged meter records are closed. Preserve `include_lyrics=False` as an
-  explicit note-only migration mode; never truncate or spread source lyrics to
-  force a match.
-- [ ] Migrate vocal-only, then mixed/polyphonic/duet imported staffs to the new
-  score path without changing solo tablature output; remove each legacy vocal
-  fallback only after canonical adapter coverage exists.
-- [ ] Add structural and text snapshots at 60, 80, and 120 columns for dense and
-  sparse measures, repeated pitches, rests, accidentals, ledger lines, ties,
-  lyrics, safe glyphs, clipping, forced breaks, and resize preserving active ID.
-- [ ] Validate the actual Voce adapter with explicit renderer ownership and
-  Petrucci public imports only. Oud's neutral-host acceptance now covers
-  repeated pitches, rests, ties, lyrics, result roles, compact trainer policy,
-  playback positions, resize, and active-system selection. Voce must still map
-  its `FlowNote` records and color policy without moving playback clocks or
-  global renderer state into Petrucci.
-- [ ] Move internal callers off underscore helpers exported by
-  `view_model.__all__`, then shrink that legacy surface without changing
-  `typeset_piece()` output.
-- [ ] Keep Petrucci in Oud until the canonical API and snapshots pass in both Oud
-  and Voce; a separate distribution remains out of scope for this milestone.
+Minimal executable coverage now protects French chord/rest/bass entry across
+both key profiles, replacement with attachment preservation, atomic
+note/rest undo-redo, Italian fret 10 save/reopen, and an explicit TAB rejection
+for unrepresentable higher Italian frets. Standard-note entry remains planned
+because Oud currently provides a read-only canonical note model, not an editable
+note-input state machine.
 
 ## P1: Credible FT3 viewer
 
@@ -77,10 +76,10 @@ artifact.
 
 - [ ] Run a deterministic, stratified remote compatibility audit over at least 1,000 public FT3 files.
   - Record a checked-in manifest of URLs and expected metadata, not downloaded third-party files.
-  - Fixed expansions: 150/150 files in the two `corpus/ft3-random-75*.json` manifests load without warnings or semantic-audit failures. The second sample adds 75 previously unseen composer directories; selection happened once and is never repeated by tests.
+  - Fixed expansions: 200/200 files in the three `corpus/ft3-random-*.json` manifests load without warnings or semantic-audit failures. The later samples add 125 previously unseen composer directories; each selection happened once and is never repeated by tests.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section, German, Italian, French, and Spanish/Neapolitan examples.
   - Report format/version and staff-kind counts; require zero crashes and make every warning or unknown record actionable.
-  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (17 PDF comparisons recorded; MIDI remains incomplete).
+  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (19 PDF comparisons recorded; MIDI remains incomplete).
 - [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real fixtures, or reject each unsupported style with a precise visible diagnostic.
 - [ ] Close the remaining notation gaps with real-file evidence: polyphonic TabVoice collision precedence, partial beams, tuplets, grace/cue notes, mensural proportions, harmonics, glissandi, ties/slurs across systems, fingerings, ornaments, fermatas, endings, and barline/repeat variants.
   - Each decoded construct needs a typed model field, importer regression, terminal rendering regression, and LilyPond/PDF assertion.

@@ -4,8 +4,6 @@ import shutil
 import subprocess
 import sys
 
-from oud.core.ft3 import build_durations, load_ft3
-from oud.core.tab_parser import load_tab, load_tab_data
 from oud.editor.command_misc_ops import (
     cmd_col,
     cmd_cursor,
@@ -63,6 +61,8 @@ from oud.editor.transform_ops import cmd_courseshift, cmd_retune, cmd_transpose
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import _midi_command, export_midi
 from oud.exports.musicxml import export_musicxml, export_mxl
+from oud.importers.ft3 import build_durations, load_ft3
+from oud.importers.tab import load_tab, load_tab_data
 from oud.settings import save_settings
 
 __all__ = [

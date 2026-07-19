@@ -1,4 +1,4 @@
-from oud.core.tab_assign_policy import (
+from oud.editor.tab_assignment import (
     AssignmentPolicy,
     assign_chord_pitches,
 )

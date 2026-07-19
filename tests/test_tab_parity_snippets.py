@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from oud.core.ft3 import build_durations
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
-from oud.petrucci.tab_policy import apply_tabnotation_preset
+from oud.importers.ft3 import build_durations
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
+from petrucci.tab_policy import apply_tabnotation_preset
 from tests.helpers_regression_cases import (
     dense_auftact_piece,
     dense_flag_alignment_piece,

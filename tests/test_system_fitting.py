@@ -1,6 +1,6 @@
 import pytest
 
-from oud.petrucci.system_fitting import MeasuredBox, fit_measured_boxes
+from petrucci.system_fitting import MeasuredBox, fit_measured_boxes
 
 
 def test_fit_measured_boxes_wraps_from_natural_width_and_justifies_nonfinal_system() -> None:

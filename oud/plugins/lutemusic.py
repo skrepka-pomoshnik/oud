@@ -9,7 +9,7 @@ from typing import NamedTuple
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
-from oud.core.plugin_model import RemoteTab
+from oud.plugins.model import RemoteTab
 
 SUPPORTED_EXTS = (".tab", ".ft3", ".ft3.gz")
 FT3_EXTS = (".ft3", ".ft3.gz")
@@ -172,7 +172,7 @@ def download_tab(item: RemoteTab, dest_dir: Path) -> Path:
     return _download_url_to(item.url, dest)
 
 
-def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -> list[Path]:
+def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -> list[Path]:  # noqa: C901
     if not item.is_dir:
         raise DownloadError
     root_url = item.url if item.url.endswith("/") else f"{item.url}/"
@@ -204,7 +204,7 @@ def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -
     return downloaded
 
 
-def random_ft3(
+def random_ft3(  # noqa: C901
     *,
     start_urls: list[str] | None = None,
     limit: int = 200,

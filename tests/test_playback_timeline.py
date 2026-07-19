@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oud.core.playback_timeline import (
+from oud.playback.timeline import (
     PlaybackCursor,
     build_timeline_from_events,
     cursor_at_time,

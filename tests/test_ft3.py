@@ -1,6 +1,6 @@
 import gzip
 
-from oud.core.ft3 import (
+from oud.importers.ft3 import (
     _decode_ft3_note_position,
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
@@ -10,7 +10,7 @@ from oud.core.ft3 import (
     note_type_to_denominator,
     parse_bar,
 )
-from oud.petrucci.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
+from petrucci.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 
 def test_load_minimal_ft3(tmp_path) -> None:
@@ -177,6 +177,18 @@ def test_parse_bar_decodes_ft3_postfix_and_under_note_ornaments() -> None:
     assert right_caret.right_ornament == "caret"
     assert left_caret.left_ornament == "caret"
     assert all(note.ft3_extra_residual is None for note in (comma, apostrophe, smile, right_caret, left_caret))
+
+
+def test_parse_bar_decodes_parenthesis_and_under_fret_hook() -> None:
+    parenthesis = parse_bar(_ft3_bar_with_one_note(extras=0x1C00)).notes[0]
+    under_hook = parse_bar(_ft3_bar_with_one_note(extras=0x2800)).notes[0]
+
+    assert parenthesis.left_ornament == "parenthesis"
+    assert parenthesis.right_ornament is None
+    assert under_hook.right_ornament == "under-hook"
+    assert under_hook.left_ornament is None
+    assert parenthesis.ft3_extra_residual is None
+    assert under_hook.ft3_extra_residual is None
 
 
 def test_parse_bar_decodes_left_apostrophe_and_legacy_open_bass_course() -> None:

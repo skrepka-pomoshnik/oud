@@ -3,7 +3,7 @@ from __future__ import annotations
 from oud.editor.controller_utils import string_index
 from oud.editor.motions import CursorMotionTarget, apply_motion_target
 from oud.editor.state import EditorState
-from oud.petrucci.render_utils import bar_cells, bar_cells_from_chords
+from petrucci.render_utils import bar_cells, bar_cells_from_chords
 
 
 def _display_string_for_actual(state: EditorState, actual: int) -> int:

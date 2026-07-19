@@ -2,8 +2,8 @@ from oud.editor.command_ops import convert_overrides
 from oud.editor.edit_ops import apply_duration
 from oud.editor.state import EditorState
 from oud.editor.verify_ops import bar_duration_sum
-from oud.petrucci.model import Bar, Chord, Note, Piece
 from oud.tui.commands import _parse_time_sig_value, _tuning_preset, apply_command
+from petrucci.model import Bar, Chord, Note, Piece
 
 
 def _state() -> EditorState:

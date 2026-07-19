@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from oud.editor.init import init_state
-from oud.petrucci.model import Piece
+from petrucci.model import Piece
 
 
 def test_init_state_new_file_defaults_to_8_bars(tmp_path: Path) -> None:

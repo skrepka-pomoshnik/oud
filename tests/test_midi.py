@@ -17,8 +17,8 @@ from oud.exports.midi import (
     build_playback_timeline,
     export_midi,
 )
-from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
-from oud.petrucci.render_utils import chord_positions as render_chord_positions
+from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.render_utils import chord_positions as render_chord_positions
 
 
 def _track_data(path) -> bytes:

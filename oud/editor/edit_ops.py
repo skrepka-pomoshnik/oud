@@ -115,7 +115,7 @@ def apply_duration(state: EditorState, key: tuple[int, int, int], dur: int) -> N
     )
 
 
-def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:
+def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:  # noqa: C901
     with undo_group(state, label="clear-cell"):
         if 0 <= bar < len(state.piece.bars):
             bar_obj = state.piece.bars[bar]
@@ -173,7 +173,7 @@ def _column_has_notes(state: EditorState, bar: int, col: int) -> bool:
     return False
 
 
-def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:
+def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:  # noqa: C901
     with undo_group(state, label="clear-cell-note"):
         if 0 <= bar < len(state.piece.bars):
             bar_obj = state.piece.bars[bar]

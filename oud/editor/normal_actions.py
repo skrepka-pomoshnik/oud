@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from oud.editor.controller_utils import consume_count, is_casual, string_index
+from oud.editor.controller_utils import (
+    append_count_digit,
+    consume_count,
+    is_casual,
+    normalize_count_prefix,
+    string_index,
+)
 from oud.editor.edit_ops import clear_cell, undo_group
 from oud.editor.edit_range import bar_range_from_cursor, deletable_bar_range_from_cursor
 from oud.editor.find_ops import perform_find, repeat_find
@@ -20,6 +26,7 @@ from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT
 from oud.editor.midi_control import start_midi, stop_midi
 from oud.editor.motions import (
     CursorMotionTarget,
+    apply_counted_visual_motion,
     apply_motion_target,
     target_bar_end,
     target_bar_next,
@@ -30,9 +37,7 @@ from oud.editor.motions import (
     target_jump_last_bar,
     target_jump_row_visual,
     target_move_left_note,
-    target_move_left_visual,
     target_move_right_note,
-    target_move_right_visual,
 )
 from oud.editor.search_ops import (
     jump_mark,
@@ -43,6 +48,7 @@ from oud.editor.search_ops import (
 )
 from oud.editor.state import EditorState
 from oud.editor.view_focus import cycle_view_staff, visible_view_staffs
+from oud.editor.viewport import scroll_viewport_page
 from oud.editor.visual_ops import (
     clear_visual_mode,
     delete_visual_rows,
@@ -50,10 +56,10 @@ from oud.editor.visual_ops import (
     visual_bar_range,
     yank_visual_rows,
 )
-from oud.tui.viewport import scroll_viewport_page
 
 
 def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR0912, C901
+    normalize_count_prefix(state)
     if state.mode in {"visual", "visual_line"}:
         return _handle_visual_mode(state, key)
     bindings = normal_bindings(state)
@@ -112,7 +118,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
                 block_read_only()
                 state.pending_key = ""
                 return True
-            from oud.petrucci.tuning_utils import parse_bass_strings, tuning_count  # noqa: PLC0415
+            from petrucci.tuning_utils import parse_bass_strings, tuning_count  # noqa: PLC0415
 
             tuning = state.settings.get("tuning", "")
             base = tuning_count(tuning) if tuning else state.piece.strings
@@ -197,7 +203,7 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
         if key == count_keys.zero and not state.count_prefix:
             apply_motion_target(state, target_home_bar(state, state.cursor_bar))
             return True
-        state.count_prefix += digit
+        append_count_digit(state, digit)
         return True
     if handle_pending_key():
         return True
@@ -361,7 +367,14 @@ def handle_normal(state: EditorState, key: int) -> bool:  # noqa: PLR0911, PLR09
                     state.cursor_col,
                 )
                 if count > 1:
-                    apply_motion_target(state, target_move_right_note(state))
+                    target = target_move_right_note(state)
+                    if target.append_bar:
+                        break
+                    before = (state.cursor_bar, state.cursor_col, state.cursor_string)
+                    apply_motion_target(state, target)
+                    after = (state.cursor_bar, state.cursor_col, state.cursor_string)
+                    if after == before:
+                        break
         state.pending_key = ""
         return True
     if key in action_keys.pending:
@@ -480,46 +493,42 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
     keys = movement_keys(state, include_arrows=True)
     move_mode = state.settings.get("movementmode", "visual")
     if key in keys.left:
-        for _ in range(count):
-            target = target_move_left_note(state) if move_mode == "note" else target_move_left_visual(state)
-            apply_motion_target(state, target)
+        if move_mode == "note":
+            _apply_counted_motion(state, count, target_move_left_note)
+        else:
+            apply_counted_visual_motion(state, -1, count)
         return True
     if key in keys.right:
-        for _ in range(count):
-            target = target_move_right_note(state) if move_mode == "note" else target_move_right_visual(state)
-            apply_motion_target(state, target)
+        if move_mode == "note":
+            _apply_counted_motion(state, count, target_move_right_note)
+        else:
+            apply_counted_visual_motion(state, 1, count)
         return True
     if key in keys.up:
         if state.read_only and len(visible_view_staffs(state.piece)) > 1:
-            for _ in range(count):
-                cycle_view_staff(state, -1)
+            cycle_view_staff(state, -count)
             return True
         state.cursor_string -= count
         state.clamp()
         return True
     if key in keys.down:
         if state.read_only and len(visible_view_staffs(state.piece)) > 1:
-            for _ in range(count):
-                cycle_view_staff(state, 1)
+            cycle_view_staff(state, count)
             return True
         state.cursor_string += count
         state.clamp()
         return True
     if key in action_keys.scroll_up:
-        for _ in range(count):
-            scroll_viewport_page(state, state.screen_width, state.screen_height, -1)
+        scroll_viewport_page(state, state.screen_width, state.screen_height, -count)
         return True
     if key in action_keys.scroll_down:
-        for _ in range(count):
-            scroll_viewport_page(state, state.screen_width, state.screen_height, 1)
+        scroll_viewport_page(state, state.screen_width, state.screen_height, count)
         return True
     if key in action_keys.page_up:
-        for _ in range(count):
-            apply_motion_target(state, target_jump_row_visual(state, -1))
+        apply_motion_target(state, target_jump_row_visual(state, -count))
         return True
     if key in action_keys.page_down:
-        for _ in range(count):
-            apply_motion_target(state, target_jump_row_visual(state, 1))
+        apply_motion_target(state, target_jump_row_visual(state, count))
         return True
     if key in action_keys.bar_next:
         apply_motion_target(state, target_bar_next(state, count))
@@ -537,3 +546,17 @@ def _handle_normal_movement(  # noqa: C901, PLR0911, PLR0912
         apply_motion_target(state, target_jump_last_bar(state))
         return True
     return False
+
+
+def _apply_counted_motion(
+    state: EditorState,
+    count: int,
+    target_for_state: Callable[[EditorState], CursorMotionTarget],
+) -> None:
+    for _ in range(count):
+        before = (state.cursor_bar, state.cursor_col, state.cursor_string, len(state.piece.bars))
+        target = target_for_state(state)
+        apply_motion_target(state, target)
+        after = (state.cursor_bar, state.cursor_col, state.cursor_string, len(state.piece.bars))
+        if target.append_bar or after == before:
+            break

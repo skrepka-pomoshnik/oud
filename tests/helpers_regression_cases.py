@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Chord, Note, Piece
+from petrucci.model import Bar, Chord, Note, Piece
 
 
 def _flatten_notes(chords: list[Chord]) -> list[Note]:

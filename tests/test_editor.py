@@ -4,9 +4,9 @@ from oud.editor import actions, edit_ops, ops, undo_ops
 from oud.editor import command_ops as cmd_ops
 from oud.editor.controller import handle_key as dispatch_key
 from oud.editor.state import EditorState
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
 
 
 def _state() -> EditorState:
@@ -1096,7 +1096,7 @@ def test_insert_bass_slash_shorthand() -> None:
     assert state.overrides[(0, 6, 0)] == "a"
 
 
-def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> None:
+def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> None:  # noqa: C901
     state = _state()
     state.screen_width = 28
     state.screen_height = 20

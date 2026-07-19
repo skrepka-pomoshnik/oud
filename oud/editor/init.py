@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.ft3 import build_durations
-from oud.core.tab_parser import load_tab_data
 from oud.editor.document import configure_document
 from oud.editor.load_ops import import_warning_summary, load_piece_data
 from oud.editor.messages import READ_ONLY_VIEWER, MessageLevel
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar
-from oud.petrucci.tuning_utils import tuning_count
+from oud.importers.ft3 import build_durations
+from oud.importers.tab import load_tab_data
 from oud.settings import DEFAULT_SETTINGS, load_settings
+from petrucci.model import Bar
+from petrucci.tuning_utils import tuning_count
 
 
 def init_state(  # noqa: C901, PLR0912

@@ -1,4 +1,4 @@
-from oud.petrucci.layout_map import block_height, layout_block_rows
+from petrucci.layout_map import block_height, layout_block_rows
 
 
 def test_layout_block_rows_show_extras_reserves_single_span_row() -> None:

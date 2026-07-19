@@ -97,7 +97,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
 }
 
 
-def load_settings(path: str) -> dict[str, str]:
+def load_settings(path: str) -> dict[str, str]:  # noqa: C901
     data: dict[str, str] = dict(DEFAULT_SETTINGS)
     file_path = _resolve_config_path(path)
     if not file_path.exists():

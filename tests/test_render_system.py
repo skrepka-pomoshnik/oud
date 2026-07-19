@@ -3,19 +3,23 @@ from __future__ import annotations
 from itertools import pairwise
 
 from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
-from oud.petrucci.model import Bar, Chord, LyricEvent, Note
-from oud.petrucci.render_bar import build_flag_rows
-from oud.petrucci.render_system import (
-    _build_chord_scale_map,
-    _chord_positions_distinct,
-    _grid_display_map,
-    _place_duration_cells_aligned,
-    _required_auto_display_width_for_bar,
-    _required_flag_content_width,
-    _scale_chord_row,
+from petrucci.model import Bar, Chord, LyricEvent, Note
+from petrucci.render_bar import build_flag_rows
+from petrucci.render_geometry import _grid_display_map, _place_duration_cells_aligned, _scale_chord_row
+from petrucci.render_spacing import (
+    build_chord_scale_map as _build_chord_scale_map,
 )
-from oud.petrucci.render_utils import smart_group_map, spread_flag_positions
-from oud.petrucci.view_model import _filter_redundant_positions, bar_cells_from_chords
+from petrucci.render_spacing import (
+    chord_positions_distinct as _chord_positions_distinct,
+)
+from petrucci.render_spacing import (
+    required_auto_display_width_for_bar as _required_auto_display_width_for_bar,
+)
+from petrucci.render_spacing import (
+    required_flag_content_width as _required_flag_content_width,
+)
+from petrucci.render_utils import smart_group_map, spread_flag_positions
+from petrucci.view_model import _filter_redundant_positions, bar_cells_from_chords
 from tests.helpers_regression_cases import regression_state, stem_alignment_problem_piece
 
 

@@ -1,14 +1,16 @@
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import _apply_overrides, _bass_strings_used
-from oud.petrucci.render_system import (
-    _build_chord_scale_map,
-    _chord_positions_distinct,
-    _playback_scaled_col_for_chords,
-    _scale_chord_row,
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import _apply_overrides, _bass_strings_used
+from petrucci.render_geometry import _scale_chord_row
+from petrucci.render_playback import _playback_scaled_col_for_chords
+from petrucci.render_spacing import (
+    build_chord_scale_map as _build_chord_scale_map,
 )
-from oud.petrucci.render_utils import bar_cells_from_chords
-from oud.petrucci.tuning_utils import default_bass_strings
-from oud.petrucci.view_model import (
+from petrucci.render_spacing import (
+    chord_positions_distinct as _chord_positions_distinct,
+)
+from petrucci.render_utils import bar_cells_from_chords
+from petrucci.tuning_utils import default_bass_strings
+from petrucci.view_model import (
     _bar_display_width,
     _bars_fit,
     _inline_bass_row,

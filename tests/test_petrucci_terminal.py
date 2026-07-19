@@ -5,13 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from oud.petrucci import (
+from petrucci import (
     AccidentalDisplay,
     BarlineKind,
     BeamKind,
-    CellStyle,
     EventKind,
-    EventOverlay,
     GlyphMode,
     KeySignature,
     LyricSyllable,
@@ -21,7 +19,6 @@ from oud.petrucci import (
     NotationSpan,
     NotationStaff,
     OrnamentKind,
-    OverlayRole,
     PitchStep,
     ScoreTypesetOptions,
     SpanKind,
@@ -30,8 +27,8 @@ from oud.petrucci import (
     pitch_from_midi,
     typeset_score,
 )
-from oud.petrucci.display import display_width
-from oud.petrucci.layout import ElementRole
+from petrucci.display import display_width
+from petrucci.layout import ElementRole
 
 
 def _event(event_id: str, onset: int, midi: int | None, duration: Fraction = Fraction(1, 4)) -> NotationEvent:
@@ -93,85 +90,37 @@ def test_typeset_score_returns_text_and_semantic_planes() -> None:
     assert all(len(row) == 64 for row in result.semantic_frame.element_ids)
 
 
-def test_repeated_pitch_overlays_style_only_the_matching_event_id() -> None:
-    result = typeset_score(
-        _score(),
-        options=ScoreTypesetOptions(width=64, height=24),
-        overlays={
-            "first-c": EventOverlay(OverlayRole.HIT),
-            "second-c": EventOverlay(OverlayRole.CURRENT, annotation="+12c"),
-            "rest": EventOverlay(OverlayRole.MISSED),
-        },
-    )
+def test_repeated_pitch_ids_resolve_to_distinct_cells() -> None:
+    result = typeset_score(_score(), options=ScoreTypesetOptions(width=64, height=24))
 
-    first_styles = {result.semantic_frame.styles[y][x] for y, x in result.cells_for("first-c")}
-    second_styles = {result.semantic_frame.styles[y][x] for y, x in result.cells_for("second-c")}
-    rest_styles = {result.semantic_frame.styles[y][x] for y, x in result.cells_for("rest")}
+    first_cells = set(result.cells_for("first-c"))
+    second_cells = set(result.cells_for("second-c"))
+    rest_cells = set(result.cells_for("rest"))
 
-    assert first_styles == {CellStyle.HIT}
-    assert second_styles == {CellStyle.CURRENT}
-    assert rest_styles == {CellStyle.MISSED}
-    assert "+12c" in result.text
+    assert first_cells
+    assert second_cells
+    assert rest_cells
+    assert first_cells.isdisjoint(second_cells)
+    assert first_cells.isdisjoint(rest_cells)
 
 
-def test_numeric_feedback_uses_a_collision_safe_semantic_lane() -> None:
-    result = typeset_score(
-        _score(),
-        options=ScoreTypesetOptions(width=64, height=24, glyph_mode=GlyphMode.SAFE),
-        overlays={
-            "first-c": EventOverlay(
-                OverlayRole.HIT,
-                pitch_error_cents=8,
-                confidence=0.82,
-            ),
-            "second-c": EventOverlay(
-                OverlayRole.MISSED,
-                timing_error_ms=-31,
-            ),
-        },
-    )
-    feedback = sorted(
-        (element for element in result.layout.elements if element.key.role is ElementRole.FEEDBACK),
-        key=lambda element: element.rect.x,
-    )
-    rows = result.layout.systems[0].staff_rows[0]
-
-    assert [element.value for element in feedback] == ["+8c 82%", "-31ms"]
-    assert all(element.rect.y == rows.feedback_row for element in feedback)
-    assert feedback[0].rect.right < feedback[1].rect.x
-    assert rows.feedback_row not in rows.lyric_rows
-    assert "+8c 82%" in result.text
-    assert "-31ms" in result.text
-
-
-def test_overlay_for_unknown_event_is_rejected() -> None:
-    with pytest.raises(ValueError, match="unknown event IDs: missing"):
-        typeset_score(
-            _score(),
-            options=ScoreTypesetOptions(width=64, height=24),
-            overlays={"missing": EventOverlay(OverlayRole.CURRENT)},
-        )
-
-
-def test_overlay_for_valid_clipped_event_is_ignored_without_becoming_unknown() -> None:
+def test_clipped_event_keeps_a_visible_identity_marker() -> None:
     score = _score()
     layout_only = typeset_score(
         score,
         options=ScoreTypesetOptions(width=30, height=24, glyph_mode=GlyphMode.SAFE),
     )
-    clipped_id = next(event_id for event_id in layout_only.layout.event_ids if not layout_only.cells_for(event_id))
+    clipped_id = layout_only.layout.systems[0].clipped_event_ids[0]
 
-    result = typeset_score(
-        score,
-        options=ScoreTypesetOptions(width=30, height=24, glyph_mode=GlyphMode.SAFE),
-        overlays={clipped_id: EventOverlay(OverlayRole.CURRENT)},
-    )
+    result = typeset_score(score, options=ScoreTypesetOptions(width=30, height=24, glyph_mode=GlyphMode.SAFE))
 
     assert result.layout.systems[0].clipped
     assert result.layout.onset_for(clipped_id) is None
     assert result.layout.location_for(clipped_id) is not None
     assert result.layout.system_for_event(clipped_id) is result.layout.systems[0]
-    assert not result.cells_for(clipped_id)
+    cells = result.cells_for(clipped_id)
+    assert cells
+    assert any(result.semantic_frame.roles[y][x] is ElementRole.CLIP_MARKER for y, x in cells)
 
 
 def test_safe_glyph_mode_keeps_structure_without_music_symbols() -> None:
@@ -185,6 +134,16 @@ def test_safe_glyph_mode_keeps_structure_without_music_symbols() -> None:
     assert "-" in result.text
     assert not {"𝄞", "●", "─"}.intersection(result.text)
     assert result.layout.onset_for("final-g") is not None
+
+
+def test_pretty_and_safe_modes_preserve_event_identity_and_roles() -> None:
+    pretty = typeset_score(_score(), options=ScoreTypesetOptions(width=64, height=24, glyph_mode=GlyphMode.PRETTY))
+    safe = typeset_score(_score(), options=ScoreTypesetOptions(width=64, height=24, glyph_mode=GlyphMode.SAFE))
+
+    for event_id in pretty.layout.event_ids:
+        assert pretty.cells_for(event_id) == safe.cells_for(event_id)
+    assert pretty.semantic_frame.element_ids == safe.semantic_frame.element_ids
+    assert pretty.semantic_frame.roles == safe.semantic_frame.roles
 
 
 def test_safe_key_signature_paints_each_accidental_as_a_semantic_cell() -> None:

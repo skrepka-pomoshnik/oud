@@ -1,5 +1,5 @@
-from oud.petrucci.model import Bar, Chord, Note
-from oud.petrucci.render_utils import (
+from petrucci.model import Bar, Chord, Note
+from petrucci.render_utils import (
     bar_cells,
     bar_cells_from_chords,
     duration_display,
@@ -50,6 +50,18 @@ def test_flag_positions_shortest_note_per_column() -> None:
         dotted=dotted,
     )
     assert positions[1][2] is True
+
+
+def test_flag_positions_use_sparse_coordinates_without_scanning_the_coordinate_space() -> None:
+    positions = flag_positions_from_durations(
+        {(0, 1_000_000_000, 2): 8},
+        bar_index=0,
+        strings=1_000_000_001,
+        bar_width=1_000_000_000,
+        default_duration=4,
+    )
+
+    assert positions == [(0, 4, False), (2, 8, False), (3, 4, False)]
 
 
 def test_flag_row_marks_stems_flags_and_dots() -> None:

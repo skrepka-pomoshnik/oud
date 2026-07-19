@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.musicxml_import import load_musicxml, load_mxl
 from oud.editor.load_ops import load_piece_data
 from oud.exports.musicxml import export_musicxml, export_mxl
+from oud.importers.musicxml import load_musicxml, load_mxl
 
 
 def _musicxml_supported_signature(piece) -> tuple:

@@ -5,10 +5,10 @@ from collections.abc import Iterable, Sequence
 from oud.editor import actions
 from oud.editor.controller import handle_key as dispatch_key
 from oud.editor.state import EditorState
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Piece
-from oud.petrucci.render import render_piece
 from oud.settings import DEFAULT_SETTINGS
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Piece
+from petrucci.render import render_piece
 
 KeyToken = int | str
 

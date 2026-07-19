@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from oud.core.ft3 import load_ft3
 from oud.editor.init import init_state
 from oud.editor.status import status_line
 from oud.editor.view_focus import current_view_staff, visible_view_staffs
-from oud.petrucci.duet_score import duet_bar_mapping
-from oud.petrucci.imported_score import project_imported_staff
+from oud.importers.ft3 import load_ft3
+from petrucci.duet_score import duet_bar_mapping
+from petrucci.imported_score import project_imported_staff
 from tests.helpers_keyscript import press_keys
 
 MIXED_FT3 = "lutemusic/can_she_excuse.ft3"

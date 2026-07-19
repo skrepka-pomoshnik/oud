@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from oud.petrucci.duet_score import (
+from petrucci.duet_score import (
     duet_bar_mapping,
     duet_raw_bar_index,
     duet_staff_labels,
     is_duet_score_piece,
 )
-from oud.petrucci.model import Piece
+from petrucci.model import Piece
 
 if TYPE_CHECKING:
     from oud.editor.state import EditorState
@@ -32,7 +32,7 @@ def _has_tablature(piece: Piece) -> bool:
     return any(bar.chords or bar.notes for bar in piece.bars)
 
 
-def visible_view_staffs(piece: Piece) -> tuple[ViewStaff, ...]:
+def visible_view_staffs(piece: Piece) -> tuple[ViewStaff, ...]:  # noqa: C901
     if is_duet_score_piece(piece):
         return tuple(
             ViewStaff(key=f"duet-{index}", label=label, source_index=index)

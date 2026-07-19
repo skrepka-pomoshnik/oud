@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 from oud.editor.rule_pipeline import BarRule, RuleContext, RuleIssue, run_rules
 from oud.editor.state import EditorState
+from oud.editor.tab_assignment import AssignmentPolicy, assign_chord_pitches
 from oud.editor.visual_cursor_map import bar_content_width_for_cursor, cursor_display_map_for_bar
-from oud.petrucci.render_utils import (
+from petrucci.render_utils import (
     bar_cells_from_chords,
     chord_slot_positions,
     note_type_to_denom,
 )
-from oud.petrucci.time_utils import parse_time_signature_value
-from oud.petrucci.tuning_utils import parse_tuning_pitches
+from petrucci.time_utils import parse_time_signature_value
+from petrucci.tuning_utils import parse_tuning_pitches
 
 
 def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) -> float:  # noqa: C901
@@ -169,7 +169,7 @@ def verify_bar(state: EditorState, bar_index: int) -> str:
     return issues[0].message
 
 
-def verify_render_bar_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:
+def verify_render_bar_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:  # noqa: C901
     issues: list[RuleIssue] = []
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return [RuleIssue(code="render.out_of_range", message="Bar out of range")]

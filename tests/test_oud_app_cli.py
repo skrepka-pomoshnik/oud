@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from oud import app as oud_app
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 
 
 def test_main_defaults_to_tui(monkeypatch: pytest.MonkeyPatch) -> None:

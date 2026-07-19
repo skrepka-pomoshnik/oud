@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 
 from oud.editor.load_ops import load_piece_data
 from oud.exports.musicxml import export_musicxml
-from oud.petrucci.model import Piece
+from petrucci.model import Piece
 
 FIXTURES = Path(__file__).parent / "fixtures" / "musicxml"
 

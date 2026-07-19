@@ -1,8 +1,9 @@
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
-from oud.petrucci.render_utils import chord_positions, flag_row
-from oud.petrucci.view_model import (
+from petrucci.framebuffer import FrameBuffer
+from petrucci.layout_map import layout_rows as _layout_rows
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
+from petrucci.render_utils import chord_positions, flag_row
+from petrucci.view_model import (
     _bar_durations,
     _bar_flags,
     _bar_number_for_index,
@@ -10,7 +11,6 @@ from oud.petrucci.view_model import (
     _beamified_chord_flag_positions,
     _filter_redundant_positions,
     _flag_positions_all,
-    _layout_rows,
     build_bar_view,
 )
 

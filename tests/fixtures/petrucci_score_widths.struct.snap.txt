@@ -1,0 +1,15 @@
+width=60
+systems=[(0, 1), (1, 2), (2, 3), (3, 4)]
+clipped=[(), (), (), ('poly-6', 'poly-7')]
+collisions=()
+active=dense-chord:0,sparse-rest:1,tied-repeat:2,poly-7:3
+width=80
+systems=[(0, 1), (1, 2), (2, 3), (3, 4)]
+clipped=[(), (), (), ()]
+collisions=()
+active=dense-chord:0,sparse-rest:1,tied-repeat:2,poly-7:3
+width=120
+systems=[(0, 1), (1, 2), (2, 4)]
+clipped=[(), (), ()]
+collisions=()
+active=dense-chord:0,sparse-rest:1,tied-repeat:2,poly-7:2

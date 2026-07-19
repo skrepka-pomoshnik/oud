@@ -16,7 +16,7 @@ from oud.editor.messages import NO_BARS
 from oud.editor.motions import apply_motion_target, target_home_bar
 from oud.editor.ops import chord_index_at_col, insert_chord
 from oud.editor.state import EditorState, UndoAction, YankedBar
-from oud.petrucci.model import Bar
+from petrucci.model import Bar
 
 
 def _inserted_chord_range(
@@ -402,7 +402,7 @@ def cmd_bar(state: EditorState, args: str) -> None:
     state.message = "Bar action: add/after/before/insert/del/yank/paste [count]"
 
 
-def cmd_stave(state: EditorState, args: str) -> None:
+def cmd_stave(state: EditorState, args: str) -> None:  # noqa: C901
     action = args.strip() or "break"
     per_line = bars_per_line(state, state.screen_width or 80)
     start, end = system_range(state, state.cursor_bar, per_line)

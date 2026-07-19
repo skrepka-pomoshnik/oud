@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.tab_parser import load_tab
 from oud.exports.export_tab import export_tab
+from oud.importers.tab import load_tab
 
 
 def test_tab_roundtrip_basic(tmp_path) -> None:

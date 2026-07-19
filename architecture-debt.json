@@ -1,0 +1,822 @@
+{
+  "version": 1,
+  "limits": {
+    "complexity": 7,
+    "module_lines": 1000
+  },
+  "complexity": {
+    "oud/app.py": [
+      {
+        "name": "_cmd_convert",
+        "complexity": 8
+      },
+      {
+        "name": "_parse_bars_spec",
+        "complexity": 8
+      }
+    ],
+    "oud/editor/controller.py": [
+      {
+        "name": "handle_key",
+        "complexity": 14
+      }
+    ],
+    "oud/editor/controller_utils.py": [
+      {
+        "name": "_bass_strings_used",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/edit_ops.py": [
+      {
+        "name": "clear_cell",
+        "complexity": 8
+      },
+      {
+        "name": "clear_cell_note",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/find_ops.py": [
+      {
+        "name": "_find_target_col",
+        "complexity": 10
+      }
+    ],
+    "oud/editor/init.py": [
+      {
+        "name": "init_state",
+        "complexity": 19
+      }
+    ],
+    "oud/editor/insert_actions.py": [
+      {
+        "name": "_handle_insert_bass_slash",
+        "complexity": 10
+      },
+      {
+        "name": "handle_insert",
+        "complexity": 31
+      }
+    ],
+    "oud/editor/layout.py": [
+      {
+        "name": "auto_system_bar_plan_with_gaps",
+        "complexity": 10
+      },
+      {
+        "name": "dynamic_system_starts",
+        "complexity": 18
+      },
+      {
+        "name": "jump_system_row_dynamic",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/load_ops.py": [
+      {
+        "name": "cmd_open",
+        "complexity": 10
+      },
+      {
+        "name": "load_piece_data",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/motions.py": [
+      {
+        "name": "target_jump_row_visual",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/normal_actions.py": [
+      {
+        "name": "_handle_normal_movement",
+        "complexity": 18
+      },
+      {
+        "name": "_handle_visual_mode",
+        "complexity": 13
+      },
+      {
+        "name": "handle_normal",
+        "complexity": 87
+      },
+      {
+        "name": "handle_pending_key",
+        "complexity": 18
+      }
+    ],
+    "oud/editor/plugin_ops.py": [
+      {
+        "name": "_handle_plugin_search",
+        "complexity": 9
+      },
+      {
+        "name": "handle_plugin_key",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/rhythm.py": [
+      {
+        "name": "bar_duration_sum_by_col",
+        "complexity": 12
+      },
+      {
+        "name": "row_duration_sum",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/score_ops.py": [
+      {
+        "name": "_paste_one_yanked_bar",
+        "complexity": 11
+      },
+      {
+        "name": "cmd_stave",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/search_ops.py": [
+      {
+        "name": "target_jump_match",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/settings_ops.py": [
+      {
+        "name": "_apply_bool_token",
+        "complexity": 8
+      },
+      {
+        "name": "_apply_meta_preset",
+        "complexity": 12
+      },
+      {
+        "name": "apply_set_command",
+        "complexity": 13
+      },
+      {
+        "name": "set_value_options",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/tab_assignment.py": [
+      {
+        "name": "assign_chord_pitches",
+        "complexity": 16
+      }
+    ],
+    "oud/editor/transform_ops.py": [
+      {
+        "name": "_find_cursor_grid_entries_for_shift",
+        "complexity": 8
+      },
+      {
+        "name": "_reassign_chord_notes",
+        "complexity": 8
+      },
+      {
+        "name": "_reassign_overrides",
+        "complexity": 12
+      },
+      {
+        "name": "transform_score_to_tuning",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/undo_ops.py": [
+      {
+        "name": "apply_action",
+        "complexity": 53
+      }
+    ],
+    "oud/editor/verify_ops.py": [
+      {
+        "name": "_rule_assignment_constraints",
+        "complexity": 13
+      },
+      {
+        "name": "bar_duration_sum",
+        "complexity": 12
+      },
+      {
+        "name": "verify_render_bar_issues",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/view_focus.py": [
+      {
+        "name": "visible_view_staffs",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/viewport.py": [
+      {
+        "name": "_duet_viewport_row_mapping",
+        "complexity": 9
+      },
+      {
+        "name": "_viewport_row_mapping",
+        "complexity": 9
+      },
+      {
+        "name": "ensure_cursor_visible",
+        "complexity": 10
+      }
+    ],
+    "oud/editor/visual_ops.py": [
+      {
+        "name": "_visual_selection_ranges",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/export_tab.py": [
+      {
+        "name": "export_tab",
+        "complexity": 35
+      }
+    ],
+    "oud/exports/lilypond.py": [
+      {
+        "name": "_append_imported_melody_bar",
+        "complexity": 10
+      },
+      {
+        "name": "_build_main_blocks",
+        "complexity": 10
+      },
+      {
+        "name": "_build_tab_body",
+        "complexity": 22
+      },
+      {
+        "name": "_build_vocal_bodies",
+        "complexity": 10
+      },
+      {
+        "name": "_chord_ft3_markup_suffix",
+        "complexity": 21
+      },
+      {
+        "name": "_collect_override_chords",
+        "complexity": 8
+      },
+      {
+        "name": "_initial_time_sig",
+        "complexity": 9
+      },
+      {
+        "name": "_lilypond_header",
+        "complexity": 10
+      },
+      {
+        "name": "_parse_tuning",
+        "complexity": 8
+      },
+      {
+        "name": "_tab_staff_with_block",
+        "complexity": 8
+      }
+    ],
+    "oud/exports/midi.py": [
+      {
+        "name": "_accent_velocity",
+        "complexity": 8
+      },
+      {
+        "name": "_append_vocal_messages",
+        "complexity": 9
+      },
+      {
+        "name": "_collect_manual_chords",
+        "complexity": 8
+      },
+      {
+        "name": "_duet_note_events",
+        "complexity": 9
+      },
+      {
+        "name": "_midi_command",
+        "complexity": 10
+      },
+      {
+        "name": "_parse_tuning",
+        "complexity": 8
+      },
+      {
+        "name": "build_playback_timeline",
+        "complexity": 9
+      }
+    ],
+    "oud/exports/musicxml.py": [
+      {
+        "name": "_add_note",
+        "complexity": 12
+      },
+      {
+        "name": "_musicxml_text",
+        "complexity": 17
+      },
+      {
+        "name": "_parse_tuning",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/_ft3_text.py": [
+      {
+        "name": "_classify_raw_line",
+        "complexity": 9
+      },
+      {
+        "name": "_classify_structured_row",
+        "complexity": 8
+      },
+      {
+        "name": "_coalesce_raw_multi_verse_rows",
+        "complexity": 8
+      },
+      {
+        "name": "_events_from_lyric_tokens",
+        "complexity": 10
+      },
+      {
+        "name": "_lyric_events_from_line",
+        "complexity": 10
+      },
+      {
+        "name": "_lyric_tokens_from_control_row",
+        "complexity": 9
+      },
+      {
+        "name": "_parse_structured_text_record",
+        "complexity": 8
+      },
+      {
+        "name": "_split_wide_gap",
+        "complexity": 9
+      },
+      {
+        "name": "_tokenize_control_row",
+        "complexity": 8
+      },
+      {
+        "name": "parse_ft3_text_record",
+        "complexity": 9
+      }
+    ],
+    "oud/importers/ft3.py": [
+      {
+        "name": "_append_raw_imported_bar",
+        "complexity": 10
+      },
+      {
+        "name": "_decode_raw_score_record",
+        "complexity": 9
+      },
+      {
+        "name": "_embedded_plain_text",
+        "complexity": 8
+      },
+      {
+        "name": "_fill_missing_time_signatures",
+        "complexity": 10
+      },
+      {
+        "name": "_normalize_vocal_event_accidentals",
+        "complexity": 8
+      },
+      {
+        "name": "_parallel_note_tab_plan",
+        "complexity": 8
+      },
+      {
+        "name": "extract_text",
+        "complexity": 8
+      },
+      {
+        "name": "load_ft3",
+        "complexity": 44
+      }
+    ],
+    "oud/importers/musicxml.py": [
+      {
+        "name": "_parse_piece",
+        "complexity": 10
+      }
+    ],
+    "oud/importers/tab.py": [
+      {
+        "name": "_parse_bar_segment_lines",
+        "complexity": 14
+      },
+      {
+        "name": "_parse_chord_line",
+        "complexity": 13
+      },
+      {
+        "name": "parse_tab_lines_data",
+        "complexity": 30
+      }
+    ],
+    "oud/playback/timeline.py": [
+      {
+        "name": "cursors_at_time",
+        "complexity": 8
+      }
+    ],
+    "oud/plugins/lutemusic.py": [
+      {
+        "name": "download_folder_ft3",
+        "complexity": 9
+      },
+      {
+        "name": "random_ft3",
+        "complexity": 10
+      }
+    ],
+    "oud/settings.py": [
+      {
+        "name": "load_settings",
+        "complexity": 9
+      }
+    ],
+    "oud/tui/commands.py": [
+      {
+        "name": "apply_command",
+        "complexity": 10
+      }
+    ],
+    "oud/tui/input.py": [
+      {
+        "name": "complete_command_text",
+        "complexity": 31
+      }
+    ],
+    "oud/tui/loop.py": [
+      {
+        "name": "run_loop",
+        "complexity": 10
+      }
+    ],
+    "oud/tui/prompt.py": [
+      {
+        "name": "update_prompt",
+        "complexity": 12
+      }
+    ],
+    "petrucci/framebuffer.py": [
+      {
+        "name": "draw_frame_rows",
+        "complexity": 12
+      },
+      {
+        "name": "overlay_dirty_rows",
+        "complexity": 9
+      }
+    ],
+    "petrucci/layout.py": [
+      {
+        "name": "__post_init__",
+        "complexity": 8
+      },
+      {
+        "name": "layout_collisions",
+        "complexity": 8
+      }
+    ],
+    "petrucci/layout_map.py": [
+      {
+        "name": "layout_block_rows",
+        "complexity": 8
+      }
+    ],
+    "petrucci/notation_annotations.py": [
+      {
+        "name": "_lyric_connector_elements",
+        "complexity": 8
+      }
+    ],
+    "petrucci/notation_elements.py": [
+      {
+        "name": "_beam_groups",
+        "complexity": 9
+      }
+    ],
+    "petrucci/piece_adapter.py": [
+      {
+        "name": "_bar_events",
+        "complexity": 8
+      },
+      {
+        "name": "_bar_lyrics",
+        "complexity": 9
+      }
+    ],
+    "petrucci/render.py": [
+      {
+        "name": "_render_duet_score_view",
+        "complexity": 23
+      },
+      {
+        "name": "render_piece",
+        "complexity": 23
+      }
+    ],
+    "petrucci/render_geometry.py": [
+      {
+        "name": "_expand_scale_map_from_anchors",
+        "complexity": 9
+      }
+    ],
+    "petrucci/render_helpers.py": [
+      {
+        "name": "bass_strings_used",
+        "complexity": 9
+      },
+      {
+        "name": "notes_lines",
+        "complexity": 10
+      }
+    ],
+    "petrucci/render_marks.py": [
+      {
+        "name": "_imported_ft3_mark_target_rows",
+        "complexity": 16
+      },
+      {
+        "name": "_merge_span_rows_with_cue_priority",
+        "complexity": 11
+      },
+      {
+        "name": "_overlay_inline_local_marks_on_display_row",
+        "complexity": 13
+      },
+      {
+        "name": "_place_parenthesize_tie_cues",
+        "complexity": 11
+      }
+    ],
+    "petrucci/render_playback.py": [
+      {
+        "name": "_playback_marker_ops",
+        "complexity": 9
+      },
+      {
+        "name": "_tab_playback_highlight_ops",
+        "complexity": 8
+      }
+    ],
+    "petrucci/render_rhythm_rows.py": [
+      {
+        "name": "_render_rhythm_rows",
+        "complexity": 52
+      }
+    ],
+    "petrucci/render_staff_rows.py": [
+      {
+        "name": "_render_staff_and_playback",
+        "complexity": 37
+      }
+    ],
+    "petrucci/render_status.py": [
+      {
+        "name": "_manual_bar_sum_quarter_beats",
+        "complexity": 8
+      },
+      {
+        "name": "build_status_lines",
+        "complexity": 9
+      },
+      {
+        "name": "resolve_duration_text",
+        "complexity": 9
+      }
+    ],
+    "petrucci/render_system.py": [
+      {
+        "name": "render_systems",
+        "complexity": 70
+      }
+    ],
+    "petrucci/render_text_lanes.py": [
+      {
+        "name": "_draw_vocal_beams",
+        "complexity": 8
+      },
+      {
+        "name": "_draw_vocal_stem",
+        "complexity": 8
+      },
+      {
+        "name": "_event_accidental_map",
+        "complexity": 9
+      },
+      {
+        "name": "_place_lyric_link_cues",
+        "complexity": 10
+      },
+      {
+        "name": "lyric_event_cells",
+        "complexity": 10
+      },
+      {
+        "name": "melody_staff_rows",
+        "complexity": 13
+      },
+      {
+        "name": "text_bar_cells",
+        "complexity": 10
+      }
+    ],
+    "petrucci/render_utils.py": [
+      {
+        "name": "_duration_values_by_col",
+        "complexity": 8
+      },
+      {
+        "name": "bar_cells",
+        "complexity": 8
+      },
+      {
+        "name": "flag_row_style",
+        "complexity": 12
+      },
+      {
+        "name": "smart_group_map",
+        "complexity": 9
+      },
+      {
+        "name": "trim_right_slack_for_onsets",
+        "complexity": 9
+      }
+    ],
+    "petrucci/score.py": [
+      {
+        "name": "__post_init__",
+        "complexity": 10
+      },
+      {
+        "name": "_validate_staff",
+        "complexity": 8
+      }
+    ],
+    "petrucci/spacing.py": [
+      {
+        "name": "auto_bar_plan",
+        "complexity": 17
+      }
+    ],
+    "petrucci/system_fitting.py": [
+      {
+        "name": "fit_measured_boxes",
+        "complexity": 8
+      }
+    ],
+    "petrucci/tab_policy.py": [
+      {
+        "name": "time_sig_inline_rows",
+        "complexity": 24
+      }
+    ],
+    "petrucci/terminal.py": [
+      {
+        "name": "_paint_element",
+        "complexity": 8
+      },
+      {
+        "name": "_valued_notation_symbol",
+        "complexity": 9
+      },
+      {
+        "name": "write",
+        "complexity": 8
+      }
+    ],
+    "petrucci/tuning_utils.py": [
+      {
+        "name": "parse_tuning_pitches",
+        "complexity": 8
+      }
+    ],
+    "petrucci/view_model.py": [
+      {
+        "name": "_bar_compact_width",
+        "complexity": 8
+      },
+      {
+        "name": "_bar_display_width",
+        "complexity": 8
+      },
+      {
+        "name": "_bar_durations",
+        "complexity": 8
+      },
+      {
+        "name": "_bar_imported_ft3_annotations",
+        "complexity": 9
+      },
+      {
+        "name": "_bar_imported_ft3_ornaments",
+        "complexity": 9
+      },
+      {
+        "name": "_bar_number_for_index",
+        "complexity": 10
+      },
+      {
+        "name": "_beamified_chord_flag_positions",
+        "complexity": 14
+      },
+      {
+        "name": "_infer_time_signature",
+        "complexity": 9
+      },
+      {
+        "name": "_place_parenthesize_tie_cues",
+        "complexity": 11
+      },
+      {
+        "name": "_scale_row",
+        "complexity": 13
+      },
+      {
+        "name": "_tuning_labels",
+        "complexity": 18
+      },
+      {
+        "name": "build_bar_view",
+        "complexity": 13
+      }
+    ],
+    "petrucci/vocal_line.py": [
+      {
+        "name": "infer_vocal_events",
+        "complexity": 8
+      }
+    ],
+    "scripts/corpus_smoke.py": [
+      {
+        "name": "_collect_remote_items",
+        "complexity": 8
+      },
+      {
+        "name": "report_results",
+        "complexity": 10
+      }
+    ],
+    "tests/render_snapshot_utils.py": [
+      {
+        "name": "snapshot_signature",
+        "complexity": 9
+      }
+    ],
+    "tests/test_app.py": [
+      {
+        "name": "test_app_main_smoke",
+        "complexity": 10
+      },
+      {
+        "name": "test_app_main_smoke_interactions",
+        "complexity": 10
+      },
+      {
+        "name": "test_app_main_smoke_with_path",
+        "complexity": 10
+      }
+    ],
+    "tests/test_editor.py": [
+      {
+        "name": "test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue",
+        "complexity": 9
+      }
+    ],
+    "tests/test_tui_commands_exec.py": [
+      {
+        "name": "test_apply_command_dispatch_executes_all_registered_specs",
+        "complexity": 8
+      },
+      {
+        "name": "test_cmd_midi_lilypond_pdf_play_source",
+        "complexity": 9
+      }
+    ],
+    "tests/test_ui_render_split.py": [
+      {
+        "name": "_first_melody_row_idx",
+        "complexity": 9
+      }
+    ]
+  },
+  "large_modules": {
+    "oud/exports/lilypond.py": 1384,
+    "oud/exports/midi.py": 1097,
+    "oud/importers/_ft3_text.py": 1175,
+    "oud/importers/ft3.py": 1769,
+    "petrucci/view_model.py": 1068,
+    "tests/test_editor.py": 1183,
+    "tests/test_lilypond.py": 1197,
+    "tests/test_tui_commands_exec.py": 1164,
+    "tests/test_ui_render_split.py": 1954
+  }
+}

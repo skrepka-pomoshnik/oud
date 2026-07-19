@@ -1,10 +1,15 @@
 from dataclasses import fields
 
+import pytest
+
+from oud.editor import motions
+from oud.editor.controller_utils import MAX_KEY_COUNT
+from oud.editor.keycodes import DEFAULT_KEYCODES
 from oud.editor.keymap import insert_bindings, normal_action_bindings, normal_bindings
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
 from oud.editor.undo_ops import undo
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:
@@ -132,6 +137,56 @@ def test_hl_skips_only_barline_between_bars() -> None:
     handle_normal(state, ord("h"))
     assert state.cursor_bar == 0
     assert state.cursor_col == state.bar_width - 1
+
+
+def test_oversized_counted_motion_stops_at_read_only_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = _state()
+    state.read_only = True
+    state.cursor_bar = len(state.piece.bars) - 1
+    state.cursor_col = state.bar_width - 1
+    calls = 0
+
+    original = motions._target_move_visual
+
+    def counted_target(current: EditorState, delta: int, *, geometry_cache=None):
+        nonlocal calls
+        calls += 1
+        return original(current, delta, geometry_cache=geometry_cache)
+
+    monkeypatch.setattr(motions, "_target_move_visual", counted_target)
+    for _ in range(100):
+        handle_normal(state, ord("9"))
+    handle_normal(state, ord("l"))
+
+    assert calls == 1
+    assert state.count_prefix == ""
+    assert state.message == f"Count limited to {MAX_KEY_COUNT}"
+    assert len(state.piece.bars) == 8
+    assert (state.cursor_bar, state.cursor_col) == (7, 7)
+
+
+@pytest.mark.parametrize("key_profile", ["vim+arrows", "casual"])
+def test_every_terminal_key_is_bounded_after_oversized_count_prefix(
+    key_profile: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("oud.editor.normal_actions.start_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.normal_actions.stop_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.command_ops.print_pdf", lambda _state: None)
+    terminal_keys = {*range(256), *vars(DEFAULT_KEYCODES).values()}
+
+    for key in terminal_keys:
+        state = _state()
+        state.settings["keys"] = key_profile
+        state.read_only = True
+        state.cursor_bar = len(state.piece.bars) - 1
+        state.cursor_col = state.bar_width - 1
+        state.count_prefix = "9" * 10_000
+
+        handle_normal(state, key)
+
+        assert len(state.count_prefix) <= len(str(MAX_KEY_COUNT)), key
+        assert len(state.piece.bars) == 8, key
 
 
 def test_hl_auto_mode_advances_visible_step_without_double_press() -> None:

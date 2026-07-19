@@ -379,7 +379,7 @@ def _set_repeat(state: EditorState, value: str) -> None:
     set_repeat(state, value)
 
 
-def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:
+def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:  # noqa: C901
     cmdline = cmdline.strip()
     if not cmdline:
         return

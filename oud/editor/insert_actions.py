@@ -35,7 +35,7 @@ from oud.editor.ops import (
 )
 from oud.editor.rhythm import advance_if_overflow, cell_has_duration
 from oud.editor.state import EditorState, UndoAction
-from oud.petrucci.render_utils import (
+from petrucci.render_utils import (
     chord_slot_positions,
     format_fret,
     note_type_to_denom,
@@ -278,7 +278,7 @@ def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
     return True
 
 
-def _handle_insert_bass_slash(  # noqa: PLR0911
+def _handle_insert_bass_slash(  # noqa: C901, PLR0911
     state: EditorState,
     key: int,
     style: str,

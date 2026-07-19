@@ -16,10 +16,10 @@ from oud.exports.export_tab import export_tab_to_file
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import export_midi
 from oud.exports.musicxml import export_musicxml, export_mxl
-from oud.petrucci.model import Piece
 from oud.settings import DEFAULT_SETTINGS, load_settings
 from oud.tui.commands import apply_command
 from oud.tui.loop import run_loop
+from petrucci.model import Piece
 
 CONFIG_PATH = "config.toml"
 COMMANDS = {"tui", "ascii", "convert"}
@@ -82,7 +82,7 @@ def _cmd_ascii(
     return 0
 
 
-def _parse_bars_spec(spec: str, total: int) -> tuple[int, int]:
+def _parse_bars_spec(spec: str, total: int) -> tuple[int, int]:  # noqa: C901
     text = spec.strip()
     if not text:
         raise ValueError(ERR_BARS_EMPTY)
@@ -137,7 +137,7 @@ def _slice_for_ascii(state, bars_spec: str | None) -> None:
     state.holds = remap_spans(state.holds)
 
 
-def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:  # noqa: PLR0911
+def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:  # noqa: C901, PLR0911
     settings, bar_width, piece, overrides, durations, dotted = _export_context(path_in, config_path)
     suffix = Path(path_out).suffix.lower()
     if suffix == ".tab":

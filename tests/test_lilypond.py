@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from oud.core.ft3 import build_durations, load_ft3
 from oud.exports import lilypond as lp
 from oud.exports.lilypond import export_lilypond
-from oud.petrucci.model import (
+from oud.importers.ft3 import build_durations, load_ft3
+from petrucci.model import (
     Bar,
     Chord,
     ImportedBarContent,

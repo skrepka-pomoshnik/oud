@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render_status import (
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render_status import (
     bar_meter_integrity_marker,
     build_status_lines,
     resolve_duration_text,
     status_attr_for_message,
 )
-from oud.petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
+from petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 
 
 def test_resolve_duration_text_manual_and_dotted() -> None:

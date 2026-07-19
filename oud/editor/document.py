@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from oud.editor.messages import MessageLevel
-from oud.petrucci.duet_score import is_duet_score_piece
-from oud.petrucci.model import Piece
+from petrucci.duet_score import is_duet_score_piece
+from petrucci.model import Piece
 
 if TYPE_CHECKING:
     from oud.editor.state import EditorState

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.plugin_model import RemoteTab
 from oud.editor.plugin_ops import (
     download_plugin_folder_recursive,
     download_plugin_item,
@@ -11,7 +10,8 @@ from oud.editor.plugin_ops import (
     open_plugin_item,
 )
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Piece
+from oud.plugins.model import RemoteTab
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

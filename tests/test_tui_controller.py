@@ -1,7 +1,7 @@
-from oud.core.plugin_model import RemoteTab
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Piece
+from oud.plugins.model import RemoteTab
 from oud.tui.controller import handle_key
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

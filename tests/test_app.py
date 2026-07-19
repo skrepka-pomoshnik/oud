@@ -8,14 +8,14 @@ from oud.editor.commands import cmd_footnote, cmd_header_template, cmd_subtitle,
 from oud.editor.document import configure_document
 from oud.editor.state import EditorState
 from oud.editor.status import status_line
-from oud.petrucci.framebuffer import Frame
-from oud.petrucci.model import Bar, Piece
 from oud.tui.commands import apply_command, apply_set_command
 from oud.tui.controller import handle_key
 from oud.tui.input import handle_command as handle_command_input
 from oud.tui.input import handle_search as handle_search_input
 from oud.tui.input import history_next, history_prev, parse_search
 from oud.tui.loop import _read_input_batch, run_loop
+from petrucci.framebuffer import Frame
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:
@@ -202,7 +202,7 @@ def test_stave_delete_removes_system() -> None:
     assert 2 not in state.stave_breaks
 
 
-def test_app_main_smoke(monkeypatch) -> None:
+def test_app_main_smoke(monkeypatch) -> None:  # noqa: C901
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
     monkeypatch.setattr(curses, "napms", lambda *_args: None)
     monkeypatch.setattr(curses, "A_REVERSE", 0)
@@ -281,7 +281,7 @@ def test_read_input_batch_drains_queued_repeat_keys_before_render() -> None:
     assert window.timeouts == [50, 0]
 
 
-def test_app_main_smoke_with_path(monkeypatch) -> None:
+def test_app_main_smoke_with_path(monkeypatch) -> None:  # noqa: C901
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
     monkeypatch.setattr(curses, "napms", lambda *_args: None)
     monkeypatch.setattr(curses, "A_REVERSE", 0)
@@ -341,7 +341,7 @@ def test_app_main_smoke_with_path(monkeypatch) -> None:
     )
 
 
-def test_app_main_smoke_interactions(monkeypatch) -> None:
+def test_app_main_smoke_interactions(monkeypatch) -> None:  # noqa: C901
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
     monkeypatch.setattr(curses, "napms", lambda *_args: None)
     monkeypatch.setattr(curses, "A_REVERSE", 0)

@@ -8,7 +8,7 @@ from oud.editor.document import set_write_target
 from oud.editor.insert_session import set_mode
 from oud.editor.messages import MISSING_LESS, NO_SOURCE_PATH, MessageLevel
 from oud.editor.state import EditorState
-from oud.exports.export_tab import export_ascii, export_tab_to_file
+from oud.exports.export_tab import TabExportError, export_ascii, export_tab_to_file
 
 RunFn = Callable[..., subprocess.CompletedProcess[str]]
 WhichFn = Callable[[str], str | None]
@@ -63,7 +63,7 @@ def cmd_write(state: EditorState, path: str) -> bool:
             ties=state.ties,
             holds=state.holds,
         )
-    except OSError as exc:
+    except (OSError, TabExportError) as exc:
         state.message = f"Write failed: {exc}"
         return False
     set_write_target(state, target)
@@ -95,8 +95,8 @@ def render_ascii_snapshot(state: EditorState) -> str:
     content = ""
     if state.screen_width > 0 and state.screen_height > 0:
         from oud.editor.status import status_line  # noqa: PLC0415
-        from oud.petrucci.framebuffer import FrameBuffer  # noqa: PLC0415
-        from oud.petrucci.render import render_piece  # noqa: PLC0415
+        from petrucci.framebuffer import FrameBuffer  # noqa: PLC0415
+        from petrucci.render import render_piece  # noqa: PLC0415
 
         frame = FrameBuffer(state.screen_height, state.screen_width)
         render_piece(

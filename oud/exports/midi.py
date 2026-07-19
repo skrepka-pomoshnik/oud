@@ -6,12 +6,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from oud.core.playback_timeline import PlaybackCursor, build_timeline_from_events
-from oud.petrucci.duet_score import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.time_utils import parse_time_signature_value
-from oud.petrucci.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
-from oud.petrucci.vocal_line import infer_vocal_events
+from oud.playback.timeline import PlaybackCursor, build_timeline_from_events
+from petrucci.duet_score import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.tab_input import editor_event_columns, editor_fret_at
+from petrucci.time_utils import parse_time_signature_value
+from petrucci.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
+from petrucci.vocal_line import infer_vocal_events
 
 TICKS_PER_QUARTER = 480
 BASE_NOTE_VELOCITY = 80
@@ -56,7 +57,9 @@ def _ornament_pitch_delta(symbol: str | None) -> int:
         return -1
     if symbol == "+":
         return 2
-    if symbol in {"#", "dot-left", "brackets"}:
+    if symbol in {"parenthesis", "brackets"}:
+        return 0
+    if symbol in {"#", "dot-left"}:
         return 1
     return 1
 
@@ -93,7 +96,7 @@ def _duration_ticks(denom: int, dotted: bool) -> int:
     return ticks
 
 
-def _parse_tuning(tuning: str) -> list[int]:
+def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
     pitches: list[int] = []
     idx = 0
     text = tuning.strip()
@@ -164,15 +167,12 @@ def _fret_from_override(ch: str, style: str) -> int | None:
     if style == "italian":
         if ch.isdigit():
             return int(ch)
-        if ch == "x":
-            return 10
-        return None
-    if "a" <= ch <= "p":
-        return ord(ch) - ord("a")
-    return None
+        return 10 if ch == "x" else None
+    letters = "abcdefghiklmnopqrst"
+    return letters.index(ch) if ch in letters else None
 
 
-def _collect_manual_chords(
+def _collect_manual_chords(  # noqa: C901
     bar_index: int,
     strings: int,
     bar_width: int,
@@ -183,7 +183,7 @@ def _collect_manual_chords(
     dotted: set[tuple[int, int]] | None,
 ) -> list[tuple[int, int, int, list[Note]]]:
     _ = bar_width
-    columns = sorted({col for (b, _s, col) in overrides if b == bar_index})
+    columns = editor_event_columns(overrides, bar_index=bar_index)
     events: list[tuple[int, int, int, list[Note]]] = []
     current_time = 0
     for col in columns:
@@ -192,7 +192,14 @@ def _collect_manual_chords(
             key = (bar_index, s_idx, col)
             if key not in overrides:
                 continue
-            fret = _fret_from_override(overrides[key], style)
+            fret = editor_fret_at(
+                overrides,
+                durations,
+                bar_index=bar_index,
+                string_index=s_idx,
+                column=col,
+                style=style,
+            )
             if fret is None:
                 continue
             notes.append(Note(string=s_idx + 1, fret=fret, raw_pos=0))
@@ -254,6 +261,7 @@ def _apply_overrides(
     col: int,
     style: str,
     strings: int,
+    durations: dict[tuple[int, int, int], int],
 ) -> list[Note]:
     if not overrides:
         return notes
@@ -262,7 +270,14 @@ def _apply_overrides(
         key = (bar_index, s_idx, col)
         if key not in overrides:
             continue
-        fret = _fret_from_override(overrides[key], style)
+        fret = editor_fret_at(
+            overrides,
+            durations,
+            bar_index=bar_index,
+            string_index=s_idx,
+            column=col,
+            style=style,
+        )
         if fret is None:
             continue
         by_string[s_idx + 1] = Note(string=s_idx + 1, fret=fret, raw_pos=0)
@@ -309,7 +324,7 @@ def _bar_chord_events(
         is_dotted = chord.dotted or (dotted is not None and (bar_index, col) in dotted)
         duration = _duration_ticks(denom, is_dotted)
         if chord.notes:
-            notes = _apply_overrides(chord.notes, overrides, bar_index, col, style, strings)
+            notes = _apply_overrides(chord.notes, overrides, bar_index, col, style, strings, durations)
             events.append((time, duration, col, notes))
         time += duration
     return events
@@ -459,7 +474,7 @@ def _duet_timeline_events(
     return timeline_events
 
 
-def _duet_note_events(
+def _duet_note_events(  # noqa: C901
     piece: Piece,
     *,
     overrides: dict[tuple[int, int, int], str],
@@ -546,7 +561,7 @@ def _duet_note_events(
     return events
 
 
-def _append_vocal_messages(
+def _append_vocal_messages(  # noqa: C901
     events: list[tuple[int, bytes]],
     *,
     bar: Bar,
@@ -635,7 +650,7 @@ def _midi_total_ticks(events: list[tuple[int, bytes]]) -> int:
     return max((start for start, _payload in events), default=0)
 
 
-def build_playback_timeline(
+def build_playback_timeline(  # noqa: C901
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -745,7 +760,7 @@ def _meter_for_bar(bar: Bar, settings: dict[str, str]) -> tuple[int, int]:
     return 4, 4
 
 
-def _accent_velocity(start: int, beats: int, unit: int, base: int = BASE_NOTE_VELOCITY) -> int:
+def _accent_velocity(start: int, beats: int, unit: int, base: int = BASE_NOTE_VELOCITY) -> int:  # noqa: C901
     beat_ticks = _duration_ticks(unit, dotted=False)
     if beat_ticks <= 0 or start % beat_ticks != 0:
         return base
@@ -1020,7 +1035,7 @@ def export_midi(
     )
 
 
-def _midi_command(
+def _midi_command(  # noqa: C901
     path: str,
     soundfont: str | None,
     platform: str,

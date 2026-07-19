@@ -63,6 +63,10 @@ Set with:
 - Command: `:`
 - Search: `/`
 
+Normal-mode numeric prefixes are limited to 999 with a visible notice. Counted
+movement stops at score boundaries, and movement in a read-only viewer never
+creates a new bar.
+
 ### Vim parity currently implemented
 
 - Char find: `f F t T`, repeat `;` and reverse `,`
@@ -188,7 +192,7 @@ Notes:
 
 ## 7.1 Tonality and Accidentals
 
-Tonal accidentals are centralized in [oud/core/key_signature.py](oud/core/key_signature.py).
+Tonal accidentals are centralized in [oud/importers/key_signature.py](oud/importers/key_signature.py).
 
 - `normalize_key_signature_name()` accepts `GM`, `Dm`, `Bb major`, `f# minor`
 - `key_signature_count()` returns the standard circle-of-fifths count
@@ -263,8 +267,8 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 ## 11) Architecture Map
 
-- `oud/petrucci/`: canonical score model, spacing policies, framebuffer, and tab/note renderer.
-- `oud/core/`: file parsers and format-specific import semantics.
+- `petrucci/`: canonical score model, spacing policies, framebuffer, and tab/note renderer.
+- `oud/importers/`: file parsers and format-specific import semantics.
 - `oud/editor/`: state + editing ops + command ops + undo/redo.
 - `oud/tui/`: input/prompt/controller/main loop.
 - `oud/ui/`: curses adapter.
@@ -319,34 +323,26 @@ Status values:
 
 ## 15) Petrucci Embedding API
 
-Petrucci has two explicit entry paths:
+Petrucci has two entry paths:
 
-- `typeset_piece(...)` preserves Oud's existing tablature-oriented renderer.
-- `typeset_score(...)` renders the source-independent standard-notation model
-  without constructing an Oud editor, FT3 parser, or curses window.
+- `typeset_piece(...)` preserves Oud tablature behavior.
+- `typeset_score(...)` renders source-independent immutable notation records.
 
-The score path accepts immutable `NotationScore` records with caller-owned
-string IDs and exact `Fraction` timing. `ScoreTypesetResult` exposes terminal
-text, an immutable `ScoreLayout`, a semantic glyph/style/role/ID frame, and
-`cells_for(id)` lookup. Repeated equal pitches remain distinct because overlays
-use event IDs rather than pitch values. Canonical IDs remain valid when a narrow
-viewport cannot place their glyphs; such overlays stay off-screen instead of
-being misreported as unknown events. Resolving and using the complete public
-Petrucci API does not import curses; `CursesScreen` translates portable text
-attributes only at Oud's terminal boundary.
+The canonical score result contains text, `ScoreLayout`, structural roles,
+source IDs, and `cells_for(id)`. Consumers own selection, playback, grading,
+colors, and terminal attributes; Petrucci does not expose result-state enums or
+interpret caller state.
 
 ```python
 from fractions import Fraction
 
-from oud.petrucci import (
+from petrucci import (
     EventKind,
-    EventOverlay,
     GlyphMode,
     NotationEvent,
     NotationMeasure,
     NotationScore,
     NotationStaff,
-    OverlayRole,
     ScoreTypesetOptions,
     pitch_from_midi,
     typeset_score,
@@ -360,84 +356,52 @@ note = NotationEvent(
     (pitch_from_midi(60),),
 )
 score = NotationScore(
-    "practice",
+    "example",
     (NotationStaff("voice", (NotationMeasure("bar:1", 1, (note,)),)),),
 )
 result = typeset_score(
     score,
     options=ScoreTypesetOptions(width=80, height=24, glyph_mode=GlyphMode.SAFE),
-    overlays={note.id: EventOverlay(OverlayRole.CURRENT)},
 )
-print(result.text)
+for row, column in result.cells_for(note.id):
+    pass  # apply caller-owned attributes here
 ```
 
-Use `notation_score_from_piece(piece)` only at Oud's boundary. Another program
-such as Voce should convert its own events directly to canonical records and
-retain ownership of grading, playback clocks, and renderer lifecycle.
+Timed consumers can use `FlowEvent`. Timing is exact; events crossing a measure
+are split and tied while `notation_ids_for(source_id)` retains source identity.
 
-An external painter can consume `ScoreLayout`, `ScoreSystem`, `StaffRows`,
-`LayoutElement`, `ElementKey`, and `Rect` directly. `EventLocation` is complete
-for every canonical event, including events whose glyphs are clipped. This lets
-a host select the active system without parsing terminal cells:
+Use `layout_score(...)` once per score, layout width, metrics, and policy.
+`typeset_layout(...)` repaints that immutable layout. For a moving horizontal
+view, choose a wide `layout_width`, a narrower `width`, and update only
+`x_offset`:
 
 ```python
-from dataclasses import replace
+from petrucci import ScoreTypesetOptions, typeset_layout
 
-from oud.petrucci import LayoutViewport, ScoreTypesetOptions, layout_score
-
-options = ScoreTypesetOptions(width=80, height=24)
-layout = layout_score(score, viewport=LayoutViewport(width=options.width, height=options.height))
-active = layout.location_for(note.id)
-result = typeset_score(score, options=replace(options, system_offset=active.system_index))
-```
-
-The Oud adapter validates lyric-to-note onset matching by default. Use
-`notation_score_from_piece(piece, include_lyrics=False)` only when a consumer
-explicitly wants the trustworthy note layer from a source whose lyrics cannot
-yet be aligned; Petrucci does not truncate or spread lyric text to make it fit.
-
-The current score path supports treble/bass staffs, chords and rests, ledger
-lines, whole through 64th durations, dots, stems, flags/beams, key-aware
-accidentals, signatures and changes, distinct repeat barlines, endings, tuplets,
-ties/slurs with system continuations, fermatas, dynamics, ornaments, lyrics,
-measured wrapping, system scrolling, and typed result overlays. Measure numbers,
-endings, spans, ornaments, fermatas, dynamics, numeric result feedback, and
-lyrics receive reserved semantic lanes before terminal painting.
-Feedback rows are content-derived by default; set
-`NotationLayoutPolicy(reserve_feedback_lane=True)` when a live consumer needs
-stable result-row geometry across every system.
-For a compact trainer view, policy flags can independently hide title, measure
-numbers, lyrics, stems/beams, and barlines, show written pitch labels, and keep a
-stable result row:
-
-```python
-from oud.petrucci import NotationLayoutPolicy
-
-trainer_policy = NotationLayoutPolicy(
-    show_title=False,
-    show_measure_numbers=False,
-    show_lyrics=False,
-    show_stems=False,
-    show_barlines=False,
-    show_pitch_labels=True,
-    reserve_feedback_lane=True,
+options = ScoreTypesetOptions(
+    width=40,
+    height=18,
+    layout_width=160,
+    x_offset=60,
 )
+frame = typeset_layout(layout, options=options)
 ```
 
-Pretty and safe modes distinguish eighth, 16th, 32nd, and 64th rests. Events at
-one musical onset retain one onset coordinate while common notehead, rest,
-stem/flag, dynamic, same-verse lyric, and pitch-label conflicts use deterministic
-visual lanes. Cross-voice beam envelopes, larger dense chords, imported notation
-depth, and Oud's TUI migration remain release work in `TODO.md`.
+`system_offset` selects the first vertically visible system. `EventLocation`,
+`OnsetPosition`, clipping metadata, structural roles, and translated cell IDs
+remain available without parsing glyph text. Pretty and safe modes preserve the
+same identities and roles.
 
-The package is the authoritative implementation home for:
+The canonical path supports notes, chords, rests, ledger lines, whole through
+64th durations, dots, stems, flags/beams, key-aware accidentals, signatures and
+changes, repeats and endings, tuplets, grace notes, ties/slurs, fermatas,
+dynamics, ornaments, pitch labels, lyrics, measured wrapping, and viewport
+translation.
 
-- score, bar, chord, note, melody, and lyric event dataclasses
-- French/Italian tablature labels and notation policies
-- rhythm flags, spacing, system packing, and text-lane layout
-- tablature, vocal/lyric, and pitched note-staff character-cell rendering
-- framebuffer snapshots and style attributes
+Petrucci imports neither Oud application modules nor curses. Oud translates the
+portable frame to curses only in its UI adapter. External programs should adapt
+their records directly to `NotationScore` or `FlowEvent`; product integration is
+owned by the consuming repository.
 
-`oud.petrucci` is the only public path for these typesetting modules. The former
-`oud.core.*` model/render and `oud.ui.*` renderer aliases were removed before
-the first public release.
+The former `oud.core.*` model/render and `oud.ui.*` renderer aliases were removed.
+`petrucci` is the only public typesetting path.

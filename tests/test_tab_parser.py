@@ -3,7 +3,7 @@ import string
 
 import pytest
 
-from oud.core.tab_parser import (
+from oud.importers.tab import (
     load_tab,
     load_tab_data,
     parse_tab_text_data,

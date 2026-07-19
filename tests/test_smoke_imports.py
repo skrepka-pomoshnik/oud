@@ -6,7 +6,7 @@ def test_import_app_module() -> None:
 
 
 def test_import_render_module() -> None:
-    __import__("oud.petrucci.render")
+    __import__("petrucci.render")
 
 
 def test_import_export_tab_module() -> None:

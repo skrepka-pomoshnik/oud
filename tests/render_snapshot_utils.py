@@ -7,10 +7,10 @@ from difflib import unified_diff
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from oud.core.ft3 import build_durations
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
+from oud.importers.ft3 import build_durations
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
 from tests.helpers_regression_cases import dense_flag_alignment_piece, regression_state
 
 
@@ -89,7 +89,7 @@ def normalize_snapshot_lines(lines: list[str]) -> list[str]:
     return core
 
 
-def snapshot_signature(lines: list[str]) -> dict[str, object]:
+def snapshot_signature(lines: list[str]) -> dict[str, object]:  # noqa: C901
     norm = normalize_snapshot_lines(lines)
     staff_rows: list[str] = [line for line in norm if line.count("|") >= 2 and "-" in line]
     staff_note_cols: set[int] = set()

@@ -5,18 +5,18 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypedDict
 
-from oud.core.playback_timeline import PlaybackCursor
 from oud.editor.controller_utils import clamp_cursor
 from oud.editor.document import DocumentMode
 from oud.editor.keycodes import DEFAULT_KEYCODES, KeyCodes
 from oud.editor.messages import MessageLevel, infer_message_level
 from oud.editor.transient_message import DEFAULT_MESSAGE_TTL_TICKS
-from oud.petrucci.model import Bar, Chord, Piece
+from oud.playback.timeline import PlaybackCursor
+from petrucci.model import Bar, Chord, Piece
 
 if TYPE_CHECKING:
-    from oud.core.plugin_model import RemoteTab
-    from oud.core.tab_parser import TabData
-    from oud.petrucci.framebuffer import Frame
+    from oud.importers.tab import TabData
+    from oud.plugins.model import RemoteTab
+    from petrucci.framebuffer import Frame
 
 
 class EditorState:

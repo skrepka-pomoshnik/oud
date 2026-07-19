@@ -42,6 +42,11 @@ ignore = [
 [lint.per-file-ignores]
 "tests/*" = ["E501", "S101", "PLR2004"]
 
+[lint.mccabe]
+# The ceiling is enforced for new code. Exact legacy C901 findings and their
+# retirement targets are tracked by architecture-debt.json and TODO.md.
+max-complexity = 7
+
 [format]
 quote-style = "double"
 indent-style = "space"

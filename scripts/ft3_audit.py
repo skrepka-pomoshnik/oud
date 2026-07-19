@@ -6,7 +6,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from oud.core.ft3 import load_ft3
+from oud.importers.ft3 import load_ft3
+from petrucci.model import Piece
 
 _KNOWN_VOCAL_FLAGS = 0x8000 | 0x4000 | 0x2000 | 0x1000 | 0x0100 | 0x0040 | 0x0010 | 0x0008 | 0x0004 | 0x0002
 
@@ -17,6 +18,12 @@ def _hex_counts(values: Counter[int]) -> dict[str, int]:
 
 def audit_file(path: Path) -> dict[str, object]:
     piece = load_ft3(str(path))
+    return audit_piece(piece, path=path)
+
+
+def audit_piece(piece: Piece, *, path: Path) -> dict[str, object]:
+    """Audit an already loaded piece without repeating FT3 parsing."""
+
     note_residuals: Counter[int] = Counter()
     vocal_residuals: Counter[int] = Counter()
     source_records: Counter[str] = Counter()

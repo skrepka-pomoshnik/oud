@@ -4,15 +4,16 @@ from fractions import Fraction
 
 import pytest
 
-from oud.petrucci.layout import (
+from petrucci.layout import (
     ElementRole,
     LayoutError,
     LayoutViewport,
     NotationLayoutPolicy,
     clear_layout_cache,
+    layout_collisions,
     layout_score,
 )
-from oud.petrucci.score import (
+from petrucci.score import (
     AccidentalDisplay,
     BeamKind,
     Clef,
@@ -448,27 +449,7 @@ def test_measure_spans_dynamics_and_lyrics_have_distinct_reserved_lanes() -> Non
     assert dynamic.rect.y > rows.notation_bottom
 
 
-def test_feedback_rows_are_content_derived_unless_stable_lane_is_requested() -> None:
-    score = NotationScore(
-        "feedback-score",
-        (
-            NotationStaff(
-                "feedback-staff",
-                (_measure(1, forced_break=True), _measure(2)),
-            ),
-        ),
-    )
-
-    compact = layout_score(score, feedback_event_ids=frozenset({"event-1-0"}))
-    stable = layout_score(score, policy=NotationLayoutPolicy(reserve_feedback_lane=True))
-
-    assert compact.systems[0].staff_rows[0].feedback_row is not None
-    assert compact.systems[1].staff_rows[0].feedback_row is None
-    assert all(system.staff_rows[0].feedback_row is not None for system in stable.systems)
-    assert compact.document_height < stable.document_height
-
-
-def test_compact_trainer_policy_hides_engraving_and_reserves_pitch_labels() -> None:
+def test_compact_policy_hides_engraving_and_reserves_pitch_labels() -> None:
     first = NotationEvent(
         "trainer-c-sharp",
         Fraction(0),
@@ -503,7 +484,6 @@ def test_compact_trainer_policy_hides_engraving_and_reserves_pitch_labels() -> N
         show_stems=False,
         show_barlines=False,
         show_pitch_labels=True,
-        reserve_feedback_lane=True,
     )
 
     layout = layout_score(score, policy=policy)
@@ -524,8 +504,6 @@ def test_compact_trainer_policy_hides_engraving_and_reserves_pitch_labels() -> N
     assert [label.value for label in labels] == ["C#4", "E4"]
     rows = layout.systems[0].staff_rows[0]
     assert rows.pitch_label_row is not None
-    assert rows.feedback_row is not None
-    assert rows.pitch_label_row != rows.feedback_row
     for event, label in zip((first, second), labels, strict=True):
         onset = layout.onset_for(event.id)
         assert onset is not None
@@ -652,3 +630,90 @@ def test_tuplet_ratio_recovers_the_written_note_value() -> None:
     layout = layout_score(score)
 
     assert any(element.key.role is ElementRole.TUPLET for element in layout.elements_for(triplet.id))
+
+
+def test_cross_voice_beams_use_disjoint_envelopes_and_leave_note_geometry_clear() -> None:
+    upper = tuple(
+        NotationEvent(
+            f"upper-{index}",
+            Fraction(index, 8),
+            Fraction(1, 8),
+            EventKind.NOTE,
+            (pitch_from_midi(76 + index),),
+            voice=0,
+            stem=StemDirection.UP,
+            beam=(BeamKind.START, BeamKind.END)[index],
+        )
+        for index in range(2)
+    )
+    lower = tuple(
+        NotationEvent(
+            f"lower-{index}",
+            Fraction(index, 8),
+            Fraction(1, 8),
+            EventKind.NOTE,
+            (pitch_from_midi(52 - index),),
+            voice=1,
+            stem=StemDirection.DOWN,
+            beam=(BeamKind.START, BeamKind.END)[index],
+        )
+        for index in range(2)
+    )
+    score = NotationScore(
+        "beam-envelope-score",
+        (NotationStaff("beam-envelope-staff", (NotationMeasure("beam-envelope-measure", 1, (*upper, *lower)),)),),
+    )
+
+    layout = layout_score(score)
+    rows = layout.systems[0].staff_rows[0]
+    upper_beam = next(element for element in layout.elements_for(upper[0].id) if element.key.role is ElementRole.BEAM)
+    lower_beam = next(element for element in layout.elements_for(lower[0].id) if element.key.role is ElementRole.BEAM)
+
+    assert upper_beam.rect.bottom < rows.line_rows[0]
+    assert lower_beam.rect.y > rows.line_rows[-1]
+    assert upper_beam.rect.y != lower_beam.rect.y
+    assert layout_collisions(layout) == ()
+
+
+def test_dense_chord_dots_nested_spans_and_reserved_cues_do_not_overlap() -> None:
+    first = NotationEvent(
+        "dense-first",
+        Fraction(0),
+        Fraction(1, 8),
+        EventKind.NOTE,
+        (WrittenPitch(PitchStep.C, 4, 1, AccidentalDisplay.EXPLICIT), WrittenPitch(PitchStep.D, 4)),
+        tuplet=TupletRatio(3, 2),
+        ornament=OrnamentKind.TURN,
+        grace=True,
+    )
+    middle = _event("dense-middle", 1, 64)
+    last = _event("dense-last", 2, 67)
+    lyrics = (
+        LyricSyllable("dense-verse-1", first.id, "first", verse=0),
+        LyricSyllable("dense-verse-2", first.id, "second", verse=1),
+    )
+    score = NotationScore(
+        "dense-score",
+        (
+            NotationStaff(
+                "dense-staff",
+                (NotationMeasure("dense-measure", 1, (first, middle, last)),),
+                lyrics=lyrics,
+                spans=(
+                    NotationSpan("outer-slur", SpanKind.SLUR, first.id, last.id),
+                    NotationSpan("inner-slur", SpanKind.SLUR, first.id, middle.id),
+                ),
+            ),
+        ),
+    )
+
+    layout = layout_score(score)
+    rows = layout.systems[0].staff_rows[0]
+    heads = [element.rect for element in layout.elements_for(first.id) if element.key.role is ElementRole.NOTEHEAD]
+    dots = [element.rect for element in layout.elements_for(first.id) if element.key.role is ElementRole.DOT]
+
+    assert len(rows.slur_rows) == 2
+    assert rows.tuplet_rows and rows.grace_row is not None and rows.ornament_row is not None
+    assert len(rows.lyric_rows) == 2
+    assert all(not (head.x == dot.x and head.y == dot.y) for head in heads for dot in dots)
+    assert layout_collisions(layout) == ()

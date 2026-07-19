@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.core.ft3 import load_ft3
-from oud.core.musicxml_import import load_musicxml, load_mxl
-from oud.core.tab_parser import TabData, load_tab, load_tab_data
 from oud.editor.document import configure_document
 from oud.editor.insert_session import set_mode
 from oud.editor.messages import MessageLevel
 from oud.editor.state import EditorState
-from oud.petrucci.model import Piece
+from oud.importers.ft3 import load_ft3
+from oud.importers.musicxml import load_musicxml, load_mxl
+from oud.importers.tab import TabData, load_tab, load_tab_data
+from petrucci.model import Piece
 
 LoadResult = tuple[
     Piece,
@@ -57,7 +57,7 @@ def _invalid_load_result(path: str | None, message: str) -> LoadResult:
     return piece, {}, {}, set(), None
 
 
-def load_piece_data(path: str | None) -> LoadResult:  # noqa: PLR0911
+def load_piece_data(path: str | None) -> LoadResult:  # noqa: C901, PLR0911
     overrides: dict[tuple[int, int, int], str] = {}
     durations: dict[tuple[int, int, int], int] = {}
     dotted: set[tuple[int, int]] = set()
@@ -119,7 +119,7 @@ def reset_loaded_file_state(state: EditorState) -> None:
     state.pending_quit = False
 
 
-def cmd_open(
+def cmd_open(  # noqa: C901
     state: EditorState,
     args: str,
     *,

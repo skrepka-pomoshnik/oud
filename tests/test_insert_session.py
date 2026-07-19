@@ -1,6 +1,6 @@
 from oud.editor.insert_session import enter_insert_mode, enter_replace_mode, set_mode
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

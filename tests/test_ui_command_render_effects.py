@@ -2,13 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from oud.core.ft3 import load_ft3
 from oud.editor.state import EditorState
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
+from oud.importers.ft3 import load_ft3
 from oud.settings import DEFAULT_SETTINGS
 from oud.tui.commands import apply_command
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
 
 
 def _state() -> EditorState:

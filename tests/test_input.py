@@ -1,8 +1,8 @@
 import os
 
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Piece
 from oud.tui.input import complete_command
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

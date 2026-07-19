@@ -6,16 +6,17 @@ import subprocess
 from dataclasses import replace
 from pathlib import Path
 
-from oud.petrucci.duet_score import (
+from petrucci.duet_score import (
     duet_staff_labels,
     is_duet_score_piece,
     split_duet_piece_staff,
     split_duet_span_list,
     split_duet_triplet_map,
 )
-from oud.petrucci.model import Bar, ImportedBarContent, ImportedStaff, Piece
-from oud.petrucci.render_utils import chord_positions, note_type_to_denom
-from oud.petrucci.vocal_line import infer_vocal_events
+from petrucci.model import Bar, ImportedBarContent, ImportedStaff, Piece
+from petrucci.render_utils import chord_positions, note_type_to_denom
+from petrucci.tab_input import editor_event_columns, editor_fret_at
+from petrucci.vocal_line import infer_vocal_events
 
 
 def _escape_lilypond(text: str) -> str:
@@ -62,7 +63,7 @@ def _metadata_comments(piece: Piece) -> list[str]:
     return comments
 
 
-def _lilypond_header(piece: Piece) -> list[str]:
+def _lilypond_header(piece: Piece) -> list[str]:  # noqa: C901
     title = piece.title or "Untitled"
     composer = piece.composer or piece.author or ""
     header = [r'\version "2.24.0"', *_metadata_comments(piece), r"\header {"]
@@ -91,7 +92,7 @@ def _lilypond_header(piece: Piece) -> list[str]:
     return header
 
 
-def _parse_tuning(tuning: str) -> list[int]:
+def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
     pitches: list[int] = []
     idx = 0
     text = tuning.strip()
@@ -325,15 +326,6 @@ def _span_maps(
     return starts, ends
 
 
-def _french_override_fret(ch: str, french_c: str) -> int | None:
-    if french_c == "alt" and ch == "r":
-        return 2
-    letters = "abcdefghiklmnopqrst"
-    if ch in letters:
-        return letters.index(ch)
-    return None
-
-
 def _collect_override_chords(  # noqa: C901
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -343,7 +335,7 @@ def _collect_override_chords(  # noqa: C901
     default_duration: int,
     french_c: str,
 ) -> list[tuple[int, list[tuple[int, int]], int]]:
-    cols = sorted({col for (b, _s, col) in overrides if b == bar_index})
+    cols = editor_event_columns(overrides, bar_index=bar_index)
     events: list[tuple[int, list[tuple[int, int]], int]] = []
     for col in cols:
         notes: list[tuple[int, int]] = []
@@ -351,16 +343,17 @@ def _collect_override_chords(  # noqa: C901
             key = (bar_index, s_idx, col)
             if key not in overrides:
                 continue
-            ch = overrides[key]
-            if style == "italian":
-                if ch.isdigit():
-                    notes.append((s_idx, int(ch)))
-                elif ch == "x":
-                    notes.append((s_idx, 10))
-            else:
-                fret = _french_override_fret(ch, french_c)
-                if fret is not None:
-                    notes.append((s_idx, fret))
+            fret = editor_fret_at(
+                overrides,
+                durations,
+                bar_index=bar_index,
+                string_index=s_idx,
+                column=col,
+                style=style,
+                french_c_shape=french_c,
+            )
+            if fret is not None:
+                notes.append((s_idx, fret))
         if not notes:
             continue
         denom = default_duration
@@ -423,7 +416,7 @@ def _ft3_fingering_text(value: str | None) -> str | None:
 def _ft3_ornament_text(value: str | None) -> str | None:
     if not value:
         return None
-    mapping = {"dot-left": ".", "caret": "^", "smile": "u"}
+    mapping = {"dot-left": ".", "caret": "^", "parenthesis": "(", "smile": "u", "under-hook": "u"}
     return mapping.get(value, value[:1])
 
 
@@ -682,7 +675,7 @@ def _piece_has_imported_lyrics(piece: Piece) -> bool:
     )
 
 
-def _initial_time_sig(piece: Piece, settings: dict[str, str]) -> str | None:
+def _initial_time_sig(piece: Piece, settings: dict[str, str]) -> str | None:  # noqa: C901
     time_sig = settings.get("time", "") or ""
     if not time_sig:
         for bar in piece.bars:
@@ -892,7 +885,7 @@ def _lyric_tokens_for_row(row, event_count: int) -> list[str]:
     return tokens
 
 
-def _build_vocal_bodies(
+def _build_vocal_bodies(  # noqa: C901
     piece: Piece,
     settings: dict[str, str],
 ) -> tuple[list[str], list[list[str]]]:
@@ -942,7 +935,7 @@ def _matching_imported_lyric_staff(
     return lyric_staffs[index] if index < len(lyric_staffs) else None
 
 
-def _append_imported_melody_bar(
+def _append_imported_melody_bar(  # noqa: C901
     melody_body: list[str],
     note_bar: ImportedBarContent,
     current_time_sig: str | None,
@@ -1138,7 +1131,7 @@ def _vocal_blocks(
     return [*vocal_block, *lyric_blocks]
 
 
-def _tab_staff_with_block(
+def _tab_staff_with_block(  # noqa: C901
     label: str | None,
     body: list[str],
     settings: dict[str, str],
@@ -1187,7 +1180,7 @@ def _tab_staff_with_block(
     return out
 
 
-def _build_main_blocks(
+def _build_main_blocks(  # noqa: C901
     *,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from oud.editor.motions import apply_motion_target, target_advance_next_bar_home
 from oud.editor.state import EditorState
-from oud.petrucci.render_utils import chord_slot_positions, note_type_to_denom
+from petrucci.render_utils import chord_slot_positions, note_type_to_denom
 
 
 def expected_beats(state: EditorState) -> float | None:
@@ -76,7 +76,7 @@ def _row_has_note(state: EditorState, bar_index: int, string: int, col: int) -> 
     return False
 
 
-def row_duration_sum(state: EditorState, bar_index: int, string: int) -> float:
+def row_duration_sum(state: EditorState, bar_index: int, string: int) -> float:  # noqa: C901
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return 0.0
     bar = state.piece.bars[bar_index]

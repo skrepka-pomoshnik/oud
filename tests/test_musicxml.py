@@ -1,9 +1,9 @@
 import zipfile
 
-from oud.core.musicxml_import import load_musicxml, load_mxl
 from oud.editor.load_ops import load_piece_data
 from oud.exports.musicxml import export_musicxml, export_mxl
-from oud.petrucci.model import Bar, Chord, Note, Piece
+from oud.importers.musicxml import load_musicxml, load_mxl
+from petrucci.model import Bar, Chord, Note, Piece
 
 
 def test_export_musicxml_writes_core_structure(tmp_path) -> None:

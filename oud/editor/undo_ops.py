@@ -5,8 +5,8 @@ from typing import cast
 
 from oud.editor.bar_ops import clear_bar_contents, delete_bar, insert_bar, restore_bar_snapshot
 from oud.editor.state import BarSnapshot, EditorState, UndoAction
-from oud.petrucci.model import Piece
 from oud.settings import save_settings
+from petrucci.model import Piece
 
 
 def _restore_action_cursor(state: EditorState, action: UndoAction, *, redo: bool) -> None:

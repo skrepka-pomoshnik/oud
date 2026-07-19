@@ -1,4 +1,4 @@
-from oud.petrucci.display import clip_display, display_width, split_display_clusters
+from petrucci.display import clip_display, display_width, split_display_clusters
 
 
 def test_display_primitives_keep_combining_and_wide_clusters_atomic() -> None:

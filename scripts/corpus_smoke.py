@@ -15,15 +15,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from oud.core.ft3 import load_ft3  # noqa: E402
-from oud.core.plugin_model import RemoteTab  # noqa: E402
-from oud.core.tab_parser import load_tab, load_tab_data  # noqa: E402
-from oud.petrucci.model import Piece  # noqa: E402
+from oud.importers.ft3 import load_ft3  # noqa: E402
+from oud.importers.tab import load_tab, load_tab_data  # noqa: E402
 from oud.plugins.lutemusic import (  # noqa: E402
     LUTEMUSIC_URLS,
     download_tab,
     fetch_supported_tabs,
 )
+from oud.plugins.model import RemoteTab  # noqa: E402
+from petrucci.model import Piece  # noqa: E402
 
 SUPPORTED_SUFFIXES = (".ft3", ".ft3.gz", ".tab")
 
@@ -109,7 +109,7 @@ def scan_files(paths: Iterable[Path]) -> list[ScanResult]:
     return results
 
 
-def _collect_remote_items(url: str, limit: int) -> tuple[list[RemoteTab], list[ScanResult]]:
+def _collect_remote_items(url: str, limit: int) -> tuple[list[RemoteTab], list[ScanResult]]:  # noqa: C901
     pending = deque([url])
     seen: set[str] = set()
     files: list[RemoteTab] = []
@@ -166,7 +166,7 @@ def download_remote_corpus(
     return sorted(downloaded), errors
 
 
-def report_results(
+def report_results(  # noqa: C901
     results: list[ScanResult],
     *,
     json_output: bool,

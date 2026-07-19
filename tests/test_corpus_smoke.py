@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from oud.core.plugin_model import RemoteTab
-from oud.petrucci.model import Bar, Piece
+from oud.plugins.model import RemoteTab
+from petrucci.model import Bar, Piece
 from scripts import corpus_smoke
 
 

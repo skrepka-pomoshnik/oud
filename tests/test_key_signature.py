@@ -1,4 +1,4 @@
-from oud.petrucci.key_signature import (
+from petrucci.key_signature import (
     key_signature_accidentals,
     key_signature_count,
     normalize_key_signature_name,

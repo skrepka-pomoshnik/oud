@@ -5,14 +5,14 @@ from typing import cast
 
 import pytest
 
-from oud.core.tab_parser import TabData
 from oud.editor import command_ops as cmd_ops
 from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.ops import french_to_fret
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
-from oud.petrucci.tuning_utils import parse_tuning_pitches
+from oud.importers.tab import TabData
 from oud.tui import commands as cmd
+from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.tuning_utils import parse_tuning_pitches
 
 
 def _state(bars: int = 2) -> EditorState:
@@ -769,7 +769,7 @@ def test_cmd_vocal_clear_removes_melody_and_lyrics_from_piece() -> None:
     assert state.piece.bars[0].lyric_event_rows == []
 
 
-def test_cmd_midi_lilypond_pdf_play_source(
+def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -1009,7 +1009,7 @@ def test_tui_notation_commands_export_to_musicxml_and_mxl(tmp_path: Path) -> Non
         assert any(name.endswith(".xml") for name in names)
 
 
-def test_apply_command_dispatch_executes_all_registered_specs(
+def test_apply_command_dispatch_executes_all_registered_specs(  # noqa: C901
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:

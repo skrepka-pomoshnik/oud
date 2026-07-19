@@ -25,5 +25,6 @@ jobs:
           corpus/ft3-regression.json
           corpus/ft3-random-75.json
           corpus/ft3-random-75-v2.json
+          corpus/ft3-random-50-v3.json
       - name: Quality gate
         run: ./scripts/quality.sh

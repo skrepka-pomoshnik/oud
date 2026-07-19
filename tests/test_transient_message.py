@@ -5,7 +5,7 @@ from oud.editor.transient_message import (
     DEFAULT_MESSAGE_TTL_TICKS,
     decay_transient_message,
 )
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

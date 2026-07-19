@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from oud.core.tab_parser import (
+from oud.editor.state import EditorState
+from oud.importers.tab import (
     TabData,
     TabParseDelta,
     parse_tab_text_data,
     reparse_tab_text_auto_delta,
     reparse_tab_text_delta,
 )
-from oud.editor.state import EditorState
 
 
 def apply_tab_reparse_delta(

@@ -1,4 +1,4 @@
-from oud.core.ft3_text import (
+from oud.importers._ft3_text import (
     _structured_lyric_rows_from_positioned_rows,
     decode_ft3_annotation_group,
     decode_ft3_note_record,

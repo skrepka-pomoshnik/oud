@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.petrucci.model import Piece
-from oud.petrucci.render_utils import (
+from petrucci.model import Piece
+from petrucci.render_utils import (
     bar_cells,
     bar_cells_from_chords,
     chord_positions,
@@ -12,6 +12,14 @@ from oud.petrucci.render_utils import (
     format_fret,
     note_type_to_denom,
 )
+from petrucci.tab_input import editor_event_columns, editor_fret_at
+
+
+class TabExportError(ValueError):
+    """Raised when the legacy TAB format cannot preserve an edit."""
+
+    def __init__(self, fret: int) -> None:
+        super().__init__(f"TAB cannot preserve Italian fret {fret}; export LilyPond, MIDI, or MusicXML")
 
 
 def export_tab(  # noqa: PLR0912, C901
@@ -50,13 +58,6 @@ def export_tab(  # noqa: PLR0912, C901
             return ord(ch) - ord("a")
         return None
 
-    def italian_to_fret(ch: str) -> int | None:
-        if ch.isdigit():
-            return int(ch)
-        if ch == "x":
-            return 10
-        return None
-
     def denom_for_column(bar_index: int, col: int) -> int:
         found = None
         for s_idx in range(piece.strings):
@@ -80,7 +81,9 @@ def export_tab(  # noqa: PLR0912, C901
         }.get(denom, "0")
 
     def format_fret_char(fret: int) -> str:
-        if style == "italian" and fret >= 10:
+        if style == "italian" and fret > 10:
+            raise TabExportError(fret)
+        if style == "italian" and fret == 10:
             return "x"
         text = format_fret(style, fret, french_c=french_c)
         return text[0] if text else "-"
@@ -89,18 +92,17 @@ def export_tab(  # noqa: PLR0912, C901
         notes: list[tuple[int, int]] = []
         for s_idx in range(piece.strings):
             key = (bar_index, s_idx, col)
-            ch = overrides.get(key)
-            if not ch:
-                continue
-            fret = None
-            if style == "french":
-                fret = french_to_fret(ch)
-            elif style == "italian":
-                fret = italian_to_fret(ch)
-            else:
-                fret = french_to_fret(ch)
-                if fret is None:
-                    fret = italian_to_fret(ch)
+            fret = editor_fret_at(
+                overrides,
+                durations,
+                bar_index=bar_index,
+                string_index=s_idx,
+                column=col,
+                style=style,
+                french_c_shape=french_c,
+            )
+            if fret is None and style not in {"french", "italian"}:
+                fret = french_to_fret(overrides.get(key, ""))
             if fret is None:
                 continue
             notes.append((s_idx + 1, fret))
@@ -136,7 +138,9 @@ def export_tab(  # noqa: PLR0912, C901
                 notes = [(note.string, note.fret) for note in chord.notes]
                 chords.append((denom, bool(chord.dotted), notes))
         else:
-            for col in range(bar_width):
+            for col in editor_event_columns(overrides, bar_index=b_idx):
+                if col >= bar_width:
+                    continue
                 notes = chord_notes_for_col(b_idx, col)
                 if not notes:
                     continue
@@ -254,3 +258,6 @@ def export_tab_to_file(
     )
     with Path(path).open("w", encoding="utf-8") as f:
         f.write(content)
+
+
+__all__ = ["TabExportError", "export_ascii", "export_tab", "export_tab_to_file"]

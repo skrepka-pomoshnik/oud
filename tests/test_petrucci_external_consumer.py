@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 
-from oud.petrucci import (
-    CellStyle,
+from petrucci import (
     ElementRole,
     EventKind,
-    EventOverlay,
     LayoutViewport,
     LyricSyllable,
     NotationEvent,
@@ -16,12 +14,12 @@ from oud.petrucci import (
     NotationScore,
     NotationSpan,
     NotationStaff,
-    OverlayRole,
     ScoreTypesetOptions,
     SpanKind,
     TimeSignature,
     layout_score,
     pitch_from_midi,
+    typeset_layout,
     typeset_score,
 )
 
@@ -63,7 +61,7 @@ def _adapt_flow(events: tuple[ConsumerFlowEvent, ...]) -> NotationScore:
     )
 
 
-def test_external_consumer_attaches_feedback_without_oud_models_or_glyph_parsing() -> None:
+def test_external_consumer_decorates_event_cells_without_glyph_parsing() -> None:
     events = (
         ConsumerFlowEvent("repeat-1", 60, Fraction(0), Fraction(1, 4)),
         ConsumerFlowEvent("repeat-2", 60, Fraction(1, 4), Fraction(1, 4)),
@@ -71,24 +69,18 @@ def test_external_consumer_attaches_feedback_without_oud_models_or_glyph_parsing
     )
     score = _adapt_flow(events)
 
-    result = typeset_score(
-        score,
-        options=ScoreTypesetOptions(width=60, height=22),
-        overlays={
-            "repeat-1": EventOverlay(OverlayRole.HIT),
-            "repeat-2": EventOverlay(OverlayRole.MISSED),
-            "rest": EventOverlay(OverlayRole.PENDING),
-        },
-    )
+    result = typeset_score(score, options=ScoreTypesetOptions(width=60, height=22))
 
     first_onset = result.layout.onset_for("repeat-1")
     second_onset = result.layout.onset_for("repeat-2")
     assert first_onset is not None
     assert second_onset is not None
     assert first_onset.x != second_onset.x
-    assert {result.semantic_frame.styles[y][x] for y, x in result.cells_for("repeat-1")} == {CellStyle.HIT}
-    assert {result.semantic_frame.styles[y][x] for y, x in result.cells_for("repeat-2")} == {CellStyle.MISSED}
-    assert {result.semantic_frame.styles[y][x] for y, x in result.cells_for("rest")} == {CellStyle.PENDING}
+    caller_states = {"repeat-1": "accepted", "repeat-2": "rejected", "rest": "waiting"}
+    decorated = {cell: caller_states[event_id] for event_id in caller_states for cell in result.cells_for(event_id)}
+    assert {decorated[cell] for cell in result.cells_for("repeat-1")} == {"accepted"}
+    assert {decorated[cell] for cell in result.cells_for("repeat-2")} == {"rejected"}
+    assert {decorated[cell] for cell in result.cells_for("rest")} == {"waiting"}
 
 
 def test_external_consumer_can_follow_an_event_across_systems_and_resize() -> None:
@@ -128,12 +120,8 @@ def test_external_consumer_can_follow_an_event_across_systems_and_resize() -> No
         result = typeset_score(
             score,
             options=ScoreTypesetOptions(width=width, height=18, system_offset=location.system_index),
-            overlays={target.id: EventOverlay(OverlayRole.CURRENT)},
         )
         assert result.cells_for(target.id)
-        assert {result.semantic_frame.styles[y][x] for y, x in result.cells_for(target.id)} == {
-            CellStyle.CURRENT,
-        }
 
 
 def test_external_score_flow_follows_repeated_notes_rests_results_and_lyrics() -> None:
@@ -193,26 +181,14 @@ def test_external_score_flow_follows_repeated_notes_rests_results_and_lyrics() -
         show_stems=False,
         show_barlines=False,
         show_pitch_labels=True,
-        reserve_feedback_lane=True,
     )
 
     for width in (48, 80):
         layout = layout_score(score, viewport=LayoutViewport(width=width, height=18), policy=policy)
         assert layout.location_for(repeated_first.id) != layout.location_for(repeated_second.id)
-        for target_index, target in enumerate(ordered):
+        for target in ordered:
             location = layout.location_for(target.id)
             assert location is not None
-            overlays = {
-                event.id: EventOverlay(
-                    OverlayRole.HIT
-                    if index < target_index
-                    else OverlayRole.CURRENT
-                    if index == target_index
-                    else OverlayRole.PENDING,
-                    confidence=0.9 if index == target_index else None,
-                )
-                for index, event in enumerate(ordered)
-            }
             result = typeset_score(
                 score,
                 options=ScoreTypesetOptions(
@@ -221,13 +197,10 @@ def test_external_score_flow_follows_repeated_notes_rests_results_and_lyrics() -
                     system_offset=location.system_index,
                     policy=policy,
                 ),
-                overlays=overlays,
             )
 
             target_cells = result.cells_for(target.id)
             assert target_cells
-            assert {result.semantic_frame.styles[y][x] for y, x in target_cells} == {CellStyle.CURRENT}
-            assert "90%" in result.text
             assert result.layout.system_for_event(target.id) is result.layout.systems[location.system_index]
             if target.kind is EventKind.NOTE:
                 target_roles = {result.semantic_frame.roles[y][x] for y, x in target_cells}
@@ -237,3 +210,33 @@ def test_external_score_flow_follows_repeated_notes_rests_results_and_lyrics() -
             options=ScoreTypesetOptions(width=width, height=18, system_offset=1, policy=policy),
         )
         assert tied_page.cells_for("flow-tie")
+
+
+def test_external_consumer_moves_horizontal_viewport_without_relayout() -> None:
+    events = tuple(
+        ConsumerFlowEvent(f"event-{index}", 60 + index % 8, Fraction(index, 32), Fraction(1, 32)) for index in range(24)
+    )
+    score = _adapt_flow(events)
+    layout = layout_score(score, viewport=LayoutViewport(width=160, height=18))
+    assert layout_score(score, viewport=LayoutViewport(width=160, height=18, x_offset=20)) is layout
+    target = layout.onset_for("event-16")
+    assert target is not None
+
+    left = typeset_layout(
+        layout,
+        options=ScoreTypesetOptions(width=40, height=18, layout_width=160),
+    )
+    shifted = typeset_layout(
+        layout,
+        options=ScoreTypesetOptions(
+            width=40,
+            height=18,
+            x_offset=max(0, target.x - 20),
+            layout_width=160,
+        ),
+    )
+
+    assert left.layout is layout
+    assert shifted.layout is layout
+    assert shifted.cells_for("event-16")
+    assert all(0 <= column < 40 for _row, column in shifted.cells_for("event-16"))

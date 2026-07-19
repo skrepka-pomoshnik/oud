@@ -21,7 +21,7 @@ Minimal curses editor for Renaissance lute tablature.
 Current import/export focus:
 
 - `.tab` editing and writing
-- `.ft3` import with editable tab-only projections and read-only vocal, lyric, duet, and mixed-score views
+- `.ft3` import with editable tab-only projections and canonical notation focus for read-only vocal and mixed scores
 - MIDI, LilyPond/PDF, MusicXML, and ASCII export
 
 FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target and never changes the source. FT3 scores containing non-TAB or duet layers open read-only so visible material cannot disappear on save.
@@ -32,6 +32,7 @@ FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target 
 
 - [User and developer guide](docs/user-guide.md)
 - [FT3 reverse-engineering notes](docs/ft3-format.md)
+- [Architecture debt baseline](docs/architecture-debt.md)
 - [Release checklist](docs/releasing.md)
 - [Documentation map](docs/README.md)
 
@@ -45,13 +46,19 @@ Requires Python 3.11+. This installs the `oud` command. No runtime
 dependencies beyond the standard library; MIDI playback optionally uses
 `fluidsynth` or `timidity` if installed.
 
+The same wheel exposes `petrucci` as a typed top-level library for canonical
+score layout and terminal rendering. It imports neither the Oud application nor
+curses; consumers adapt their own events through `petrucci.FlowEvent` or the
+immutable notation records. Semantic event cells support caller-owned styling,
+and horizontal viewports repaint cached wide layouts without relayout.
+
 FT3 integration payloads are external. Fetch the fixed, checksum-verified
 manifests, then scan the local cache:
 
 ```
 python3 scripts/fetch_ft3_corpus.py \
   corpus/ft3-regression.json corpus/ft3-random-75.json \
-  corpus/ft3-random-75-v2.json
+  corpus/ft3-random-75-v2.json corpus/ft3-random-50-v3.json
 python3 scripts/corpus_smoke.py lutemusic
 ```
 
@@ -129,8 +136,8 @@ midipatch = 24
 ```
 ## Architecture overview
 
-- `oud/petrucci/` reusable score model and tab/note character-cell typesetting
-- `oud/core/` FT3/TAB/MusicXML parsing and import semantics
+- `petrucci/` reusable top-level score model and tab/note character-cell typesetting
+- `oud/importers/` FT3/TAB/MusicXML parsing and import semantics
 - `oud/editor/` state, ops, undo/redo, commands
 - `oud/tui/` input, controller, viewport
 - `oud/ui/` curses adapter

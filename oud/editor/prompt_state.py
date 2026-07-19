@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from oud.editor.history import history_next, history_prev
 from oud.editor.state import EditorState
-from oud.tui.prompt_history import history_next, history_prev
 
 
 def command_history_prev(state: EditorState) -> str | None:

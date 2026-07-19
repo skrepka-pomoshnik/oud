@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from oud.core.tab_parser import parse_tab_text_data
 from oud.editor.init import init_state
 from oud.editor.state import EditorState
 from oud.editor.tab_reparse import apply_tab_reparse_delta
-from oud.petrucci.model import Bar, Piece
+from oud.importers.tab import parse_tab_text_data
+from petrucci.model import Bar, Piece
 
 
 def _base_tab_text() -> str:

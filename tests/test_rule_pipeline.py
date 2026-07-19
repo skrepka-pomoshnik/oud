@@ -3,7 +3,7 @@ from __future__ import annotations
 from oud.editor.rule_pipeline import RuleContext, RuleIssue, run_rules
 from oud.editor.state import EditorState
 from oud.editor.verify_ops import verify_bar_issues
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 
 
 def _state() -> EditorState:

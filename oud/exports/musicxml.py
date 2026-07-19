@@ -4,19 +4,19 @@ import zipfile
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from oud.petrucci.model import Bar, Piece
-from oud.petrucci.time_utils import parse_time_signature_value
+from petrucci.model import Bar, Piece
+from petrucci.tab_input import editor_event_columns, editor_fret_at
+from petrucci.time_utils import parse_time_signature_value
 
 MUSICXML_DOCTYPE = (
     '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" '
     '"http://www.musicxml.org/dtds/partwise.dtd">'
 )
 
-LETTERS = "abcdefghiklmnopqrst"
 DIVISIONS = 480
 
 
-def _parse_tuning(tuning: str) -> list[int]:
+def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
     pitches: list[int] = []
     idx = 0
     text = tuning.strip()
@@ -89,20 +89,6 @@ def _duration_type(denom: int) -> str:
         256: "256th",
     }
     return mapping.get(denom, "quarter")
-
-
-def _fret_from_override(ch: str, style: str) -> int | None:
-    if style == "italian":
-        if ch.isdigit():
-            return int(ch)
-        if ch == "x":
-            return 10
-        return None
-    if ch == "r":
-        return 2
-    if ch in LETTERS:
-        return LETTERS.index(ch)
-    return None
 
 
 def _midi_to_pitch(midi: int) -> tuple[str, int, int]:
@@ -189,16 +175,20 @@ def _events_from_overrides(
     style: str,
     dotted: set[tuple[int, int]] | None,
 ) -> list[tuple[int, bool, list[tuple[int, int]]]]:
-    cols = sorted({col for (b, _s, col) in overrides if b == bar_index})
+    cols = editor_event_columns(overrides, bar_index=bar_index)
     events: list[tuple[int, bool, list[tuple[int, int]]]] = []
     for col in cols:
         notes: list[tuple[int, int]] = []
         for s_idx in range(strings):
             key = (bar_index, s_idx, col)
-            text = overrides.get(key)
-            if text is None:
-                continue
-            fret = _fret_from_override(text, style)
+            fret = editor_fret_at(
+                overrides,
+                durations,
+                bar_index=bar_index,
+                string_index=s_idx,
+                column=col,
+                style=style,
+            )
             if fret is None:
                 continue
             notes.append((s_idx + 1, fret))

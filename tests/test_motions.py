@@ -1,4 +1,7 @@
 from oud.editor.motions import (
+    CursorMotionTarget,
+    apply_counted_visual_motion,
+    apply_motion_target,
     target_advance_next_bar_home,
     target_bar_end,
     target_bar_next,
@@ -20,7 +23,7 @@ from oud.editor.motions import (
 )
 from oud.editor.navigation import jump_row_visual, move_left_note, move_right_note
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Piece
+from petrucci.model import Bar, Piece
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 
@@ -77,6 +80,43 @@ def test_target_move_right_requests_append_at_end() -> None:
     state.cursor_col = 3
     target = target_move_right(state)
     assert (target.bar, target.col, target.append_bar) == (2, 0, True)
+
+
+def test_read_only_motion_cannot_append_a_bar() -> None:
+    state = _state()
+    state.read_only = True
+    state.cursor_bar = 1
+    state.cursor_col = 3
+
+    target = target_move_right(state)
+    apply_motion_target(state, CursorMotionTarget(2, 0, append_bar=True))
+
+    assert target == CursorMotionTarget(1, 3)
+    assert len(state.piece.bars) == 2
+    assert (state.cursor_bar, state.cursor_col) == (1, 3)
+    assert state.modified is False
+
+
+def test_counted_visual_motion_reuses_bar_geometry(monkeypatch) -> None:
+    state = _state()
+    state.cursor_col = 0
+    calls = 0
+
+    def content_width(_state: EditorState, _bar_index: int) -> int:
+        nonlocal calls
+        calls += 1
+        return 4
+
+    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", content_width)
+    monkeypatch.setattr(
+        "oud.editor.motions.cursor_display_map_for_bar",
+        lambda _state, _bar_index, _content_width: [0, 1, 2, 3],
+    )
+
+    apply_counted_visual_motion(state, 1, 3)
+
+    assert calls == 1
+    assert (state.cursor_bar, state.cursor_col) == (0, 3)
 
 
 def test_target_home_bar_clamps_and_homes_column() -> None:
@@ -299,7 +339,7 @@ def test_target_snap_to_chord_slot_chooses_nearest_chord_position() -> None:
     state.bar_width = 8
     bar = Bar()
     # Three chord onsets; cursor starts between them.
-    from oud.petrucci.model import Chord, Note  # noqa: PLC0415
+    from petrucci.model import Chord, Note  # noqa: PLC0415
 
     bar.chords = [
         Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=0)]),
@@ -307,7 +347,7 @@ def test_target_snap_to_chord_slot_chooses_nearest_chord_position() -> None:
         Chord(note_type=6, dotted=False, grid="", notes=[Note(raw_pos=0, string=1, fret=2)]),
     ]
     state.piece.bars[0] = bar
-    from oud.petrucci.render_utils import chord_positions  # noqa: PLC0415
+    from petrucci.render_utils import chord_positions  # noqa: PLC0415
 
     slots = [col for (col, _denom, _dot) in chord_positions(bar, state.bar_width, default_duration=4)]
     between = next((c for c in range(state.bar_width) if c not in slots), None)

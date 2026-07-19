@@ -8,22 +8,22 @@ from oud.editor.status import status_line
 from oud.editor.transient_message import decay_transient_message
 from oud.editor.view_focus import current_view_staff
 from oud.editor.view_state import view_commit_frame, view_merge_dirty, view_resize
+from oud.editor.viewport import ensure_cursor_visible
 from oud.exports.export_tab import export_ascii
-from oud.petrucci.duet_score import is_duet_score_piece
-from oud.petrucci.framebuffer import (
+from oud.tui.controller import handle_key as handle_key_impl
+from oud.tui.input import handle_command as handle_command_input
+from oud.tui.input import handle_search as handle_search_input
+from oud.tui.keycodes import keycodes_from_curses
+from oud.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
+from petrucci.duet_score import is_duet_score_piece
+from petrucci.framebuffer import (
     FrameBuffer,
     draw_frame_rows,
     frame_diff_rows,
     overlay_dirty_rows,
     overlay_frame,
 )
-from oud.petrucci.render import render_piece
-from oud.tui.controller import handle_key as handle_key_impl
-from oud.tui.input import handle_command as handle_command_input
-from oud.tui.input import handle_search as handle_search_input
-from oud.tui.keycodes import keycodes_from_curses
-from oud.tui.viewport import ensure_cursor_visible
-from oud.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
+from petrucci.render import render_piece
 
 _MAX_INPUT_BATCH = 64
 
@@ -43,7 +43,7 @@ def _read_input_batch(stdscr: curses.window, timeout_ms: int) -> tuple[int, ...]
     return tuple(keys)
 
 
-def run_loop(
+def run_loop(  # noqa: C901
     stdscr: curses.window,
     path: str | None,
     *,

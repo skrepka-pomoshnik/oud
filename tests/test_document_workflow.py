@@ -9,10 +9,10 @@ from oud.editor.file_ops import cmd_write_ascii
 from oud.editor.init import init_state
 from oud.editor.messages import MessageLevel, infer_message_level
 from oud.editor.status import status_line
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.render_helpers import render_help
 from oud.tui.commands import apply_command
 from oud.tui.input import handle_command
+from petrucci.framebuffer import FrameBuffer
+from petrucci.render_helpers import render_help
 from tests.helpers_keyscript import press_keys
 
 PURE_FT3 = "lutemusic/01_unquiet_thoughts/unquiet_thoughts_T.ft3"

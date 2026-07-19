@@ -4,13 +4,13 @@ from itertools import pairwise
 
 import pytest
 
-from oud.core.ft3 import build_durations
-from oud.petrucci.framebuffer import FrameBuffer
-from oud.petrucci.model import Bar, Chord, Note, Piece
-from oud.petrucci.render import render_piece
-from oud.petrucci.render_helpers import flag_symbols
-from oud.petrucci.render_utils import flag_row_style
+from oud.importers.ft3 import build_durations
 from oud.settings import DEFAULT_SETTINGS
+from petrucci.framebuffer import FrameBuffer
+from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.render import render_piece
+from petrucci.render_helpers import flag_symbols
+from petrucci.render_utils import flag_row_style
 from tests.helpers_regression_cases import (
     long_width_fill_piece,
     piece_with_unused_then_used_bass_rows,

@@ -3,13 +3,13 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
-from oud.core.tab_assign_policy import AssignmentPolicy, assign_chord_pitches
 from oud.editor.controller_utils import string_index
 from oud.editor.edit_ops import record_action, undo_group
 from oud.editor.ops import french_to_fret, fret_to_french, fret_to_italian, italian_to_fret
 from oud.editor.state import EditorState, UndoAction
-from oud.petrucci.render_utils import chord_positions
-from oud.petrucci.tuning_utils import parse_tuning_pitches, tuning_preset
+from oud.editor.tab_assignment import AssignmentPolicy, assign_chord_pitches
+from petrucci.render_utils import chord_positions
+from petrucci.tuning_utils import parse_tuning_pitches, tuning_preset
 
 
 @dataclass
@@ -86,7 +86,7 @@ def _record_score_transform(
     )
 
 
-def _reassign_chord_notes(
+def _reassign_chord_notes(  # noqa: C901
     chord,
     *,
     source_tuning: list[int],
@@ -201,7 +201,7 @@ def _reassign_overrides(  # noqa: C901
     return report
 
 
-def transform_score_to_tuning(
+def transform_score_to_tuning(  # noqa: C901
     state: EditorState,
     *,
     target_tuning_text: str,
@@ -382,7 +382,7 @@ def _assign_shifted_chord(
     return True
 
 
-def _find_cursor_grid_entries_for_shift(
+def _find_cursor_grid_entries_for_shift(  # noqa: C901
     state: EditorState,
 ) -> tuple[list[tuple[tuple[int, int, int], int, str]], int | None]:
     if not state.piece.bars:

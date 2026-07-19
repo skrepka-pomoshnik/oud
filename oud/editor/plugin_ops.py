@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from oud.core.plugin_model import RemoteTab
 from oud.editor.command_ops import cmd_open
 from oud.editor.insert_session import set_mode
 from oud.editor.keymap import plugin_bindings
@@ -31,6 +30,7 @@ from oud.editor.plugin_state import (
     plugin_search_start,
 )
 from oud.editor.state import EditorState
+from oud.plugins.model import RemoteTab
 
 
 @dataclass(frozen=True)
@@ -265,7 +265,7 @@ def open_plugin_item(state: EditorState) -> None:
     cmd_open(state, str(path))
 
 
-def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: PLR0911
+def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
     bindings = plugin_bindings(state)
     if key in bindings.search:
         plugin_search_start(state)

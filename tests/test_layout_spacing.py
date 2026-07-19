@@ -1,6 +1,6 @@
-from oud.core.ft3 import build_durations, load_ft3
-from oud.petrucci.model import Bar, Chord, Note
-from oud.petrucci.view_model import _bar_compact_width, _bar_display_width, _bars_fit
+from oud.importers.ft3 import build_durations, load_ft3
+from petrucci.model import Bar, Chord, Note
+from petrucci.view_model import _bar_compact_width, _bar_display_width, _bars_fit
 
 
 def test_bar_display_width_accounts_for_flags_and_dots() -> None:

@@ -7,7 +7,7 @@ from oud.editor.layout import (
     jump_system_row_dynamic,
 )
 from oud.editor.state import EditorState
-from oud.petrucci.model import Bar, Chord, Note, Piece
+from petrucci.model import Bar, Chord, Note, Piece
 
 
 def _state(settings: dict[str, str]) -> EditorState:

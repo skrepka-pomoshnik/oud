@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oud"
-version = "0.2.0a2"
+version = "0.3.0a1"
 description = "Curses lute tablature editor"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,19 +33,22 @@ oud = "oud.app:main"
 dev = [
   "pytest>=8",
   "pytest-cov>=7.1.0",
+  "pytest-xdist>=3.8",
   "ruff>=0.8",
   "ty",
 ]
 
 [tool.pytest.ini_options]
+addopts = "-n 4 --dist loadscope"
 pythonpath = ["."]
 
 [tool.ty]
 environment.python-version = "3.11"
 
 [tool.setuptools.packages.find]
-include = ["oud*"]
+include = ["oud*", "petrucci*"]
 exclude = ["refs*", "downloads*", "lutemusic*", "examples*", "tests*"]
 
 [tool.setuptools.package-data]
 oud = ["py.typed"]
+petrucci = ["py.typed"]

@@ -3,8 +3,8 @@ from __future__ import annotations
 from oud.editor.document import display_path, document_status_label
 from oud.editor.state import EditorState
 from oud.editor.view_focus import current_view_staff, visible_view_staffs
-from oud.petrucci.duet_score import duet_bar_mapping, is_duet_score_piece
-from oud.petrucci.time_utils import parse_time_signature_value
+from petrucci.duet_score import duet_bar_mapping, is_duet_score_piece
+from petrucci.time_utils import parse_time_signature_value
 
 
 def _compact_name(name: str, width: int) -> str:

@@ -5,7 +5,7 @@ from oud.editor.edit_ops import clear_cell_note, undo_group
 from oud.editor.edit_range import BarRange
 from oud.editor.insert_session import set_mode
 from oud.editor.state import EditorState
-from oud.petrucci.render_utils import bar_cells, bar_cells_from_chords
+from petrucci.render_utils import bar_cells, bar_cells_from_chords
 
 
 def enter_visual_mode(state: EditorState, *, linewise: bool = False) -> None:
@@ -64,7 +64,7 @@ def visual_bar_range(state: EditorState) -> BarRange:
     return BarRange(start, end).clamp(len(state.piece.bars))
 
 
-def _visual_selection_ranges(state: EditorState) -> list[tuple[int, int, int, int]]:
+def _visual_selection_ranges(state: EditorState) -> list[tuple[int, int, int, int]]:  # noqa: C901
     anchor = state.visual_anchor or (state.cursor_bar, state.cursor_string, state.cursor_col)
     a_bar, a_row, a_col = anchor
     c_bar, c_row, c_col = state.cursor_bar, state.cursor_string, state.cursor_col
