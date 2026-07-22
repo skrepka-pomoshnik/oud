@@ -2,11 +2,11 @@
 
 ## NAME
 
-`oud` - terminal editor and viewer for Renaissance lute tablature
+`oud` - terminal editor and viewer for lute tablature
 
 ## DISCLAIMER
 
-This project is vibe-coded. Treat its documented format boundaries and quality gates as the source of truth, and preserve source files when testing import or export behavior.
+This project is vibe-coded, use it with care.
 
 ## SYNOPSIS
 
@@ -26,14 +26,10 @@ Current import/export focus:
 
 FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target and never changes the source. FT3 scores containing non-TAB or duet layers open read-only so visible material cannot disappear on save.
 
-![oud editing a tablature score in the terminal](https://raw.githubusercontent.com/skrepka-pomoshnik/oud/main/docs/oud-tui.svg)
-
 ## Docs
 
 - [User and developer guide](docs/user-guide.md)
-- [FT3 reverse-engineering notes](docs/ft3-format.md)
-- [Architecture debt baseline](docs/architecture-debt.md)
-- [Release checklist](docs/releasing.md)
+- [FT3 format notes](docs/ft3-format.md)
 - [Documentation map](docs/README.md)
 
 ## QUICK START
@@ -46,23 +42,6 @@ Requires Python 3.11+. This installs the `oud` command. No runtime
 dependencies beyond the standard library; MIDI playback optionally uses
 `fluidsynth` or `timidity` if installed.
 
-The same wheel exposes `petrucci` as a typed top-level library for canonical
-score layout and terminal rendering. It imports neither the Oud application nor
-curses; consumers adapt their own events through `petrucci.FlowEvent` or the
-immutable notation records. Semantic event cells support caller-owned styling,
-and horizontal viewports repaint cached wide layouts without relayout.
-
-FT3 integration payloads are external. Fetch the fixed, checksum-verified
-manifests, then scan the local cache:
-
-```
-python3 scripts/fetch_ft3_corpus.py \
-  corpus/ft3-regression.json corpus/ft3-random-75.json \
-  corpus/ft3-random-75-v2.json corpus/ft3-random-50-v3.json \
-  corpus/ft3-random-63-v4.json
-python3 scripts/corpus_smoke.py lutemusic
-```
-
 ## Run
 
 ```
@@ -71,7 +50,9 @@ oud examples/si_par_souffrir.tab
 uv run oud examples/si_par_souffrir.tab
 ```
 
-## Controls (vim)
+## Controls
+
+Vim-like:
 
 - `h/j/k/l` move one cell/row
 - `J/K` jump to next/previous rendered row (same bar offset)
@@ -81,7 +62,8 @@ uv run oud examples/si_par_souffrir.tab
 - `x` delete note (normal mode), space clears in insert mode
 - `o/O` add bar after/before, `+/-` delete bar
 
-## Controls (casual)
+
+Casual: 
 
 - `w/a/s/d` or arrows move
 - `W/S` jump to the previous/next rendered row
@@ -90,19 +72,6 @@ uv run oud examples/si_par_souffrir.tab
 - `Insert` add bar, `Delete` delete bar
 - `Ctrl-Z/Ctrl-Y` undo/redo
 - `F1` help
-
-## ASCII preview
-
-```
- 6|a--b--c--d--|e--f--g--a--|
- 5|---------------0---------|
- 4|---------2----------------|
- 3|-----2--------------------|
- 2|--------------------------|
- 1|--------------------------|
-```
-
-ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 
 ## Commands
 
@@ -127,14 +96,6 @@ ASCII note/lyric lanes are rendered from the same layout path as the TUI frame.
 :dark / :light  force dark/light color theme (:set theme=auto follows terminal)
 ```
 
-## MIDI soundfont
-
-Set your SoundFont in `config.toml`:
-
-```
-soundfont = "~/soundfonts/my-soundfont.sf2"
-midipatch = 24
-```
 ## Architecture overview
 
 - `petrucci/` reusable top-level score model and tab/note character-cell typesetting
@@ -156,23 +117,6 @@ The external FT3 test manifests reference typesettings by Sarge Gerbode from
 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/); see
 `lutemusic/README.md`. Their payloads are ignored by Git and are not covered by
 this project's GPL-3.0 license.
-
-## FILES
-
-- `docs/README.md` - documentation map
-- `docs/user-guide.md` - detailed usage and workflows
-- `docs/ft3-format.md` - reverse-engineered FT3 format notes
-- `docs/releasing.md` - release procedure
-- `scripts/quality.sh` - shared local and CI quality gate
-
-## DEVELOPMENT
-
-```bash
-uv sync --dev
-./scripts/quality.sh
-```
-
-The gate runs Ruff linting, Ruff formatting checks, project-scoped Ty, pytest with coverage, and the corpus smoke test.
 
 ## LICENSE
 
