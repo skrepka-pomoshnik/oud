@@ -7,10 +7,6 @@
   "complexity": {
     "oud/app.py": [
       {
-        "name": "_cmd_convert",
-        "complexity": 8
-      },
-      {
         "name": "_parse_bars_spec",
         "complexity": 8
       }

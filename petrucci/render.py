@@ -617,7 +617,7 @@ def _render_ascii_preview(
     )
 
 
-def render_piece(  # noqa: C901, PLR0912
+def render_piece(  # noqa: C901, PLR0912, PLR0917 - legacy facade pending a typed render request
     stdscr: Screen,
     piece: Piece,
     bar_offset: int,

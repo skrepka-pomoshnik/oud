@@ -285,7 +285,7 @@ def _draw_durations(
     return duration_cells, duration_map, padded
 
 
-def _draw_cursor(
+def _draw_cursor(  # noqa: PLR0917 - coordinated rhythm cells are one render operation
     context: RhythmRenderContext,
     positions: list[tuple[int, int, bool]],
     grid_map: list[int],
@@ -312,7 +312,7 @@ def _draw_cursor(
     _draw_duration_cursor(context, matching, scaled_col, duration_cells, duration_map, duration_padded)
 
 
-def _draw_duration_cursor(
+def _draw_duration_cursor(  # noqa: PLR0917 - coordinated rhythm cells are one render operation
     context: RhythmRenderContext,
     raw_col: int,
     scaled_col: int,

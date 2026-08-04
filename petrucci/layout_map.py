@@ -69,7 +69,7 @@ def layout_rows(height: int, strings: int) -> dict[str, int | None]:
     }
 
 
-def layout_block_rows(  # noqa: C901
+def layout_block_rows(  # noqa: C901, PLR0917 - legacy API pending a typed layout-policy record
     strings: int,
     include_meta: bool,
     show_dur: bool,
@@ -147,7 +147,7 @@ def layout_block_rows(  # noqa: C901
     }
 
 
-def block_height(
+def block_height(  # noqa: PLR0917 - legacy API pending a typed layout-policy record
     include_meta: bool,
     strings: int,
     show_dur: bool,

@@ -143,7 +143,7 @@ def test_cmd_play_loop_uses_visual_or_cursor_range(
     state = _state(bars=4)
     calls: list[dict[str, int | None]] = []
 
-    def _start_midi(
+    def _start_midi(  # noqa: PLR0917 - mirrors the legacy playback callback
         state: EditorState,
         start_bar: int | None = None,
         path: str | None = None,

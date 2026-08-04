@@ -507,7 +507,7 @@ def test_imported_fingering_renders_right_superscript_in_italian() -> None:
         ("auto", "smart", 96),
     ],
 )
-def test_imported_fingering_render_matrix_stays_adjacent(
+def test_imported_fingering_render_matrix_stays_adjacent(  # noqa: PLR0917 - pytest parameter matrix
     style: str,
     italian_orient: str | None,
     expected: str,

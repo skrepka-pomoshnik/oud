@@ -240,7 +240,7 @@ def _resolved_target_rows(base: list[int], imported: list[int], cells: list[str]
     return resolved
 
 
-def _apply_tie_notehead_policy(
+def _apply_tie_notehead_policy(  # noqa: PLR0917 - coordinated cue rows are one render operation
     context: SystemRenderContext,
     system: SystemLayout,
     basics: BarBasics,

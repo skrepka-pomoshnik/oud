@@ -61,7 +61,7 @@ def _draw_meta(
         safe_addstr(context.stdscr, y, cue_x, " ".join(cue_parts))
 
 
-def _draw_named_row(
+def _draw_named_row(  # noqa: PLR0917 - row geometry is explicit at this rendering boundary
     context: SystemRenderContext,
     system: SystemLayout,
     key: str,

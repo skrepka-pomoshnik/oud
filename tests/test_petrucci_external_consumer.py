@@ -5,7 +5,9 @@ from fractions import Fraction
 
 from petrucci import (
     ElementRole,
+    EnterNote,
     EventKind,
+    InputPitch,
     LayoutViewport,
     LyricSyllable,
     NotationEvent,
@@ -14,9 +16,13 @@ from petrucci import (
     NotationScore,
     NotationSpan,
     NotationStaff,
+    NoteInputTransaction,
+    PitchStep,
+    ScorePosition,
     ScoreTypesetOptions,
     SpanKind,
     TimeSignature,
+    apply_note_input,
     layout_score,
     pitch_from_midi,
     typeset_layout,
@@ -81,6 +87,31 @@ def test_external_consumer_decorates_event_cells_without_glyph_parsing() -> None
     assert {decorated[cell] for cell in result.cells_for("repeat-1")} == {"accepted"}
     assert {decorated[cell] for cell in result.cells_for("repeat-2")} == {"rejected"}
     assert {decorated[cell] for cell in result.cells_for("rest")} == {"waiting"}
+
+
+def test_external_consumer_types_and_renders_notes_through_public_petrucci_api() -> None:
+    score = _adapt_flow(())
+    transaction = NoteInputTransaction(
+        (
+            EnterNote(
+                ScorePosition("consumer-staff", "consumer-measure", Fraction(0)),
+                InputPitch(PitchStep.C),
+                event_id="typed-c",
+            ),
+            EnterNote(
+                ScorePosition("consumer-staff", "consumer-measure", Fraction(1, 4)),
+                InputPitch(PitchStep.E),
+                event_id="typed-e",
+            ),
+        ),
+    )
+
+    typed = apply_note_input(score, transaction)
+    rendered = typeset_score(typed.score, options=ScoreTypesetOptions(width=60, height=18))
+
+    assert [event.pitches[0].midi for event in typed.score.staffs[0].measures[0].events] == [60, 64]
+    assert rendered.cells_for("typed-c")
+    assert rendered.cells_for("typed-e")
 
 
 def test_external_consumer_can_follow_an_event_across_systems_and_resize() -> None:

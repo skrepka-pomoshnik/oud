@@ -226,7 +226,7 @@ def render_help(
     safe_addstr(stdscr, height - 1, 0, clean_text(status), status_attr)
 
 
-def render_plugin(
+def render_plugin(  # noqa: PLR0917 - legacy facade pending a typed menu view model
     stdscr: Screen,
     status: str,
     status_attr: int,
@@ -252,7 +252,7 @@ def render_plugin(
     safe_addstr(stdscr, height - 1, 0, clean_text(status_text), status_attr)
 
 
-def render_info(
+def render_info(  # noqa: PLR0917 - legacy facade pending a typed info view model
     stdscr: Screen,
     status: str,
     status_attr: int,

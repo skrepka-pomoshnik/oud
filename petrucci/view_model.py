@@ -28,7 +28,7 @@ from petrucci.tab_policy import string_label as tab_string_label
 __all__ = ["build_bar_view"]
 
 
-def _bar_compact_width(  # noqa: C901
+def _bar_compact_width(  # noqa: C901, PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     bar_width: int,
@@ -253,7 +253,7 @@ def _bar_note_columns(
     return cols
 
 
-def _bar_display_width(  # noqa: C901
+def _bar_display_width(  # noqa: C901, PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     bar_width: int,
@@ -305,7 +305,7 @@ def _bar_display_width(  # noqa: C901
     return max(3, width_needed, (count * min_unit) + 1)
 
 
-def _bar_flag_span(
+def _bar_flag_span(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     strings: int,
@@ -337,7 +337,7 @@ def _bar_flag_span(
     return max_slash, max_dot
 
 
-def _bar_note_count(
+def _bar_note_count(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     bar_width: int,
@@ -351,7 +351,7 @@ def _bar_note_count(
     return len(_bar_note_columns(overrides, durations, bar_index=bar_index))
 
 
-def _bar_chord_count(
+def _bar_chord_count(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     bar_width: int,
@@ -376,7 +376,7 @@ def _bar_chord_count(
     return 0
 
 
-def _bars_fit(
+def _bars_fit(  # noqa: PLR0917 - legacy grid projection pending typed system inputs
     bars: list[Bar],
     bar_offset: int,
     bar_gap: int,
@@ -642,7 +642,7 @@ def _bar_durations(  # noqa: C901
     return row
 
 
-def _flag_positions_all(
+def _flag_positions_all(  # noqa: PLR0917 - legacy grid projection pending a typed input record
     durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
@@ -866,7 +866,7 @@ def _bar_imported_ft3_ornaments(  # noqa: C901
     return row
 
 
-def _bar_span_row(
+def _bar_span_row(  # noqa: PLR0917 - span glyphs form one compact rendering operation
     spans: list[tuple[int, int, int]],
     bar_index: int,
     bar_width: int,
@@ -920,7 +920,7 @@ def _bar_flags(
     return row
 
 
-def build_bar_view(  # noqa: C901
+def build_bar_view(  # noqa: C901, PLR0917 - public compatibility; replace options with a typed view request
     bar: Bar,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],

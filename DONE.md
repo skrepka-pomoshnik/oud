@@ -2,6 +2,29 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-08-04
+- Added Petrucci's immutable, source-independent standard-note transaction API:
+  nearest-octave or explicit pitches, accidentals, persistent dotted/tuplet
+  duration, voices, chords, rests, grace style, repitch/replacement/deletion,
+  ties, slurs, lyrics, deterministic IDs, atomic rollback, and stable errors.
+- Added a fixed one-time 100-score Gerbode manifest disjoint from all earlier
+  corpora. Public note transactions exactly reconstruct every canonical notation
+  score and more than 20,000 independently projected sounding TAB events; the
+  downloaded FT3 payloads remain ignored and excluded from release artifacts.
+- Closed release artifact hygiene with wheel/sdist allowlists, payload and
+  development-file rejection, typed-package checks, and isolated Petrucci import
+  verification without Oud or curses.
+- Closed the Unix conversion contract: text pipelines use `-`, diagnostics and
+  stable exit statuses are separate from primary output, existing files require
+  `-f`, all file publication is atomic, and failed PDF builds preserve `.ly`.
+  Corrupt FT3 input now fails explicitly instead of becoming a blank score.
+- Kept CI acceptance macOS-only and added every fixed corpus manifest to its
+  deterministic fetch step.
+- Validation: no tracked FT3 payloads; architecture debt 157/157 with one
+  oversized module; Ruff, Ruff format, Ty, and release artifacts pass; 1,340
+  tests pass with one Darwin-only skip at 86.64% coverage; 401/401 local FT3
+  files load without errors or warnings.
+
 ## 2026-07-19
 - Added a fourth fixed, one-time 63-file FT3 manifest with no URL or digest
   overlap, bringing the random compatibility corpus to 263 files. All 63 new

@@ -21,7 +21,7 @@ from petrucci.duet_score import is_duet_score_piece
 from petrucci.model import Piece
 
 
-def export_midi(
+def export_midi(  # noqa: PLR0917 - public compatibility; replace options with a typed export request
     path: str,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
@@ -91,7 +91,7 @@ def export_midi(
     )
 
 
-def _midi_command(  # noqa: C901
+def _midi_command(  # noqa: C901, PLR0917 - explicit executable inputs keep player selection deterministic
     path: str,
     soundfont: str | None,
     platform: str,

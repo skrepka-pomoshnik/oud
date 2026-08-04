@@ -5,21 +5,19 @@ import curses
 import shutil
 import sys
 from dataclasses import replace
-from pathlib import Path
 
 from oud import __version__
+from oud.cli_convert import (
+    FORMAT_ALIASES,
+    ConvertOptions,
+    convert_command,
+)
+from oud.command_io import OutputExistsError, atomic_write_text
 from oud.editor.actions import handle_insert, handle_normal
 from oud.editor.file_ops import render_ascii_snapshot
 from oud.editor.init import init_state
-from oud.editor.load_ops import load_piece_data
-from oud.exports.export_tab import export_tab_to_file
-from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
-from oud.exports.midi import export_midi
-from oud.exports.musicxml import export_musicxml, export_mxl
-from oud.settings import DEFAULT_SETTINGS, load_settings
 from oud.tui.commands import apply_command
 from oud.tui.loop import run_loop
-from petrucci.model import Piece
 
 CONFIG_PATH = "config.toml"
 COMMANDS = {"tui", "ascii", "convert"}
@@ -29,6 +27,14 @@ ERR_BARS_RANGE_FORMAT = "bars must be START:END"
 ERR_BARS_POSITIVE = "bars are 1-based and must be > 0"
 ERR_BARS_ORDER = "bar range start must be <= end"
 ERR_BARS_PAST_END = "bar range starts past end of piece"
+EXIT_INPUT = 3
+EXIT_OUTPUT = 4
+EXIT_INTERRUPTED = 130
+
+
+class AsciiInputError(ValueError):
+    def __init__(self, path: str, warnings: list[str] | tuple[str, ...]) -> None:
+        super().__init__(f"cannot render {path}: {'; '.join(warnings)}")
 
 
 def _main(stdscr, path: str | None, config_path: str, read_only: bool = False) -> int:
@@ -43,43 +49,53 @@ def _main(stdscr, path: str | None, config_path: str, read_only: bool = False) -
     )
 
 
-def _export_context(
-    path: str, config_path: str
-) -> tuple[
-    dict[str, str],
-    int,
-    Piece,
-    dict[tuple[int, int, int], str],
-    dict[tuple[int, int, int], int],
-    set[tuple[int, int]],
-]:
-    settings = load_settings(config_path)
-    piece, overrides, durations, dotted, parsed_bar_width = load_piece_data(path)
-    try:
-        default_width = int(settings.get("spacing", DEFAULT_SETTINGS["spacing"]))
-    except ValueError:
-        default_width = int(DEFAULT_SETTINGS["spacing"])
-    bar_width = parsed_bar_width or max(4, default_width)
-    return settings, bar_width, piece, overrides, durations, dotted
-
-
 def _cmd_ascii(
     path: str,
     config_path: str,
     output: str | None,
     bars: str | None = None,
+    *,
+    overwrite: bool = False,
 ) -> int:
+    if path == "-":
+        print("oud: ascii stdin is unsupported; use convert - - --input-format tab --format ascii", file=sys.stderr)
+        return 2
+    if bars:
+        _parse_bars_spec(bars, sys.maxsize)
+    try:
+        text = _ascii_text(path, config_path, bars)
+        if output and output != "-":
+            atomic_write_text(output, text, overwrite=overwrite)
+            print(f"Wrote {output}")
+        else:
+            sys.stdout.write(text)
+    except (AsciiInputError, OutputExistsError, KeyboardInterrupt, OSError) as exc:
+        return _report_ascii_failure(exc)
+    else:
+        return 0
+
+
+def _ascii_text(path: str, config_path: str, bars: str | None) -> str:
     state = init_state(path, config_path=config_path)
+    warnings = getattr(getattr(state, "piece", None), "import_warnings", ())
+    if warnings:
+        raise AsciiInputError(path, warnings)
     _slice_for_ascii(state, bars)
     term = shutil.get_terminal_size((120, 40))
     state.screen_width = max(1, term.columns)
     state.screen_height = max(1, term.lines)
-    text = render_ascii_snapshot(state)
-    if output:
-        Path(output).write_text(text, encoding="utf-8")
-    else:
-        print(text, end="")
-    return 0
+    return render_ascii_snapshot(state)
+
+
+def _report_ascii_failure(exc: BaseException) -> int:
+    if isinstance(exc, AsciiInputError):
+        print(f"oud: {exc}", file=sys.stderr)
+        return EXIT_INPUT
+    if isinstance(exc, KeyboardInterrupt):
+        print("oud: interrupted", file=sys.stderr)
+        return EXIT_INTERRUPTED
+    print(f"oud: ASCII output failed: {exc}", file=sys.stderr)
+    return EXIT_OUTPUT
 
 
 def _parse_bars_spec(spec: str, total: int) -> tuple[int, int]:  # noqa: C901
@@ -137,95 +153,13 @@ def _slice_for_ascii(state, bars_spec: str | None) -> None:
     state.holds = remap_spans(state.holds)
 
 
-def _cmd_convert(path_in: str, path_out: str, config_path: str) -> int:  # noqa: C901, PLR0911
-    settings, bar_width, piece, overrides, durations, dotted = _export_context(path_in, config_path)
-    suffix = Path(path_out).suffix.lower()
-    if suffix == ".tab":
-        export_tab_to_file(
-            path_out,
-            piece,
-            overrides,
-            durations,
-            bar_width,
-            settings=settings,
-            dotted=dotted,
-        )
-        print(f"Wrote {path_out}")
-        return 0
-    if suffix in {".txt", ".ascii"}:
-        _cmd_ascii(path_in, config_path, path_out, None)
-        print(f"Wrote {path_out}")
-        return 0
-    if suffix == ".ly":
-        print(
-            export_lilypond(
-                path_out,
-                piece,
-                overrides,
-                durations,
-                bar_width,
-                settings=settings,
-            ),
-        )
-        return 0
-    if suffix == ".pdf":
-        ly_path = str(Path(path_out).with_suffix(".ly"))
-        print(
-            export_lilypond(
-                ly_path,
-                piece,
-                overrides,
-                durations,
-                bar_width,
-                settings=settings,
-            ),
-        )
-        print(print_lilypond_pdf(ly_path, str(Path(path_out).with_suffix(""))))
-        return 0
-    if suffix in {".musicxml", ".xml"}:
-        print(
-            export_musicxml(
-                path_out,
-                piece,
-                overrides,
-                durations,
-                bar_width,
-                settings=settings,
-                dotted=dotted,
-            ),
-        )
-        return 0
-    if suffix == ".mxl":
-        print(
-            export_mxl(
-                path_out,
-                piece,
-                overrides,
-                durations,
-                bar_width,
-                settings=settings,
-                dotted=dotted,
-            ),
-        )
-        return 0
-    if suffix in {".mid", ".midi"}:
-        bpm_text = settings.get("tempo", "90")
-        bpm = int(bpm_text) if bpm_text.isdigit() else 90
-        print(
-            export_midi(
-                path_out,
-                piece,
-                overrides,
-                durations,
-                bar_width,
-                settings=settings,
-                bpm=bpm,
-                dotted=dotted,
-            ),
-        )
-        return 0
-    print(f"Unsupported output format: {path_out}", file=sys.stderr)
-    return 2
+def _cmd_convert(
+    path_in: str,
+    path_out: str,
+    config_path: str,
+    options: ConvertOptions | None = None,
+) -> int:
+    return convert_command(path_in, path_out, config_path, options=options)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -256,6 +190,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ascii = sub.add_parser("ascii", help="Render tablature as ASCII")
     p_ascii.add_argument("path", help="Input .ft3/.tab path")
     p_ascii.add_argument("-o", "--output", help="Write ASCII output to file")
+    p_ascii.add_argument("-f", "--force", action="store_true", help="Replace an existing output file")
     p_ascii.add_argument(
         "--bars",
         help="Optional 1-based bar range (N or START:END)",
@@ -270,7 +205,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_convert.add_argument("input", help="Input .ft3/.tab path")
     p_convert.add_argument(
         "output",
-        help="Output path (.tab/.txt/.ascii/.ly/.mid/.musicxml/.xml/.mxl)",
+        help="Output path, or - for a supported text stream",
+    )
+    p_convert.add_argument("-f", "--force", action="store_true", help="Replace existing output files")
+    p_convert.add_argument(
+        "--input-format",
+        choices=("tab",),
+        help="Input format required when input is -",
+    )
+    p_convert.add_argument(
+        "--format",
+        choices=tuple(sorted(FORMAT_ALIASES)),
+        help="Output format; required when output is -",
     )
     return parser
 
@@ -332,12 +278,13 @@ def main(argv: list[str] | None = None) -> int:
                         file=sys.stderr,
                     )
                     return 2
-            return _cmd_ascii(parsed.path, parsed.config, parsed.output, bars)
+            return _cmd_ascii(parsed.path, parsed.config, parsed.output, bars, overwrite=parsed.force)
         except ValueError as exc:
             print(f"Invalid --bars: {exc}", file=sys.stderr)
             return 2
     if parsed.command == "convert":
-        return _cmd_convert(parsed.input, parsed.output, parsed.config)
+        options = ConvertOptions(parsed.force, parsed.input_format, parsed.format)
+        return _cmd_convert(parsed.input, parsed.output, parsed.config, options)
     _build_parser().print_help()
     return 2
 

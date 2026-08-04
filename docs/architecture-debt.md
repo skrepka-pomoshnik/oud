@@ -40,7 +40,7 @@ test modules are split by behavior, with every test module below the ceiling.
 
 ## Complexity
 
-The enforced ceiling is 7. The baseline currently contains 158 over-limit
+The enforced ceiling is 7. The baseline currently contains 157 over-limit
 functions, including suppressed findings. The former normal-mode and Petrucci
 render dispatchers now delegate to focused command, movement, system, rhythm,
 staff, and cue modules without over-limit coordinator functions. The highest
@@ -48,11 +48,18 @@ remaining findings include `oud.editor.undo_ops.apply_action` (53),
 `oud.importers.ft3.load_ft3` (44), `oud.exports.export_tab.export_tab` (35),
 and `oud.importers.tab.parse_tab_lines_data` (30).
 
+Ruff 0.16 also exposes 31 legacy production call surfaces with more than five
+positional parameters. Each suppression is function-local and carries its
+replacement boundary inline. Retire these with typed request or policy records
+when splitting the owning renderer/exporter; do not replace them with per-file
+ignores or pass-through wrappers.
+
 Retirement order follows ownership and risk:
 
 1. Split `petrucci/view_model.py` along its existing projection and display boundaries.
 2. Decompose the remaining high-complexity editor, importer, and export functions.
-3. Retire remaining local findings, lowering `architecture-debt.json` after each verified change.
+3. Replace legacy positional render/export surfaces with typed request records.
+4. Retire remaining local findings, lowering `architecture-debt.json` after each verified change.
 
 An entry is retired only after focused regressions and the full quality gate
 pass. Moving code without reducing ownership or complexity does not count.

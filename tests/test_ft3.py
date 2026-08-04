@@ -1,5 +1,7 @@
 import gzip
 
+import pytest
+
 from oud.importers._ft3_duration import (
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
@@ -11,7 +13,7 @@ from oud.importers._ft3_score import (
     _parallel_raw_bar_targets,
 )
 from oud.importers._ft3_tab import _decode_ft3_note_position, parse_bar
-from oud.importers.ft3 import load_ft3
+from oud.importers.ft3 import FT3FormatError, load_ft3
 from petrucci.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 
@@ -25,6 +27,14 @@ def test_load_minimal_ft3(tmp_path) -> None:
     assert piece is not None
     assert len(piece.bars) > 0
     assert piece.title in (None, "Test")
+
+
+def test_load_ft3_rejects_bytes_without_document_marker(tmp_path) -> None:
+    path = tmp_path / "broken.ft3"
+    path.write_bytes(b"not an FT3 score")
+
+    with pytest.raises(FT3FormatError, match="CPiece"):
+        load_ft3(str(path))
 
 
 def test_note_type_to_denominator() -> None:
@@ -402,7 +412,7 @@ def test_load_ft3_cpiece_length_prefix(tmp_path) -> None:
 
 def test_load_ft3_uses_filename_when_title_missing(tmp_path) -> None:
     path = tmp_path / "czarna_krowa.ft3"
-    path.write_bytes(b"\x03\x80")
+    path.write_bytes(b"CPiece\x03\x80")
     piece = load_ft3(str(path))
     assert piece.title == "czarna krowa"
 

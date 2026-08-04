@@ -179,7 +179,7 @@ def _fret_from_override(ch: str, style: str) -> int | None:
     return letters.index(ch) if ch in letters else None
 
 
-def _collect_manual_chords(  # noqa: C901
+def _collect_manual_chords(  # noqa: C901, PLR0917 - legacy grid projection pending typed export context
     bar_index: int,
     strings: int,
     bar_width: int,
@@ -261,7 +261,7 @@ def _chord_positions(
     return positions
 
 
-def _apply_overrides(
+def _apply_overrides(  # noqa: PLR0917 - legacy grid projection pending typed export context
     notes: list[Note],
     overrides: dict[tuple[int, int, int], str],
     bar_index: int,
@@ -291,7 +291,7 @@ def _apply_overrides(
     return list(by_string.values())
 
 
-def _bar_chord_events(
+def _bar_chord_events(  # noqa: PLR0917 - legacy grid projection pending typed export context
     bar: Bar,
     bar_index: int,
     strings: int,

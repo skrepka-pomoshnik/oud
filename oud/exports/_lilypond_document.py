@@ -146,12 +146,12 @@ def _build_main_blocks(  # noqa: C901
     return blocks
 
 
-def export_lilypond(
-    path: str,
+def lilypond_text(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
+    *,
     settings: dict[str, str] | None = None,
     ornaments: dict[tuple[int, int], str] | None = None,
     annotations: dict[tuple[int, int], str] | None = None,
@@ -188,7 +188,7 @@ def export_lilypond(
         ties=ties,
         holds=holds,
     )
-    content = "\n".join(
+    return "\n".join(
         [
             *header,
             "",
@@ -199,6 +199,34 @@ def export_lilypond(
             *layout,
             "",
         ],
+    )
+
+
+def export_lilypond(
+    path: str,
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    *,
+    settings: dict[str, str] | None = None,
+    ornaments: dict[tuple[int, int], str] | None = None,
+    annotations: dict[tuple[int, int], str] | None = None,
+    slurs: list[tuple[int, int, int]] | None = None,
+    ties: list[tuple[int, int, int]] | None = None,
+    holds: list[tuple[int, int, int]] | None = None,
+) -> str:
+    content = lilypond_text(
+        piece,
+        overrides,
+        durations,
+        bar_width,
+        settings=settings,
+        ornaments=ornaments,
+        annotations=annotations,
+        slurs=slurs,
+        ties=ties,
+        holds=holds,
     )
     Path(path).write_text(content, encoding="utf-8")
     return f"Wrote {path}"
@@ -227,12 +255,6 @@ def print_lilypond_pdf(ly_path: str, output_base: str | None = None) -> str:
         detail = err.splitlines()[-1] if err else "unknown error"
         return f"LilyPond failed: {detail}"
     pdf_path = (workdir / f"{out_base.name}.pdf").resolve()
-    if not pdf_path.exists():
-        # Some LilyPond builds ignore directory components in -o when passed odd paths;
-        # check the process cwd fallback basename before reporting failure.
-        cwd_fallback = Path.cwd() / f"{out_base.name}.pdf"
-        if cwd_fallback.exists():
-            pdf_path = cwd_fallback.resolve()
     if not pdf_path.exists():
         return f"LilyPond finished but PDF not found: {pdf_path}"
     return f"Printed {pdf_path}"

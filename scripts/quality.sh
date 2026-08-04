@@ -37,7 +37,7 @@ run_check "Architecture debt" uv run python tools/check_architecture_debt.py
 run_check "Ruff" uv run ruff check .
 run_check "Ruff format" uv run ruff format --check .
 run_check "Ty" uv run ty check
-run_check "Petrucci package" uv run python tools/check_petrucci_package.py
+run_check "Release artifacts" uv run python tools/check_release_artifacts.py
 run_check "Pytest + coverage" uv run pytest tests --cov --cov-fail-under=85
 run_check "Corpus smoke" uv run python scripts/corpus_smoke.py lutemusic
 

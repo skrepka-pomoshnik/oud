@@ -30,6 +30,21 @@ uv run oud
 uv run oud examples/si_par_souffrir.tab
 ```
 
+Non-interactive commands use stdout for primary output and stderr for
+diagnostics. Existing output files are refused unless `-f` is explicit:
+
+```bash
+uv run oud ascii score.ft3 --bars 1:8
+uv run oud convert score.ft3 score.musicxml
+uv run oud convert score.ft3 score.pdf
+printf '%s\n' '-C' 'b' '0a-----' 'e' \
+  | uv run oud convert - - --input-format tab --format lilypond
+```
+
+`-` supports TAB input and TAB, ASCII, LilyPond, or MusicXML output. Binary MXL,
+MIDI, and PDF output requires a path. PDF conversion writes the companion `.ly`
+atomically and preserves it when compilation fails.
+
 ## 3) Modes
 
 - `normal`: navigation + editor commands.
@@ -327,11 +342,18 @@ Petrucci has two entry paths:
 
 - `typeset_piece(...)` preserves Oud tablature behavior.
 - `typeset_score(...)` renders source-independent immutable notation records.
+- `apply_note_input(...)` applies an atomic, source-independent note transaction.
 
 The canonical score result contains text, `ScoreLayout`, structural roles,
 source IDs, and `cells_for(id)`. Consumers own selection, playback, grading,
 colors, and terminal attributes; Petrucci does not expose result-state enums or
 interpret caller state.
+
+`NoteInputTransaction` supports notes, rests, chords, voices, persistent dotted
+or tuplet durations, grace style, repitching, replacement, deletion, ties,
+slurs, and lyrics. It returns a new immutable score, updated typing context, and
+typed changes. Rejections carry a stable `NoteInputError.code`; the source score
+is unchanged. This API imports no Oud editor, FT3, curses, or file-I/O module.
 
 ```python
 from fractions import Fraction

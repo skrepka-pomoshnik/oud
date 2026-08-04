@@ -87,8 +87,8 @@ def test_supported_conversion_roundtrip_matrix_synthetic_subset(tmp_path: Path) 
 
     xml_path = tmp_path / "synthetic.musicxml"
     mxl_path = tmp_path / "synthetic.mxl"
-    export_musicxml(str(xml_path), piece, {}, {}, 12, settings, dotted=set())
-    export_mxl(str(mxl_path), piece, {}, {}, 12, settings, dotted=set())
+    export_musicxml(str(xml_path), piece, {}, {}, 12, settings=settings, dotted=set())
+    export_mxl(str(mxl_path), piece, {}, {}, 12, settings=settings, dotted=set())
     xml_piece = load_musicxml(str(xml_path))
     mxl_piece = load_mxl(str(mxl_path))
     assert _sig_musicxml_subset(xml_piece) == _sig_musicxml_subset(piece)
@@ -111,8 +111,8 @@ def test_load_piece_data_synthetic_input_matrix_supported_formats(tmp_path: Path
 
     xml_path = tmp_path / "in.musicxml"
     mxl_path = tmp_path / "in.mxl"
-    export_musicxml(str(xml_path), piece, {}, {}, 12, settings, dotted=set())
-    export_mxl(str(mxl_path), piece, {}, {}, 12, settings, dotted=set())
+    export_musicxml(str(xml_path), piece, {}, {}, 12, settings=settings, dotted=set())
+    export_mxl(str(mxl_path), piece, {}, {}, 12, settings=settings, dotted=set())
 
     ft3_path = tmp_path / "mini.ft3.gz"
     with gzip.open(ft3_path, "wb") as f:

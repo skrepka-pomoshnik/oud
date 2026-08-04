@@ -22,7 +22,7 @@ class TabExportError(ValueError):
         super().__init__(f"TAB cannot preserve Italian fret {fret}; export LilyPond, MIDI, or MusicXML")
 
 
-def export_tab(  # noqa: PLR0912, C901
+def export_tab(  # noqa: C901, PLR0912, PLR0917 - public compatibility; replace options with a typed request
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -162,7 +162,7 @@ def export_tab(  # noqa: PLR0912, C901
     return "\n".join(lines) + "\n"
 
 
-def export_ascii(
+def export_ascii(  # noqa: PLR0917 - public compatibility; replace options with a typed request
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -229,7 +229,7 @@ def export_ascii(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def export_tab_to_file(
+def export_tab_to_file(  # noqa: PLR0917 - public compatibility; replace options with a typed request
     path: str,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],

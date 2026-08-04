@@ -170,6 +170,7 @@ def _key_fifths(value: str) -> int:
 def _events_from_overrides(
     bar_index: int,
     strings: int,
+    *,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     style: str,
@@ -209,6 +210,7 @@ def _events_for_bar(
     bar: Bar,
     bar_index: int,
     strings: int,
+    *,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     style: str,
@@ -220,7 +222,14 @@ def _events_for_bar(
             notes = [(note.string, note.fret) for note in chord.notes]
             events.append((_note_type_to_denom(chord.note_type), bool(chord.dotted), notes))
         return events
-    return _events_from_overrides(bar_index, strings, overrides, durations, style, dotted)
+    return _events_from_overrides(
+        bar_index,
+        strings,
+        overrides=overrides,
+        durations=durations,
+        style=style,
+        dotted=dotted,
+    )
 
 
 def _add_note(  # noqa: C901
@@ -416,11 +425,11 @@ def export_musicxml(
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: dict[str, str] | None = None,
     *,
+    settings: dict[str, str] | None = None,
     dotted: set[tuple[int, int]] | None = None,
 ) -> str:
-    content = _musicxml_text(
+    content = musicxml_text(
         piece,
         overrides,
         durations,
@@ -438,13 +447,13 @@ def export_mxl(
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
-    settings: dict[str, str] | None = None,
     *,
+    settings: dict[str, str] | None = None,
     dotted: set[tuple[int, int]] | None = None,
 ) -> str:
     output = Path(path)
     inner_name = output.with_suffix(".xml").name
-    xml_text = _musicxml_text(
+    xml_text = musicxml_text(
         piece,
         overrides,
         durations,
@@ -571,10 +580,10 @@ def _musicxml_text(  # noqa: C901, PLR0912
                 bar,
                 b_idx - 1,
                 piece.strings,
-                overrides,
-                durations,
-                style,
-                dotted,
+                overrides=overrides,
+                durations=durations,
+                style=style,
+                dotted=dotted,
             ):
                 duration_units = _duration_units(denom, is_dotted)
                 note_type = _duration_type(denom)
@@ -615,3 +624,27 @@ def _musicxml_text(  # noqa: C901, PLR0912
 
     xml_bytes = tostring(root, encoding="utf-8")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + MUSICXML_DOCTYPE + "\n" + xml_bytes.decode("utf-8") + "\n"
+
+
+def musicxml_text(
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    settings: dict[str, str] | None = None,
+    *,
+    dotted: set[tuple[int, int]] | None = None,
+) -> str:
+    """Render one score as uncompressed MusicXML text."""
+
+    return _musicxml_text(
+        piece,
+        overrides,
+        durations,
+        bar_width,
+        settings,
+        dotted=dotted,
+    )
+
+
+__all__ = ["export_musicxml", "export_mxl", "musicxml_text"]

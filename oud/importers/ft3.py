@@ -50,11 +50,24 @@ from petrucci.model import (
     Piece,
 )
 
-__all__ = ["build_durations", "load_ft3"]
+
+class FT3FormatError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("FT3 input is missing the CPiece document marker")
+
+
+__all__ = ["FT3FormatError", "build_durations", "load_ft3"]
+
+
+def _read_valid_ft3(path: str) -> bytes:
+    data = read_ft3(path)
+    if b"CPiece" not in data:
+        raise FT3FormatError
+    return data
 
 
 def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
-    data = read_ft3(path)
+    data = _read_valid_ft3(path)
 
     blocks, metadata_blob = _extract_cpiece_blocks(data)
     preamble_notes = _extract_ft3_preamble_notes(data)

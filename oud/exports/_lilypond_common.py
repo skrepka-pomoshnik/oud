@@ -314,7 +314,7 @@ def _span_maps(
     return starts, ends
 
 
-def _collect_override_chords(  # noqa: C901
+def _collect_override_chords(  # noqa: C901, PLR0917 - legacy grid projection pending typed export context
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_index: int,

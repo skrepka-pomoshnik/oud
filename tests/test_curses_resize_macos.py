@@ -99,7 +99,7 @@ def _reports(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in lines if line.strip()]
 
 
-def _wait_for_report(
+def _wait_for_report(  # noqa: PLR0917 - PTY polling keeps all process state explicit
     process: subprocess.Popen[bytes],
     master_fd: int,
     report_path: Path,

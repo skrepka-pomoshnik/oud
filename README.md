@@ -12,6 +12,8 @@ This project is vibe-coded, use it with care.
 
 ```text
 oud [FILE]
+oud ascii INPUT [-o OUTPUT] [--bars N|START:END] [-f]
+oud convert INPUT OUTPUT [--format FORMAT] [-f]
 ```
 
 ## DESCRIPTION
@@ -49,6 +51,19 @@ oud examples/si_par_souffrir.tab
 # or straight from a checkout:
 uv run oud examples/si_par_souffrir.tab
 ```
+
+Non-interactive conversion infers the format from the output suffix and refuses
+to replace an existing file unless `-f` is explicit:
+
+```bash
+oud ascii score.ft3 --bars 1:8
+oud convert score.ft3 score.musicxml
+oud convert score.ft3 score.pdf
+printf '%s\n' '-C' 'b' '0a-----' 'e' | oud convert - - --input-format tab --format lilypond
+```
+
+Text formats can stream through `-`; MIDI, MXL, and PDF require a file. PDF
+conversion keeps the generated `.ly` source when LilyPond is missing or fails.
 
 ## Controls
 
@@ -98,12 +113,12 @@ Casual:
 
 ## Architecture overview
 
-- `petrucci/` reusable top-level score model and tab/note character-cell typesetting
+- `petrucci/` reusable top-level score model, tab/note input contracts, and character-cell typesetting
 - `oud/importers/` FT3/TAB/MusicXML parsing and import semantics
 - `oud/editor/` state, ops, undo/redo, commands
 - `oud/tui/` input, controller, viewport
 - `oud/ui/` curses adapter
-- `oud/exports/` tab/ly/midi exporters
+- `oud/exports/` TAB, ASCII, LilyPond/PDF, MIDI, and MusicXML exporters
 - `oud/plugins/` self-contained plugins
 
 Entry point: `oud` -> `oud.app:main`.

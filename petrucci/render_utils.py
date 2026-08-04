@@ -22,7 +22,7 @@ def format_fret(
     )
 
 
-def bar_cells(  # noqa: C901
+def bar_cells(  # noqa: C901, PLR0917 - public compatibility; replace options with a typed tab policy
     bar: Bar,
     strings: int,
     bar_width: int,
@@ -124,7 +124,7 @@ def chord_slot_positions(
     return chord_positions(bar, bar_width, default_duration)
 
 
-def bar_cells_from_chords(
+def bar_cells_from_chords(  # noqa: PLR0917 - public compatibility; replace options with a typed tab policy
     bar: Bar,
     strings: int,
     bar_width: int,
@@ -330,7 +330,7 @@ def stem_row_style(
     return row
 
 
-def flag_positions_from_durations(
+def flag_positions_from_durations(  # noqa: PLR0917 - legacy grid projection pending a typed input record
     durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,

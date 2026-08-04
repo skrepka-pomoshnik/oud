@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from oud import app as oud_app
+from oud.cli_convert import ConvertOptions
 from petrucci.model import Bar, Piece
 
 
@@ -71,21 +72,29 @@ def test_main_tui_subcommand_accepts_readonly_flag(monkeypatch: pytest.MonkeyPat
 
 
 def test_main_dispatches_convert(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: list[tuple[str, str, str]] = []
+    captured: list[tuple[str, str, str, ConvertOptions | None]] = []
 
-    def fake_convert(path_in: str, path_out: str, config: str) -> int:
-        captured.append((path_in, path_out, config))
+    def fake_convert(path_in: str, path_out: str, config: str, options: ConvertOptions | None = None) -> int:
+        captured.append((path_in, path_out, config, options))
         return 7
 
     monkeypatch.setattr(oud_app, "_cmd_convert", fake_convert)
     assert oud_app.main(["convert", "in.ft3", "out.tab"]) == 7
-    assert captured == [("in.ft3", "out.tab", oud_app.CONFIG_PATH)]
+    assert captured == [("in.ft3", "out.tab", oud_app.CONFIG_PATH, ConvertOptions())]
 
 
 def test_main_dispatches_ascii(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[tuple[str, str, str | None, str | None]] = []
 
-    def fake_ascii(path: str, config: str, output: str | None, bars: str | None = None) -> int:
+    def fake_ascii(
+        path: str,
+        config: str,
+        output: str | None,
+        bars: str | None = None,
+        *,
+        overwrite: bool = False,
+    ) -> int:
+        assert overwrite is False
         captured.append((path, config, output, bars))
         return 9
 
@@ -97,7 +106,15 @@ def test_main_dispatches_ascii(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_main_dispatches_ascii_with_bars(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[tuple[str, str, str | None, str | None]] = []
 
-    def fake_ascii(path: str, config: str, output: str | None, bars: str | None = None) -> int:
+    def fake_ascii(
+        path: str,
+        config: str,
+        output: str | None,
+        bars: str | None = None,
+        *,
+        overwrite: bool = False,
+    ) -> int:
+        assert overwrite is False
         captured.append((path, config, output, bars))
         return 11
 
@@ -109,7 +126,15 @@ def test_main_dispatches_ascii_with_bars(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_main_dispatches_ascii_with_bars_expr(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[tuple[str, str, str | None, str | None]] = []
 
-    def fake_ascii(path: str, config: str, output: str | None, bars: str | None = None) -> int:
+    def fake_ascii(
+        path: str,
+        config: str,
+        output: str | None,
+        bars: str | None = None,
+        *,
+        overwrite: bool = False,
+    ) -> int:
+        assert overwrite is False
         captured.append((path, config, output, bars))
         return 12
 

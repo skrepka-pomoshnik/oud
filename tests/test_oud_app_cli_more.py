@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import curses
 import os
+import zipfile
+from pathlib import Path
 
 import pytest
 
 from oud import app as oud_app
+from oud import cli_convert
+from petrucci.model import Bar, Piece
+
+
+def _write_tab(path: Path) -> None:
+    path.write_text("% test\n-C\n{CLI score}\nb\n0a-----\n\ne\n", encoding="utf-8")
 
 
 def test_parse_bars_spec_errors() -> None:
@@ -48,85 +56,73 @@ def test_main_unknown_command_shows_help(capsys: pytest.CaptureFixture[str]) -> 
 
 
 def test_export_context_spacing_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(oud_app, "load_settings", lambda _cfg: {"spacing": "oops"})
+    piece = Piece(title="T", bars=[Bar()])
+    monkeypatch.setattr(cli_convert, "load_settings", lambda _cfg: {"spacing": "oops"})
     monkeypatch.setattr(
-        oud_app,
+        cli_convert,
         "load_piece_data",
-        lambda _p: ("piece", {}, {}, set(), 0),
+        lambda _p: (piece, {}, {}, set(), 0),
     )
-    settings, width, piece, overrides, durations, dotted = oud_app._export_context(
-        "in.ft3",
-        "cfg.toml",
-    )
-    assert settings["spacing"] == "oops"
-    assert width >= 4
-    assert piece == "piece"
-    assert overrides == {}
-    assert durations == {}
-    assert dotted == set()
+    context = cli_convert.load_export_context("in.ft3", "cfg.toml")
+    assert context.settings["spacing"] == "oops"
+    assert context.bar_width >= 4
+    assert context.piece is piece
+    assert context.overrides == {}
+    assert context.durations == {}
+    assert context.dotted == set()
 
 
 def test_cmd_convert_ascii_and_unsupported(
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setattr(
-        oud_app,
-        "_export_context",
-        lambda _in, _cfg: ({}, 8, "piece", {}, {}, set()),
-    )
-    monkeypatch.setattr(oud_app, "_cmd_ascii", lambda *_args, **_kwargs: 0)
-    rc = oud_app._cmd_convert("in.ft3", "out.txt", "cfg.toml")
-    assert rc == 0
-    assert "Wrote out.txt" in capsys.readouterr().out
+    source = tmp_path / "input score.tab"
+    output = tmp_path / "output score.txt"
+    _write_tab(source)
 
-    rc = oud_app._cmd_convert("in.ft3", "out.unsupported", "cfg.toml")
+    rc = oud_app._cmd_convert(str(source), str(output), "cfg.toml")
+    assert rc == 0
+    assert output.read_text(encoding="utf-8")
+    assert f"Wrote {output}" in capsys.readouterr().out
+
+    rc = oud_app._cmd_convert(str(source), str(tmp_path / "out.unsupported"), "cfg.toml")
     assert rc == 2
-    assert "Unsupported output format" in capsys.readouterr().err
+    assert "unsupported output format" in capsys.readouterr().err
 
 
-def test_cmd_convert_mxl(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    called: list[str] = []
-    monkeypatch.setattr(
-        oud_app,
-        "_export_context",
-        lambda _in, _cfg: ({}, 8, "piece", {}, {}, set()),
-    )
-    monkeypatch.setattr(
-        oud_app,
-        "export_mxl",
-        lambda path, *_args, **_kwargs: called.append(path) or f"Wrote {path}",
-    )
-    rc = oud_app._cmd_convert("in.ft3", "out.mxl", "cfg.toml")
+def test_cmd_convert_mxl_is_atomic_zip(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    source = tmp_path / "input.tab"
+    output = tmp_path / "out.mxl"
+    _write_tab(source)
+
+    rc = oud_app._cmd_convert(str(source), str(output), "cfg.toml")
     assert rc == 0
-    assert called == ["out.mxl"]
-    assert "Wrote out.mxl" in capsys.readouterr().out
+    assert zipfile.is_zipfile(output)
+    assert f"Wrote {output}" in capsys.readouterr().out
 
 
-def test_cmd_convert_pdf(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    calls: dict[str, list[str]] = {"export": [], "print": []}
+def test_cmd_convert_pdf_preserves_source_and_fails_when_lilypond_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "input.tab"
+    output = tmp_path / "out.pdf"
+    _write_tab(source)
     monkeypatch.setattr(
-        oud_app,
-        "_export_context",
-        lambda _in, _cfg: ({}, 8, "piece", {}, {}, set()),
-    )
-    monkeypatch.setattr(
-        oud_app,
-        "export_lilypond",
-        lambda path, *_args, **_kwargs: calls["export"].append(path) or f"Wrote {path}",
-    )
-    monkeypatch.setattr(
-        oud_app,
+        cli_convert,
         "print_lilypond_pdf",
-        lambda ly_path, out_base: calls["print"].append(f"{ly_path}|{out_base}") or "Printed out.pdf",
+        lambda _ly_path, _out_base: "LilyPond not found on PATH",
     )
-    rc = oud_app._cmd_convert("in.ft3", "out.pdf", "cfg.toml")
-    assert rc == 0
-    assert calls["export"] == ["out.ly"]
-    assert calls["print"] == ["out.ly|out"]
-    out = capsys.readouterr().out
-    assert "Wrote out.ly" in out
-    assert "Printed out.pdf" in out
+
+    rc = oud_app._cmd_convert(str(source), str(output), "cfg.toml")
+
+    assert rc == cli_convert.EXIT_TOOL
+    assert output.with_suffix(".ly").is_file()
+    assert not output.exists()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "LilyPond not found" in captured.err
 
 
 def test_main_tui_no_path_when_only_config(monkeypatch: pytest.MonkeyPatch) -> None:

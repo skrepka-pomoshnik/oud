@@ -1,34 +1,92 @@
 # TODO
 
-## P2: Architecture debt retirement
+Priority order:
 
-CI now enforces complexity 7 and a 1,000-line module ceiling against the exact
-non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
-targets are in `docs/architecture-debt.md`.
+1. Publication-grade FT3 viewer support.
+2. Gerbode-based lute tablature and standard-note typing parity.
+3. Intelligent, score-aware transposition.
+4. Publication-quality PDF generation through LilyPond.
+5. Architecture debt and secondary release work.
 
-- [ ] Split `petrucci/view_model.py` by width planning, source projection, and
-  tuning/display records; it is the sole module still above 1,000 lines.
-- [ ] Retire the remaining 158 function-level C901 findings without raising
-  limits, broad per-file ignores, compatibility wrappers, or count-only helper
-  modules. Start with `oud.editor.undo_ops.apply_action` (53),
-  `oud.importers.ft3.load_ft3` (44), and the remaining exporter/importer locals.
+## P0: Publication blockers
 
-## P1: Note and tablature typing confidence
+No open P0 items. Publication readiness still depends on the P1 FT3 support and
+acceptance claims below.
 
-Reference model: MuseScore's `note_tests.cpp` drives real note-input operations
-and compares complete score state, while its TablEdit fixtures separate normal
-and dotted notes/rests, positions, voices, ties, tuplets, grace notes, and bass
-courses. LilyPond's `input/regression` keeps one-feature tablature files for
-string assignment, letter frets, open/additional bass strings, chord repetition,
-dots beside two-digit frets, beams/slurs, ties, and grace notes.
+## P1.1: Publication-grade FT3 viewer
 
-- [ ] Define a public, source-independent Petrucci typing transaction API before
-  moving editor mutation code. It must accept explicit pitch/fret, string,
-  duration, voice, onset, rest/chord intent, and return typed changes/errors
-  without importing curses, Oud editor state, FT3, or file I/O.
-- [ ] Add standard-note typing once that API exists: nearest-octave letter entry,
-  explicit accidental/natural spelling, rests, chord stacking, voices, duration
-  persistence, dots, ties, tuplets, grace notes, and out-of-range pitch errors.
+Target: a mature read-only workflow for supported public Gerbode FT3 scores.
+Native FT3 writing and Fronimo editor parity remain out of scope.
+
+### Full-score presentation
+
+- [ ] Add explicit `score` and `staff` viewer modes for imported scores.
+  - At 120x40, `score` mode renders every mapped tablature, notation, and lyric
+    staff together when they fit.
+  - At 80x24, vertical scrolling reaches every staff without dropping content;
+    `staff` mode remains the compact focused view.
+  - Preserve source staff label/index, bar, cursor, playback position, filename,
+    document mode, and write target across mode changes and resize.
+  - Cover solo, mixed song, four-part vocal, vocal-only, and duet FT3 files at
+    80x24 and 120x40.
+- [ ] Add navigation suitable for long read-only scores.
+  - Support previous/next system and section/page jumps without changing the
+    logical score cursor.
+  - Show current section/page and system range in status or `:info` when the FT3
+    contains that data.
+
+### Format confidence
+
+- [ ] Expand the deterministic, stratified compatibility manifest from 263 to
+  at least 1,000 public FT3 files without repeating random selection at test
+  time or committing downloaded payloads.
+  - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section,
+    German, Italian, French, and Spanish/Neapolitan examples.
+  - Record URL, checksum, format/version, expected metadata, and staff-kind
+    counts; require zero crashes and actionable warnings or unknown records.
+- [ ] Complete at least 25 stratified manual comparisons against published PDF
+  and MIDI evidence in `docs/ft3-parity.md` (19 PDF comparisons are recorded;
+  MIDI evidence remains incomplete).
+- [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real
+  fixtures, or reject each unsupported style with a precise visible diagnostic.
+- [ ] Close the remaining notation gaps with real-file evidence: polyphonic
+  TabVoice collision precedence, partial beams, tuplets, grace/cue notes,
+  mensural proportions, harmonics, glissandi, cross-system ties/slurs,
+  fingerings, ornaments, fermatas, endings, and barline/repeat variants.
+  - Each construct needs a typed model field, importer regression, terminal
+    rendering regression, and LilyPond assertion.
+  - Unknown values must remain visible in `:info` and fail the semantic audit
+    instead of being silently discarded.
+
+### Playback and acceptance
+
+- [ ] Play all mapped voices and staffs with synchronized cursor movement.
+  - Compare MIDI note-on events, voice/channel assignment, repeats/endings,
+    tempo, and start-bar behavior for the representative viewer matrix.
+  - Keep pause/stop/restart and missing-synth diagnostics deterministic; never
+    report playback success when no player started.
+- [ ] Add the macOS-only terminal acceptance pass.
+  - Cover first run, open failure, solo/mixed/polyphonic/duet navigation,
+    score/staff switching, edit/undo, modified quit, first Save As, overwrite
+    refusal, playback failure/success, PDF failure/success, resize, and reopen.
+  - Run real curses cases at 80x24 and 120x40 and retain terminal output on
+    failure.
+- [ ] Publish a concise supported-behavior matrix and test every claimed cell.
+  - Do not claim general FT3 or Fronimo parity while a required cell is missing,
+    partial, or validated only by synthetic fixtures.
+  - Label native FT3 save, page engraving controls, templates, and direct
+    printing as unsupported.
+
+## P1.2: Gerbode lute and note typing parity
+
+Target: re-enter representative Gerbode score material without losing musical
+intent. This is score-entry parity against documented examples, not parity with
+every Fronimo editing feature.
+
+- [ ] Move tablature mutation behind a public, source-independent Petrucci
+  transaction API accepting fret, string/course, duration, onset, rest/chord
+  intent, and returning typed changes or errors. Keep curses, Oud editor state,
+  FT3, and file I/O outside that contract.
 - [ ] Complete tablature typing matrices for French and Italian styles: open and
   two-digit frets, extra bass courses, same-onset chords, rests, repeated chords,
   string movement, full-bar overflow, invalid frets, and alternate tunings.
@@ -37,76 +95,89 @@ dots beside two-digit frets, beams/slurs, ties, and grace notes.
   cross-string mutation.
 - [ ] Add deterministic operation-sequence tests that compare canonical state,
   rendered semantics, TAB save/reopen, and LilyPond/MIDI export. Keep compact
-  one-feature fixtures for failures; do not vendor MuseScore/LilyPond fixtures.
+  one-feature fixtures for failures; do not vendor MuseScore or LilyPond
+  fixtures.
+- [ ] Curate feature-balanced excerpts from the fixed 100-score Gerbode corpus
+  covering French and Italian tablature, bass courses, chords/rests,
+  polyphonic notation, lyrics, ties, tuplets, grace notes, and ornaments.
+  - Add checked-in render/export expectations and published-score comparisons.
+  - Compare saved/reopened canonical state and rendered semantics against those
+    expectations without committing external FT3 payloads.
 
-Minimal executable coverage now protects French chord/rest/bass entry across
-both key profiles, replacement with attachment preservation, atomic
-note/rest undo-redo, Italian fret 10 save/reopen, and an explicit TAB rejection
-for unrepresentable higher Italian frets. Standard-note entry remains planned
-because Oud currently provides a read-only canonical note model, not an editable
-note-input state machine.
+## P1.3: Intelligent transposition (next after FT3 and typing parity)
 
-## P1: Credible FT3 viewer
+Replace the current per-chord reassignment with a deterministic score-aware
+algorithm that preserves sounding pitch and produces playable tablature.
 
-Target: a mature read-only FT3 viewing workflow, not Fronimo editor parity. Native
-FT3 writing and direct printer control remain out of scope; PDF is the printable
-artifact.
+- [ ] Define explicit hard constraints: tuning, course count, fret range, forced
+  strings, no same-course chord collisions, bass-course rules, maximum hand
+  stretch, and representable output glyphs.
+- [ ] Define a documented cost model for playability and notation stability:
+  fret position, hand movement, course changes, open-string preference, chord
+  shape continuity, repeated fingering, voice continuity, and preservation of
+  user-forced assignments.
+- [ ] Optimize over a phrase or selected range with dynamic programming or a
+  bounded beam search; do not choose each note/chord greedily in isolation.
+  Equal-cost results must have a stable tie-break.
+- [ ] Make transposition transactional.
+  - Preview changed, impossible, and ambiguous events with concrete reasons.
+  - Apply all changes atomically, or require an explicit partial mode.
+  - Preserve attachments, durations, voices, selection, cursor, and one-step
+    undo/redo.
+- [ ] Support whole score and visual-range transposition, target tuning/course
+  changes, and standard-note respelling with an explicit key-aware policy.
+- [ ] Add adversarial and real-score tests for dense chords, repeated passages,
+  bass courses, alternate tunings, impossible ranges, deterministic output,
+  save/reopen pitch invariants, and LilyPond/MIDI agreement.
 
-### Full-score presentation
+## P1.4: Publication-quality PDF via LilyPond (next after transposition)
 
-- [ ] Add `score` and `staff` viewer modes for imported scores.
-  - At 120x40, `score` mode renders every mapped tablature, notation, and lyric staff together when they fit.
-  - At 80x24, vertical scrolling reaches every staff without dropping content; `staff` mode remains the compact focused view.
-  - Keep source staff label/index, bar, cursor, playback position, filename, document mode, and write target visible across mode changes and resize.
-  - Cover solo, mixed song, four-part vocal, vocal-only, and duet FT3 files at 80x24 and 120x40.
-- [ ] Add system/page navigation suitable for long read-only scores.
-  - Support previous/next system and section/page jumps without changing the logical score cursor.
-  - Show current section/page and system range in status or `:info` when the FT3 contains that data.
+- [ ] Add explicit LilyPond executable/version selection and retain structured,
+  actionable compiler diagnostics.
+- [ ] Add stable engraving profiles for solo lute, lute with voice, vocal-only,
+  polyphonic mixed score, duet, and multi-section works.
+  - Control paper size, margins, staff size, system spacing, bars/system,
+    page/system breaks, title/credits, instrument names, and page numbering.
+  - Preserve staff order, lyrics, repeats/endings, meter/key/clef changes,
+    bass courses, rhythms, beams, fingerings, ornaments, and section/page data.
+- [ ] Require generated `.ly` files to compile with the supported LilyPond
+  version without errors or undocumented warnings.
+- [ ] Build a rendered-PDF acceptance matrix for solo, mixed, four-part, duet,
+  long multi-page, and dense scores.
+  - Check page count, system count, staff order, clipping, collisions, orphaned
+    headings, lyric alignment, and readable scale.
+  - Record intentional differences from Gerbode/Fronimo output instead of
+    claiming pixel identity.
+- [ ] Add a macOS acceptance test with real LilyPond and retain compiler logs and
+  rendered failing pages as CI artifacts.
 
-### Format and notation confidence
+## P2: Architecture debt retirement
 
-- [ ] Run a deterministic, stratified remote compatibility audit over at least 1,000 public FT3 files.
-  - Record a checked-in manifest of URLs and expected metadata, not downloaded third-party files.
-  - Fixed expansions: 263/263 files in the four `corpus/ft3-random-*.json` manifests load without warnings or semantic-audit failures. Each selection happened once and is never repeated by tests.
-  - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section, German, Italian, French, and Spanish/Neapolitan examples.
-  - Report format/version and staff-kind counts; require zero crashes and make every warning or unknown record actionable.
-  - Manually compare at least 25 stratified files against their published PDF and MIDI, and record evidence in `docs/ft3-parity.md` (19 PDF comparisons recorded; MIDI remains incomplete).
-- [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real fixtures, or reject each unsupported style with a precise visible diagnostic.
-- [ ] Close the remaining notation gaps with real-file evidence: polyphonic TabVoice collision precedence, partial beams, tuplets, grace/cue notes, mensural proportions, harmonics, glissandi, ties/slurs across systems, fingerings, ornaments, fermatas, endings, and barline/repeat variants.
-  - Each decoded construct needs a typed model field, importer regression, terminal rendering regression, and LilyPond/PDF assertion.
-  - Unknown values must remain visible in `:info` and fail the semantic audit rather than being silently discarded.
+CI enforces complexity 7 and a 1,000-line module ceiling against the exact
+non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
+targets are in `docs/architecture-debt.md`.
 
-### Edition and export fidelity
+- [ ] Split `petrucci/view_model.py` by width planning, source projection, and
+  tuning/display records; it is the sole module still above 1,000 lines.
+- [ ] Retire the remaining 157 function-level C901 findings without raising
+  limits, broad per-file ignores, compatibility wrappers, or count-only helper
+  modules. Start with `oud.editor.undo_ops.apply_action` (53),
+  `oud.importers.ft3.load_ft3` (44), and the remaining exporter/importer locals.
+- [ ] Replace the 31 narrowly suppressed production `PLR0917` surfaces with
+  typed render, layout, playback, and export request records as their owning
+  modules are split; do not add per-file ignores or forwarding wrappers.
 
-- [ ] Build a representative PDF acceptance matrix for solo, mixed, four-part, duet, and multi-section scores.
-  - Verify staff order, lyrics, annotations, repeats/endings, section/page boundaries, system count, and absence of clipping or overlap.
-  - Document intentional LilyPond differences from Fronimo instead of claiming pixel-identical output.
-- [ ] Make `:pdf` a complete printable workflow: deterministic output path, explicit compiler command, actionable failure diagnostics, overwrite behavior, and success message containing the resulting file.
-
-### Playback and interaction
-
-- [ ] Play all mapped voices/staffs with synchronized cursor movement.
-  - Compare MIDI note-on events, voice/channel assignment, repeats/endings, tempo, and start-bar behavior for the representative viewer matrix.
-  - Keep pause/stop/restart and missing-synth diagnostics deterministic; never report playback success when no player started.
-- [ ] Add the macOS-only terminal acceptance pass.
-  - Cover first run, open failure, solo/mixed/polyphonic/duet navigation, score/staff switching, edit/undo, modified quit, first Save As, overwrite refusal, playback failure/success, PDF failure/success, resize, and reopen.
-  - Run the real curses cases at 80x24 and 120x40 and retain terminal output on failure.
-
-### Viewer-parity release gate
-
-- [ ] Publish a concise comparison matrix against Fronimo's viewer behavior and test every claimed supported cell.
-  - Do not use “Fronimo parity” while any required cell above is missing, partial, or validated only by synthetic fixtures.
-  - Label unsupported editor-only behavior explicitly: native FT3 save, page engraving controls, templates, and direct printing.
-
-## Low priority: Release operations
+## P3: Secondary release work
 
 - [ ] Confirm GitHub Actions green on macOS.
-
-## Later: Manual page
-
 - [ ] Ship a real `oud(1)` manual page that works with `man oud`.
-  - Maintain `man/oud.1.scd` as the readable source and commit generated `man/oud.1` roff output.
-  - Cover synopsis, options and subcommands, files, environment, exit status, examples, diagnostics, and see-also references.
-  - Add reproducible build and user-local installation under `~/.local/share/man/man1` without requiring sudo.
-  - Validate with `mandoc -T lint man/oud.1` and `man -l man/oud.1` when available.
-  - Keep README as the quick-start landing page and the man page as the exhaustive command reference.
+  - Maintain `man/oud.1.scd` as the readable source and commit generated
+    `man/oud.1` roff output.
+  - Cover synopsis, options/subcommands, files, environment, exit status,
+    examples, diagnostics, and see-also references.
+  - Add reproducible build and user-local installation under
+    `~/.local/share/man/man1` without requiring sudo.
+  - Validate with `mandoc -T lint man/oud.1` and `man -l man/oud.1` when
+    available.
+  - Keep README as the quick-start page and the man page as the exhaustive
+    command reference.
