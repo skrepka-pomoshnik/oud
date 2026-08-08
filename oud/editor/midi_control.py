@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import TypeVar
 
@@ -11,8 +12,10 @@ from oud.editor.playback import (
     start_playback_clock,
 )
 from oud.editor.state import EditorState
+from oud.editor.view_focus import current_view_staff
 from oud.exports.midi import build_playback_timeline, export_midi, play_midi
 from oud.playback.timeline import PlaybackCursor
+from petrucci.imported_score import project_imported_staff
 from petrucci.model import Piece
 
 T = TypeVar("T")
@@ -115,20 +118,23 @@ def _playback_export_state(
     set[tuple[int, int]],
     dict[tuple[int, int], str],
 ]:
-    total = len(state.piece.bars)
+    focused_staff = current_view_staff(state)
+    source_piece = project_imported_staff(state.piece, focused_staff.source_index)
+    total = len(source_piece.bars)
     if total == 0:
-        return state.piece, state.overrides, state.durations, state.dotted, state.ornaments
+        return source_piece, state.overrides, state.durations, state.dotted, state.ornaments
     start = max(0, min(start_bar, total - 1))
     # No explicit end means "play to the end of the piece", not a single bar.
     end = (total - 1) if end_bar is None else max(start, min(end_bar, total - 1))
     loops = max(1, loop_count)
     if start == 0 and end == total - 1 and loops == 1:
-        return state.piece, state.overrides, state.durations, state.dotted, state.ornaments
+        return source_piece, state.overrides, state.durations, state.dotted, state.ornaments
 
     source_indices = list(range(start, end + 1))
     repeated_indices = source_indices * loops
-    piece = copy.deepcopy(state.piece)
-    piece.bars = [copy.deepcopy(state.piece.bars[idx]) for idx in repeated_indices]
+    piece = copy.deepcopy(source_piece)
+    piece.bars = [copy.deepcopy(source_piece.bars[idx]) for idx in repeated_indices]
+    _slice_imported_score(piece, repeated_indices)
     index_map = {source: pos for pos, source in enumerate(source_indices)}
     span = len(source_indices)
 
@@ -137,6 +143,30 @@ def _playback_export_state(
     dotted = _remap_bar_col_set(state.dotted, index_map, loops=loops, span=span)
     ornaments = _remap_bar_col_map(state.ornaments, index_map, loops=loops, span=span)
     return piece, overrides, durations, dotted, ornaments
+
+
+def _slice_imported_score(piece: Piece, source_indices: list[int]) -> None:
+    imported = piece.imported_score
+    if imported is None:
+        return
+    staffs = []
+    for staff in imported.staffs:
+        bars_by_source = {bar.source_bar_index: bar for bar in staff.bars}
+        bars = [
+            replace(copy.deepcopy(bars_by_source[source]), source_bar_index=target)
+            for target, source in enumerate(source_indices)
+            if source in bars_by_source
+        ]
+        staffs.append(replace(copy.deepcopy(staff), bars=bars))
+    records_by_source: dict[int, list] = {}
+    for record in imported.source_records:
+        records_by_source.setdefault(record.source_bar_index, []).append(record)
+    records = [
+        replace(copy.deepcopy(record), source_bar_index=target)
+        for target, source in enumerate(source_indices)
+        for record in records_by_source.get(source, ())
+    ]
+    piece.imported_score = replace(copy.deepcopy(imported), staffs=staffs, source_records=records)
 
 
 def _remap_bar_string_col_map(

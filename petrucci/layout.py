@@ -43,6 +43,7 @@ class ElementRole(StrEnum):
     ORNAMENT = "ornament"
     DYNAMIC = "dynamic"
     PITCH_LABEL = "pitch-label"
+    PITCH_CUE = "pitch-cue"
     LYRIC = "lyric"
     LYRIC_LINE = "lyric-line"
     LYRIC_HYPHEN = "lyric-hyphen"
@@ -190,6 +191,7 @@ class LayoutViewport:
     height: int = 24
     system_offset: int = 0
     x_offset: int = 0
+    y_offset: int = 0
 
     def __post_init__(self) -> None:
         if self.width <= 0 or self.height <= 0:
@@ -198,6 +200,8 @@ class LayoutViewport:
             _fail("layout system offset must be non-negative")
         if self.x_offset < 0:
             _fail("layout horizontal offset must be non-negative")
+        if self.y_offset < 0:
+            _fail("layout vertical offset must be non-negative")
 
 
 @dataclass(frozen=True, slots=True)

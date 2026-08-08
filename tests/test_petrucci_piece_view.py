@@ -73,29 +73,73 @@ def test_vocal_only_typeset_piece_uses_canonical_score_frame() -> None:
 
     assert "Imported view" in result.text
     assert "sing" in result.text
-    assert " G " in result.text
-    assert result.cursor_display_maps == {0: [19]}
+    assert "G" in result.text
+    assert result.cursor_display_maps == {0: [17]}
 
 
 @pytest.mark.parametrize(("width", "height"), ((80, 24), (120, 40)))
-def test_each_polyphonic_staff_is_reachable_in_compact_focus(width: int, height: int) -> None:
+def test_vocal_only_view_keeps_all_staffs_while_focus_selects_active_voice(width: int, height: int) -> None:
     piece = _imported_piece(tablature=False, two_voices=True)
-    for staff_index, expected_label in ((0, "soprano"), (2, "bass")):
-        view = typeset_piece_score_view(
-            piece,
-            width=width,
-            height=height,
-            bar_offset=0,
-            cursor=(0, 0),
-            playback=None,
-            settings=SETTINGS,
-            focused_imported_staff_index=staff_index,
-        )
-        assert view is not None
-        assert len(view.result.layout.systems) == 1
-        assert view.result.layout.event_ids == (f"piece:staff:{staff_index}:bar:0:event:0:0",)
-        assert expected_label in view.result.text
-        assert view.result.cells_for(f"piece:staff:{staff_index}:bar:0:event:0:0")
+    view = typeset_piece_score_view(
+        piece,
+        width=width,
+        height=height,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=(0, 0),
+        settings=SETTINGS,
+        focused_imported_staff_index=2,
+    )
+
+    assert view is not None
+    assert len(view.result.layout.systems) == 1
+    assert view.result.layout.event_ids == (
+        "piece:staff:0:bar:0:event:0:0",
+        "piece:staff:2:bar:0:event:0:0",
+    )
+    assert "bass" in view.result.text
+    soprano_cells = view.result.cells_for("piece:staff:0:bar:0:event:0:0")
+    bass_cells = view.result.cells_for("piece:staff:2:bar:0:event:0:0")
+    assert bass_cells
+    if height >= 40:
+        assert "soprano" in view.result.text
+        assert soprano_cells
+        assert all(view.result.frame.attrs[row][column] == 0 for row, column in soprano_cells)
+    else:
+        assert not soprano_cells
+    assert any(view.result.frame.attrs[row][column] != 0 for row, column in bass_cells)
+
+
+def test_vocal_score_uses_compact_rows_and_clips_only_at_terminal_bottom() -> None:
+    staffs = []
+    for label in ("soprano", "alto", "tenor", "bass"):
+        staffs.extend((_note_staff(label, 0, "c4"), _lyric_staff(label, 0, label)))
+    piece = Piece(title="Full score", bars=[Bar()], imported_score=ImportedScore("ft3", staffs))
+
+    view = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=18,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=None,
+        settings=SETTINGS,
+    )
+
+    assert view is not None
+    system = view.result.layout.systems[0]
+    assert system.rect.height > 18
+    assert len(view.result.lines) == 18
+    assert all(
+        all(second - first == 2 for first, second in zip(rows.line_rows, rows.line_rows[1:], strict=False))
+        for rows in system.staff_rows
+    )
+    assert all(
+        second.top - first.bottom == 1 for first, second in zip(system.staff_rows, system.staff_rows[1:], strict=False)
+    )
+    assert all(rows.measure_number_row is None for rows in system.staff_rows)
+    assert view.result.cells_for("piece:staff:0:bar:0:event:0:0")
+    assert not view.result.cells_for("piece:staff:6:bar:0:event:0:0")
 
 
 def test_mixed_default_remains_tablature_but_note_and_lyric_focus_are_canonical() -> None:
@@ -174,5 +218,24 @@ def test_playback_selects_later_system_and_current_style_without_reflow() -> Non
     assert idle is not None and playing is not None
     active_id = "piece:staff:0:bar:2:event:0:0"
     assert playing.result.cells_for(active_id)
-    assert playing.result.lines == idle.result.lines
+    assert tuple(line.replace("^", " ") for line in playing.result.lines) == idle.result.lines
     assert playing.result.frame.attrs != idle.result.frame.attrs
+    assert "^" in playing.result.text
+
+
+def test_short_view_scrolls_to_focused_voice_without_partial_neighbor() -> None:
+    piece = _imported_piece(tablature=False, two_voices=True)
+    view = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=12,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=None,
+        settings=SETTINGS,
+        focused_imported_staff_index=2,
+    )
+
+    assert view is not None
+    assert view.result.cells_for("piece:staff:2:bar:0:event:0:0")
+    assert not view.result.cells_for("piece:staff:0:bar:0:event:0:0")

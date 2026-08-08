@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from fractions import Fraction
 from typing import NoReturn, TypeAlias
@@ -67,10 +67,13 @@ class NotatedDuration:
     tuplet_normal: int | None = None
 
     def __post_init__(self) -> None:
-        if self.denominator not in {1, 2, 4, 8, 16, 32, 64}:
-            _reject("invalid-duration", "duration denominator must be one of 1, 2, 4, 8, 16, 32, or 64")
-        if not 0 <= self.dots <= 2:
-            _reject("invalid-duration", "duration dots must be between 0 and 2")
+        if self.denominator not in {1, 2, 4, 8, 16, 32, 64, 128}:
+            _reject(
+                "invalid-duration",
+                "duration denominator must be one of 1, 2, 4, 8, 16, 32, 64, or 128",
+            )
+        if not 0 <= self.dots <= 4:
+            _reject("invalid-duration", "duration dots must be between 0 and 4")
         values = (self.tuplet_actual, self.tuplet_normal)
         if (values[0] is None) != (values[1] is None):
             _reject("invalid-duration", "tuplet actual and normal values must be provided together")
@@ -90,6 +93,20 @@ class NotatedDuration:
         if self.tuplet_actual is None or self.tuplet_normal is None:
             return None
         return TupletRatio(self.tuplet_actual, self.tuplet_normal)
+
+    def halved(self) -> NotatedDuration:
+        """Return the next shorter base duration, preserving dots and tuplet ratio."""
+
+        if self.denominator == 128:
+            _reject("duration-boundary", "128th duration cannot be halved")
+        return replace(self, denominator=self.denominator * 2)
+
+    def doubled(self) -> NotatedDuration:
+        """Return the next longer base duration, preserving dots and tuplet ratio."""
+
+        if self.denominator == 1:
+            _reject("duration-boundary", "whole duration cannot be doubled")
+        return replace(self, denominator=self.denominator // 2)
 
 
 @dataclass(frozen=True, slots=True)

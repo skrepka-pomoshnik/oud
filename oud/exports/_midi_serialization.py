@@ -33,7 +33,10 @@ from oud.exports._midi_projection import (
     _shift_midi_events,
     _show_ornaments,
 )
+from petrucci.imported_score import project_imported_staff
 from petrucci.model import Piece
+
+_VOCAL_CHANNELS = tuple(channel for channel in range(1, 16) if channel != 9)
 
 
 def _repeated_midi_note_events(
@@ -65,7 +68,7 @@ def _write_midi_file(
     events: list[tuple[int, bytes]] = []
     events.append((0, _meta_tempo(bpm)))
     events.append((0, _program_change(0, program)))
-    events.append((0, _program_change(1, vocal_program)))
+    events.extend((0, _program_change(channel, vocal_program)) for channel in _VOCAL_CHANNELS)
     events.extend(note_events)
     track = _write_track(events)
     header = b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big")
@@ -123,6 +126,7 @@ def _single_score_midi_note_events(
     gate: float,
     pitches: list[int],
     ornaments: dict[tuple[int, int], str] | None,
+    vocal_channel: int = 1,
 ) -> list[tuple[int, bytes]]:
     note_events: list[tuple[int, bytes]] = []
     show_ornaments = _show_ornaments(settings)
@@ -188,6 +192,49 @@ def _single_score_midi_note_events(
             base_time=current_time,
             tuning_pitches=pitches,
             settings=settings,
+            channel=vocal_channel,
         )
         current_time += max_end
     return _repeated_midi_note_events(note_events, piece=piece, settings=settings)
+
+
+def _polyphonic_score_midi_note_events(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    dotted: set[tuple[int, int]] | None,
+    settings: dict[str, str],
+    gate: float,
+    pitches: list[int],
+    ornaments: dict[tuple[int, int], str] | None,
+) -> list[tuple[int, bytes]]:
+    imported = piece.imported_score
+    if imported is None:
+        return []
+    note_indices = [index for index, staff in enumerate(imported.staffs) if staff.kind == "note"]
+    events: list[tuple[int, bytes]] = []
+    for voice_index, staff_index in enumerate(note_indices):
+        projected = project_imported_staff(piece, staff_index)
+        events.extend(
+            _single_score_midi_note_events(
+                projected,
+                overrides=overrides,
+                durations=durations,
+                bar_width=bar_width,
+                style=style,
+                default_duration=default_duration,
+                start_bar=start_bar,
+                dotted=dotted,
+                settings=settings,
+                gate=gate,
+                pitches=pitches,
+                ornaments=ornaments,
+                vocal_channel=_VOCAL_CHANNELS[voice_index % len(_VOCAL_CHANNELS)],
+            ),
+        )
+    return events

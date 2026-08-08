@@ -304,8 +304,18 @@ Typed source provenance (`note`, `note-lyrics`, `annotation-group`, and
 `score-terminator`) is recorded once in `source_records`, separately from the
 musical bars. Future unclassified records use `unknown` and fail the FT3 audit.
 
-The read-only viewer cycles actual imported voices and LilyPond exports every
-mapped voice. The bundled corpus produces no unknown staffs or import warnings.
+The read-only vocal-only viewer renders every mapped note staff in one compact
+canonical score. The current `j`/`k` focus selects the voice used for cursor and
+playback tracking without hiding the other voices. If the complete system is
+taller than the terminal, rendering clips cleanly at the lower content border.
+Compact score view omits repeated per-staff measure numbers and stems by default;
+`:set showdur=on` restores stems when rhythmic detail is preferred over density.
+Five-line spacing remains pitch-correct. Short terminals scroll within a system
+to keep the focused voice complete and suppress partial neighboring staffs.
+Playback marks the active note with `^`; vocal-only polyphony sends every mapped
+voice to a separate MIDI channel while focus controls the tracked cursor.
+Mixed scores retain focused tab/note/lyric views. LilyPond exports every mapped
+voice. The bundled corpus produces no unknown staffs or import warnings.
 
 ## 13) Rendering Notes
 
@@ -427,3 +437,17 @@ owned by the consuming repository.
 
 The former `oud.core.*` model/render and `oud.ui.*` renderer aliases were removed.
 `petrucci` is the only public typesetting path.
+
+## Timed flow scores
+
+`FlowEvent` accepts either `midi_pitches` for sounding-pitch input or `written_pitches` when enharmonic spelling must be preserved. `FlowScoreOptions` can set the initial clef and key signature. Automatic beaming is disabled by default for compatibility; select `FlowBeamPolicy.METER` to group beamable notes by simple or compound meter beats.
+
+Use `adapt_flow_events` for one fixed meter whose event times may cross inferred measure boundaries. Use `adapt_flow_measures` with `FlowMeasure` when boundaries are known, including pickups, short or irregular measures, meter changes, key changes, and clef changes. Measure-local event onset and duration values remain in units of that measure's active meter beat. An event crossing an explicit boundary is rejected rather than guessed or silently split.
+
+## Transient pitch cues
+
+`PitchCue` attaches a written pitch to an existing event ID or to an exact staff, measure, and event onset. Pass cues through `ScoreTypesetOptions.pitch_cues`. For a cached layout, call `typeset_layout(layout, score=score, options=...)`; changing cues repaints semantic cells with `ElementRole.PITCH_CUE` and does not run layout again or alter spacing. Cues outside the visible viewport are clipped.
+
+## Upstream-derived quality coverage
+
+Petrucci's typed note and tablature behavior is checked against translated invariants from the LilyPond 2.24.4 and MuseScore 4.6.0 software test suites. See `docs/upstream-notation-quality.md` for pinned sources, covered contracts, and explicit non-claims.

@@ -88,7 +88,10 @@ def _candidate_frets_for_pitch(
             continue
         base_pitch = tuning_pitches[string - 1]
         fret = pitch - base_pitch
-        if fret < policy.minimum_fret:
+        if fret < 0:
+            continue
+        open_string_is_exempt = fret == 0 and not policy.restrain_open_strings
+        if not open_string_is_exempt and fret < policy.minimum_fret:
             continue
         candidates.append(AssignedTabNote(pitch=pitch, string=string, fret=fret))
     return candidates

@@ -681,6 +681,7 @@ def test_load_ft3_builds_complete_logical_bars_for_every_polyphonic_staff() -> N
     note_staffs = [staff for staff in piece.imported_score.staffs if staff.kind == "note"]
     assert [staff.label for staff in note_staffs] == ["soprano", "alto", "tenor", "bass"]
     assert all(len(staff.bars) == len(piece.bars) == 24 for staff in note_staffs)
+    assert all(staff.kind != "lyrics" for staff in piece.imported_score.staffs)
 
 
 def test_load_ft3_warns_when_mixed_tab_retains_unknown_staff(tmp_path) -> None:

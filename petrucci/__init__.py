@@ -6,11 +6,15 @@ from typing import TYPE_CHECKING, Any
 
 from petrucci.flow import (
     FlowAdapterError,
+    FlowBeamPolicy,
     FlowEvent,
     FlowEventMap,
+    FlowMeasure,
     FlowScore,
     FlowScoreOptions,
+    FlowSegmentMap,
     adapt_flow_events,
+    adapt_flow_measures,
 )
 from petrucci.layout import (
     ElementKey,
@@ -96,6 +100,7 @@ from petrucci.score import (
     duration_notation,
     pitch_from_midi,
 )
+from petrucci.score_cues import PitchCue, PitchCueError, paint_pitch_cues
 from petrucci.tab_input import CellKey, editor_event_columns, editor_fret_at
 
 if TYPE_CHECKING:
@@ -124,10 +129,13 @@ __all__ = [
     "EventKind",
     "EventLocation",
     "FlowAdapterError",
+    "FlowBeamPolicy",
     "FlowEvent",
     "FlowEventMap",
+    "FlowMeasure",
     "FlowScore",
     "FlowScoreOptions",
+    "FlowSegmentMap",
     "GlyphMode",
     "ImportedBarContent",
     "ImportedScore",
@@ -164,6 +172,8 @@ __all__ = [
     "OrnamentKind",
     "Piece",
     "PieceAdapterError",
+    "PitchCue",
+    "PitchCueError",
     "PitchStep",
     "Rect",
     "RemoveLyric",
@@ -187,6 +197,7 @@ __all__ = [
     "TypesetResult",
     "WrittenPitch",
     "adapt_flow_events",
+    "adapt_flow_measures",
     "apply_note_input",
     "clear_layout_cache",
     "duration_notation",
@@ -195,6 +206,7 @@ __all__ = [
     "layout_collisions",
     "layout_score",
     "notation_score_from_piece",
+    "paint_pitch_cues",
     "paint_score",
     "pitch_from_midi",
     "resolve_input_pitch",
@@ -248,10 +260,11 @@ def typeset_layout(
     layout: ScoreLayout,
     *,
     options: ScoreTypesetOptions | None = None,
+    score: NotationScore | None = None,
 ) -> ScoreTypesetResult:
     from petrucci.score_typeset import typeset_layout as _typeset_layout  # noqa: PLC0415
 
-    return _typeset_layout(layout, options=options)
+    return _typeset_layout(layout, options=options, score=score)
 
 
 def paint_score(

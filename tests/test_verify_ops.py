@@ -56,6 +56,7 @@ def test_verify_bar_assignment_constraints_warning() -> None:
     state.settings["time"] = "4/4"
     state.settings["tuning"] = "g2c3f3a3d4g4"
     state.settings["minimumfret"] = "1"
+    state.settings["restrainopenstrings"] = "on"
     state.piece.bars[0].chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]) for _ in range(4)]
     msg = verify_bar(state, 0)
     assert msg.startswith("Assignment constraints:")

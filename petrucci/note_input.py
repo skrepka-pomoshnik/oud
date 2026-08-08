@@ -363,8 +363,8 @@ def _add_span_between(
 
 
 def _events_share_tie_pitch(start: NotationEvent, end: NotationEvent) -> bool:
-    start_spellings = {(pitch.step, pitch.octave, pitch.alter) for pitch in start.pitches}
-    return any((pitch.step, pitch.octave, pitch.alter) in start_spellings for pitch in end.pitches)
+    sounding_pitches = {pitch.midi for pitch in start.pitches}
+    return any(pitch.midi in sounding_pitches for pitch in end.pitches)
 
 
 def _validate_tie(start: EventLocation, end: EventLocation) -> None:
@@ -374,16 +374,13 @@ def _validate_tie(start: EventLocation, end: EventLocation) -> None:
     if not prior_in_voice or prior_in_voice[-1].id != start.event.id:
         raise NoteInputError("invalid-tie", "tie endpoints must be consecutive events in their voice")
     if not _events_share_tie_pitch(start.event, end.event):
-        raise NoteInputError("invalid-tie", "tie endpoints must share a written pitch")
+        raise NoteInputError("invalid-tie", "tie endpoints must share a sounding pitch")
 
 
 def _tie_entered_pitch(draft: ScoreDraft, event_id: str, pitch: WrittenPitch) -> NoteInputChange:
     end = draft.event(event_id)
-    spelling = (pitch.step, pitch.octave, pitch.alter)
     previous = [event for event in previous_events(end) if event.voice == end.event.voice]
-    if not previous or not any(
-        (candidate.step, candidate.octave, candidate.alter) == spelling for candidate in previous[-1].pitches
-    ):
+    if not previous or not any(candidate.midi == pitch.midi for candidate in previous[-1].pitches):
         raise NoteInputError(
             "invalid-tie",
             f"the preceding event in voice {end.event.voice} does not contain {pitch!r}",

@@ -82,6 +82,7 @@ class _GlyphInventory:
     sixteenth_rest: str
     thirty_second_rest: str
     sixty_fourth_rest: str
+    one_hundred_twenty_eighth_rest: str
     fermata: str
     ornament_plus: str
     clip: str
@@ -125,6 +126,7 @@ _PRETTY = _GlyphInventory(
     sixteenth_rest="𝄿",
     thirty_second_rest="𝅀",
     sixty_fourth_rest="𝅁",
+    one_hundred_twenty_eighth_rest="𝅂",
     fermata="𝄐",
     ornament_plus="+",
     clip="»",
@@ -168,6 +170,7 @@ _SAFE = _GlyphInventory(
     sixteenth_rest="s",
     thirty_second_rest="t",
     sixty_fourth_rest="x",
+    one_hundred_twenty_eighth_rest="z",
     fermata="^",
     ornament_plus="+",
     clip=">",
@@ -245,7 +248,7 @@ def paint_score(
     )
     if not layout.systems:
         return canvas.snapshot()
-    scroll_y = layout.systems[active_viewport.system_offset].rect.y
+    scroll_y = layout.systems[active_viewport.system_offset].rect.y + active_viewport.y_offset
     glyphs = _PRETTY if glyph_mode is GlyphMode.PRETTY else _SAFE
     for system in layout.systems[active_viewport.system_offset :]:
         if system.rect.y - scroll_y >= active_viewport.height:
@@ -459,7 +462,9 @@ def _rest_text(value: str, glyphs: _GlyphInventory) -> str:
         8: glyphs.eighth_rest,
         16: glyphs.sixteenth_rest,
         32: glyphs.thirty_second_rest,
-    }.get(denominator, glyphs.sixty_fourth_rest)
+        64: glyphs.sixty_fourth_rest,
+        128: glyphs.one_hundred_twenty_eighth_rest,
+    }[denominator]
 
 
 def _accidental_text(value: str, glyphs: _GlyphInventory) -> str:

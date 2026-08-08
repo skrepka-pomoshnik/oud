@@ -15,7 +15,7 @@ def test_assign_chord_pitches_basic_unique_strings() -> None:
 
 
 def test_assign_chord_pitches_respects_minimum_fret() -> None:
-    policy = AssignmentPolicy(minimum_fret=1)
+    policy = AssignmentPolicy(minimum_fret=1, restrain_open_strings=True)
     result = assign_chord_pitches([67], LUTE_6, policy=policy)
     assert result.ok is True
     assert result.notes[0].string == 2
@@ -52,12 +52,13 @@ def test_assign_chord_pitches_forced_string_impossible_diagnostic() -> None:
 
 def test_assign_chord_pitches_max_stretch_constraint() -> None:
     # Without stretch limit this fits.
-    ok = assign_chord_pitches([67, 64, 60], LUTE_6, policy=AssignmentPolicy(minimum_fret=1))
+    policy = AssignmentPolicy(minimum_fret=1, restrain_open_strings=True)
+    ok = assign_chord_pitches([67, 64, 60], LUTE_6, policy=policy)
     assert ok.ok is True
     constrained = assign_chord_pitches(
         [67, 64, 60],
         LUTE_6,
-        policy=AssignmentPolicy(minimum_fret=1, max_stretch=1),
+        policy=AssignmentPolicy(minimum_fret=1, max_stretch=1, restrain_open_strings=True),
     )
     assert constrained.ok is False
     assert any(d.code == "max_stretch_exceeded" for d in constrained.diagnostics)

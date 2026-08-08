@@ -14,6 +14,7 @@ from petrucci.layout import (
     layout_score,
 )
 from petrucci.score import NotationScore
+from petrucci.score_cues import PitchCue, paint_pitch_cues
 from petrucci.terminal import GlyphMode, SemanticFrame, paint_score
 
 
@@ -23,10 +24,12 @@ class ScoreTypesetOptions:
     height: int = 24
     system_offset: int = 0
     x_offset: int = 0
+    y_offset: int = 0
     layout_width: int | None = None
     glyph_mode: GlyphMode = GlyphMode.PRETTY
     metrics: LayoutMetrics = field(default_factory=LayoutMetrics)
     policy: NotationLayoutPolicy = field(default_factory=NotationLayoutPolicy)
+    pitch_cues: tuple[PitchCue, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.glyph_mode, GlyphMode):
@@ -35,6 +38,8 @@ class ScoreTypesetOptions:
             _type_fail("score typeset metrics must be LayoutMetrics")
         if not isinstance(self.policy, NotationLayoutPolicy):
             _type_fail("score typeset policy must be NotationLayoutPolicy")
+        if any(not isinstance(cue, PitchCue) for cue in self.pitch_cues):
+            _type_fail("score typeset pitch cues must contain PitchCue values")
         viewport = self.viewport
         layout_width = self.resolved_layout_width
         if layout_width < viewport.width:
@@ -53,6 +58,7 @@ class ScoreTypesetOptions:
             height=self.height,
             system_offset=self.system_offset,
             x_offset=self.x_offset,
+            y_offset=self.y_offset,
         )
 
     @property
@@ -97,13 +103,14 @@ def typeset_score(
         metrics=active.metrics,
         policy=active.policy,
     )
-    return typeset_layout(layout, options=active)
+    return typeset_layout(layout, options=active, score=score)
 
 
 def typeset_layout(
     layout: ScoreLayout,
     *,
     options: ScoreTypesetOptions | None = None,
+    score: NotationScore | None = None,
 ) -> ScoreTypesetResult:
     """Paint an existing layout, allowing a host to select a system without relayout."""
 
@@ -119,6 +126,17 @@ def typeset_layout(
         viewport=active.viewport,
         glyph_mode=active.glyph_mode,
     )
+    if active.pitch_cues:
+        if score is None:
+            _type_fail("score is required when painting pitch cues on an existing layout")
+        semantic_frame = paint_pitch_cues(
+            semantic_frame,
+            score=score,
+            layout=layout,
+            cues=active.pitch_cues,
+            viewport=active.viewport,
+            glyph_mode=active.glyph_mode,
+        )
     return ScoreTypesetResult(layout=layout, semantic_frame=semantic_frame)
 
 

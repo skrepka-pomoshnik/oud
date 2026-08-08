@@ -14,6 +14,7 @@ from oud.exports._midi_projection import (
 )
 from oud.exports._midi_serialization import (
     _duet_midi_note_events,
+    _polyphonic_score_midi_note_events,
     _single_score_midi_note_events,
     _write_midi_file,
 )
@@ -66,6 +67,25 @@ def export_midi(  # noqa: PLR0917 - public compatibility; replace options with a
             pitches=pitches,
             ornaments=ornaments,
             max_repeat_hops=max_repeat_hops,
+        )
+    elif (
+        piece.imported_score is not None
+        and sum(staff.kind == "note" for staff in piece.imported_score.staffs) > 1
+        and not any(bar.chords or bar.notes for bar in piece.bars)
+    ):
+        note_events = _polyphonic_score_midi_note_events(
+            piece,
+            overrides=overrides,
+            durations=durations,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
+            start_bar=start_bar,
+            dotted=dotted,
+            settings=settings,
+            gate=gate,
+            pitches=pitches,
+            ornaments=ornaments,
         )
     else:
         note_events = _single_score_midi_note_events(

@@ -817,7 +817,14 @@ def _build_imported_score(
             source_bar=source_bar,
             decoded=decoded,
         )
-    ordered = [*note_staffs.values(), *lyric_staffs.values()]
+    imported_lyrics = list(lyric_staffs.values())
+    if (
+        len(note_staffs) > 1
+        and imported_lyrics
+        and all(_is_control_fragment_lyric_staff(staff) for staff in imported_lyrics)
+    ):
+        imported_lyrics = []
+    ordered = [*note_staffs.values(), *imported_lyrics]
     ordered.extend((comment_staff, barline_staff, layout_staff, unknown_staff))
     staffs = [staff for staff in ordered if staff.bars]
     if not staffs:
@@ -833,3 +840,10 @@ def _build_imported_score(
         for imported in imported_chunks
     ]
     return ImportedScore(source_format="ft3", staffs=staffs, source_records=source_records)
+
+
+def _is_control_fragment_lyric_staff(staff: ImportedStaff) -> bool:
+    rows = [row for bar in staff.bars for row in bar.lyric_event_rows if row]
+    if len(rows) < 4:
+        return False
+    return all(len(row) == 1 and 0 < len(row[0].text.strip()) <= 2 for row in rows)

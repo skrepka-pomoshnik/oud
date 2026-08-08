@@ -492,7 +492,7 @@ def test_invalid_tie_and_cross_voice_replacement_fail_explicitly() -> None:
         _note("second", Fraction(1, 4), WrittenPitch(PitchStep.D, 4)),
     )
 
-    with pytest.raises(NoteInputError, match="must share a written pitch") as tie_error:
+    with pytest.raises(NoteInputError, match="must share a sounding pitch") as tie_error:
         apply_note_input(score, NoteInputTransaction((AddTie("first", "second"),)))
     assert tie_error.value.code == "invalid-tie"
 

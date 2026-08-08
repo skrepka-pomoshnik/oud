@@ -33,7 +33,17 @@ from oud.exports._midi_projection import (
     build_playback_timeline,
 )
 from oud.exports.midi import export_midi
-from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.model import (
+    Bar,
+    Chord,
+    ImportedBarContent,
+    ImportedScore,
+    ImportedStaff,
+    LyricEvent,
+    MelodyEvent,
+    Note,
+    Piece,
+)
 from petrucci.render_utils import chord_positions as render_chord_positions
 
 
@@ -337,6 +347,27 @@ def test_vocal_only_ft3_events_drive_timeline_and_midi(tmp_path) -> None:
     path = tmp_path / "vocal_only.mid"
     export_midi(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
     assert b"\x91" in _track_data(path)
+
+
+def test_polyphonic_imported_score_exports_every_voice_on_its_own_channel(tmp_path) -> None:
+    staffs = [
+        ImportedStaff(
+            kind="note",
+            label=label,
+            bars=[ImportedBarContent(0, melody_events=[MelodyEvent(pitch, 0, note_type=4)])],
+        )
+        for label, pitch in (("soprano", "c4"), ("alto", "e4"), ("tenor", "g3"))
+    ]
+    piece = Piece(
+        bars=[Bar(melody_events=[MelodyEvent("c4", 0, note_type=4)])],
+        imported_score=ImportedScore("ft3", staffs),
+    )
+    path = tmp_path / "polyphonic.mid"
+
+    export_midi(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
+
+    track = _track_data(path)
+    assert all(status in track for status in (b"\x91", b"\x92", b"\x93"))
 
 
 def test_build_playback_timeline_uses_chord_index_for_marker_col() -> None:

@@ -2,6 +2,16 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-08-08
+- Made vocal-only FT3 viewing use a compact full-score layout: all mapped voices
+  remain visible up to the terminal's lower border, with deterministic clipping
+  below it. Voice focus now selects canonical cursor/playback highlighting and
+  MIDI projection without replacing the displayed score. Compact mode removes
+  repeated measure rows, tab-driven stems, blank staff gaps, and polyphonic FT3
+  control fragments misread as singleton lyrics. Correct line/space pitch
+  geometry, within-system focus scrolling, explicit playback markers, and
+  separate-channel MIDI for every imported vocal staff complete the viewer path.
+
 ## 2026-08-04
 - Added Petrucci's immutable, source-independent standard-note transaction API:
   nearest-octave or explicit pitches, accidentals, persistent dotted/tuplet
@@ -289,3 +299,13 @@ Technical change log. Keep short, append newest on top.
 - Moved verify logic into `editor/verify_ops.py`.
 - Added `editor/load_ops.py` for file loading.
 - Added `tui/viewport.py` and `tui/controller.py` for TUI wiring.
+# Petrucci timed-flow and pitch-cue coverage
+
+- Added opt-in simple/compound-meter beam grouping, explicit measures with pickups and meter/state changes, initial key/clef state, and lossless `WrittenPitch` flow input.
+- Added semantic event/onset pitch cues that repaint cached layouts without changing score geometry.
+- Added regression coverage for compatibility defaults, explicit-boundary failures, spelling preservation, meter beaming, and cue identity/reflow behavior.
+# Upstream-derived notation quality matrix
+
+- Translated applicable LilyPond 2.24.4 and MuseScore 4.6.0 software-test invariants into deterministic public-API tests without copying upstream fixtures.
+- Extended typed duration support through 128th notes and four dots, added reversible half/double duration operations, and accepted enharmonic ties while preserving spelling.
+- Corrected tablature minimum-fret handling for open strings and added generated tuning/string/fret round-trip coverage, extended-bass, duplicate-pitch, and explicit-failure cases.

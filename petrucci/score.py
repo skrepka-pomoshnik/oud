@@ -357,15 +357,15 @@ def iter_score_events(score: NotationScore) -> Iterator[NotationEvent]:
 
 
 def duration_notation(duration: Fraction) -> tuple[int, int] | None:
-    """Return (denominator, dots) for whole through 64th durations."""
+    """Return (denominator, dots) for whole through 128th durations."""
 
     if not isinstance(duration, Fraction) or duration <= 0:
         return None
-    for denominator in (1, 2, 4, 8, 16, 32, 64):
+    for denominator in (1, 2, 4, 8, 16, 32, 64, 128):
         base = Fraction(1, denominator)
         value = base
         addition = base
-        for dots in range(3):
+        for dots in range(5):
             if value == duration:
                 return denominator, dots
             addition /= 2

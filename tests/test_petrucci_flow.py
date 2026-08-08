@@ -6,20 +6,100 @@ from typing import cast
 import pytest
 
 from petrucci import (
+    BeamKind,
+    Clef,
     ElementRole,
     FlowAdapterError,
+    FlowBeamPolicy,
     FlowEvent,
+    FlowMeasure,
     FlowScoreOptions,
     GlyphMode,
+    KeySignature,
     LayoutViewport,
+    PitchStep,
     ScoreTypesetOptions,
     Syllabic,
     TimeSignature,
+    WrittenPitch,
     adapt_flow_events,
+    adapt_flow_measures,
     layout_collisions,
     layout_score,
     typeset_layout,
 )
+
+
+def test_flow_adapter_preserves_written_pitch_and_score_state() -> None:
+    pitch = WrittenPitch(PitchStep.F, 4, alter=1)
+    flow = adapt_flow_events(
+        (FlowEvent("spelled", Fraction(0), Fraction(1), written_pitches=(pitch,)),),
+        options=FlowScoreOptions(key_signature=KeySignature(2), clef=Clef.BASS),
+    )
+
+    staff = flow.score.staffs[0]
+    assert staff.clef is Clef.BASS
+    assert staff.measures[0].key_signature == KeySignature(2)
+    assert staff.measures[0].events[0].pitches == (pitch,)
+
+
+def test_flow_adapter_applies_compound_meter_beams_only_when_requested() -> None:
+    events = tuple(FlowEvent(f"note-{index}", Fraction(index), Fraction(1), (60 + index,)) for index in range(3))
+
+    plain = adapt_flow_events(events, options=FlowScoreOptions(time_signature=TimeSignature(6, 8)))
+    beamed = adapt_flow_events(
+        events,
+        options=FlowScoreOptions(time_signature=TimeSignature(6, 8), beam_policy=FlowBeamPolicy.METER),
+    )
+
+    assert [event.beam for event in plain.score.staffs[0].measures[0].events] == [BeamKind.NONE] * 3
+    assert [event.beam for event in beamed.score.staffs[0].measures[0].events] == [
+        BeamKind.START,
+        BeamKind.CONTINUE,
+        BeamKind.END,
+    ]
+
+
+def test_explicit_flow_measures_support_pickup_and_meter_change() -> None:
+    flow = adapt_flow_measures(
+        (
+            FlowMeasure("pickup", (FlowEvent("upbeat", Fraction(0), Fraction(1), (60,)),), beat_capacity=Fraction(1)),
+            FlowMeasure(
+                "six-eight",
+                (FlowEvent("compound", Fraction(0), Fraction(3), (62,)),),
+                time_signature=TimeSignature(6, 8),
+            ),
+        )
+    )
+
+    first, second = flow.score.staffs[0].measures
+    assert first.irregular
+    assert second.time_signature == TimeSignature(6, 8)
+    assert flow.measure_capacity is None
+    assert flow.measure_capacities == (Fraction(1), Fraction(6))
+    assert flow.active_notation_event_ids(Fraction(1)) == ("compound",)
+
+
+def test_explicit_flow_measure_rejects_boundary_crossing() -> None:
+    with pytest.raises(FlowAdapterError, match="crosses explicit measure"):
+        adapt_flow_measures(
+            (
+                FlowMeasure(
+                    "pickup", (FlowEvent("too-long", Fraction(0), Fraction(2), (60,)),), beat_capacity=Fraction(1)
+                ),
+            )
+        )
+
+
+def test_flow_event_rejects_mixed_pitch_representations() -> None:
+    with pytest.raises(FlowAdapterError, match="both MIDI and written pitches"):
+        FlowEvent(
+            "mixed",
+            Fraction(0),
+            Fraction(1),
+            (60,),
+            written_pitches=(WrittenPitch(PitchStep.C, 4),),
+        )
 
 
 def test_flow_adapter_splits_measure_crossing_note_and_adds_tie() -> None:

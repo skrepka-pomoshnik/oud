@@ -576,6 +576,7 @@ def _append_vocal_messages(  # noqa: C901
     base_time: int,
     tuning_pitches: list[int],
     settings: dict[str, str],
+    channel: int = 1,
 ) -> None:
     has_explicit_melody = bool(
         (getattr(bar, "melody_events", None) or []) or (getattr(bar, "melody_grid", None) or "").strip(),
@@ -604,7 +605,7 @@ def _append_vocal_messages(  # noqa: C901
             note_len = max(note_len, int(duration * 1.5))
         _append_note_messages(
             events,
-            channel=1,
+            channel=channel,
             start_tick=base_time + start,
             note_len=note_len,
             pitch=event.pitch,
