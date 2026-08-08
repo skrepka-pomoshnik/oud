@@ -15,7 +15,7 @@ from petrucci.layout import (
 )
 from petrucci.score import NotationScore
 from petrucci.score_cues import PitchCue, paint_pitch_cues
-from petrucci.terminal import GlyphMode, SemanticFrame, paint_score
+from petrucci.terminal import GlyphMode, SemanticFrame, TerminalNoteheads, paint_score
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,13 +27,13 @@ class ScoreTypesetOptions:
     y_offset: int = 0
     layout_width: int | None = None
     glyph_mode: GlyphMode = GlyphMode.PRETTY
+    noteheads: TerminalNoteheads | None = None
     metrics: LayoutMetrics = field(default_factory=LayoutMetrics)
     policy: NotationLayoutPolicy = field(default_factory=NotationLayoutPolicy)
     pitch_cues: tuple[PitchCue, ...] = ()
 
     def __post_init__(self) -> None:
-        if not isinstance(self.glyph_mode, GlyphMode):
-            _type_fail("glyph mode must be a GlyphMode")
+        _validate_display_options(self)
         if not isinstance(self.metrics, LayoutMetrics):
             _type_fail("score typeset metrics must be LayoutMetrics")
         if not isinstance(self.policy, NotationLayoutPolicy):
@@ -64,6 +64,13 @@ class ScoreTypesetOptions:
     @property
     def layout_viewport(self) -> LayoutViewport:
         return LayoutViewport(width=self.resolved_layout_width, height=self.height)
+
+
+def _validate_display_options(options: ScoreTypesetOptions) -> None:
+    if not isinstance(options.glyph_mode, GlyphMode):
+        _type_fail("glyph mode must be a GlyphMode")
+    if options.noteheads is not None and not isinstance(options.noteheads, TerminalNoteheads):
+        _type_fail("score typeset noteheads must be TerminalNoteheads or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +132,7 @@ def typeset_layout(
         layout,
         viewport=active.viewport,
         glyph_mode=active.glyph_mode,
+        noteheads=active.noteheads,
     )
     if active.pitch_cues:
         if score is None:

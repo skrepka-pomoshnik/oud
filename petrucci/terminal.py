@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import NoReturn
 
@@ -15,6 +15,19 @@ from petrucci.screen import A_DIM
 class GlyphMode(StrEnum):
     PRETTY = "pretty"
     SAFE = "safe"
+
+
+@dataclass(frozen=True, slots=True)
+class TerminalNoteheads:
+    """One-cell noteheads that override only the active inventory's note shapes."""
+
+    filled: str = "o"
+    open: str = "O"
+
+    def __post_init__(self) -> None:
+        for label, glyph in (("filled", self.filled), ("open", self.open)):
+            if display_width(glyph) != 1 or len(split_display_clusters(glyph)) != 1:
+                _fail(f"terminal {label} notehead must occupy exactly one terminal cell")
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,12 +246,12 @@ def paint_score(
     *,
     viewport: LayoutViewport | None = None,
     glyph_mode: GlyphMode = GlyphMode.PRETTY,
+    noteheads: TerminalNoteheads | None = None,
 ) -> SemanticFrame:
     """Paint a semantic layout into a fixed terminal frame."""
 
     active_viewport = viewport or LayoutViewport(width=layout.width)
-    if not isinstance(glyph_mode, GlyphMode):
-        _fail("glyph mode must be a GlyphMode")
+    glyphs = _glyph_inventory(glyph_mode, noteheads)
     if active_viewport.system_offset >= len(layout.systems) and layout.systems:
         _fail("paint system offset is outside the score layout")
     canvas = _SemanticCanvas(
@@ -249,13 +262,23 @@ def paint_score(
     if not layout.systems:
         return canvas.snapshot()
     scroll_y = layout.systems[active_viewport.system_offset].rect.y + active_viewport.y_offset
-    glyphs = _PRETTY if glyph_mode is GlyphMode.PRETTY else _SAFE
     for system in layout.systems[active_viewport.system_offset :]:
         if system.rect.y - scroll_y >= active_viewport.height:
             break
         for element in sorted(system.elements, key=lambda item: _priority(item.key.role)):
             _paint_element(canvas, element, y_offset=scroll_y, glyphs=glyphs)
     return canvas.snapshot()
+
+
+def _glyph_inventory(glyph_mode: GlyphMode, noteheads: TerminalNoteheads | None) -> _GlyphInventory:
+    if not isinstance(glyph_mode, GlyphMode):
+        _fail("glyph mode must be a GlyphMode")
+    if noteheads is not None and not isinstance(noteheads, TerminalNoteheads):
+        _fail("terminal noteheads must be TerminalNoteheads or None")
+    glyphs = _PRETTY if glyph_mode is GlyphMode.PRETTY else _SAFE
+    if noteheads is None:
+        return glyphs
+    return replace(glyphs, filled_notehead=noteheads.filled, open_notehead=noteheads.open)
 
 
 def _paint_element(  # noqa: C901
@@ -526,5 +549,6 @@ def _fail(message: str) -> NoReturn:
 __all__ = [
     "GlyphMode",
     "SemanticFrame",
+    "TerminalNoteheads",
     "paint_score",
 ]

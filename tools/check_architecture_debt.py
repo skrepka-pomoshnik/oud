@@ -144,6 +144,39 @@ def _large_module_regressions(current: dict[str, int], baseline: dict[str, int])
     return regressions
 
 
+def _complexity_scores(findings: Counter[tuple[str, str, int]]) -> dict[tuple[str, str], list[int]]:
+    grouped: dict[tuple[str, str], list[int]] = {}
+    for (path, name, score), count in findings.items():
+        grouped.setdefault((path, name), []).extend([score] * count)
+    return {key: sorted(scores, reverse=True) for key, scores in grouped.items()}
+
+
+def _complexity_regressions(
+    current: Counter[tuple[str, str, int]],
+    baseline: Counter[tuple[str, str, int]],
+) -> Counter[tuple[str, str, int]]:
+    regressions: Counter[tuple[str, str, int]] = Counter()
+    baseline_scores = _complexity_scores(baseline)
+    for (path, name), scores in _complexity_scores(current).items():
+        allowed = baseline_scores.get((path, name), [])
+        for index, score in enumerate(scores):
+            if index >= len(allowed) or score > allowed[index]:
+                regressions[(path, name, score)] += 1
+    return regressions
+
+
+def _complexity_improvements(
+    current: Counter[tuple[str, str, int]],
+    baseline: Counter[tuple[str, str, int]],
+) -> int:
+    current_scores = _complexity_scores(current)
+    improvements = 0
+    for key, allowed in _complexity_scores(baseline).items():
+        scores = current_scores.get(key, [])
+        improvements += sum(index >= len(scores) or scores[index] < score for index, score in enumerate(allowed))
+    return improvements
+
+
 def main() -> int:
     complexity = _complexity_findings()
     large_modules = _module_lines()
@@ -162,7 +195,7 @@ def main() -> int:
         return 1
 
     baseline_complexity, baseline_modules = _load_baseline()
-    complexity_regressions = complexity - baseline_complexity
+    complexity_regressions = _complexity_regressions(complexity, baseline_complexity)
     module_regressions = _large_module_regressions(large_modules, baseline_modules)
     if complexity_regressions or module_regressions:
         for (path, name, score), count in sorted(complexity_regressions.items()):
@@ -171,9 +204,8 @@ def main() -> int:
             print(message, file=sys.stderr)
         return 1
 
-    retired_complexity = baseline_complexity - complexity
     retired_modules = set(baseline_modules) - set(large_modules)
-    retired = sum(retired_complexity.values()) + len(retired_modules)
+    retired = _complexity_improvements(complexity, baseline_complexity) + len(retired_modules)
     suffix = f"; {retired} entries ready to retire" if retired else ""
     print(
         f"Architecture debt: {sum(complexity.values())}/{sum(baseline_complexity.values())} complex functions, "

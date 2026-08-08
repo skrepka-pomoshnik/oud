@@ -102,10 +102,29 @@ from petrucci.score import (
 )
 from petrucci.score_cues import PitchCue, PitchCueError, paint_pitch_cues
 from petrucci.tab_input import CellKey, editor_event_columns, editor_fret_at
+from petrucci.tab_mutation import (
+    EditableTablature,
+    TabCellDelta,
+    TabChordDelta,
+    TabDotDelta,
+    TabEdit,
+    TabEditIntent,
+    TabEditTransaction,
+    TabMutation,
+    TabMutationError,
+    TabMutationResult,
+    TabPosition,
+    TabRhythmDelta,
+    apply_tab_mutation,
+    clear_tab_cell,
+    clear_tab_note,
+    set_tab_cell,
+    set_tab_duration,
+)
 
 if TYPE_CHECKING:
     from petrucci.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
-    from petrucci.terminal import GlyphMode, SemanticFrame
+    from petrucci.terminal import GlyphMode, SemanticFrame, TerminalNoteheads
     from petrucci.typeset import TypesetOptions, TypesetResult
 
 __all__ = [
@@ -121,6 +140,7 @@ __all__ = [
     "Chord",
     "Clef",
     "DeleteEvent",
+    "EditableTablature",
     "ElementKey",
     "ElementRole",
     "EnterNote",
@@ -191,6 +211,18 @@ __all__ = [
     "StaffRows",
     "StemDirection",
     "Syllabic",
+    "TabCellDelta",
+    "TabChordDelta",
+    "TabDotDelta",
+    "TabEdit",
+    "TabEditIntent",
+    "TabEditTransaction",
+    "TabMutation",
+    "TabMutationError",
+    "TabMutationResult",
+    "TabPosition",
+    "TabRhythmDelta",
+    "TerminalNoteheads",
     "TimeSignature",
     "TupletRatio",
     "TypesetOptions",
@@ -199,7 +231,10 @@ __all__ = [
     "adapt_flow_events",
     "adapt_flow_measures",
     "apply_note_input",
+    "apply_tab_mutation",
     "clear_layout_cache",
+    "clear_tab_cell",
+    "clear_tab_note",
     "duration_notation",
     "editor_event_columns",
     "editor_fret_at",
@@ -210,6 +245,8 @@ __all__ = [
     "paint_score",
     "pitch_from_midi",
     "resolve_input_pitch",
+    "set_tab_cell",
+    "set_tab_duration",
     "typeset_layout",
     "typeset_piece",
     "typeset_score",
@@ -227,7 +264,7 @@ def __getattr__(name: str) -> Any:
         from petrucci import score_typeset  # noqa: PLC0415
 
         return getattr(score_typeset, name)
-    if name in {"GlyphMode", "SemanticFrame"}:
+    if name in {"GlyphMode", "SemanticFrame", "TerminalNoteheads"}:
         from petrucci import terminal  # noqa: PLC0415
 
         return getattr(terminal, name)
@@ -272,9 +309,10 @@ def paint_score(
     *,
     viewport: LayoutViewport | None = None,
     glyph_mode: GlyphMode | None = None,
+    noteheads: TerminalNoteheads | None = None,
 ) -> SemanticFrame:
     from petrucci.terminal import paint_score as _paint_score  # noqa: PLC0415
 
     if glyph_mode is None:
-        return _paint_score(layout, viewport=viewport)
-    return _paint_score(layout, viewport=viewport, glyph_mode=glyph_mode)
+        return _paint_score(layout, viewport=viewport, noteheads=noteheads)
+    return _paint_score(layout, viewport=viewport, glyph_mode=glyph_mode, noteheads=noteheads)

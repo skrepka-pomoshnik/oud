@@ -23,16 +23,6 @@
         "complexity": 9
       }
     ],
-    "oud/editor/edit_ops.py": [
-      {
-        "name": "clear_cell",
-        "complexity": 8
-      },
-      {
-        "name": "clear_cell_note",
-        "complexity": 9
-      }
-    ],
     "oud/editor/find_ops.py": [
       {
         "name": "_find_target_col",
@@ -72,7 +62,7 @@
     "oud/editor/load_ops.py": [
       {
         "name": "cmd_open",
-        "complexity": 10
+        "complexity": 8
       },
       {
         "name": "load_piece_data",
@@ -161,12 +151,6 @@
       {
         "name": "transform_score_to_tuning",
         "complexity": 9
-      }
-    ],
-    "oud/editor/undo_ops.py": [
-      {
-        "name": "apply_action",
-        "complexity": 53
       }
     ],
     "oud/editor/verify_ops.py": [
@@ -260,7 +244,7 @@
     "oud/exports/_midi_projection.py": [
       {
         "name": "_append_vocal_messages",
-        "complexity": 9
+        "complexity": 8
       },
       {
         "name": "_collect_manual_chords",
@@ -283,12 +267,6 @@
       {
         "name": "_midi_command",
         "complexity": 10
-      }
-    ],
-    "oud/exports/export_tab.py": [
-      {
-        "name": "export_tab",
-        "complexity": 35
       }
     ],
     "oud/exports/musicxml.py": [
@@ -383,12 +361,6 @@
         "complexity": 8
       }
     ],
-    "oud/importers/ft3.py": [
-      {
-        "name": "load_ft3",
-        "complexity": 44
-      }
-    ],
     "oud/importers/musicxml.py": [
       {
         "name": "_parse_piece",
@@ -463,16 +435,6 @@
       {
         "name": "overlay_dirty_rows",
         "complexity": 9
-      }
-    ],
-    "petrucci/layout.py": [
-      {
-        "name": "__post_init__",
-        "complexity": 8
-      },
-      {
-        "name": "layout_collisions",
-        "complexity": 8
       }
     ],
     "petrucci/layout_map.py": [
@@ -623,16 +585,6 @@
         "complexity": 9
       }
     ],
-    "petrucci/score.py": [
-      {
-        "name": "__post_init__",
-        "complexity": 10
-      },
-      {
-        "name": "_validate_staff",
-        "complexity": 8
-      }
-    ],
     "petrucci/spacing.py": [
       {
         "name": "auto_bar_plan",
@@ -665,21 +617,7 @@
         "complexity": 8
       }
     ],
-    "petrucci/tuning_utils.py": [
-      {
-        "name": "parse_tuning_pitches",
-        "complexity": 8
-      }
-    ],
     "petrucci/view_model.py": [
-      {
-        "name": "_bar_compact_width",
-        "complexity": 8
-      },
-      {
-        "name": "_bar_display_width",
-        "complexity": 8
-      },
       {
         "name": "_bar_durations",
         "complexity": 8
@@ -701,12 +639,26 @@
         "complexity": 14
       },
       {
-        "name": "_infer_time_signature",
-        "complexity": 9
-      },
-      {
         "name": "_place_parenthesize_tie_cues",
         "complexity": 11
+      },
+      {
+        "name": "build_bar_view",
+        "complexity": 13
+      }
+    ],
+    "petrucci/view_width.py": [
+      {
+        "name": "_bar_compact_width",
+        "complexity": 8
+      },
+      {
+        "name": "_bar_display_width",
+        "complexity": 8
+      },
+      {
+        "name": "_infer_time_signature",
+        "complexity": 9
       },
       {
         "name": "_scale_row",
@@ -715,10 +667,6 @@
       {
         "name": "_tuning_labels",
         "complexity": 18
-      },
-      {
-        "name": "build_bar_view",
-        "complexity": 13
       }
     ],
     "petrucci/vocal_line.py": [
@@ -780,7 +728,5 @@
       }
     ]
   },
-  "large_modules": {
-    "petrucci/view_model.py": 1068
-  }
+  "large_modules": {}
 }

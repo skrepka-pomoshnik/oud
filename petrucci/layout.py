@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
@@ -265,23 +266,10 @@ class ScoreLayout:
     systems: tuple[ScoreSystem, ...]
     onsets: tuple[OnsetPosition, ...]
 
-    def __post_init__(self) -> None:  # noqa: C901
-        if len(set(self.event_ids)) != len(self.event_ids):
-            _fail("score layout event IDs must be unique")
-        if any(position.event_id not in self.event_ids for position in self.onsets):
-            _fail("score layout onsets must reference known event IDs")
-        location_ids = tuple(location.event_id for location in self.event_locations)
-        if location_ids != self.event_ids:
-            _fail("score layout locations must match canonical event IDs in order")
-        if any(not 0 <= location.system_index < len(self.systems) for location in self.event_locations):
-            _fail("score layout locations must reference known systems")
-        if any(element.rect.right >= self.width for element in self.elements):
-            _fail("score layout elements must stay within the document width")
-        if any(element.rect.bottom >= self.document_height for element in self.elements):
-            _fail("score layout elements must stay within the document height")
-        known_ids = set(self.event_ids)
-        if any(event_id not in known_ids for system in self.systems for event_id in system.clipped_event_ids):
-            _fail("clipped event IDs must reference canonical events")
+    def __post_init__(self) -> None:
+        _validate_layout_references(self)
+        _validate_layout_bounds(self)
+        _validate_clipped_event_ids(self)
 
     @property
     def elements(self) -> tuple[LayoutElement, ...]:
@@ -301,6 +289,31 @@ class ScoreLayout:
         if location is None:
             return None
         return self.systems[location.system_index]
+
+
+def _validate_layout_references(layout: ScoreLayout) -> None:
+    if len(set(layout.event_ids)) != len(layout.event_ids):
+        _fail("score layout event IDs must be unique")
+    if any(position.event_id not in layout.event_ids for position in layout.onsets):
+        _fail("score layout onsets must reference known event IDs")
+    location_ids = tuple(location.event_id for location in layout.event_locations)
+    if location_ids != layout.event_ids:
+        _fail("score layout locations must match canonical event IDs in order")
+    if any(not 0 <= location.system_index < len(layout.systems) for location in layout.event_locations):
+        _fail("score layout locations must reference known systems")
+
+
+def _validate_layout_bounds(layout: ScoreLayout) -> None:
+    if any(element.rect.right >= layout.width for element in layout.elements):
+        _fail("score layout elements must stay within the document width")
+    if any(element.rect.bottom >= layout.document_height for element in layout.elements):
+        _fail("score layout elements must stay within the document height")
+
+
+def _validate_clipped_event_ids(layout: ScoreLayout) -> None:
+    known_ids = set(layout.event_ids)
+    if any(event_id not in known_ids for system in layout.systems for event_id in system.clipped_event_ids):
+        _fail("clipped event IDs must reference canonical events")
 
 
 def layout_score(
@@ -328,26 +341,39 @@ def clear_layout_cache() -> None:
     _cached_layout_score.cache_clear()
 
 
-def layout_collisions(layout: ScoreLayout) -> tuple[LayoutCollision, ...]:  # noqa: C901
+@dataclass(slots=True)
+class _CollisionScan:
+    occupied: dict[tuple[int, int], list[LayoutElement]]
+    seen: set[tuple[ElementKey, ElementKey, int, int]]
+    collisions: list[LayoutCollision]
+
+    def record(self, element: LayoutElement, x: int, y: int) -> None:
+        for other in self.occupied.get((x, y), ()):
+            if not _illegal_pair(other, element):
+                continue
+            key = (other.key, element.key, x, y)
+            if key not in self.seen:
+                self.seen.add(key)
+                self.collisions.append(LayoutCollision(other.key, element.key, x, y))
+        self.occupied.setdefault((x, y), []).append(element)
+
+
+def layout_collisions(layout: ScoreLayout) -> tuple[LayoutCollision, ...]:
     """Return illegal cross-source overlaps between positioned score elements."""
 
-    occupied: dict[tuple[int, int], list[LayoutElement]] = {}
-    collisions: list[LayoutCollision] = []
-    seen: set[tuple[ElementKey, ElementKey, int, int]] = set()
+    scan = _CollisionScan({}, set(), [])
     for element in layout.elements:
         if element.key.role not in _COLLISION_ROLES:
             continue
-        for y in range(element.rect.y, element.rect.bottom + 1):
-            for x in range(element.rect.x, element.rect.right + 1):
-                for other in occupied.get((x, y), ()):
-                    if not _illegal_pair(other, element):
-                        continue
-                    key = (other.key, element.key, x, y)
-                    if key not in seen:
-                        seen.add(key)
-                        collisions.append(LayoutCollision(other.key, element.key, x, y))
-                occupied.setdefault((x, y), []).append(element)
-    return tuple(collisions)
+        for x, y in _element_cells(element):
+            scan.record(element, x, y)
+    return tuple(scan.collisions)
+
+
+def _element_cells(element: LayoutElement) -> Iterator[tuple[int, int]]:
+    for y in range(element.rect.y, element.rect.bottom + 1):
+        for x in range(element.rect.x, element.rect.right + 1):
+            yield x, y
 
 
 @lru_cache(maxsize=64)

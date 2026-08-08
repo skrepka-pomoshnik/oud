@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import copy
-from typing import cast
+from collections.abc import Callable, Mapping, MutableMapping, MutableSet
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import TypeVar, cast
 
 from oud.editor.bar_ops import clear_bar_contents, delete_bar, insert_bar, restore_bar_snapshot
 from oud.editor.state import BarSnapshot, EditorState, UndoAction
 from oud.settings import save_settings
 from petrucci.model import Piece
+
+_K = TypeVar("_K")
+_V = TypeVar("_V")
 
 
 def _restore_action_cursor(state: EditorState, action: UndoAction, *, redo: bool) -> None:
@@ -27,211 +33,252 @@ def _refresh_modified_from_clean_depth(state: EditorState) -> None:
     state.modified = len(state.undo_stack) != state.clean_undo_depth
 
 
-def apply_action(  # noqa: C901, PLR0911, PLR0912
+@dataclass(frozen=True, slots=True)
+class _ApplyContext:
+    state: EditorState
+    action: UndoAction
+    redo: bool
+    config_path: str
+
+    @property
+    def data(self) -> dict[str, object]:
+        return self.action.data
+
+    def selected(self, new: str = "new", previous: str = "prev") -> object:
+        return self.data[new if self.redo else previous]
+
+
+def _set_optional(mapping: MutableMapping[_K, _V], key: _K, value: _V | None) -> None:
+    if value is None:
+        mapping.pop(key, None)
+    else:
+        mapping[key] = value
+
+
+def _set_membership(values: MutableSet[_K], key: _K, present: bool) -> None:
+    if present:
+        values.add(key)
+    else:
+        values.discard(key)
+
+
+def _apply_group(context: _ApplyContext) -> None:
+    actions = cast(list[UndoAction], context.data.get("actions", []))
+    ordered = actions if context.redo else reversed(actions)
+    for action in ordered:
+        apply_action(context.state, action, redo=context.redo, config_path=context.config_path)
+
+
+def _apply_override(context: _ApplyContext) -> None:
+    key = cast(tuple[int, int, int], context.data["key"])
+    _set_optional(context.state.overrides, key, cast(str | None, context.selected()))
+
+
+def _apply_duration(context: _ApplyContext) -> None:
+    key = cast(tuple[int, int, int], context.data["key"])
+    _set_optional(context.state.durations, key, cast(int | None, context.selected()))
+
+
+def _apply_duration_column(context: _ApplyContext) -> None:
+    bar = cast(int, context.data["bar"])
+    col = cast(int, context.data["col"])
+    payload = cast(dict[tuple[int, int, int], int], context.selected())
+    for key in [key for key in context.state.durations if key[0] == bar and key[2] == col]:
+        context.state.durations.pop(key, None)
+    context.state.durations.update(payload)
+
+
+def _apply_dotted(context: _ApplyContext) -> None:
+    key = cast(tuple[int, int], context.data["key"])
+    _set_membership(context.state.dotted, key, cast(bool, context.selected()))
+
+
+def _apply_text_marker(context: _ApplyContext) -> None:
+    key = cast(tuple[int, int], context.data["key"])
+    target = context.state.ornaments if context.action.kind == "ornament" else context.state.annotations
+    _set_optional(target, key, cast(str | None, context.selected()))
+
+
+def _apply_all_annotations(context: _ApplyContext) -> None:
+    context.state.annotations = dict(cast(dict[tuple[int, int], str], context.selected()))
+
+
+def _apply_highlight(context: _ApplyContext) -> None:
+    key = cast(tuple[int, int, int], context.data["key"])
+    _set_membership(context.state.highlights, key, cast(bool, context.selected()))
+
+
+def _apply_bar_attribute(context: _ApplyContext) -> None:
+    bar_index = cast(int, context.data["bar"])
+    if not 0 <= bar_index < len(context.state.piece.bars):
+        return
+    bar = context.state.piece.bars[bar_index]
+    attribute = {"barline": "barline", "repeat": "repeat", "dynamic": "dynamic"}[context.action.kind]
+    value = context.selected()
+    setattr(bar, attribute, value if isinstance(value, str) else None)
+
+
+def _apply_ending(context: _ApplyContext) -> None:
+    bar_index = cast(int, context.data["bar"])
+    if 0 <= bar_index < len(context.state.piece.bars):
+        context.state.piece.bars[bar_index].ending_numbers = tuple(cast(tuple[int, ...], context.selected()))
+
+
+def _apply_fermata(context: _ApplyContext) -> None:
+    bar_index = cast(int, context.data["bar"])
+    if 0 <= bar_index < len(context.state.piece.bars):
+        context.state.piece.bars[bar_index].fermata = bool(context.selected())
+
+
+def _apply_time_signature(context: _ApplyContext) -> None:
+    bar_index = cast(int, context.data["bar"])
+    if not 0 <= bar_index < len(context.state.piece.bars):
+        return
+    value = context.selected()
+    context.state.piece.bars[bar_index].time_sig = value if isinstance(value, str) else None
+    setting_key = "setting_new" if context.redo else "setting_prev"
+    _set_optional(context.state.settings, "time", cast(str | None, context.data.get(setting_key)))
+
+
+def _apply_chords(context: _ApplyContext) -> None:
+    bar_index = cast(int, context.data["bar"])
+    if not 0 <= bar_index < len(context.state.piece.bars):
+        return
+    bar = context.state.piece.bars[bar_index]
+    value = cast(list | None, context.selected())
+    bar.chords = copy.deepcopy(value) if value else []
+    notes_key = "new_notes" if context.redo else "prev_notes"
+    if notes_key in context.data:
+        notes = cast(list | None, context.data[notes_key])
+        bar.notes = copy.deepcopy(notes) if notes else []
+
+
+def _selected_breaks(context: _ApplyContext) -> set[int]:
+    return cast(set[int], context.selected())
+
+
+def _apply_bar_insert(context: _ApplyContext) -> None:
+    index = cast(int, context.data["index"])
+    (insert_bar if context.redo else delete_bar)(context.state, index)
+    context.state.stave_breaks = _selected_breaks(context)
+
+
+def _apply_bar_delete(context: _ApplyContext) -> None:
+    index = cast(int, context.data["index"])
+    if context.redo:
+        delete_bar(context.state, index)
+    else:
+        insert_bar(context.state, index)
+        snapshot = cast(BarSnapshot | None, context.data["snapshot"])
+        if snapshot is not None:
+            restore_bar_snapshot(context.state, index, snapshot)
+    context.state.stave_breaks = _selected_breaks(context)
+
+
+def _apply_bars_delete(context: _ApplyContext) -> None:
+    start = cast(int, context.data["start"])
+    if context.redo:
+        for _ in range(cast(int, context.data["count"])):
+            delete_bar(context.state, start)
+    else:
+        for offset, snapshot in enumerate(cast(list[BarSnapshot], context.data["snapshots"])):
+            insert_bar(context.state, start + offset)
+            restore_bar_snapshot(context.state, start + offset, snapshot)
+    context.state.stave_breaks = _selected_breaks(context)
+
+
+def _apply_bars_insert(context: _ApplyContext) -> None:
+    start = cast(int, context.data["start"])
+    if context.redo:
+        for offset, snapshot in enumerate(cast(list[BarSnapshot], context.data["snapshots"])):
+            insert_bar(context.state, start + offset)
+            restore_bar_snapshot(context.state, start + offset, snapshot)
+    else:
+        for _ in range(cast(int, context.data["count"])):
+            delete_bar(context.state, start)
+    context.state.stave_breaks = _selected_breaks(context)
+
+
+def _apply_bar_clear(context: _ApplyContext) -> None:
+    index = cast(int, context.data["index"])
+    if context.redo:
+        clear_bar_contents(context.state, index)
+    else:
+        snapshot = cast(BarSnapshot | None, context.data["snapshot"])
+        if snapshot is not None:
+            restore_bar_snapshot(context.state, index, snapshot)
+
+
+def _apply_stave_breaks(context: _ApplyContext) -> None:
+    context.state.stave_breaks = _selected_breaks(context)
+
+
+def _apply_setting(context: _ApplyContext) -> None:
+    key = context.data["key"]
+    if not isinstance(key, str):
+        return
+    value = context.selected()
+    _set_optional(context.state.settings, key, None if value is None else str(value))
+    save_settings(context.config_path, context.state.settings)
+
+
+def _apply_score_transform(context: _ApplyContext) -> None:
+    payload = cast(dict[str, object], context.data["after"] if context.redo else context.data["before"])
+    piece = cast(Piece | None, payload.get("piece"))
+    overrides = payload.get("overrides")
+    if piece is not None:
+        context.state.piece = copy.deepcopy(piece)
+    if overrides is not None:
+        context.state.overrides = dict(cast(dict[tuple[int, int, int], str], overrides))
+    _set_optional_setting(context.state, "tuning", payload.get("settings_tuning"))
+    _set_optional_setting(context.state, "strings", payload.get("settings_strings"))
+
+
+def _set_optional_setting(state: EditorState, key: str, value: object) -> None:
+    _set_optional(state.settings, key, None if value is None else str(value))
+
+
+_ActionHandler = Callable[[_ApplyContext], None]
+_ACTION_HANDLERS: Mapping[str, _ActionHandler] = MappingProxyType(
+    {
+        "group": _apply_group,
+        "override": _apply_override,
+        "duration": _apply_duration,
+        "duration_col": _apply_duration_column,
+        "dotted": _apply_dotted,
+        "ornament": _apply_text_marker,
+        "annotation": _apply_text_marker,
+        "annotations-all": _apply_all_annotations,
+        "highlight": _apply_highlight,
+        "barline": _apply_bar_attribute,
+        "repeat": _apply_bar_attribute,
+        "dynamic": _apply_bar_attribute,
+        "ending": _apply_ending,
+        "fermata": _apply_fermata,
+        "timesig": _apply_time_signature,
+        "chords": _apply_chords,
+        "bar-insert": _apply_bar_insert,
+        "bar-delete": _apply_bar_delete,
+        "bars-delete": _apply_bars_delete,
+        "bars-insert": _apply_bars_insert,
+        "bar-clear": _apply_bar_clear,
+        "stave-breaks": _apply_stave_breaks,
+        "setting": _apply_setting,
+        "score-transform": _apply_score_transform,
+    },
+)
+
+
+def apply_action(
     state: EditorState,
     action: UndoAction,
     *,
     redo: bool,
     config_path: str,
 ) -> None:
-    kind = action.kind
-    data = action.data
-    if kind == "group":
-        actions = cast(list, data.get("actions", []))
-        ordered = actions if redo else list(reversed(actions))
-        for sub in ordered:
-            apply_action(
-                state,
-                cast(UndoAction, sub),
-                redo=redo,
-                config_path=config_path,
-            )
-        return
-    if kind == "override":
-        key = cast(tuple[int, int, int], data["key"])
-        value = cast(str | None, data["new"] if redo else data["prev"])
-        if value is None:
-            state.overrides.pop(key, None)
-        else:
-            state.overrides[key] = value
-        return
-    if kind == "duration":
-        key = cast(tuple[int, int, int], data["key"])
-        value = cast(int | None, data["new"] if redo else data["prev"])
-        if value is None:
-            state.durations.pop(key, None)
-        else:
-            state.durations[key] = value
-        return
-    if kind == "duration_col":
-        bar = cast(int, data["bar"])
-        col = cast(int, data["col"])
-        payload = cast(dict[tuple[int, int, int], int], data["new"] if redo else data["prev"])
-        for existing in [k for k in state.durations if k[0] == bar and k[2] == col]:
-            state.durations.pop(existing, None)
-        state.durations.update(payload)
-        return
-    if kind == "dotted":
-        key = cast(tuple[int, int], data["key"])
-        value = cast(bool, data["new"] if redo else data["prev"])
-        if value:
-            state.dotted.add(key)
-        else:
-            state.dotted.discard(key)
-        return
-    if kind in ("ornament", "annotation"):
-        key = cast(tuple[int, int], data["key"])
-        value = cast(str | None, data["new"] if redo else data["prev"])
-        target = state.ornaments if kind == "ornament" else state.annotations
-        if value is None:
-            target.pop(key, None)
-        else:
-            target[key] = value
-        return
-    if kind == "annotations-all":
-        value = cast(dict[tuple[int, int], str], data["new"] if redo else data["prev"])
-        state.annotations = dict(value)
-        return
-    if kind == "highlight":
-        key = cast(tuple[int, int, int], data["key"])
-        value = cast(bool, data["new"] if redo else data["prev"])
-        if value:
-            state.highlights.add(key)
-        else:
-            state.highlights.discard(key)
-        return
-    if kind in ("barline", "repeat", "ending", "timesig", "dynamic", "fermata"):
-        bar_index = cast(int, data["bar"])
-        if 0 <= bar_index < len(state.piece.bars):
-            bar = state.piece.bars[bar_index]
-            if kind == "barline":
-                value = cast(str | None, data["new"] if redo else data["prev"])
-                bar.barline = value if isinstance(value, str) else None
-            elif kind == "repeat":
-                value = cast(str | None, data["new"] if redo else data["prev"])
-                bar.repeat = value if isinstance(value, str) else None
-            elif kind == "ending":
-                value = cast(tuple[int, ...], data["new"] if redo else data["prev"])
-                bar.ending_numbers = tuple(value)
-            elif kind == "dynamic":
-                value = cast(str | None, data["new"] if redo else data["prev"])
-                bar.dynamic = value if isinstance(value, str) else None
-            elif kind == "fermata":
-                value = cast(bool, data["new"] if redo else data["prev"])
-                bar.fermata = bool(value)
-            else:
-                value = cast(str | None, data["new"] if redo else data["prev"])
-                bar.time_sig = value if isinstance(value, str) else None
-                setting_value = cast(
-                    str | None,
-                    data.get("setting_new") if redo else data.get("setting_prev"),
-                )
-                if setting_value is None:
-                    state.settings.pop("time", None)
-                else:
-                    state.settings["time"] = setting_value
-        return
-    if kind == "chords":
-        bar_index = cast(int, data["bar"])
-        value = cast(list | None, data["new"] if redo else data["prev"])
-        if 0 <= bar_index < len(state.piece.bars):
-            bar = state.piece.bars[bar_index]
-            bar.chords = copy.deepcopy(value) if value else []
-            notes_key = "new_notes" if redo else "prev_notes"
-            if notes_key in data:
-                notes = cast(list | None, data[notes_key])
-                bar.notes = copy.deepcopy(notes) if notes else []
-        return
-    if kind == "bar-insert":
-        index = cast(int, data["index"])
-        breaks = cast(set[int], data["new"] if redo else data["prev"])
-        if redo:
-            insert_bar(state, index)
-        else:
-            delete_bar(state, index)
-        state.stave_breaks = breaks
-        return
-    if kind == "bar-delete":
-        index = cast(int, data["index"])
-        snapshot = cast(BarSnapshot | None, data["snapshot"] if not redo else None)
-        breaks = cast(set[int], data["new"] if redo else data["prev"])
-        if redo:
-            delete_bar(state, index)
-        else:
-            insert_bar(state, index)
-            if snapshot is not None:
-                restore_bar_snapshot(state, index, snapshot)
-        state.stave_breaks = breaks
-        return
-    if kind == "bars-delete":
-        start = cast(int, data["start"])
-        snapshots = cast(list[BarSnapshot] | None, data["snapshots"] if not redo else None)
-        breaks = cast(set[int], data["new"] if redo else data["prev"])
-        if redo:
-            count = cast(int, data["count"])
-            for _ in range(count):
-                delete_bar(state, start)
-        elif snapshots is not None:
-            for offset, snapshot in enumerate(snapshots):
-                insert_bar(state, start + offset)
-                restore_bar_snapshot(state, start + offset, snapshot)
-        state.stave_breaks = breaks
-        return
-    if kind == "bars-insert":
-        start = cast(int, data["start"])
-        snapshots = cast(list[BarSnapshot] | None, data["snapshots"] if redo else None)
-        breaks = cast(set[int], data["new"] if redo else data["prev"])
-        if redo and snapshots is not None:
-            for offset, snapshot in enumerate(snapshots):
-                insert_bar(state, start + offset)
-                restore_bar_snapshot(state, start + offset, snapshot)
-        else:
-            count = cast(int, data["count"])
-            for _ in range(count):
-                delete_bar(state, start)
-        state.stave_breaks = breaks
-        return
-    if kind == "bar-clear":
-        index = cast(int, data["index"])
-        snapshot = cast(BarSnapshot | None, data["snapshot"] if not redo else None)
-        if redo:
-            clear_bar_contents(state, index)
-        elif snapshot is not None:
-            restore_bar_snapshot(state, index, snapshot)
-        return
-    if kind == "stave-breaks":
-        breaks = cast(set[int], data["new"] if redo else data["prev"])
-        state.stave_breaks = breaks
-        return
-    if kind == "setting":
-        key = data["key"]
-        value = data["new"] if redo else data["prev"]
-        if isinstance(key, str):
-            if value is None:
-                state.settings.pop(key, None)
-            else:
-                state.settings[key] = str(value)
-            save_settings(config_path, state.settings)
-        return
-    if kind == "score-transform":
-        payload = cast(dict[str, object], data["after"] if redo else data["before"])
-        piece = cast(Piece | None, payload.get("piece"))
-        overrides = payload.get("overrides")
-        if piece is not None:
-            state.piece = copy.deepcopy(piece)
-        if overrides is not None:
-            state.overrides = dict(cast(dict[tuple[int, int, int], str], overrides))
-        tuning_value = payload.get("settings_tuning")
-        strings_value = payload.get("settings_strings")
-        if tuning_value is None:
-            state.settings.pop("tuning", None)
-        else:
-            state.settings["tuning"] = str(tuning_value)
-        if strings_value is None:
-            state.settings.pop("strings", None)
-        else:
-            state.settings["strings"] = str(strings_value)
-        return
+    handler = _ACTION_HANDLERS.get(action.kind)
+    if handler is not None:
+        handler(_ApplyContext(state, action, redo, config_path))
 
 
 def undo(state: EditorState, *, config_path: str) -> None:

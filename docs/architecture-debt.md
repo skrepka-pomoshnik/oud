@@ -26,11 +26,9 @@ restore two canonical paths and hide incomplete migrations.
 
 ## Oversized modules
 
-One production module remains above 1,000 physical lines:
-
-| Module | Baseline | Intended split |
-|---|---:|---|
-| `petrucci/view_model.py` | 1,068 | width planning, source projection, tuning labels, rendered bar records |
+No production or test module remains above 1,000 physical lines. Petrucci width
+planning and tuning-label projection now live separately from rendered bar
+source projection.
 
 FT3 import now separates metadata, tablature, note records, score assembly,
 text rows, and duration normalization. LilyPond separates common projection,
@@ -40,13 +38,21 @@ test modules are split by behavior, with every test module below the ceiling.
 
 ## Complexity
 
-The enforced ceiling is 7. The baseline currently contains 157 over-limit
+The enforced ceiling is 7. The baseline currently contains 147 over-limit
 functions, including suppressed findings. The former normal-mode and Petrucci
 render dispatchers now delegate to focused command, movement, system, rhythm,
-staff, and cue modules without over-limit coordinator functions. The highest
-remaining findings include `oud.editor.undo_ops.apply_action` (53),
-`oud.importers.ft3.load_ft3` (44), `oud.exports.export_tab.export_tab` (35),
-and `oud.importers.tab.parse_tab_lines_data` (30).
+staff, cue, and undo-action modules without over-limit coordinator functions.
+FT3 loading now has explicit metadata, body-decoding, and finalization phases;
+TAB export has separate header, event-projection, and serialization ownership.
+Petrucci score validation, layout validation, collision scanning, and tuning
+parsing now delegate to focused domain operations below the complexity ceiling.
+The highest remaining findings include `oud.editor.insert_actions.handle_insert`
+(31), `oud.tui.input.complete_command_text` (31), and
+`oud.importers.tab.parse_tab_lines_data` (30).
+
+The debt checker compares findings by module and function identity, with the
+recorded score as a maximum. Lower scores are improvements ready for baseline
+retirement; only higher scores or additional same-name findings are regressions.
 
 Ruff 0.16 also exposes 31 legacy production call surfaces with more than five
 positional parameters. Each suppression is function-local and carries its
@@ -56,10 +62,9 @@ ignores or pass-through wrappers.
 
 Retirement order follows ownership and risk:
 
-1. Split `petrucci/view_model.py` along its existing projection and display boundaries.
-2. Decompose the remaining high-complexity editor, importer, and export functions.
-3. Replace legacy positional render/export surfaces with typed request records.
-4. Retire remaining local findings, lowering `architecture-debt.json` after each verified change.
+1. Decompose the remaining high-complexity editor, importer, and export functions.
+2. Replace legacy positional render/export surfaces with typed request records.
+3. Retire remaining local findings, lowering `architecture-debt.json` after each verified change.
 
 An entry is retired only after focused regressions and the full quality gate
 pass. Moving code without reducing ownership or complexity does not count.

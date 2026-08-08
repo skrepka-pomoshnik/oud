@@ -272,24 +272,14 @@ class NotationMeasure:
     forced_break_after: bool = False
     irregular: bool = False
 
-    def __post_init__(self) -> None:  # noqa: C901
+    def __post_init__(self) -> None:
         _validate_id(self.id, "measure")
         if self.number < 0:
             _fail("measure number must be non-negative")
         if any(not isinstance(event, NotationEvent) for event in self.events):
             _fail("measure events must be NotationEvent values")
-        if self.time_signature is not None and not isinstance(self.time_signature, TimeSignature):
-            _fail("measure time signature must be a TimeSignature")
-        if self.key_signature is not None and not isinstance(self.key_signature, KeySignature):
-            _fail("measure key signature must be a KeySignature")
-        if self.clef is not None and not isinstance(self.clef, Clef):
-            _fail("measure clef must be a Clef")
-        if not isinstance(self.barline, BarlineKind):
-            _fail("measure barline must be a BarlineKind")
-        if any(number <= 0 for number in self.ending_numbers):
-            _fail("measure ending numbers must be positive")
-        if tuple(sorted(set(self.ending_numbers))) != self.ending_numbers:
-            _fail("measure ending numbers must be sorted and unique")
+        _validate_measure_context(self)
+        _validate_ending_numbers(self.ending_numbers)
         if not isinstance(self.irregular, bool):
             _fail("measure irregular must be a bool")
 
@@ -410,25 +400,75 @@ def pitch_from_midi(midi: int, *, prefer_sharps: bool = True) -> WrittenPitch:
     return WrittenPitch(step=step, octave=(midi // 12) - 1, alter=alter)
 
 
-def _validate_staff(staff: NotationStaff, seen: set[str]) -> None:  # noqa: C901
+def _validate_measure_context(measure: NotationMeasure) -> None:
+    if measure.time_signature is not None and not isinstance(measure.time_signature, TimeSignature):
+        _fail("measure time signature must be a TimeSignature")
+    if measure.key_signature is not None and not isinstance(measure.key_signature, KeySignature):
+        _fail("measure key signature must be a KeySignature")
+    if measure.clef is not None and not isinstance(measure.clef, Clef):
+        _fail("measure clef must be a Clef")
+    if not isinstance(measure.barline, BarlineKind):
+        _fail("measure barline must be a BarlineKind")
+
+
+def _validate_ending_numbers(ending_numbers: tuple[int, ...]) -> None:
+    if any(number <= 0 for number in ending_numbers):
+        _fail("measure ending numbers must be positive")
+    if tuple(sorted(set(ending_numbers))) != ending_numbers:
+        _fail("measure ending numbers must be sorted and unique")
+
+
+def _validate_staff(staff: NotationStaff, seen: set[str]) -> None:
+    event_order, measure_ids = _validate_staff_measures(staff.measures, seen)
+    _validate_staff_lyrics(staff.lyrics, event_order, seen)
+    _validate_staff_lyric_lines(staff.lyric_lines, measure_ids, seen)
+    _validate_staff_spans(staff.spans, event_order, seen)
+
+
+def _validate_staff_measures(
+    measures: tuple[NotationMeasure, ...],
+    seen: set[str],
+) -> tuple[dict[str, int], set[str]]:
     event_order: dict[str, int] = {}
     measure_ids: set[str] = set()
     current_time = TimeSignature()
-    for measure in staff.measures:
+    for measure in measures:
         _claim_id(measure.id, "measure", seen)
         measure_ids.add(measure.id)
         if measure.time_signature is not None:
             current_time = measure.time_signature
         _validate_measure(measure, current_time.duration, seen, event_order)
-    for lyric in staff.lyrics:
+    return event_order, measure_ids
+
+
+def _validate_staff_lyrics(
+    lyrics: tuple[LyricSyllable, ...],
+    event_order: dict[str, int],
+    seen: set[str],
+) -> None:
+    for lyric in lyrics:
         _claim_id(lyric.id, "lyric", seen)
         if lyric.event_id not in event_order:
             _fail(f"lyric {lyric.id!r} references unknown event {lyric.event_id!r}")
-    for line in staff.lyric_lines:
+
+
+def _validate_staff_lyric_lines(
+    lyric_lines: tuple[LyricLine, ...],
+    measure_ids: set[str],
+    seen: set[str],
+) -> None:
+    for line in lyric_lines:
         _claim_id(line.id, "lyric line", seen)
         if line.measure_id not in measure_ids:
             _fail(f"lyric line {line.id!r} references unknown measure {line.measure_id!r}")
-    for span in staff.spans:
+
+
+def _validate_staff_spans(
+    spans: tuple[NotationSpan, ...],
+    event_order: dict[str, int],
+    seen: set[str],
+) -> None:
+    for span in spans:
         _claim_id(span.id, "span", seen)
         _validate_span_references(span, event_order)
 

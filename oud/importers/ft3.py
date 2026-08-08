@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from oud.importers._ft3_duration import (
@@ -32,6 +33,7 @@ from oud.importers._ft3_score import (
     _is_tab_bar,
     _map_body_with_tab,
     _map_score_only_body,
+    _MappedScoreEntry,
     _merge_text_record_into_bar,
     _parallel_note_tab_plan,
     _parse_score_text_record,
@@ -66,9 +68,28 @@ def _read_valid_ft3(path: str) -> bytes:
     return data
 
 
-def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
-    data = _read_valid_ft3(path)
+@dataclass(frozen=True, slots=True)
+class _DocumentMetadata:
+    title: str
+    subtitle: str | None
+    composer: str | None
+    footnote: str | None
+    annotations: dict[str, str]
+    preamble_notes: list[str]
 
+
+@dataclass(slots=True)
+class _BodyState:
+    bar_chunks: list[bytes]
+    bar_text_records: list[list[FT3TextRecord]]
+    parsed_bars: list[Bar]
+    imported_chunks: list[_ImportedScoreChunk]
+    imported_staff_labels: list[str]
+    parallel_meta_bars: list[tuple[int, Bar]]
+    text_record_cache: dict[bytes, FT3TextRecord]
+
+
+def _document_metadata(data: bytes, path: str) -> _DocumentMetadata:
     blocks, metadata_blob = _extract_cpiece_blocks(data)
     preamble_notes = _extract_ft3_preamble_notes(data)
     title = blocks[0] if len(blocks) >= 1 else None
@@ -81,190 +102,213 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
             title = _strip_rtf(title)
     if not title:
         title = Path(path).stem.replace("_", " ")
-    author = None
-    annotations = _parse_section_annotations(metadata_blob)
+    return _DocumentMetadata(
+        title,
+        subtitle,
+        composer,
+        footnote,
+        _parse_section_annotations(metadata_blob),
+        preamble_notes,
+    )
 
-    raw_chunks = re.split(b"\x03\x80", data)
-    parsed_text_records: list[FT3TextRecord] = []
-    bar_chunks = raw_chunks
-    bar_text_records: list[list[FT3TextRecord]] = []
-    parsed_bars: list[Bar] = []
-    imported_chunks: list[_ImportedScoreChunk] = []
-    imported_staff_labels: list[str] = []
-    parallel_meta_bars: list[tuple[int, Bar]] = []
-    text_record_cache: dict[bytes, FT3TextRecord] = {}
+
+def _classify_body_entries(data: bytes, state: _BodyState) -> list[_BodyEntry]:
     body_start = data.find(b"CBar")
-    if body_start >= 0:
-        body_chunks = re.split(b"\x03\x80", data[body_start + 4 :])
-        body_entries: list[_BodyEntry] = []
-        for chunk in body_chunks:
-            parsed = parse_bar(chunk)
-            raw_kind = _classify_unknown_score_chunk(
+    if body_start < 0:
+        return []
+    entries: list[_BodyEntry] = []
+    for chunk in re.split(b"\x03\x80", data[body_start + 4 :]):
+        parsed = parse_bar(chunk)
+        raw_kind = _classify_unknown_score_chunk(
+            chunk,
+            parsed,
+            text_record_cache=state.text_record_cache,
+        )
+        kind = "other"
+        if raw_kind in {"note-staff-raw", "note-lyric-raw"}:
+            kind = "raw"
+        elif _is_tab_bar(parsed):
+            kind = "tab"
+        elif raw_kind is not None:
+            kind = "raw"
+        entries.append(_BodyEntry(kind, chunk, parsed, raw_kind))
+    return entries
+
+
+def _decode_tab_body(
+    entries: list[_BodyEntry],
+    annotations: dict[str, str],
+    state: _BodyState,
+) -> None:
+    parallel_plan = _parallel_note_tab_plan(entries, annotations)
+    if parallel_plan is not None:
+        tab_entries, mapped_entries, state.imported_staff_labels = parallel_plan
+    else:
+        tab_entries, mapped_entries = _map_body_with_tab(entries, text_record_cache=state.text_record_cache)
+        max_staff = max((mapped.staff_index for mapped in mapped_entries), default=-1)
+        labels = _ensemble_staff_labels(annotations)
+        state.imported_staff_labels = list(reversed(labels[-max_staff - 1 :]))
+    state.bar_chunks = [entry.chunk for entry in tab_entries]
+    state.bar_text_records = [[] for _ in tab_entries]
+    for mapped in mapped_entries:
+        raw_kind = mapped.entry.score_kind
+        if raw_kind is None:
+            continue
+        chunk = mapped.entry.chunk
+        state.imported_chunks.append(
+            _ImportedScoreChunk(
+                mapped.bar_index,
+                mapped.staff_index,
+                len(chunk),
+                raw_kind,
                 chunk,
-                parsed,
-                text_record_cache=text_record_cache,
-            )
-            kind = "other"
-            if raw_kind in {"note-staff-raw", "note-lyric-raw"}:
-                kind = "raw"
-            elif _is_tab_bar(parsed):
-                kind = "tab"
-            elif raw_kind is not None:
-                kind = "raw"
-            body_entries.append(_BodyEntry(kind, chunk, parsed, raw_kind))
-        if any(entry.kind == "tab" for entry in body_entries):
-            parallel_plan = _parallel_note_tab_plan(body_entries, annotations)
-            if parallel_plan is not None:
-                tab_entries, mapped_score_entries, imported_staff_labels = parallel_plan
+                mapped.voice_index,
+            ),
+        )
+        decoded = _decode_raw_score_record(
+            raw_kind,
+            chunk,
+            voice_index=mapped.voice_index,
+            text_record_cache=state.text_record_cache,
+        )
+        if decoded is not None and _record_has_content(decoded):
+            state.bar_text_records[mapped.bar_index].append(decoded)
+        parsed = mapped.entry.parsed
+        if parsed.time_sig or parsed.barline or parsed.repeat or parsed.system_break:
+            state.parallel_meta_bars.append((mapped.bar_index, parsed))
+
+
+def _decode_score_only_body(
+    score_plan: tuple[int, list[_MappedScoreEntry], list[str]],
+    state: _BodyState,
+) -> None:
+    bar_count, mapped_entries, state.imported_staff_labels = score_plan
+    state.parsed_bars = [Bar() for _ in range(bar_count)]
+    state.bar_chunks = []
+    state.bar_text_records = [[] for _ in range(bar_count)]
+    for mapped in mapped_entries:
+        raw_kind = mapped.entry.score_kind
+        if raw_kind is None:
+            continue
+        chunk = mapped.entry.chunk
+        state.imported_chunks.append(
+            _ImportedScoreChunk(
+                mapped.bar_index,
+                mapped.staff_index,
+                len(chunk),
+                raw_kind,
+                chunk,
+                mapped.voice_index,
+            ),
+        )
+        decoded = _decode_raw_score_record(
+            raw_kind,
+            chunk,
+            voice_index=mapped.voice_index,
+            text_record_cache=state.text_record_cache,
+        )
+        if mapped.staff_index == 0 and decoded is not None and _record_has_content(decoded):
+            state.bar_text_records[mapped.bar_index].append(decoded)
+        if mapped.staff_index == 0 and _has_structural_score_marker(mapped.entry.parsed):
+            state.parallel_meta_bars.append((mapped.bar_index, mapped.entry.parsed))
+
+
+def _decode_sequential_body(entries: list[_BodyEntry], state: _BodyState) -> None:
+    state.bar_chunks = []
+    state.bar_text_records = []
+    leading_records: list[FT3TextRecord] = []
+    for entry in entries:
+        chunk = entry.chunk
+        if is_ft3_text_record(chunk):
+            record = _parse_score_text_record(chunk, text_record_cache=state.text_record_cache)
+            if not _record_has_content(record):
+                continue
+            if state.bar_chunks:
+                state.bar_text_records[-1].append(record)
             else:
-                tab_entries, mapped_score_entries = _map_body_with_tab(
-                    body_entries,
-                    text_record_cache=text_record_cache,
-                )
-                max_staff_index = max((mapped.staff_index for mapped in mapped_score_entries), default=-1)
-                ensemble_labels = _ensemble_staff_labels(annotations)
-                imported_staff_labels = list(reversed(ensemble_labels[-max_staff_index - 1 :]))
-            bar_chunks = [entry.chunk for entry in tab_entries]
-            bar_text_records = [[] for _ in tab_entries]
-            for mapped in mapped_score_entries:
-                target_index = mapped.bar_index
-                chunk = mapped.entry.chunk
-                parsed = mapped.entry.parsed
-                raw_kind = mapped.entry.score_kind
-                if raw_kind is None:
-                    continue
-                imported_chunks.append(
-                    _ImportedScoreChunk(
-                        target_index,
-                        mapped.staff_index,
-                        len(chunk),
-                        raw_kind,
-                        chunk,
-                        mapped.voice_index,
-                    ),
-                )
-                decoded = _decode_raw_score_record(
-                    raw_kind,
-                    chunk,
-                    voice_index=mapped.voice_index,
-                    text_record_cache=text_record_cache,
-                )
-                if decoded is not None and _record_has_content(decoded):
-                    parsed_text_records.append(decoded)
-                    bar_text_records[target_index].append(decoded)
-                if parsed.time_sig or parsed.barline or parsed.repeat or parsed.system_break:
-                    parallel_meta_bars.append((target_index, parsed))
-        elif score_plan := _map_score_only_body(body_entries, annotations):
-            bar_count, mapped_score_entries, imported_staff_labels = score_plan
-            parsed_bars = [Bar() for _ in range(bar_count)]
-            bar_chunks = []
-            bar_text_records = [[] for _ in range(bar_count)]
-            for mapped in mapped_score_entries:
-                raw_kind = mapped.entry.score_kind
-                if raw_kind is None:
-                    continue
-                imported_chunks.append(
-                    _ImportedScoreChunk(
-                        mapped.bar_index,
-                        mapped.staff_index,
-                        len(mapped.entry.chunk),
-                        raw_kind,
-                        mapped.entry.chunk,
-                        mapped.voice_index,
-                    ),
-                )
-                decoded = _decode_raw_score_record(
-                    raw_kind,
-                    mapped.entry.chunk,
-                    voice_index=mapped.voice_index,
-                    text_record_cache=text_record_cache,
-                )
-                if mapped.staff_index == 0 and decoded is not None and _record_has_content(decoded):
-                    parsed_text_records.append(decoded)
-                    bar_text_records[mapped.bar_index].append(decoded)
-                if mapped.staff_index == 0 and _has_structural_score_marker(mapped.entry.parsed):
-                    parallel_meta_bars.append((mapped.bar_index, mapped.entry.parsed))
-        else:
-            # Always parse bars from the CBar body stream so CPiece/metadata bytes
-            # cannot pollute bar 1 (common in duet-score files).
-            bar_chunks = []
-            bar_text_records = []
-            leading_records: list[FT3TextRecord] = []
-            for entry in body_entries:
-                chunk = entry.chunk
-                if is_ft3_text_record(chunk):
-                    record = _parse_score_text_record(chunk, text_record_cache=text_record_cache)
-                    if not _record_has_content(record):
-                        continue
-                    parsed_text_records.append(record)
-                    if bar_chunks:
-                        bar_text_records[-1].append(record)
-                    else:
-                        leading_records.append(record)
-                    continue
-                bar_chunks.append(chunk)
-                attached: list[FT3TextRecord] = []
-                if leading_records:
-                    attached.append(leading_records.pop(0))
-                bar_text_records.append(attached)
-    for bar_index, chunk in enumerate(bar_chunks):
+                leading_records.append(record)
+            continue
+        state.bar_chunks.append(chunk)
+        attached = [leading_records.pop(0)] if leading_records else []
+        state.bar_text_records.append(attached)
+
+
+def _decode_body(data: bytes, annotations: dict[str, str]) -> _BodyState:
+    state = _BodyState(re.split(b"\x03\x80", data), [], [], [], [], [], {})
+    entries = _classify_body_entries(data, state)
+    if not entries:
+        return state
+    if any(entry.kind == "tab" for entry in entries):
+        _decode_tab_body(entries, annotations, state)
+    elif score_plan := _map_score_only_body(entries, annotations):
+        _decode_score_only_body(score_plan, state)
+    else:
+        _decode_sequential_body(entries, state)
+    return state
+
+
+def _parse_body_bars(state: _BodyState) -> None:
+    for bar_index, chunk in enumerate(state.bar_chunks):
         bar = parse_bar(chunk)
-        parsed_bars.append(bar)
+        state.parsed_bars.append(bar)
         if not _is_tab_bar(bar) and (
             raw_kind := _classify_unknown_score_chunk(
                 chunk,
                 bar,
-                text_record_cache=text_record_cache,
+                text_record_cache=state.text_record_cache,
             )
         ):
-            imported_chunks.append(_ImportedScoreChunk(bar_index, 0, len(chunk), raw_kind, chunk))
-    if bar_chunks:
-        _apply_embedded_sections(bar_chunks, parsed_bars)
-    for bar_index, meta_bar in parallel_meta_bars:
-        if 0 <= bar_index < len(parsed_bars):
-            target = parsed_bars[bar_index]
-            if target.time_sig is None:
-                target.time_sig = meta_bar.time_sig
-            if target.barline is None:
-                target.barline = meta_bar.barline
-            if target.repeat is None:
-                target.repeat = meta_bar.repeat
-            if not target.ending_numbers:
-                target.ending_numbers = meta_bar.ending_numbers
-            target.system_break = target.system_break or meta_bar.system_break
-    bars = parsed_bars
-    _apply_legacy_duration_fix(bars)
-    _fill_missing_time_signatures(bars)
+            state.imported_chunks.append(_ImportedScoreChunk(bar_index, 0, len(chunk), raw_kind, chunk))
+    if state.bar_chunks:
+        _apply_embedded_sections(state.bar_chunks, state.parsed_bars)
+
+
+def _merge_meta_bar(target: Bar, source: Bar) -> None:
+    if target.time_sig is None:
+        target.time_sig = source.time_sig
+    if target.barline is None:
+        target.barline = source.barline
+    if target.repeat is None:
+        target.repeat = source.repeat
+    if not target.ending_numbers:
+        target.ending_numbers = source.ending_numbers
+    target.system_break = target.system_break or source.system_break
+
+
+def _merge_parallel_metadata(state: _BodyState) -> None:
+    for bar_index, meta_bar in state.parallel_meta_bars:
+        if 0 <= bar_index < len(state.parsed_bars):
+            _merge_meta_bar(state.parsed_bars[bar_index], meta_bar)
+
+
+def _string_count(bars: list[Bar]) -> int:
     max_string = 0
     for bar in bars:
         for note in bar.notes:
             max_string = max(max_string, note.string)
-    strings = max(6, max_string) if max_string else 6
-    piece = Piece(
-        title=title,
-        subtitle=subtitle,
-        author=author,
-        composer=composer,
-        footnote=footnote,
-        bars=bars,
-        strings=strings,
-    )
-    if bar_text_records:
-        for bar, records in zip(piece.bars, bar_text_records, strict=False):
-            for record in records:
-                _merge_text_record_into_bar(bar, record)
+    return max(6, max_string) if max_string else 6
+
+
+def _merge_bar_text(piece: Piece, records_by_bar: list[list[FT3TextRecord]]) -> None:
+    for bar, records in zip(piece.bars, records_by_bar, strict=False):
+        for record in records:
+            _merge_text_record_into_bar(bar, record)
+
+
+def _finalize_piece(piece: Piece, metadata: _DocumentMetadata, state: _BodyState) -> Piece:
+    _merge_bar_text(piece, state.bar_text_records)
     piece.imported_score = _build_imported_score(
         piece,
-        imported_chunks=imported_chunks,
-        staff_labels=imported_staff_labels,
-        text_record_cache=text_record_cache,
+        imported_chunks=state.imported_chunks,
+        staff_labels=state.imported_staff_labels,
+        text_record_cache=state.text_record_cache,
     )
     if piece.imported_score is not None and any(staff.kind == "unknown" for staff in piece.imported_score.staffs):
         piece.import_warnings.append(
             "FT3 contains non-tab score data that is not decoded yet; imported as unknown staves.",
         )
-    _apply_annotations(piece, annotations)
-    _apply_preamble_notes(piece, preamble_notes)
+    _apply_annotations(piece, metadata.annotations)
+    _apply_preamble_notes(piece, metadata.preamble_notes)
     for bar in piece.bars:
         _normalize_vocal_event_accidentals(
             bar,
@@ -275,10 +319,27 @@ def load_ft3(path: str) -> Piece:  # noqa: C901, PLR0912
     piece.footnote_source = source
     piece.footnote_editor = editor
     piece.footnote_comment = comment
-    if piece.source is None:
-        piece.source = source
-    if piece.editor is None:
-        piece.editor = editor
-    if piece.comment is None:
-        piece.comment = comment
+    piece.source = piece.source or source
+    piece.editor = piece.editor or editor
+    piece.comment = piece.comment or comment
     return piece
+
+
+def load_ft3(path: str) -> Piece:
+    data = _read_valid_ft3(path)
+    metadata = _document_metadata(data, path)
+    state = _decode_body(data, metadata.annotations)
+    _parse_body_bars(state)
+    _merge_parallel_metadata(state)
+    _apply_legacy_duration_fix(state.parsed_bars)
+    _fill_missing_time_signatures(state.parsed_bars)
+    piece = Piece(
+        title=metadata.title,
+        subtitle=metadata.subtitle,
+        author=None,
+        composer=metadata.composer,
+        footnote=metadata.footnote,
+        bars=state.parsed_bars,
+        strings=_string_count(state.parsed_bars),
+    )
+    return _finalize_piece(piece, metadata, state)

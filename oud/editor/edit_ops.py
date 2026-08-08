@@ -3,8 +3,15 @@ from __future__ import annotations
 import copy
 from contextlib import contextmanager
 
-from oud.editor.ops import chord_index_at_col, set_chord_note
 from oud.editor.state import EditorState, UndoAction, UndoGroupFrame
+from petrucci.tab_mutation import (
+    EditableTablature,
+    TabMutation,
+    clear_tab_cell,
+    clear_tab_note,
+    set_tab_cell,
+    set_tab_duration,
+)
 
 
 def _cursor_snapshot(state: EditorState) -> tuple[int, int, int]:
@@ -95,125 +102,70 @@ def record_undo(
 
 
 def apply_override(state: EditorState, key: tuple[int, int, int], ch: str) -> None:
-    prev = state.overrides.get(key)
-    state.overrides[key] = ch
-    record_undo(state, "override", key, prev, ch)
+    _record_tab_mutation(state, set_tab_cell(_editable_tablature(state), key, ch))
 
 
 def apply_duration(state: EditorState, key: tuple[int, int, int], dur: int) -> None:
-    bar, string, col = key
-    prev = {k: v for k, v in state.durations.items() if k[0] == bar and k[2] == col}
-    state.durations[(bar, string, col)] = dur
-    new = dict(prev)
-    new[(bar, string, col)] = dur
-    record_action(
-        state,
-        UndoAction(
-            kind="duration_col",
-            data={"bar": bar, "col": col, "prev": prev, "new": new},
-        ),
+    _record_tab_mutation(state, set_tab_duration(_editable_tablature(state), key, dur))
+
+
+def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:
+    with undo_group(state, label="clear-cell"):
+        _record_tab_mutation(state, clear_tab_cell(_editable_tablature(state), (bar, string, col)))
+        state.modified = True
+
+
+def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:
+    with undo_group(state, label="clear-cell-note"):
+        _record_tab_mutation(state, clear_tab_note(_editable_tablature(state), (bar, string, col)))
+        state.modified = True
+
+
+def _editable_tablature(state: EditorState) -> EditableTablature:
+    return EditableTablature(
+        state.piece.bars,
+        state.piece.strings,
+        state.bar_width,
+        state.overrides,
+        state.durations,
+        state.dotted,
+        state.settings.get("style") or state.piece.style or "french",
     )
 
 
-def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:  # noqa: C901
-    with undo_group(state, label="clear-cell"):
-        if 0 <= bar < len(state.piece.bars):
-            bar_obj = state.piece.bars[bar]
-            if bar_obj.chords:
-                prev_chords = copy.deepcopy(bar_obj.chords)
-                if set_chord_note(bar_obj, state.bar_width, col, string + 1, None):
-                    new_chords = copy.deepcopy(bar_obj.chords)
-                    record_action(
-                        state,
-                        UndoAction(
-                            kind="chords",
-                            data={"bar": bar, "prev": prev_chords, "new": new_chords},
-                        ),
-                    )
-                    state.modified = True
-        key = (bar, string, col)
-        if key in state.overrides:
-            prev = state.overrides.get(key)
-            state.overrides.pop(key, None)
-            record_undo(state, "override", key, prev, None)
-        prev_durations = {k: v for k, v in state.durations.items() if k[0] == bar and k[2] == col}
-        if prev_durations:
-            for prev_key in prev_durations:
-                state.durations.pop(prev_key, None)
-            record_action(
-                state,
-                UndoAction(
-                    kind="duration_col",
-                    data={"bar": bar, "col": col, "prev": prev_durations, "new": {}},
-                ),
-            )
-        dot_key = (bar, col)
-        if dot_key in state.dotted:
-            record_action(
-                state,
-                UndoAction(
-                    kind="dotted",
-                    data={"key": dot_key, "prev": True, "new": False},
-                ),
-            )
-            state.dotted.discard(dot_key)
-        state.modified = True
-
-
-def _column_has_notes(state: EditorState, bar: int, col: int) -> bool:
-    for b, _s, c in state.overrides:
-        if b == bar and c == col:
-            return True
-    if 0 <= bar < len(state.piece.bars):
-        bar_obj = state.piece.bars[bar]
-        if bar_obj.chords:
-            idx = chord_index_at_col(bar_obj, state.bar_width, col)
-            if idx is not None and bar_obj.chords[idx].notes:
-                return True
-    return False
-
-
-def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:  # noqa: C901
-    with undo_group(state, label="clear-cell-note"):
-        if 0 <= bar < len(state.piece.bars):
-            bar_obj = state.piece.bars[bar]
-            if bar_obj.chords:
-                prev_chords = copy.deepcopy(bar_obj.chords)
-                if set_chord_note(bar_obj, state.bar_width, col, string + 1, None):
-                    new_chords = copy.deepcopy(bar_obj.chords)
-                    record_action(
-                        state,
-                        UndoAction(
-                            kind="chords",
-                            data={"bar": bar, "prev": prev_chords, "new": new_chords},
-                        ),
-                    )
-                    state.modified = True
-        key = (bar, string, col)
-        if key in state.overrides:
-            prev = state.overrides.get(key)
-            state.overrides.pop(key, None)
-            record_undo(state, "override", key, prev, None)
-        if not _column_has_notes(state, bar, col):
-            prev_durations = {k: v for k, v in state.durations.items() if k[0] == bar and k[2] == col}
-            if prev_durations:
-                for prev_key in prev_durations:
-                    state.durations.pop(prev_key, None)
-                record_action(
-                    state,
-                    UndoAction(
-                        kind="duration_col",
-                        data={"bar": bar, "col": col, "prev": prev_durations, "new": {}},
-                    ),
-                )
-            dot_key = (bar, col)
-            if dot_key in state.dotted:
-                record_action(
-                    state,
-                    UndoAction(
-                        kind="dotted",
-                        data={"key": dot_key, "prev": True, "new": False},
-                    ),
-                )
-                state.dotted.discard(dot_key)
-        state.modified = True
+def _record_tab_mutation(state: EditorState, mutation: TabMutation) -> None:
+    for delta in mutation.chords:
+        record_action(
+            state,
+            UndoAction(
+                kind="chords",
+                data={
+                    "bar": delta.bar_index,
+                    "prev": copy.deepcopy(list(delta.before)),
+                    "new": copy.deepcopy(list(delta.after)),
+                },
+            ),
+        )
+    for delta in mutation.cells:
+        record_undo(state, "override", delta.key, delta.before, delta.after)
+    for delta in mutation.rhythms:
+        record_action(
+            state,
+            UndoAction(
+                kind="duration_col",
+                data={
+                    "bar": delta.bar_index,
+                    "col": delta.column,
+                    "prev": dict(delta.before),
+                    "new": dict(delta.after),
+                },
+            ),
+        )
+    for delta in mutation.dots:
+        record_action(
+            state,
+            UndoAction(
+                kind="dotted",
+                data={"key": delta.key, "prev": delta.before, "new": delta.after},
+            ),
+        )

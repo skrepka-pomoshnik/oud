@@ -18,36 +18,37 @@ def tuning_count(tuning: str) -> int:
     return count
 
 
-def parse_tuning_pitches(tuning: str) -> list[int]:  # noqa: C901
+def parse_tuning_pitches(tuning: str) -> list[int]:
     pitches: list[int] = []
     idx = 0
     text = (tuning or "").strip()
     while idx < len(text):
-        ch = text[idx]
-        if ch.isalpha():
-            note = ch.upper()
-            idx += 1
-            accidental = ""
-            if idx < len(text) and text[idx] in "+-#b":
-                accidental = text[idx]
-                idx += 1
-            start = idx
-            while idx < len(text) and text[idx].isdigit():
-                idx += 1
-            octave_text = text[start:idx]
-            octave = int(octave_text) if octave_text else 3
-            semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(note, 0)
-            if accidental in ("+", "#"):
-                semis += 1
-            elif accidental in ("-", "b"):
-                semis -= 1
-            midi = (octave + 1) * 12 + semis
-            if 0 <= midi <= 127:
+        if text[idx].isalpha():
+            midi, idx = _parse_tuning_pitch(text, idx)
+            if midi is not None:
                 pitches.append(midi)
         else:
             idx += 1
     pitches.reverse()  # return high -> low (string1..N)
     return pitches
+
+
+def _parse_tuning_pitch(text: str, index: int) -> tuple[int | None, int]:
+    note = text[index].upper()
+    index += 1
+    accidental = ""
+    if index < len(text) and text[index] in "+-#b":
+        accidental = text[index]
+        index += 1
+    octave_start = index
+    while index < len(text) and text[index].isdigit():
+        index += 1
+    octave_text = text[octave_start:index]
+    octave = int(octave_text) if octave_text else 3
+    semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(note, 0)
+    semitones += {"+": 1, "#": 1, "-": -1, "b": -1}.get(accidental, 0)
+    midi = (octave + 1) * 12 + semitones
+    return (midi if 0 <= midi <= 127 else None), index
 
 
 def tuning_preset(value: str) -> str | None:

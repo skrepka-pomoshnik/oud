@@ -83,10 +83,6 @@ Target: re-enter representative Gerbode score material without losing musical
 intent. This is score-entry parity against documented examples, not parity with
 every Fronimo editing feature.
 
-- [ ] Move tablature mutation behind a public, source-independent Petrucci
-  transaction API accepting fret, string/course, duration, onset, rest/chord
-  intent, and returning typed changes or errors. Keep curses, Oud editor state,
-  FT3, and file I/O outside that contract.
 - [ ] Complete tablature typing matrices for French and Italian styles: open and
   two-digit frets, extra bass courses, same-onset chords, rests, repeated chords,
   string movement, full-bar overflow, invalid frets, and alternate tunings.
@@ -155,12 +151,11 @@ CI enforces complexity 7 and a 1,000-line module ceiling against the exact
 non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
 targets are in `docs/architecture-debt.md`.
 
-- [ ] Split `petrucci/view_model.py` by width planning, source projection, and
-  tuning/display records; it is the sole module still above 1,000 lines.
-- [ ] Retire the remaining 157 function-level C901 findings without raising
+- [ ] Retire the remaining 147 function-level C901 findings without raising
   limits, broad per-file ignores, compatibility wrappers, or count-only helper
-  modules. Start with `oud.editor.undo_ops.apply_action` (53),
-  `oud.importers.ft3.load_ft3` (44), and the remaining exporter/importer locals.
+  modules. Continue with `oud.editor.insert_actions.handle_insert` (31),
+  `oud.tui.input.complete_command_text` (31), and
+  `oud.importers.tab.parse_tab_lines_data` (30).
 - [ ] Replace the 31 narrowly suppressed production `PLR0917` surfaces with
   typed render, layout, playback, and export request records as their owning
   modules are split; do not add per-file ignores or forwarding wrappers.

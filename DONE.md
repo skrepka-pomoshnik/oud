@@ -3,6 +3,30 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-08-09
+- Added public one-cell terminal notehead overrides without replacing the active
+  pretty/safe glyph inventory; added a source-independent typed tablature
+  transaction API for fret, course, rational onset, duration, note/chord/rest,
+  deletion, typed changes, and stable errors. Oud cell/rhythm clearing and entry
+  now reuse Petrucci mutation primitives. Split width planning and tuning labels
+  from `petrucci/view_model.py`, retiring the final oversized module and reducing
+  the function-level debt baseline to 147.
+- Retired five Petrucci library boundary findings without changing its public
+  contracts: measure and staff validation, score-layout reference and bounds
+  validation, collision-cell scanning, and tuning-token parsing now have focused
+  ownership. The architecture baseline is now 149 complex functions and one
+  oversized module.
+- Retired the two largest remaining coordinator findings. FT3 import now separates
+  document metadata, body classification/decoding, bar assembly, and piece
+  finalization; legacy TAB export now separates immutable export policy, source or
+  edited chord projection, header generation, and serialization. Public signatures
+  and focused importer/export behavior remain unchanged. The baseline is now 154
+  complex functions and one oversized module.
+- Retired the highest architecture finding by replacing the complexity-53 undo
+  coordinator with a typed action context and immutable responsibility-specific
+  handler registry. Corrected the debt gate so reduced scores are improvements,
+  while higher and duplicate findings remain regressions; moved Felice integration
+  cases out of the generic FT3 module. The baseline is now 156 complex functions
+  and one oversized module.
 - Added viewport-only navigation for long read-only scores: `K/J` or `W/S`
   move by rendered system, `[` and `]` jump across section/page boundaries, and
   counted jumps preserve the logical score cursor. Status now reports the visible

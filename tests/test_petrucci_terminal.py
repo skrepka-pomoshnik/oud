@@ -22,6 +22,7 @@ from petrucci import (
     PitchStep,
     ScoreTypesetOptions,
     SpanKind,
+    TerminalNoteheads,
     TimeSignature,
     WrittenPitch,
     pitch_from_midi,
@@ -134,6 +135,29 @@ def test_safe_glyph_mode_keeps_structure_without_music_symbols() -> None:
     assert "-" in result.text
     assert not {"𝄞", "●", "─"}.intersection(result.text)
     assert result.layout.onset_for("final-g") is not None
+
+
+def test_custom_noteheads_preserve_pretty_inventory_and_semantics() -> None:
+    result = typeset_score(
+        _score(),
+        options=ScoreTypesetOptions(
+            width=64,
+            height=24,
+            glyph_mode=GlyphMode.PRETTY,
+            noteheads=TerminalNoteheads(filled="o", open="O"),
+        ),
+    )
+
+    assert "o" in result.text
+    assert "●" not in result.text
+    assert "𝄞" in result.text
+    assert "─" in result.text
+    assert result.cells_for("first-c")
+
+
+def test_custom_noteheads_reject_non_cell_glyphs() -> None:
+    with pytest.raises(ValueError, match="exactly one terminal cell"):
+        TerminalNoteheads(filled="oo", open="O")
 
 
 def test_pretty_and_safe_modes_preserve_event_identity_and_roles() -> None:

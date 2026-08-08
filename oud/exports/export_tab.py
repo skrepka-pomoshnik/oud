@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
-from petrucci.model import Piece
+from petrucci.model import Bar, Piece
 from petrucci.render_utils import (
     bar_cells,
     bar_cells_from_chords,
@@ -22,7 +23,166 @@ class TabExportError(ValueError):
         super().__init__(f"TAB cannot preserve Italian fret {fret}; export LilyPond, MIDI, or MusicXML")
 
 
-def export_tab(  # noqa: C901, PLR0912, PLR0917 - public compatibility; replace options with a typed request
+@dataclass(frozen=True, slots=True)
+class _TabExportContext:
+    piece: Piece
+    overrides: dict[tuple[int, int, int], str]
+    durations: dict[tuple[int, int, int], int]
+    bar_width: int
+    settings: dict[str, str]
+    dotted: set[tuple[int, int]]
+    style: str
+    french_c: str
+    default_duration: int = 4
+
+
+def _time_signature_line(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip()
+    if text == "C":
+        return "Sc"
+    if text == "C|":
+        return "Sc|"
+    return f"S{text}"
+
+
+def _french_to_fret(ch: str) -> int | None:
+    if ch == "r":
+        return 2
+    if "a" <= ch <= "p":
+        return ord(ch) - ord("a")
+    return None
+
+
+def _denom_for_column(context: _TabExportContext, bar_index: int, column: int) -> int:
+    found = None
+    for string_index in range(context.piece.strings):
+        duration = context.durations.get((bar_index, string_index, column))
+        if duration is not None and (found is None or duration > found):
+            found = duration
+    return found if found is not None else context.default_duration
+
+
+def _denom_to_flag(denom: int) -> str:
+    return {
+        1: "W",
+        2: "w",
+        4: "0",
+        8: "1",
+        16: "2",
+        32: "3",
+        64: "4",
+        128: "5",
+    }.get(denom, "0")
+
+
+def _format_fret_char(context: _TabExportContext, fret: int) -> str:
+    if context.style == "italian" and fret > 10:
+        raise TabExportError(fret)
+    if context.style == "italian" and fret == 10:
+        return "x"
+    text = format_fret(context.style, fret, french_c=context.french_c)
+    return text[0] if text else "-"
+
+
+def _chord_notes_for_column(
+    context: _TabExportContext,
+    bar_index: int,
+    column: int,
+) -> list[tuple[int, int]]:
+    notes: list[tuple[int, int]] = []
+    for string_index in range(context.piece.strings):
+        key = (bar_index, string_index, column)
+        fret = editor_fret_at(
+            context.overrides,
+            context.durations,
+            bar_index=bar_index,
+            string_index=string_index,
+            column=column,
+            style=context.style,
+            french_c_shape=context.french_c,
+        )
+        if fret is None and context.style not in {"french", "italian"}:
+            fret = _french_to_fret(context.overrides.get(key, ""))
+        if fret is not None:
+            notes.append((string_index + 1, fret))
+    return notes
+
+
+def _source_chords(context: _TabExportContext, bar: Bar) -> list[tuple[int, bool, list[tuple[int, int]]]]:
+    chords: list[tuple[int, bool, list[tuple[int, int]]]] = []
+    for chord in bar.chords:
+        denom = note_type_to_denom(chord.note_type) or context.default_duration
+        notes = [(note.string, note.fret) for note in chord.notes]
+        chords.append((denom, bool(chord.dotted), notes))
+    return chords
+
+
+def _edited_chords(
+    context: _TabExportContext,
+    bar_index: int,
+) -> list[tuple[int, bool, list[tuple[int, int]]]]:
+    chords: list[tuple[int, bool, list[tuple[int, int]]]] = []
+    for column in editor_event_columns(context.overrides, bar_index=bar_index):
+        if column >= context.bar_width:
+            continue
+        notes = _chord_notes_for_column(context, bar_index, column)
+        if notes:
+            chords.append(
+                (
+                    _denom_for_column(context, bar_index, column),
+                    (bar_index, column) in context.dotted,
+                    notes,
+                ),
+            )
+    return chords
+
+
+def _serialize_chord(
+    context: _TabExportContext,
+    denom: int,
+    dotted: bool,
+    notes: list[tuple[int, int]],
+) -> str:
+    row = ["-" for _ in range(context.piece.strings)]
+    for string, fret in notes:
+        if 1 <= string <= context.piece.strings:
+            row[string - 1] = _format_fret_char(context, fret)
+    return _denom_to_flag(denom) + ("." if dotted else "") + "".join(row)
+
+
+def _bar_lines(context: _TabExportContext, bar_index: int, bar: Bar) -> list[str]:
+    lines = ["b"]
+    signature = _time_signature_line(bar.time_sig or context.settings.get("time"))
+    if signature:
+        lines.append(signature)
+    chords = _source_chords(context, bar) if bar.chords else _edited_chords(context, bar_index)
+    lines.extend(_serialize_chord(context, denom, dotted, notes) for denom, dotted, notes in chords)
+    lines.append("")
+    return lines
+
+
+def _header_lines(context: _TabExportContext) -> list[str]:
+    lines = ["% Generated by oud", "-C"]
+    tuning = context.piece.tuning or context.settings.get("tuning")
+    if tuning:
+        lines.append(f"-tuning {tuning}")
+    title = context.piece.title or ""
+    composer = context.piece.composer or ""
+    if title and composer:
+        lines.append(f"{{{title}/{composer}}}")
+    elif title:
+        lines.append(f"{{{title}}}")
+    elif composer:
+        lines.append(f"{{{composer}}}")
+    if context.piece.author:
+        lines.append(f"{{{context.piece.author}}}")
+    lines.append("")
+    return lines
+
+
+def export_tab(  # noqa: PLR0917 - public compatibility; replace options with a typed request
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -39,125 +199,19 @@ def export_tab(  # noqa: C901, PLR0912, PLR0917 - public compatibility; replace 
     settings_map = settings or {}
     style = settings_map.get("style") or piece.style or "french"
     french_c = settings_map.get("frenchc") or "normal"
-    default_duration = 4
-
-    def time_signature_line(value: str | None) -> str | None:
-        if not value:
-            return None
-        text = value.strip()
-        if text == "C":
-            return "Sc"
-        if text == "C|":
-            return "Sc|"
-        return f"S{text}"
-
-    def french_to_fret(ch: str) -> int | None:
-        if ch == "r":
-            return 2
-        if "a" <= ch <= "p":
-            return ord(ch) - ord("a")
-        return None
-
-    def denom_for_column(bar_index: int, col: int) -> int:
-        found = None
-        for s_idx in range(piece.strings):
-            key = (bar_index, s_idx, col)
-            if key in durations:
-                denom = durations[key]
-                if found is None or denom > found:
-                    found = denom
-        return found if found is not None else default_duration
-
-    def denom_to_flag(denom: int) -> str:
-        return {
-            1: "W",
-            2: "w",
-            4: "0",
-            8: "1",
-            16: "2",
-            32: "3",
-            64: "4",
-            128: "5",
-        }.get(denom, "0")
-
-    def format_fret_char(fret: int) -> str:
-        if style == "italian" and fret > 10:
-            raise TabExportError(fret)
-        if style == "italian" and fret == 10:
-            return "x"
-        text = format_fret(style, fret, french_c=french_c)
-        return text[0] if text else "-"
-
-    def chord_notes_for_col(bar_index: int, col: int) -> list[tuple[int, int]]:
-        notes: list[tuple[int, int]] = []
-        for s_idx in range(piece.strings):
-            key = (bar_index, s_idx, col)
-            fret = editor_fret_at(
-                overrides,
-                durations,
-                bar_index=bar_index,
-                string_index=s_idx,
-                column=col,
-                style=style,
-                french_c_shape=french_c,
-            )
-            if fret is None and style not in {"french", "italian"}:
-                fret = french_to_fret(overrides.get(key, ""))
-            if fret is None:
-                continue
-            notes.append((s_idx + 1, fret))
-        return notes
-
-    lines: list[str] = []
-    lines.append("% Generated by oud")
-    lines.append("-C")
-    tuning = piece.tuning or settings_map.get("tuning")
-    if tuning:
-        lines.append(f"-tuning {tuning}")
-    title = piece.title or ""
-    composer = piece.composer or ""
-    if title and composer:
-        lines.append(f"{{{title}/{composer}}}")
-    elif title:
-        lines.append(f"{{{title}}}")
-    elif composer:
-        lines.append(f"{{{composer}}}")
-    if piece.author:
-        lines.append(f"{{{piece.author}}}")
-    lines.append("")
-
+    context = _TabExportContext(
+        piece,
+        overrides,
+        durations,
+        bar_width,
+        settings_map,
+        dotted or set(),
+        style,
+        french_c,
+    )
+    lines = _header_lines(context)
     for b_idx, bar in enumerate(piece.bars):
-        lines.append("b")
-        sig_line = time_signature_line(bar.time_sig or settings_map.get("time"))
-        if sig_line:
-            lines.append(sig_line)
-        chords: list[tuple[int, bool, list[tuple[int, int]]]] = []
-        if bar.chords:
-            for chord in bar.chords:
-                denom = note_type_to_denom(chord.note_type) or default_duration
-                notes = [(note.string, note.fret) for note in chord.notes]
-                chords.append((denom, bool(chord.dotted), notes))
-        else:
-            for col in editor_event_columns(overrides, bar_index=b_idx):
-                if col >= bar_width:
-                    continue
-                notes = chord_notes_for_col(b_idx, col)
-                if not notes:
-                    continue
-                denom = denom_for_column(b_idx, col)
-                dot = (b_idx, col) in (dotted or set())
-                chords.append((denom, dot, notes))
-        for denom, dot, notes in chords:
-            flag = denom_to_flag(denom)
-            row = ["-" for _ in range(piece.strings)]
-            for string, fret in notes:
-                if not (1 <= string <= piece.strings):
-                    continue
-                idx = string - 1
-                row[idx] = format_fret_char(fret)
-            line = flag + ("." if dot else "") + "".join(row)
-            lines.append(line)
-        lines.append("")
+        lines.extend(_bar_lines(context, b_idx, bar))
     lines.append("e")
     return "\n".join(lines) + "\n"
 
