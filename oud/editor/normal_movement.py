@@ -22,7 +22,7 @@ from oud.editor.motions import (
 )
 from oud.editor.state import EditorState
 from oud.editor.view_focus import cycle_view_staff, visible_view_staffs
-from oud.editor.viewport import scroll_viewport_page
+from oud.editor.viewport import scroll_viewport_page, scroll_viewport_system
 from oud.editor.visual_ops import (
     clear_visual_mode,
     delete_visual_rows,
@@ -138,14 +138,21 @@ def _viewport_motion(state: EditorState, key: int, count: int, actions: NormalAc
     directions = (
         (actions.scroll_up, lambda: scroll_viewport_page(state, state.screen_width, state.screen_height, -count)),
         (actions.scroll_down, lambda: scroll_viewport_page(state, state.screen_width, state.screen_height, count)),
-        (actions.page_up, lambda: apply_motion_target(state, target_jump_row_visual(state, -count))),
-        (actions.page_down, lambda: apply_motion_target(state, target_jump_row_visual(state, count))),
+        (actions.page_up, lambda: _jump_system(state, -count)),
+        (actions.page_down, lambda: _jump_system(state, count)),
     )
     for keys, action in directions:
         if key in keys:
             action()
             return True
     return False
+
+
+def _jump_system(state: EditorState, delta: int) -> None:
+    if state.read_only:
+        scroll_viewport_system(state, state.screen_width, state.screen_height, delta)
+    else:
+        apply_motion_target(state, target_jump_row_visual(state, delta))
 
 
 def _jump_motion(state: EditorState, key: int, count: int, actions: NormalActionBindings) -> bool:

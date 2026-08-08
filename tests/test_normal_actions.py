@@ -8,6 +8,7 @@ from oud.editor.keycodes import DEFAULT_KEYCODES
 from oud.editor.keymap import insert_bindings, normal_action_bindings, normal_bindings
 from oud.editor.normal_actions import handle_normal
 from oud.editor.state import EditorState
+from oud.editor.status import status_line
 from oud.editor.undo_ops import undo
 from petrucci.model import Bar, Piece
 
@@ -104,6 +105,53 @@ def test_upper_k_jumps_to_same_offset_in_previous_system() -> None:
     handle_normal(state, ord("K"))
     assert state.cursor_bar == 1
     assert state.cursor_col == 3
+
+
+def test_read_only_system_jumps_scroll_without_moving_logical_cursor() -> None:
+    state = _state()
+    state.read_only = True
+    state.cursor_bar = 1
+    state.cursor_col = 5
+
+    handle_normal(state, ord("J"))
+    assert (state.cursor_bar, state.cursor_col) == (1, 5)
+    assert state.bar_offset == 3
+    handle_normal(state, ord("K"))
+    assert (state.cursor_bar, state.cursor_col) == (1, 5)
+    assert state.bar_offset == 0
+
+
+def test_read_only_section_page_jumps_are_viewport_only_and_counted() -> None:
+    state = _state()
+    state.read_only = True
+    state.piece.bars[3].page_break_before = True
+    state.piece.bars[5].section_title = "Appendix"
+    state.cursor_bar = 1
+    state.cursor_col = 4
+    state.count_prefix = "2"
+
+    handle_normal(state, ord("]"))
+    assert state.bar_offset == 5
+    assert (state.cursor_bar, state.cursor_col) == (1, 4)
+    handle_normal(state, ord("["))
+    assert state.bar_offset == 3
+    assert (state.cursor_bar, state.cursor_col) == (1, 4)
+
+
+def test_read_only_status_reports_view_system_page_and_section() -> None:
+    state = _state()
+    state.read_only = True
+    state.piece.page = "aa3"
+    state.piece.bars[3].page_break_before = True
+    state.piece.bars[5].section_title = "Appendix"
+    state.bar_offset = 5
+
+    line = status_line(state)
+
+    assert "cur:1" in line
+    assert "sys:4-6" in line
+    assert "page:2/2" in line
+    assert "sec:Appendix" in line
 
 
 def test_upper_j_clamps_on_short_last_system() -> None:

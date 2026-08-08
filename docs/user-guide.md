@@ -77,6 +77,7 @@ Set with:
 - Help: `?`
 - Command: `:`
 - Search: `/`
+- Read-only score viewport: `K` / `J` move one system and `[` / `]` jump to the previous/next section or source page without moving the logical cursor. `PgUp` / `PgDn` scroll whole viewport pages.
 
 Normal-mode numeric prefixes are limited to 999 with a visible notice. Counted
 movement stops at score boundaries, and movement in a read-only viewer never
@@ -92,12 +93,12 @@ creates a new bar.
 ### Casual profile (core)
 
 - Move: arrows or `w a s d`
-- Row jump: `W` / `S` (previous/next rendered row)
+- Row jump: `W` / `S` (previous/next rendered row; viewport-only in read-only scores)
 - Bar step: `,` / `.`
 - Bar edge: `Home` / `End`; viewport scroll: `PgUp` / `PgDn`
 - Insert/delete bar: `Insert` / `Delete`
 - Undo/redo: `Ctrl-Z` / `Ctrl-Y` (`u` / `Ctrl-R` remain available)
-- Char-find repeat: `]` forward / `[` reverse
+- Char-find repeat: `]` forward / `[` reverse in editable scores; these keys jump sections/pages in read-only scores
 - Help: `F1`
 
 ## 5) Entering Notes

@@ -175,6 +175,62 @@ def scroll_viewport_page(state: EditorState, width: int, height: int, delta_page
     state.viewport_scroll_hold_ticks = 1
 
 
+def scroll_viewport_system(state: EditorState, width: int, height: int, delta_systems: int) -> None:
+    _rows, row_for_bar, start_for_row = _viewport_row_mapping(state, width, height)
+    current_row = row_for_bar(state.bar_offset)
+    state.bar_offset = start_for_row(max(0, current_row + delta_systems))
+    state.viewport_scroll_hold_ticks = 1
+
+
+def jump_viewport_section_page(state: EditorState, delta: int) -> None:
+    boundaries = _section_page_boundaries(state)
+    target = state.bar_offset
+    for _ in range(abs(delta)):
+        candidates = (
+            [bar for bar in boundaries if bar > target] if delta > 0 else [bar for bar in boundaries if bar < target]
+        )
+        if not candidates:
+            break
+        target = min(candidates) if delta > 0 else max(candidates)
+    state.bar_offset = target
+    state.viewport_scroll_hold_ticks = 1
+
+
+def viewport_system_range(state: EditorState, width: int, height: int) -> tuple[int, int]:
+    if not state.piece.bars:
+        return 0, 0
+    _rows, row_for_bar, start_for_row = _viewport_row_mapping(state, width, height)
+    row = row_for_bar(state.bar_offset)
+    start = start_for_row(row)
+    next_start = start_for_row(row + 1)
+    end = len(state.piece.bars) if next_start <= start else next_start
+    return start + 1, end
+
+
+def viewport_page_label(state: EditorState) -> str | None:
+    starts = [0, *(index for index, bar in enumerate(state.piece.bars) if index > 0 and bar.page_break_before)]
+    page_index = max((index for index, start in enumerate(starts) if start <= state.bar_offset), default=0)
+    if len(starts) > 1:
+        return f"{page_index + 1}/{len(starts)}"
+    return state.piece.page
+
+
+def viewport_section_label(state: EditorState) -> str | None:
+    for bar in reversed(state.piece.bars[: state.bar_offset + 1]):
+        labels = [value.strip() for value in (bar.section_title, bar.section_subtitle) if value and value.strip()]
+        if labels:
+            return " / ".join(labels)
+    return None
+
+
+def _section_page_boundaries(state: EditorState) -> list[int]:
+    return [
+        index
+        for index, bar in enumerate(state.piece.bars)
+        if index == 0 or bar.page_break_before or bool(bar.section_title) or bool(bar.section_subtitle)
+    ]
+
+
 def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:  # noqa: C901
     hold = int(getattr(state, "viewport_scroll_hold_ticks", 0))
     if hold > 0:

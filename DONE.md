@@ -3,6 +3,11 @@
 Technical change log. Keep short, append newest on top.
 
 ## 2026-08-09
+- Added viewport-only navigation for long read-only scores: `K/J` or `W/S`
+  move by rendered system, `[` and `]` jump across section/page boundaries, and
+  counted jumps preserve the logical score cursor. Status now reports the visible
+  system range plus available FT3 section and page context. Regression tests cover
+  cursor preservation, counted boundaries, and status context.
 - Matched Bossinensis's *Felice fu quel dì* mixed-score structure: decoded its
   printable FT3 lyric-position bytes into twelve verse lanes, removed singleton
   control fragments from comments, and rendered conventional soprano notation

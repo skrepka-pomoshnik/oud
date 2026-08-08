@@ -143,6 +143,8 @@ class NormalActionBindings:
     page_down: tuple[int, ...]
     scroll_up: tuple[int, ...]
     scroll_down: tuple[int, ...]
+    section_prev: tuple[int, ...]
+    section_next: tuple[int, ...]
     col_start: tuple[int, ...]
     col_end: tuple[int, ...]
     jump_bottom: tuple[int, ...]
@@ -365,6 +367,8 @@ def normal_action_bindings(state) -> NormalActionBindings:
         page_down=_remap_tuple(state, "remap_page_down", page_down),
         scroll_up=_remap_tuple(state, "remap_scroll_up", scroll_up),
         scroll_down=_remap_tuple(state, "remap_scroll_down", scroll_down),
+        section_prev=_remap_tuple(state, "remap_section_prev", (ord("["),)) if state.read_only else (),
+        section_next=_remap_tuple(state, "remap_section_next", (ord("]"),)) if state.read_only else (),
         col_start=col_start,
         col_end=col_end,
         jump_bottom=_remap_tuple(state, "remap_jump_bottom", (ord("G"),)),

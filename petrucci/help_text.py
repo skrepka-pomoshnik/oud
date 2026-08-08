@@ -15,6 +15,7 @@ HELP_LINES = [
     "Left h / a / ^B / Left                  Delete   x / [count]x",
     "Right l / d / ^F / Right                Clear    Space (insert)",
     "Row  K/J or W/S    Scroll PgUp/PgDn      Yank     yy  Paste  p",
+    "Viewer system K/J or W/S; section/page [ / ] (cursor stays put)",
     "Bar  w/b or ,/.                          Delete  dd / Delete",
     "Undo u/^Z  Redo ^R/^Y                    Bar     o/O  +/-",
     "Top  gg / g                             Help    ? / F1 / gh",

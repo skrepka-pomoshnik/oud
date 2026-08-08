@@ -12,6 +12,7 @@ from oud.editor.midi_control import start_midi, stop_midi
 from oud.editor.motions import CursorMotionTarget, apply_motion_target, target_move_right_note
 from oud.editor.search_ops import jump_match, repeat_word_search, search_word_under_cursor
 from oud.editor.state import EditorState
+from oud.editor.viewport import jump_viewport_section_page
 from oud.editor.visual_ops import enter_visual_mode
 
 Action = Callable[[EditorState, int], None]
@@ -56,6 +57,8 @@ def handle_primary_action(state: EditorState, key: int) -> bool:
         (bindings.redo, _redo),
         (action_keys.row_first, _row_first),
         (action_keys.paste, _paste),
+        (action_keys.section_prev, lambda state, _key: _jump_section_page(state, -1)),
+        (action_keys.section_next, lambda state, _key: _jump_section_page(state, 1)),
     )
     return _dispatch(state, key, actions)
 
@@ -183,6 +186,10 @@ def _row_first(state: EditorState, _key: int) -> None:
     from oud.editor.command_ops import row_first_note_col  # noqa: PLC0415
 
     apply_motion_target(state, CursorMotionTarget(state.cursor_bar, row_first_note_col(state)))
+
+
+def _jump_section_page(state: EditorState, direction: int) -> None:
+    jump_viewport_section_page(state, direction * consume_count(state))
 
 
 def _paste(state: EditorState, _key: int) -> None:

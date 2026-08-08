@@ -29,7 +29,7 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
     document mode, and write target across mode changes and resize.
   - Cover solo, mixed song, four-part vocal, vocal-only, and duet FT3 files at
     80x24 and 120x40.
-- [ ] Add navigation suitable for long read-only scores.
+- [x] Add navigation suitable for long read-only scores.
   - Support previous/next system and section/page jumps without changing the
     logical score cursor.
   - Show current section/page and system range in status or `:info` when the FT3
@@ -148,8 +148,6 @@ algorithm that preserves sounding pitch and produces playable tablature.
     headings, lyric alignment, and readable scale.
   - Record intentional differences from Gerbode/Fronimo output instead of
     claiming pixel identity.
-- [ ] Add a macOS acceptance test with real LilyPond and retain compiler logs and
-  rendered failing pages as CI artifacts.
 
 ## P2: Architecture debt retirement
 
