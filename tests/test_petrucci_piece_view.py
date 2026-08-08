@@ -142,7 +142,7 @@ def test_vocal_score_uses_compact_rows_and_clips_only_at_terminal_bottom() -> No
     assert not view.result.cells_for("piece:staff:6:bar:0:event:0:0")
 
 
-def test_mixed_default_remains_tablature_but_note_and_lyric_focus_are_canonical() -> None:
+def test_mixed_default_aligns_canonical_voice_lyrics_and_tablature() -> None:
     piece = _imported_piece(tablature=True)
     default = typeset_piece_score_view(
         piece,
@@ -174,10 +174,31 @@ def test_mixed_default_remains_tablature_but_note_and_lyric_focus_are_canonical(
         focused_imported_staff_index=1,
     )
 
-    assert default is None
+    assert default is not None
+    assert len(default.result.layout.systems[0].staff_rows) == 2
+    assert "sing" in default.result.text
+    assert "lute" in default.result.text
+    assert any("|" in line and "-" in line for line in default.result.lines)
     assert note is not None and lyric is not None
     assert note.result.text == lyric.result.text
     assert "sing" in note.result.text
+
+
+def test_mixed_playback_marks_voice_and_matching_tab_chord() -> None:
+    piece = _imported_piece(tablature=True)
+    view = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=30,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=(0, 0),
+        settings=SETTINGS,
+    )
+
+    assert view is not None
+    assert "^" in view.result.text
+    assert any(attr != 0 for row in view.result.frame.attrs for attr in row)
 
 
 def test_playback_selects_later_system_and_current_style_without_reflow() -> None:

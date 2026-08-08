@@ -29,6 +29,24 @@ def test_load_minimal_ft3(tmp_path) -> None:
     assert piece.title in (None, "Test")
 
 
+def test_felice_positioned_lyrics_transpose_into_twelve_verses() -> None:
+    piece = load_ft3("lutemusic/01_felice_fu_quel_anon.ft3")
+    assert piece.imported_score is not None
+    lyrics = next(staff for staff in piece.imported_score.staffs if staff.kind == "lyrics")
+
+    assert len(lyrics.bars[0].lyric_event_rows) == 12
+    assert [[event.text for event in lyrics.bars[index].lyric_event_rows[0]] for index in range(4)] == [
+        ["Fe", "li", "ce"],
+        ["fu", "quel", "di"],
+        ["fe", "li", "ce_il"],
+        ["pon", "to"],
+    ]
+    assert [event.text for event in lyrics.bars[1].lyric_event_rows[1]] == ["gli_oc", "chi", "miei"]
+    comments = next(staff for staff in piece.imported_score.staffs if staff.kind == "comment")
+    assert len(comments.bars) == 1
+    assert comments.bars[0].editorial_text == ["Intro: Ricercars 1,9,12,14,15,16,18,20"]
+
+
 def test_load_ft3_rejects_bytes_without_document_marker(tmp_path) -> None:
     path = tmp_path / "broken.ft3"
     path.write_bytes(b"not an FT3 score")
@@ -397,6 +415,17 @@ def test_load_ft3_strips_rtf_title(tmp_path) -> None:
         f.write(payload)
     piece = load_ft3(str(path))
     assert piece.title == "Test Title"
+
+
+def test_load_ft3_decodes_cp1252_rtf_title_escape(tmp_path) -> None:
+    rtf = "{\\rtf1\\ansi Felice fu quel d\\'ec}"
+    payload = b"CPiece" + bytes([len(rtf)]) + rtf.encode("ascii") + b"\x03\x80"
+    path = tmp_path / "accented_rtf.ft3"
+    path.write_bytes(payload)
+
+    piece = load_ft3(str(path))
+
+    assert piece.title == "Felice fu quel dì"
 
 
 def test_load_ft3_cpiece_length_prefix(tmp_path) -> None:

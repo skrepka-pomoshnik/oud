@@ -14,7 +14,11 @@ def _strip_rtf(text: str) -> str:
         return text.strip()
     cleaned = re.sub(r"{\\fonttbl.*?}", " ", text, flags=re.S)
     cleaned = re.sub(r"{\\colortbl.*?}", " ", cleaned, flags=re.S)
-    cleaned = re.sub(r"\\'[0-9a-fA-F]{2}", "", cleaned)
+    cleaned = re.sub(
+        r"\\'([0-9a-fA-F]{2})",
+        lambda match: bytes.fromhex(match.group(1)).decode("cp1252"),
+        cleaned,
+    )
     cleaned = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", cleaned)
     cleaned = re.sub(r"\\[{}]", "", cleaned)
     cleaned = cleaned.replace("{", " ").replace("}", " ")

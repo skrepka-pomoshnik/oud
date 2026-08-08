@@ -110,9 +110,13 @@ def test_release_viewer_cases_render_visible_score_content(path: str) -> None:
         assert all(staff.kind != "unknown" for staff in piece.imported_score.staffs)
 
 
-def test_felice_narrow_view_keeps_at_least_one_tablature_bar() -> None:
+def test_felice_narrow_view_keeps_voice_verses_and_aligned_tablature() -> None:
     _piece, result = _typeset("01_felice_fu_quel_anon.ft3")
-    assert any(line.lstrip().startswith("6|") and "-" in line for line in result.lines)
+    assert "Fe" in result.text
+    assert "fu" in result.text
+    assert "lute" in result.text
+    assert any("|" in line and "-" in line for line in result.lines)
+    assert "Fe- Fe- Fe-" not in result.text
 
 
 @pytest.mark.parametrize(

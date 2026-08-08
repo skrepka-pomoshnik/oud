@@ -9,7 +9,8 @@ from petrucci.framebuffer import Frame
 from petrucci.layout import ElementRole, LayoutMetrics, NotationLayoutPolicy, ScoreLayout, layout_score
 from petrucci.model import ImportedStaff, Piece
 from petrucci.piece_adapter import notation_score_from_piece
-from petrucci.score import NotationEvent, NotationScore
+from petrucci.render_utils import bar_cells_from_chords, chord_positions
+from petrucci.score import NotationEvent, NotationScore, NotationStaff
 from petrucci.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
 from petrucci.screen import A_BOLD, A_DIM, A_REVERSE
 from petrucci.terminal import GlyphMode, SemanticFrame, paint_score
@@ -35,6 +36,49 @@ class PieceScoreView:
     cursor_display_maps: dict[int, list[int]]
 
 
+@dataclass
+class _TabCanvas:
+    lines: list[list[str]]
+    attrs: list[list[int]]
+    roles: list[list[ElementRole | None]]
+    element_ids: list[list[str | None]]
+
+    @classmethod
+    def from_frame(cls, frame: SemanticFrame) -> _TabCanvas:
+        return cls(
+            lines=[list(line) for line in frame.frame.lines],
+            attrs=[list(row) for row in frame.frame.attrs],
+            roles=[list(row) for row in frame.roles],
+            element_ids=[list(row) for row in frame.element_ids],
+        )
+
+    def clear_rows(self, top: int, bottom: int) -> None:
+        for y in range(max(0, top), min(len(self.lines), bottom + 1)):
+            self.lines[y] = [" "] * len(self.lines[y])
+            self.attrs[y] = [0] * len(self.attrs[y])
+            self.roles[y] = [None] * len(self.roles[y])
+            self.element_ids[y] = [None] * len(self.element_ids[y])
+
+    def put(self, y: int, x: int, text: str) -> None:
+        if not 0 <= y < len(self.lines):
+            return
+        for offset, char in enumerate(text):
+            column = x + offset
+            if not 0 <= column < len(self.lines[y]):
+                continue
+            self.lines[y][column] = char
+            self.attrs[y][column] = 0
+            self.roles[y][column] = ElementRole.STAFF
+            self.element_ids[y][column] = "piece:tab"
+
+    def freeze(self) -> SemanticFrame:
+        return SemanticFrame(
+            frame=Frame(lines=["".join(row) for row in self.lines], attrs=[tuple(row) for row in self.attrs]),
+            roles=tuple(tuple(row) for row in self.roles),
+            element_ids=tuple(tuple(row) for row in self.element_ids),
+        )
+
+
 def typeset_piece_score_view(
     piece: Piece,
     *,
@@ -56,6 +100,9 @@ def typeset_piece_score_view(
         staff_indices=None if staff_indices is None else staff_indices,
         include_lyrics=settings.get("showlyrics", "on") == "on",
     )
+    mixed_default = _has_tablature(piece) and focused_imported_staff_index is None
+    if mixed_default:
+        score = _with_tablature_staff(score)
     policy = NotationLayoutPolicy(
         justify=settings.get("justify", "smart") != "packed",
         show_measure_numbers=False,
@@ -73,6 +120,7 @@ def typeset_piece_score_view(
     active_position = playback or cursor
     focused_staff_id = _focused_staff_id(piece, focused_imported_staff_index)
     active_event = _source_event(
+        piece,
         score,
         *active_position,
         preferred_staff_id=focused_staff_id,
@@ -98,13 +146,16 @@ def typeset_piece_score_view(
         viewport=options.viewport,
         glyph_mode=options.glyph_mode,
     )
-    semantic_frame = _without_partial_staffs(
-        semantic_frame,
-        layout,
-        system_offset=system_offset,
-        y_offset=y_offset,
-        focused_staff_id=focused_staff_id,
-    )
+    if mixed_default:
+        semantic_frame = _with_tablature(
+            semantic_frame,
+            layout=layout,
+            piece=piece,
+            system_offset=system_offset,
+            y_offset=y_offset,
+            settings=settings,
+            playback=playback,
+        )
     if active_event is not None:
         semantic_frame = _with_event_attr(
             semantic_frame,
@@ -115,6 +166,145 @@ def typeset_piece_score_view(
             semantic_frame = _with_playback_marker(semantic_frame, active_event.id)
     result = ScoreTypesetResult(layout=layout, semantic_frame=semantic_frame)
     return PieceScoreView(result=result, cursor_display_maps=_cursor_display_maps(score, layout, system_offset))
+
+
+def _has_tablature(piece: Piece) -> bool:
+    return any(bar.chords or bar.notes for bar in piece.bars)
+
+
+def _with_tablature_staff(score: NotationScore) -> NotationScore:
+    source = score.staffs[0]
+    measures = tuple(
+        replace(
+            measure,
+            id=f"piece:tab:bar:{index}:measure",
+            events=(),
+            time_signature=None,
+            key_signature=None,
+            clef=None,
+        )
+        for index, measure in enumerate(source.measures)
+    )
+    tab = NotationStaff(id="piece:tab", label="lute", measures=measures)
+    return replace(score, staffs=(*score.staffs, tab))
+
+
+def _with_tablature(
+    frame: SemanticFrame,
+    *,
+    layout: ScoreLayout,
+    piece: Piece,
+    system_offset: int,
+    y_offset: int,
+    settings: dict[str, str],
+    playback: tuple[int, int] | None,
+) -> SemanticFrame:
+    canvas = _TabCanvas.from_frame(frame)
+    origin_y = layout.systems[system_offset].rect.y + y_offset
+    for system in layout.systems[system_offset:]:
+        rows = next((row for row in system.staff_rows if row.staff_id == "piece:tab"), None)
+        if rows is None:
+            continue
+        canvas.clear_rows(rows.top - origin_y, rows.bottom - origin_y)
+        _draw_tab_system(
+            canvas,
+            system=system,
+            course_top=rows.notation_top + 1 - origin_y,
+            piece=piece,
+            settings=settings,
+            playback=playback,
+        )
+    return canvas.freeze()
+
+
+def _draw_tab_system(
+    canvas: _TabCanvas,
+    *,
+    system,
+    course_top: int,
+    piece: Piece,
+    settings: dict[str, str],
+    playback: tuple[int, int] | None,
+) -> None:
+    for bar_index, box in zip(range(system.measure_start, system.measure_end), system.measure_boxes, strict=True):
+        if not 0 <= bar_index < len(piece.bars):
+            continue
+        _draw_tab_bar(
+            canvas,
+            bar=piece.bars[bar_index],
+            bar_index=bar_index,
+            x=box.x,
+            width=box.width,
+            course_top=course_top,
+            settings=settings,
+            playback=playback,
+        )
+    if system.measure_boxes:
+        canvas.put(course_top + 2, max(0, system.measure_boxes[0].x - 5), "lute")
+
+
+def _draw_tab_bar(
+    canvas: _TabCanvas,
+    *,
+    bar,
+    bar_index: int,
+    x: int,
+    width: int,
+    course_top: int,
+    settings: dict[str, str],
+    playback: tuple[int, int] | None,
+) -> None:
+    inner_width = max(1, width - 2)
+    cells = bar_cells_from_chords(
+        bar,
+        6,
+        inner_width,
+        4,
+        settings.get("style", "french"),
+        french_c_shape=settings.get("frenchc", "normal"),
+        label_mode=settings.get("fretlabels", "auto"),
+    )
+    for course, row in enumerate(cells):
+        canvas.put(course_top + course, x, "|")
+        canvas.put(course_top + course, x + 1, "".join(row))
+        canvas.put(course_top + course, x + width - 1, "|")
+    if settings.get("showdur", "off") != "off":
+        _draw_tab_durations(canvas, bar, x + 1, inner_width, course_top - 1)
+    if playback is not None and playback[0] == bar_index:
+        _highlight_tab_chord(
+            canvas,
+            bar,
+            x=x + 1,
+            width=inner_width,
+            course_top=course_top,
+            playback_column=playback[1],
+        )
+
+
+def _draw_tab_durations(canvas: _TabCanvas, bar, x: int, width: int, y: int) -> None:
+    for position, denominator, dotted in chord_positions(bar, width, 4):
+        text = f"{denominator}{'.' if dotted else ''}"
+        canvas.put(y, x + position, text)
+
+
+def _highlight_tab_chord(
+    canvas: _TabCanvas,
+    bar,
+    *,
+    x: int,
+    width: int,
+    course_top: int,
+    playback_column: int,
+) -> None:
+    positions = chord_positions(bar, width, 4)
+    if not positions:
+        return
+    index = min(max(0, playback_column), len(positions) - 1)
+    column = x + positions[index][0]
+    for course in range(6):
+        y = course_top + course
+        if 0 <= y < len(canvas.attrs) and 0 <= column < len(canvas.attrs[y]):
+            canvas.attrs[y][column] = A_REVERSE | A_BOLD
 
 
 def _with_event_attr(frame: SemanticFrame, event_id: str, attr: int) -> SemanticFrame:
@@ -191,7 +381,7 @@ def _without_partial_staffs(
 
 def _canonical_staff_indices(piece: Piece, focused_index: int | None) -> tuple[int, ...] | None:
     imported = piece.imported_score
-    has_tablature = any(bar.chords or bar.notes for bar in piece.bars)
+    has_tablature = _has_tablature(piece)
     if imported is None:
         return None if not has_tablature and any(bar.melody_events for bar in piece.bars) else ()
     note_indices = tuple(index for index, staff in enumerate(imported.staffs) if staff.kind == "note")
@@ -203,7 +393,7 @@ def _canonical_staff_indices(piece: Piece, focused_index: int | None) -> tuple[i
         selected = imported.staffs[focused_index]
         note_index = _note_index_for_focus(imported.staffs, focused_index, selected)
         return (note_index,) if note_index is not None else ()
-    return ()
+    return note_indices
 
 
 def _note_index_for_focus(staffs: list[ImportedStaff], index: int, selected: ImportedStaff) -> int | None:
@@ -235,12 +425,14 @@ def _focused_staff_id(piece: Piece, focused_index: int | None) -> str | None:
 
 
 def _source_event(
+    piece: Piece,
     score: NotationScore,
     bar_index: int,
     onset_index: int,
     *,
     preferred_staff_id: str | None,
 ) -> NotationEvent | None:
+    onset_index = _source_onset_index(piece, bar_index, onset_index, preferred_staff_id=preferred_staff_id)
     staffs = sorted(score.staffs, key=lambda staff: staff.id != preferred_staff_id)
     for staff in staffs:
         for measure in staff.measures:
@@ -251,6 +443,32 @@ def _source_event(
                 if match is not None and int(match["onset"]) == onset_index:
                     return event
     return None
+
+
+def _source_onset_index(
+    piece: Piece,
+    bar_index: int,
+    source_position: int,
+    *,
+    preferred_staff_id: str | None,
+) -> int:
+    imported = piece.imported_score
+    if imported is None:
+        return source_position
+    preferred = int(preferred_staff_id.rsplit(":", 1)[-1]) if preferred_staff_id is not None else None
+    staffs = [(index, staff) for index, staff in enumerate(imported.staffs) if staff.kind == "note"]
+    staffs.sort(key=lambda item: item[0] != preferred)
+    for _index, staff in staffs:
+        bar = next((item for item in staff.bars if item.source_bar_index == bar_index), None)
+        if bar is None or not bar.melody_events:
+            continue
+        direct = next((event for event in bar.melody_events if event.onset_index == source_position), None)
+        event = direct or min(
+            bar.melody_events,
+            key=lambda item: (abs(item.src_pos - source_position), item.onset_index),
+        )
+        return event.onset_index
+    return source_position
 
 
 def _system_offset(layout, score: NotationScore, *, bar_offset: int, active_event: NotationEvent | None) -> int:

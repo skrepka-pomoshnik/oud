@@ -50,6 +50,24 @@ def _load_tab_for_open(path: str, *, load_tab_data_fn, load_tab_fn) -> TabOpenRe
     )
 
 
+def _load_for_open(
+    path: str,
+    *,
+    load_tab_data_fn,
+    load_tab_fn,
+    load_ft3_fn,
+    load_musicxml_fn,
+    load_mxl_fn,
+) -> TabOpenResult:
+    if path.lower().endswith(".tab"):
+        return _load_tab_for_open(path, load_tab_data_fn=load_tab_data_fn, load_tab_fn=load_tab_fn)
+    if path.lower().endswith(".mxl"):
+        return load_mxl_fn(path), {}, {}, set(), None, None
+    if path.lower().endswith((".musicxml", ".xml")):
+        return load_musicxml_fn(path), {}, {}, set(), None, None
+    return load_ft3_fn(path), {}, {}, set(), None, None
+
+
 def _invalid_load_result(path: str | None, message: str) -> LoadResult:
     title = Path(path).stem if path else "Untitled"
     piece = Piece(title=title, bars=[])
@@ -138,30 +156,23 @@ def cmd_open(  # noqa: C901
     if Path(path).is_dir():
         state.message = ""
         return
-    overrides: dict[tuple[int, int, int], str] = {}
-    durations: dict[tuple[int, int, int], int] = {}
-    dotted: set[tuple[int, int]] = set()
-    bar_width: int | None = None
-    if path.lower().endswith(".tab"):
-        loaded_piece, overrides, durations, dotted, bar_width, parsed = _load_tab_for_open(
+    try:
+        loaded_piece, overrides, durations, dotted, bar_width, parsed = _load_for_open(
             path,
             load_tab_data_fn=load_tab_data_fn,
             load_tab_fn=load_tab_fn,
+            load_ft3_fn=load_ft3_fn,
+            load_musicxml_fn=load_musicxml_fn,
+            load_mxl_fn=load_mxl_fn,
         )
-        if not loaded_piece.bars and loaded_piece.import_warnings:
-            state.message = import_warning_summary(loaded_piece)
-            return
-        state.piece = loaded_piece
-        state.tab_data = parsed
-    elif path.lower().endswith(".mxl"):
-        state.piece = load_mxl_fn(path)
-        state.tab_data = None
-    elif path.lower().endswith((".musicxml", ".xml")):
-        state.piece = load_musicxml_fn(path)
-        state.tab_data = None
-    else:
-        state.piece = load_ft3_fn(path)
-        state.tab_data = None
+    except FileNotFoundError:
+        state.message = f"Missing file: {path}"
+        return
+    if not loaded_piece.bars and loaded_piece.import_warnings:
+        state.message = import_warning_summary(loaded_piece)
+        return
+    state.piece = loaded_piece
+    state.tab_data = parsed
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted

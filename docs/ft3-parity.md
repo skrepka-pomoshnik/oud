@@ -11,6 +11,7 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 
 | Shape | Local FT3 | Published PDF | Result |
 | --- | --- | --- | --- |
+| Twelve-verse mixed song | `lutemusic/01_felice_fu_quel_anon.ft3` | [Felice fu quel dì](https://browse.lutemusic.org/sources/BossinensisF/v.2_1511/pdf/01_felice_fu_quel_anon.pdf) | Sixteen vocal/tab bars agree. Printable FT3 position bytes are removed and the column-major text matrix becomes twelve onset-aligned verses. The terminal uses shared vocal/tab measure boxes and clips only at its lower border. |
 | Solo | `lutemusic/01_unquiet_thoughts/unquiet_thoughts_T.ft3` | [Unquiet Thoughts](https://www.lutemusic.org/sources/DowlandJ/1st_book_of_ayres/01_unquiet_thoughts/pdf/unquiet_thoughts_T.pdf) | 25 bars, meter, rhythms, notes, bass courses, repeats, and the `0x20`/`0x40` first/second endings agree. |
 | Mixed | `lutemusic/05_can_she_excuse/can_she_excuse.ft3` | [Can she excuse my wrongs?](https://www.lutemusic.org/sources/DowlandJ/1st_book_of_ayres/05_can_she_excuse/pdf/can_she_excuse.pdf) | 40 aligned melody/lyric/tab bars agree; both lyric verses and imported staff focus remain available. |
 | Polyphonic | `lutemusic/05_can_she_excuse/can_she_excuse_4_part.ft3` | [Can she excuse my wrongs?](https://www.lutemusic.org/sources/DowlandJ/1st_book_of_ayres/05_can_she_excuse/pdf/can_she_excuse.pdf) | Soprano, alto, tenor, and bass map to 24 complete logical bars and export as four LilyPond staffs. |

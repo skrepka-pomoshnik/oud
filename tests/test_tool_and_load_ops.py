@@ -80,6 +80,12 @@ def test_cmd_open_basic_paths(tmp_path: Path) -> None:
     cmd_open(state, "", no_path_msg="No path", build_durations_fn=None)
     assert state.message == "No path"
 
+    original = state.piece
+    missing = tmp_path / "missing.ft3"
+    cmd_open(state, str(missing), no_path_msg="No path", build_durations_fn=None)
+    assert state.message == f"Missing file: {missing}"
+    assert state.piece is original
+
     folder = tmp_path / "dir"
     folder.mkdir()
     state.insert_prefix = ",1"

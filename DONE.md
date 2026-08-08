@@ -2,6 +2,15 @@
 
 Technical change log. Keep short, append newest on top.
 
+## 2026-08-09
+- Matched Bossinensis's *Felice fu quel dì* mixed-score structure: decoded its
+  printable FT3 lyric-position bytes into twelve verse lanes, removed singleton
+  control fragments from comments, and rendered conventional soprano notation
+  above six-course French tablature on one shared system grid. Mixed playback
+  now marks both the canonical vocal event and corresponding tab chord; partial
+  content is clipped only at the terminal's lower edge. Interactive open now
+  reports missing paths without replacing the current score or raising.
+
 ## 2026-08-08
 - Made vocal-only FT3 viewing use a compact full-score layout: all mapped voices
   remain visible up to the terminal's lower border, with deterministic clipping

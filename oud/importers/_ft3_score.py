@@ -32,6 +32,8 @@ from petrucci.model import (
     Piece,
 )
 
+_MATRIX_COORDINATES = frozenset(b"0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
 
 def _is_tab_bar(bar: Bar) -> bool:
     return bool(bar.chords or bar.notes)
@@ -663,12 +665,25 @@ def _import_decoded_bar_text_layers(
 def _decoded_comment_content(decoded: FT3TextRecord | None) -> tuple[list[str], list[ImportedTextRow]] | None:
     if decoded is None:
         return None
-    text_rows = [row for row in decoded.structured_rows if row.kind in {"editorial", "unknown"}]
+    text_rows = [
+        row
+        for row in decoded.structured_rows
+        if row.kind == "editorial" or (row.kind == "unknown" and len(row.text.strip()) > 1)
+    ]
     meta_rows = [row for row in decoded.structured_rows if row.kind in {"font", "control"}]
     if decoded.editorial_text or text_rows or meta_rows:
-        editorial = list(decoded.editorial_text) + [row.text for row in text_rows if row.text]
-        return editorial, text_rows + meta_rows
+        editorial = [
+            cleaned
+            for text in (*decoded.editorial_text, *(row.text for row in text_rows))
+            if (cleaned := _clean_editorial_text(text))
+        ]
+        return list(dict.fromkeys(editorial)), text_rows + meta_rows
     return None
+
+
+def _clean_editorial_text(text: str) -> str:
+    cleaned = text.split("&", 1)[-1].strip()
+    return re.sub(r"\s+(\d+)(?:\s+\1){2,}\s+.*$", "", cleaned).strip()
 
 
 def _decoded_note_content(
@@ -687,7 +702,10 @@ def _decoded_note_content(
     )
 
 
-def _decoded_lyric_content(decoded: FT3TextRecord) -> tuple[list[str], list[list[LyricEvent]]]:
+def _decoded_lyric_content(decoded: FT3TextRecord, chunk: bytes) -> tuple[list[str], list[list[LyricEvent]]]:
+    matrix = _positioned_lyric_matrix(chunk, decoded.melody_events)
+    if matrix is not None:
+        return matrix
     lyrics = [line for line in decoded.lyrics if _is_meaningful_lyric_line(line)]
     rows = [
         list(row)
@@ -695,6 +713,135 @@ def _decoded_lyric_content(decoded: FT3TextRecord) -> tuple[list[str], list[list
         if any(event.extender for event in row) or _is_meaningful_lyric_line(" ".join(event.text for event in row))
     ]
     return lyrics, rows
+
+
+def _positioned_lyric_matrix(
+    chunk: bytes,
+    melody_events: list[MelodyEvent],
+) -> tuple[list[str], list[list[LyricEvent]]] | None:
+    onsets = sorted({event.onset_index for event in melody_events if not event.is_rest})
+    cells = _matrix_cells(chunk)
+    if not onsets or not cells:
+        return None
+    columns = _matrix_columns(cells, len(onsets))
+    if columns is None:
+        return None
+    rows = _transpose_lyric_columns(columns, onsets, melody_events)
+    if not rows:
+        return None
+    lyrics = [" ".join(_matrix_source_text(cell) for cell in row) for row in zip(*columns, strict=True)]
+    return lyrics, rows
+
+
+def _matrix_cells(chunk: bytes) -> list[bytes]:
+    parts = chunk.split(b"\r\n")
+    if len(parts) < 2:
+        return []
+    first = re.search(rb"[\x20-\x7e\x80-\xff]+$", parts[0])
+    last = re.match(rb"[\x20-\x7e\x80-\xff]+", parts[-1])
+    if first is None or last is None:
+        return []
+    cells = [first.group(0), *parts[1:-1], last.group(0)]
+    if not cells[0] or cells[0][0] not in _MATRIX_COORDINATES:
+        return []
+    cells[0] = cells[0][1:]
+    return cells
+
+
+def _matrix_columns(cells: list[bytes], column_count: int) -> list[list[bytes]] | None:
+    if len(cells) == column_count:
+        return [[cell] for cell in cells]
+    expanded_count = len(cells) + column_count - 1
+    if column_count < 2 or expanded_count % column_count:
+        return None
+    verse_count = expanded_count // column_count
+    columns: list[list[bytes]] = []
+    carry: bytes | None = None
+    cursor = 0
+    for column_index in range(column_count):
+        column = [carry] if carry is not None else []
+        needed = verse_count - len(column)
+        column.extend(cells[cursor : cursor + needed])
+        cursor += needed
+        carry = None
+        if column_index < column_count - 1:
+            split = _split_matrix_boundary(column[-1])
+            if split is None:
+                return None
+            column[-1], carry = split
+        columns.append(column)
+    if carry is not None or cursor != len(cells) or any(len(column) != verse_count for column in columns):
+        return None
+    return columns
+
+
+def _split_matrix_boundary(cell: bytes) -> tuple[bytes, bytes] | None:
+    for marker_width in (2, 1):
+        for start in range(1, len(cell) - marker_width):
+            marker = cell[start : start + marker_width]
+            left = cell[:start]
+            right = cell[start + marker_width :]
+            if _is_matrix_marker(marker) and _valid_matrix_token(left) and _valid_matrix_token(right):
+                return left, right
+    return None
+
+
+def _is_matrix_marker(value: bytes) -> bool:
+    return bool(value) and all(byte < 0x20 or byte in _MATRIX_COORDINATES for byte in value)
+
+
+def _valid_matrix_token(value: bytes) -> bool:
+    text = _decode_matrix_text(value)
+    return bool(text) and bool(re.match(r"[^\W\d_]", text, flags=re.UNICODE))
+
+
+def _decode_matrix_text(value: bytes) -> str:
+    return value.decode("cp1252", errors="replace").replace("\x00", "").strip()
+
+
+def _matrix_source_text(value: bytes) -> str:
+    return _decode_matrix_text(value)
+
+
+def _matrix_event_text(value: bytes) -> tuple[str, str]:
+    source = _matrix_source_text(value)
+    starts = source.startswith("-")
+    ends = source.endswith("-")
+    text = source.strip("-")
+    if starts and ends:
+        return text, "middle"
+    if starts:
+        return text, "end"
+    if ends:
+        return text, "begin"
+    return text, "single"
+
+
+def _transpose_lyric_columns(
+    columns: list[list[bytes]],
+    onsets: list[int],
+    melody_events: list[MelodyEvent],
+) -> list[list[LyricEvent]]:
+    source_positions = {
+        onset: min(event.src_pos for event in melody_events if event.onset_index == onset) for onset in onsets
+    }
+    rows: list[list[LyricEvent]] = []
+    for verse, values in enumerate(zip(*columns, strict=True)):
+        row: list[LyricEvent] = []
+        for onset, value in zip(onsets, values, strict=True):
+            text, syllabic = _matrix_event_text(value)
+            if text:
+                row.append(
+                    LyricEvent(
+                        text,
+                        onset,
+                        verse=verse,
+                        syllabic=syllabic,
+                        src_pos=source_positions[onset],
+                    ),
+                )
+        rows.append(row)
+    return rows
 
 
 def _append_or_merge_note_bar(staff: ImportedStaff, incoming: ImportedBarContent) -> None:
@@ -718,6 +865,7 @@ def _append_raw_imported_bar(  # noqa: C901
     unknown_staff: ImportedStaff,
     bar_index: int,
     raw_kind: str,
+    chunk: bytes,
     source_bar: Bar,
     decoded: FT3TextRecord | None,
 ) -> None:
@@ -731,7 +879,7 @@ def _append_raw_imported_bar(  # noqa: C901
         raw_kind == "text-score-raw" and decoded is not None and decoded.melody_events
     ):
         _append_or_merge_note_bar(note_staff, _decoded_note_content(base, decoded))
-    lyric_content = _decoded_lyric_content(decoded) if decoded is not None else ([], [])
+    lyric_content = _decoded_lyric_content(decoded, chunk) if decoded is not None else ([], [])
     if decoded is not None and raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"} and any(lyric_content):
         lyrics, lyric_event_rows = lyric_content
         lyric_staff.bars.append(
@@ -814,6 +962,7 @@ def _build_imported_score(
             unknown_staff=unknown_staff,
             bar_index=imported.bar_index,
             raw_kind=imported.record_kind,
+            chunk=imported.chunk,
             source_bar=source_bar,
             decoded=decoded,
         )
