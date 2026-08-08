@@ -57,6 +57,7 @@ class FlowEvent:
     lyric: str | None = None
     syllabic: Syllabic = Syllabic.SINGLE
     written_pitches: tuple[WrittenPitch, ...] = ()
+    beam: BeamKind | None = None
 
     def __post_init__(self) -> None:
         _validate_flow_event_identity(self)
@@ -195,6 +196,7 @@ def adapt_flow_events(
                 active.time_signature,
                 active.beam_policy,
                 split_ids,
+                {event.id for event in events if event.beam is not None},
             ),
             time_signature=active.time_signature if index == 0 else None,
             key_signature=active.key_signature if index == 0 else None,
@@ -261,6 +263,7 @@ def _adapt_explicit_measure(
             meter,
             options.beam_policy,
             set(),
+            {event.id for event in measure.events if event.beam is not None},
         )
     )
     notation = NotationMeasure(
@@ -373,6 +376,9 @@ def _event_segments(
     capacity: Fraction,
     beat_unit: int,
 ) -> tuple[tuple[int, NotationEvent, FlowSegmentMap], ...]:
+    first_segment_capacity = capacity - event.onset % capacity
+    if event.duration > first_segment_capacity and event.beam not in {None, BeamKind.NONE}:
+        _fail(f"flow event {event.id!r} with an explicit beam group cannot cross a measure boundary")
     segments: list[tuple[int, NotationEvent, FlowSegmentMap]] = []
     cursor = event.onset
     remaining = event.duration
@@ -404,6 +410,7 @@ def _notation_event(
         kind=EventKind.NOTE if pitches else EventKind.REST,
         pitches=pitches,
         voice=event.voice,
+        beam=BeamKind.NONE if event.beam is None else event.beam,
     )
 
 
@@ -421,13 +428,14 @@ def _apply_meter_beams(
     meter: TimeSignature,
     policy: FlowBeamPolicy,
     split_ids: set[str],
+    explicit_beam_ids: set[str],
 ) -> tuple[NotationEvent, ...]:
     if policy is FlowBeamPolicy.NONE:
         return events
     group_duration = Fraction(3 if meter.beat_unit >= 8 and meter.beats % 3 == 0 else 1, meter.beat_unit)
     replacements: dict[str, BeamKind] = {}
     for voice in sorted({event.voice for event in events}):
-        for run in _beam_runs(events, voice, group_duration, split_ids):
+        for run in _beam_runs(events, voice, group_duration, split_ids | explicit_beam_ids):
             if len(run) < 2:
                 continue
             replacements[run[0].id] = BeamKind.START
@@ -441,12 +449,15 @@ def _beam_runs(
     events: tuple[NotationEvent, ...],
     voice: int,
     group_duration: Fraction,
-    split_ids: set[str],
+    excluded_ids: set[str],
 ) -> list[list[NotationEvent]]:
     candidates = [
         event
         for event in events
-        if event.voice == voice and _beamable(event) and event.id not in split_ids and _SEGMENT_MARKER not in event.id
+        if event.voice == voice
+        and _beamable(event)
+        and event.id not in excluded_ids
+        and _SEGMENT_MARKER not in event.id
     ]
     runs: list[list[NotationEvent]] = []
     for event in candidates:
@@ -509,6 +520,8 @@ def _validate_flow_event_content(event: FlowEvent) -> None:
         _fail("flow event lyric must be non-empty when present")
     if not isinstance(event.syllabic, Syllabic):
         _fail("flow event syllabic value must be a Syllabic")
+    if event.beam is not None and not isinstance(event.beam, BeamKind):
+        _fail("flow event beam must be a BeamKind or None")
 
 
 def _validate_midi_pitches(event: FlowEvent) -> None:

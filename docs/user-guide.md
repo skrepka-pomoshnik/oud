@@ -440,7 +440,7 @@ The former `oud.core.*` model/render and `oud.ui.*` renderer aliases were remove
 
 ## Timed flow scores
 
-`FlowEvent` accepts either `midi_pitches` for sounding-pitch input or `written_pitches` when enharmonic spelling must be preserved. `FlowScoreOptions` can set the initial clef and key signature. Automatic beaming is disabled by default for compatibility; select `FlowBeamPolicy.METER` to group beamable notes by simple or compound meter beats.
+`FlowEvent` accepts either `midi_pitches` for sounding-pitch input or `written_pitches` when enharmonic spelling must be preserved. Set its optional `beam` to preserve a source-authored `BeamKind`; an explicit value, including `BeamKind.NONE`, takes precedence over `FlowBeamPolicy.METER`. Automatic beaming is disabled by default for compatibility; select `FlowBeamPolicy.METER` to group only events whose `beam` is `None` by simple or compound meter beats. A source-authored beam group that would be split across an inferred measure boundary is rejected rather than altered. `FlowScoreOptions` can set the initial clef and key signature.
 
 Use `adapt_flow_events` for one fixed meter whose event times may cross inferred measure boundaries. Use `adapt_flow_measures` with `FlowMeasure` when boundaries are known, including pickups, short or irregular measures, meter changes, key changes, and clef changes. Measure-local event onset and duration values remain in units of that measure's active meter beat. An event crossing an explicit boundary is rejected rather than guessed or silently split.
 

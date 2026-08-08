@@ -60,6 +60,31 @@ def test_flow_adapter_applies_compound_meter_beams_only_when_requested() -> None
     ]
 
 
+def test_flow_adapter_preserves_explicit_beams_over_meter_policy() -> None:
+    flow = adapt_flow_events(
+        (
+            FlowEvent("source-start", Fraction(0), Fraction(1), (60,), beam=BeamKind.START),
+            FlowEvent("source-end", Fraction(1), Fraction(1), (62,), beam=BeamKind.END),
+            FlowEvent("source-unbeamed", Fraction(2), Fraction(1), (64,), beam=BeamKind.NONE),
+        ),
+        options=FlowScoreOptions(time_signature=TimeSignature(6, 8), beam_policy=FlowBeamPolicy.METER),
+    )
+
+    assert [event.beam for event in flow.score.staffs[0].measures[0].events] == [
+        BeamKind.START,
+        BeamKind.END,
+        BeamKind.NONE,
+    ]
+
+
+def test_flow_adapter_rejects_split_explicit_beam_group() -> None:
+    with pytest.raises(FlowAdapterError, match="explicit beam group cannot cross a measure boundary"):
+        adapt_flow_events(
+            (FlowEvent("split-beam", Fraction(5), Fraction(2), (60,), beam=BeamKind.START),),
+            options=FlowScoreOptions(time_signature=TimeSignature(6, 8)),
+        )
+
+
 def test_explicit_flow_measures_support_pickup_and_meter_change() -> None:
     flow = adapt_flow_measures(
         (

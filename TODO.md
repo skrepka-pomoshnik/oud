@@ -181,3 +181,35 @@ targets are in `docs/architecture-debt.md`.
     available.
   - Keep README as the quick-start page and the man page as the exhaustive
     command reference.
+## Source-faithful notation architecture
+
+These items refine the existing FT3, terminal-viewer, and publication work. They do not constitute a claim of general mensural, neumatic, or chant support.
+
+### P1: separate source testimony from interpretation
+
+- [ ] Define typed diplomatic records for the historical signs currently supported by FT3: stable source identity and order, source coordinates, written pitch/shape, mensuration and proportion signs, coloration, ligature membership, dots, accidentals/ficta, and text association.
+- [ ] Represent editorial decisions separately from diplomatic records: effective onset and duration, perfection/imperfection or alteration where applicable, dot meaning, ficta decisions, and voice synchronization. Derivation must be deterministic and must not mutate source testimony.
+- [ ] Preserve one stable object identity and source location through import, interpretation, `NotationScore`, `ScoreLayout`, terminal semantic cells, playback diagnostics, and LilyPond export.
+- [ ] Add one small end-to-end fixture for every historical construct we claim to support. Start with mensuration and proportion from real FT3 files; require diplomatic display, interpreted timing, terminal rendering, LilyPond output, and MIDI timing assertions.
+- [ ] Add an alternative-interpretation regression case proving that two explicit editorial decisions can share the same diplomatic source without duplicating or rewriting it.
+- [ ] Document the supported historical-notation matrix explicitly; reject unsupported constructs visibly instead of approximating or silently discarding them.
+
+### P2: improve proof rendering and publication typesetting
+
+- [ ] Define the semantic typesetting requests needed by both the compact terminal proof and LilyPond export: object identity, anchors, ordering, collision roles, spacing constraints, registration points, and explicit local overrides. Do not build a second geometry engine or an SVG backend.
+- [ ] Keep the terminal renderer as the deterministic proof and editing surface. Its acceptance criteria remain compact fitting, clipping only at the lower viewport border, stable cursor/playback highlighting, ASCII-safe geometry, and graceful narrow-terminal behavior.
+- [ ] Add typesetting microcases for spacing, collisions, lyrics, ligatures, mensuration signs, tablature rhythm flags, and mixed vocal-plus-lute systems. Assert generated LilyPond structure and use bounded PDF raster comparisons for final typography.
+- [ ] Borrow proven printing concepts rather than output formats: duration-sensitive spacing, optical corrections, anchors, collision boxes, registration, local engraver responsibilities, and explicit per-object overrides.
+- [ ] Keep font and glyph metrics inside the publication backend; core notation and terminal layout must not depend on SMuFL private-use glyph widths or a particular terminal font.
+- [ ] Retain LilyPond as the publication backend and improve its output until the Gerbode comparison corpus and visual regression cases pass.
+
+### P3: bounded interoperability experiments
+
+- [ ] Prototype lossless MEI mensural import/export for the supported diplomatic subset only. Preserve IDs, source order, graphic mensuration signs, semantic mensuration values, explicit interpretive durations, and unsupported data diagnostics.
+- [ ] Compare the MEI prototype with Verovio on a small checked-in legal fixture set, including mensural score-up. Use it only as an interoperability oracle; do not add an SVG backend, make Verovio a required dependency, or advertise MEI support until round trips and comparisons pass.
+- [ ] Evaluate public CMME and Measuring Polyphony examples only after fixture licensing and expected interpretations are documented.
+
+### Deferred pending a product decision
+
+- [ ] Decide whether a dedicated mensural input DSL is needed only after the diplomatic model and round trips expose concrete limitations in FT3/TAB entry. Do not design syntax before that evidence exists.
+- [ ] Treat neumes, `gabc`, chant editing, facsimile overlays, and terminal image protocols as separate future scopes, not extensions implied by mensural or tablature support.
