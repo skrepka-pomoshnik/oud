@@ -155,7 +155,7 @@ def run_loop(  # noqa: C901
             focused_staff = current_view_staff(state)
             state.display_cursor_maps.clear()
             playback_cache: dict[tuple[int, int], list[tuple[int, int, str, int]]] | None = (
-                {} if not is_duet_score_piece(state.piece) else None
+                {} if not is_duet_score_piece(state.piece) and state.piece.imported_score is None else None
             )
             render_piece(
                 frame_buffer,

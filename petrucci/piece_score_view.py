@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
+from fractions import Fraction
 
 from petrucci.framebuffer import Frame
 from petrucci.layout import ElementRole, LayoutMetrics, NotationLayoutPolicy, ScoreLayout, layout_score
-from petrucci.model import ImportedStaff, Piece
+from petrucci.model import ImportedStaff, MelodyEvent, Piece
 from petrucci.piece_adapter import notation_score_from_piece
-from petrucci.render_utils import bar_cells_from_chords, chord_positions
+from petrucci.render_utils import bar_cells_from_chords, chord_positions, note_type_to_denom
 from petrucci.score import NotationEvent, NotationScore, NotationStaff
 from petrucci.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
 from petrucci.screen import A_BOLD, A_DIM, A_REVERSE
@@ -124,6 +125,7 @@ def typeset_piece_score_view(
         score,
         *active_position,
         preferred_staff_id=focused_staff_id,
+        temporal_tab_position=playback is not None and _has_tablature(piece),
     )
     system_offset = _system_offset(layout, score, bar_offset=bar_offset, active_event=active_event)
     y_offset = _vertical_offset(
@@ -431,8 +433,15 @@ def _source_event(
     onset_index: int,
     *,
     preferred_staff_id: str | None,
+    temporal_tab_position: bool = False,
 ) -> NotationEvent | None:
-    onset_index = _source_onset_index(piece, bar_index, onset_index, preferred_staff_id=preferred_staff_id)
+    onset_index = _source_onset_index(
+        piece,
+        bar_index,
+        onset_index,
+        preferred_staff_id=preferred_staff_id,
+        temporal_tab_position=temporal_tab_position,
+    )
     staffs = sorted(score.staffs, key=lambda staff: staff.id != preferred_staff_id)
     for staff in staffs:
         for measure in staff.measures:
@@ -451,6 +460,7 @@ def _source_onset_index(
     source_position: int,
     *,
     preferred_staff_id: str | None,
+    temporal_tab_position: bool,
 ) -> int:
     imported = piece.imported_score
     if imported is None:
@@ -462,6 +472,10 @@ def _source_onset_index(
         bar = next((item for item in staff.bars if item.source_bar_index == bar_index), None)
         if bar is None or not bar.melody_events:
             continue
+        if temporal_tab_position:
+            mapped = _notation_onset_at_tab_attack(piece, bar_index, source_position, bar.melody_events)
+            if mapped is not None:
+                return mapped
         direct = next((event for event in bar.melody_events if event.onset_index == source_position), None)
         event = direct or min(
             bar.melody_events,
@@ -469,6 +483,38 @@ def _source_onset_index(
         )
         return event.onset_index
     return source_position
+
+
+def _notation_onset_at_tab_attack(
+    piece: Piece,
+    bar_index: int,
+    chord_index: int,
+    melody_events: list[MelodyEvent],
+) -> int | None:
+    if not 0 <= bar_index < len(piece.bars):
+        return None
+    chords = piece.bars[bar_index].chords
+    if not chords or not melody_events:
+        return None
+    target = sum((_written_duration(chord.note_type, chord.dotted) for chord in chords[:chord_index]), Fraction())
+    voice = min(event.voice for event in melody_events)
+    ordered = sorted(
+        (event for event in melody_events if event.voice == voice),
+        key=lambda event: event.onset_index,
+    )
+    onset = Fraction()
+    for event in ordered:
+        end = onset + _written_duration(event.note_type, event.dotted)
+        if target < end:
+            return event.onset_index
+        onset = end
+    return ordered[-1].onset_index if ordered else None
+
+
+def _written_duration(note_type: int | None, dotted: bool) -> Fraction:
+    denominator = note_type_to_denom(note_type or 4) or 4
+    duration = Fraction(1, denominator)
+    return duration * Fraction(3, 2) if dotted else duration
 
 
 def _system_offset(layout, score: NotationScore, *, bar_offset: int, active_event: NotationEvent | None) -> int:

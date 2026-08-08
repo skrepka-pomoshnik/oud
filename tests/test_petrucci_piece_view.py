@@ -201,6 +201,42 @@ def test_mixed_playback_marks_voice_and_matching_tab_chord() -> None:
     assert any(attr != 0 for row in view.result.frame.attrs for attr in row)
 
 
+def test_mixed_playback_maps_tab_subdivision_to_active_voice_duration() -> None:
+    melody = [
+        MelodyEvent("c4", 0, note_type=3),
+        MelodyEvent("d4", 1, note_type=4),
+        MelodyEvent("e4", 2, note_type=4),
+    ]
+    piece = Piece(
+        bars=[
+            Bar(
+                chords=[Chord(5, False, None, [Note(1, 0, 0)]) for _ in range(8)],
+                melody_events=melody,
+            ),
+        ],
+        strings=6,
+        imported_score=ImportedScore(
+            "ft3",
+            [ImportedStaff("note", "voice", [ImportedBarContent(0, melody_events=melody)])],
+        ),
+    )
+    view = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=30,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=(0, 3),
+        settings=SETTINGS,
+    )
+
+    assert view is not None
+    active_id = "piece:staff:0:bar:0:event:0:0"
+    later_id = "piece:staff:0:bar:0:event:2:0"
+    assert any(view.result.frame.attrs[row][column] != 0 for row, column in view.result.cells_for(active_id))
+    assert all(view.result.frame.attrs[row][column] == 0 for row, column in view.result.cells_for(later_id))
+
+
 def test_playback_selects_later_system_and_current_style_without_reflow() -> None:
     staffs = [
         ImportedStaff(

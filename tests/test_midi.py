@@ -26,12 +26,14 @@ from oud.exports._midi_projection import (
     _bar_chord_events,
     _chord_positions,
     _collect_manual_chords,
+    _default_tuning,
     _duration_ticks,
     _fret_from_override,
     _parse_tuning,
     _resolved_tuning_for_piece,
     build_playback_timeline,
 )
+from oud.exports._midi_serialization import _single_score_midi_note_events
 from oud.exports.midi import export_midi
 from petrucci.model import (
     Bar,
@@ -150,6 +152,38 @@ def test_export_midi_includes_vocal_channel_for_explicit_melody_bars(tmp_path) -
     track = _track_data(path)
     assert bytes([0xC1, 54]) in track
     assert bytes([0x91]) in track
+
+
+def test_explicit_vocal_timing_is_independent_from_tab_subdivisions() -> None:
+    bar = Bar(
+        chords=[Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]) for _ in range(8)],
+        melody_events=[
+            MelodyEvent("c'", 0, note_type=3),
+            MelodyEvent("d'", 1, note_type=4),
+            MelodyEvent("e'", 2, note_type=4),
+        ],
+    )
+    events = _single_score_midi_note_events(
+        Piece(bars=[bar], strings=6),
+        overrides={},
+        durations={},
+        bar_width=8,
+        style="french",
+        default_duration=4,
+        start_bar=0,
+        dotted=None,
+        settings={},
+        gate=0.85,
+        pitches=[67, 62, 57, 53, 48, 43],
+        ornaments=None,
+    )
+
+    vocal_starts = [tick for tick, payload in events if payload[0] == 0x91 and payload[2] > 0]
+    assert vocal_starts == [0, 960, 1440]
+
+
+def test_default_six_course_tuning_uses_the_six_course_range() -> None:
+    assert _default_tuning(6) == [67, 62, 57, 53, 48, 43]
 
 
 def test_export_midi_skips_explicit_vocal_rest_events(tmp_path) -> None:

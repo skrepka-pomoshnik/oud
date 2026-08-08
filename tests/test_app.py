@@ -15,7 +15,7 @@ from oud.tui.input import handle_search as handle_search_input
 from oud.tui.input import history_next, history_prev, parse_search
 from oud.tui.loop import _read_input_batch, run_loop
 from petrucci.framebuffer import Frame
-from petrucci.model import Bar, Piece
+from petrucci.model import Bar, ImportedScore, Piece
 
 
 def _state() -> EditorState:
@@ -602,3 +602,37 @@ def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
     assert updates == 2
     assert rendered_markers == [None]
     assert state.playback_overlay_key == (0, 1)
+
+
+def test_run_loop_passes_playback_position_to_imported_score_renderer(monkeypatch) -> None:
+    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    state = _playback_scroll_state()
+    state.piece.imported_score = ImportedScore("ft3")
+    rendered_positions: list[tuple[object, object, object]] = []
+
+    class _OneFrameWindow(_PlaybackScrollFakeWindow):
+        def getch(self):
+            return ord("q")
+
+    def _fake_init_state(*_args, **_kwargs):
+        return state
+
+    def _fake_render_piece(*args, **kwargs):
+        rendered_positions.append((args[29], args[30], kwargs["playback_cache"]))
+
+    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.tui.loop.update_playback_animation", lambda _state: False)
+    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+
+    assert (
+        run_loop(
+            cast(curses.window, _OneFrameWindow()),
+            None,
+            config_path="config.toml",
+            handle_insert=handle_insert,
+            handle_normal=lambda *_args: False,
+            apply_command=apply_command,
+        )
+        == 0
+    )
+    assert rendered_positions == [(8, 0, None)]

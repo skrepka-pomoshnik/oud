@@ -23,7 +23,7 @@ from petrucci.duet_score import duet_logical_bar_count, duet_raw_bar_index, is_d
 from petrucci.model import Bar, Chord, Note, Piece
 from petrucci.tab_input import editor_event_columns, editor_fret_at
 from petrucci.tuning_utils import default_bass_strings, parse_bass_strings, tuning_count
-from petrucci.vocal_line import infer_vocal_events
+from petrucci.vocal_line import VocalEvent, infer_vocal_events
 
 
 def _note_type_to_denom(note_type: int) -> int | None:
@@ -151,8 +151,7 @@ def _default_tuning(strings: int) -> list[int]:
         "d2",
         "c2",
     ]
-    pitches = _parse_tuning("".join(defaults))
-    return pitches[:strings]
+    return _parse_tuning("".join(reversed(defaults[:strings])))
 
 
 def _resolved_tuning_for_piece(piece: Piece, settings: dict[str, str]) -> str:
@@ -592,14 +591,15 @@ def _append_vocal_messages(  # noqa: C901
     if gate_text.isdigit():
         gate_percent = max(10, min(100, int(gate_text)))
     gate = gate_percent / 100.0
-    for event in vocal_events:
+    for event, start, duration in _timed_vocal_events(
+        vocal_events,
+        chord_events,
+        has_explicit_melody=has_explicit_melody,
+    ):
         if getattr(event, "is_rest", False):
             continue
         if event.pitch is None:
             continue
-        if not (0 <= event.chord_index < len(chord_events)):
-            continue
-        start, duration, _col, _notes = chord_events[event.chord_index]
         note_len = max(1, int(duration * gate))
         if event.fermata:
             note_len = max(note_len, int(duration * 1.5))
@@ -612,6 +612,28 @@ def _append_vocal_messages(  # noqa: C901
             velocity=min(127, BASE_NOTE_VELOCITY + 4),
             ornament_symbol=None,
         )
+
+
+def _timed_vocal_events(
+    vocal_events: list[VocalEvent],
+    chord_events: list[tuple[int, int, int, list[Note]]],
+    *,
+    has_explicit_melody: bool,
+) -> list[tuple[VocalEvent, int, int]]:
+    if has_explicit_melody:
+        timed: list[tuple[VocalEvent, int, int]] = []
+        start = 0
+        for event in vocal_events:
+            denominator = _note_type_to_denom(event.note_type) or 4
+            duration = _duration_ticks(denominator, event.dotted)
+            timed.append((event, start, duration))
+            start += duration
+        return timed
+    return [
+        (event, chord_events[event.chord_index][0], chord_events[event.chord_index][1])
+        for event in vocal_events
+        if 0 <= event.chord_index < len(chord_events)
+    ]
 
 
 def _playverse_count(piece: Piece, settings: dict[str, str]) -> int:
