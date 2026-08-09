@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from petrucci.input.tablature.policy import time_sig_inline_rows
 from petrucci.rendering.primitives.geometry import _scale_chord_row
 from petrucci.rendering.primitives.helpers import pad_row, safe_addstr
 from petrucci.rendering.primitives.marks import _overlay_inline_local_marks_on_display_row
 from petrucci.terminal.canvas.screen import A_BOLD, A_REVERSE, Screen
-from petrucci.input.tablature.policy import time_sig_inline_rows
 from petrucci.terminal.view.model import _inline_bass_row, _scale_col
 
 

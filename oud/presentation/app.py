@@ -7,15 +7,15 @@ import sys
 from dataclasses import replace
 
 from oud import __version__
+from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
+from oud.editor.services.bootstrap import init_state
+from oud.editor.services.io.files import render_ascii_snapshot
 from oud.presentation.cli_convert import (
     FORMAT_ALIASES,
     ConvertOptions,
     convert_command,
 )
 from oud.presentation.command_io import OutputExistsError, atomic_write_text
-from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
-from oud.editor.services.bootstrap import init_state
-from oud.editor.services.io.files import render_ascii_snapshot
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.loop import run_loop
 

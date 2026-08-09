@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from petrucci.adapters.vocal import infer_vocal_events
 from petrucci.terminal.canvas.framebuffer import _split_display_clusters
 from petrucci.terminal.canvas.screen import A_BOLD, A_REVERSE
 from petrucci.terminal.view.model import _scale_col
-from petrucci.adapters.vocal import infer_vocal_events
 
 PlaybackOverlayCache = dict[tuple[int, int], list[tuple[int, int, str, int]]]
 

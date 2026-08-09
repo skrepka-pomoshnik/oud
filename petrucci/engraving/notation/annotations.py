@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from itertools import pairwise
 
-from petrucci.terminal.display import display_width
+from petrucci.core.score import LyricLine, LyricSyllable, NotationScore, NotationStaff, SpanKind, Syllabic
 from petrucci.engraving.layout.engine import (
     ElementKey,
     ElementRole,
@@ -15,7 +15,7 @@ from petrucci.engraving.layout.engine import (
     StaffRows,
 )
 from petrucci.engraving.notation.elements import _layout_fail
-from petrucci.core.score import LyricLine, LyricSyllable, NotationScore, NotationStaff, SpanKind, Syllabic
+from petrucci.terminal.display import display_width
 
 
 def _span_lane_map(staff: NotationStaff, *, kinds: frozenset[SpanKind]) -> dict[str, int]:

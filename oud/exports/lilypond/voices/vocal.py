@@ -23,9 +23,9 @@ from oud.exports.lilypond.common import (
 )
 from oud.exports.lilypond.registration import LilyPondRegistration
 from oud.exports.lilypond.timing import duration_scale, timed_items_duration
+from petrucci.adapters.vocal import infer_vocal_events
 from petrucci.core.model import Bar, ImportedBarContent, ImportedStaff, MelodyEvent, Piece
 from petrucci.rendering.primitives.utils import note_type_to_denom
-from petrucci.adapters.vocal import infer_vocal_events
 
 
 def _lyric_tokens_for_row(row, sung_onsets: tuple[int, ...]) -> list[str]:
@@ -149,6 +149,56 @@ def _beam_suffix(event: MelodyEvent, beam_open: bool, *, final_event: bool) -> t
     return suffix, beam_open
 
 
+def _open_imported_duration_scales(
+    melody_body: list[str],
+    note_bar: ImportedBarContent,
+    target_duration: Fraction,
+) -> tuple[bool, bool]:
+    proportion_open = note_bar.proportion is not None
+    if note_bar.proportion is not None:
+        numerator, denominator = note_bar.proportion
+        melody_body.append(f"  \\scaleDurations {denominator}/{numerator} {{")
+    measure_scale = duration_scale(
+        target_duration,
+        timed_items_duration(note_bar.melody_events, fallback=Fraction(1, 4)),
+    )
+    measure_scale_open = measure_scale != 1
+    if measure_scale_open:
+        melody_body.append(f"  \\scaleDurations {measure_scale.numerator}/{measure_scale.denominator} {{")
+    return proportion_open, measure_scale_open
+
+
+def _append_imported_events(melody_body: list[str], note_bar: ImportedBarContent) -> tuple[int, tuple[int, ...]]:
+    sung_onsets: list[int] = []
+    beam_open = False
+    for event_index, event in enumerate(note_bar.melody_events):
+        if not event.is_rest:
+            sung_onsets.append(event.onset_index)
+        lily = "r" if event.is_rest else _lily_note_from_event_text(event.text)
+        duration = _duration_token(note_type_to_denom(event.note_type or 4) or 4, event.dotted)
+        glissando_to_next = (
+            event_index + 1 < len(note_bar.melody_events)
+            and note_bar.melody_events[event_index + 1].glissando_from_previous
+        )
+        beam_suffix, beam_open = _beam_suffix(
+            event,
+            beam_open,
+            final_event=event_index == len(note_bar.melody_events) - 1,
+        )
+        suffix = _imported_event_suffix(
+            event,
+            beam_suffix=beam_suffix,
+            glissando_to_next=glissando_to_next,
+            dynamic=note_bar.dynamic if event_index == 0 else None,
+        )
+        melody_body.append(f"  {(lily or 'r')}{duration}{suffix}")
+    return len(note_bar.melody_events), tuple(sung_onsets)
+
+
+def _close_imported_duration_scales(melody_body: list[str], scales: tuple[bool, bool]) -> None:
+    melody_body.extend("  }" for scale_open in reversed(scales) if scale_open)
+
+
 def _append_imported_melody_bar(
     melody_body: list[str],
     note_bar: ImportedBarContent,
@@ -168,51 +218,14 @@ def _append_imported_melody_bar(
     repeat_mark = _repeat_mark_token(bar_like)
     if repeat_mark:
         melody_body.append(f"  {repeat_mark}")
-    if note_bar.proportion is not None:
-        numerator, denominator = note_bar.proportion
-        melody_body.append(f"  \\scaleDurations {denominator}/{numerator} {{")
-    measure_scale = duration_scale(
-        target_duration,
-        timed_items_duration(note_bar.melody_events, fallback=Fraction(1, 4)),
-    )
-    if measure_scale != 1:
-        melody_body.append(f"  \\scaleDurations {measure_scale.numerator}/{measure_scale.denominator} {{")
-    event_count = 0
-    sung_onsets: list[int] = []
-    beam_open = False
-    for event_index, event in enumerate(note_bar.melody_events):
-        is_rest = getattr(event, "is_rest", False)
-        if not is_rest:
-            sung_onsets.append(event.onset_index)
-        lily = "r" if is_rest else _lily_note_from_event_text(event.text)
-        note_type = event.note_type or 4
-        duration = _duration_token(note_type_to_denom(note_type) or 4, event.dotted)
-        glissando_to_next = (
-            event_index + 1 < len(note_bar.melody_events)
-            and note_bar.melody_events[event_index + 1].glissando_from_previous
-        )
-        beam_suffix, beam_open = _beam_suffix(
-            event,
-            beam_open,
-            final_event=event_index == len(note_bar.melody_events) - 1,
-        )
-        suffix = _imported_event_suffix(
-            event,
-            beam_suffix=beam_suffix,
-            glissando_to_next=glissando_to_next,
-            dynamic=note_bar.dynamic if event_count == 0 else None,
-        )
-        melody_body.append(f"  {(lily or 'r')}{duration}{suffix}")
-        event_count += 1
+    scales = _open_imported_duration_scales(melody_body, note_bar, target_duration)
+    event_count, sung_onsets = _append_imported_events(melody_body, note_bar)
     if event_count == 0:
         melody_body.append("  r4")
         melody_body.extend(f"  {mark}" for mark in _bar_sign_mark_tokens(bar_like))
-    if note_bar.proportion is not None:
-        melody_body.append("  }")
-    if measure_scale != 1:
-        melody_body.append("  }")
+    _close_imported_duration_scales(melody_body, scales)
     _append_barline(melody_body, bar_like)
-    return current_time_sig, tuple(sung_onsets)
+    return current_time_sig, sung_onsets
 
 
 def _append_editorial_marks(

@@ -86,7 +86,10 @@ def _build_tab_body(  # noqa: C901, PLR0912
         actual_duration = (
             timed_items_duration(bar.chords, fallback=Fraction(1, 4))
             if bar.chords
-            else sum((Fraction(1, denominator) for _col, _notes, denominator in events), Fraction(1, 4) if not events else Fraction())
+            else sum(
+                (Fraction(1, denominator) for _col, _notes, denominator in events),
+                Fraction(1, 4) if not events else Fraction(),
+            )
         )
         scale = duration_scale(registration.duration_for(b_idx), actual_duration)
         if scale != 1:

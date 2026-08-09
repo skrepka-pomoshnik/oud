@@ -6,13 +6,13 @@ from oud.editor.core.state import EditorState
 from oud.editor.editing.tab.assignment import AssignmentPolicy, assign_chord_pitches
 from oud.editor.navigation.cursor_map import bar_content_width_for_cursor, cursor_display_map_for_bar
 from oud.editor.services.validation.rules import BarRule, RuleContext, RuleIssue, run_rules
+from petrucci.core.music.time import parse_time_signature_value
+from petrucci.core.music.tuning import parse_tuning_pitches
 from petrucci.rendering.primitives.utils import (
     bar_cells_from_chords,
     chord_slot_positions,
     note_type_to_denom,
 )
-from petrucci.core.music.time import parse_time_signature_value
-from petrucci.core.music.tuning import parse_tuning_pitches
 
 
 def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) -> float:  # noqa: C901

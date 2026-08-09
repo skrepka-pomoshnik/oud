@@ -336,14 +336,14 @@ def auto_system_bar_plan_with_gaps(  # noqa: C901
 
 def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list[int]:
     """Per-bar minimum display widths, mirroring render_systems' computation."""
-    from petrucci.rendering.bar.state import resolved_bar_time_value  # noqa: PLC0415
-    from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar  # noqa: PLC0415
     from petrucci.input.tablature.policy import (  # noqa: PLC0415
         bar_has_multifret_tokens,
         multifret_event_gap,
         show_time_cue_for_bar,
         time_cue_side_pad,
     )
+    from petrucci.rendering.bar.state import resolved_bar_time_value  # noqa: PLC0415
+    from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar  # noqa: PLC0415
     from petrucci.terminal.view.model import _parse_time_signature  # noqa: PLC0415
 
     bars = state.piece.bars

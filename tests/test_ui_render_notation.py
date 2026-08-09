@@ -5,11 +5,11 @@ import re
 import pytest
 
 from oud.presentation.ui.adapter import Screen
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.core.model import Bar, Chord, MelodyEvent, Note, Piece
 from petrucci.rendering.api import render_piece
 from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from petrucci.rendering.staff.vocal import melody_row_count
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from tests.helpers_regression_cases import repeat_and_meter_change_piece
 from tests.render_test_utils import first_melody_row_idx as _first_melody_row_idx
 

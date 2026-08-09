@@ -63,15 +63,6 @@ def configure_document(
     if forced_read_only:
         state.persistent_notice = "Read-only viewer"
         state.persistent_notice_level = MessageLevel.WARNING
-    elif state.document_mode is DocumentMode.IMPORTED_READ_ONLY:
-        state.persistent_notice = ""
-        state.persistent_notice_level = MessageLevel.INFO
-    elif state.document_mode is DocumentMode.IMPORTED_PROJECTION:
-        state.persistent_notice = ""
-        state.persistent_notice_level = MessageLevel.INFO
-    elif path is None:
-        state.persistent_notice = ""
-        state.persistent_notice_level = MessageLevel.INFO
     else:
         state.persistent_notice = ""
         state.persistent_notice_level = MessageLevel.INFO

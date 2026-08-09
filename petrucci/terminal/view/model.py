@@ -2,8 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from petrucci.engraving.layout.placement import place_parenthesize_tie_cues as _place_parenthesize_tie_cues
 from petrucci.core.model import Bar, Note, Piece
+from petrucci.engraving.layout.placement import place_parenthesize_tie_cues as _place_parenthesize_tie_cues
+from petrucci.input.tablature.policy import (
+    gliss_span_chars,
+    hold_span_chars,
+    slur_span_chars,
+    tie_notehead_hidden_cols,
+    tie_notehead_parenthesize_cols,
+    tie_span_chars,
+)
 from petrucci.rendering.primitives.utils import (
     bar_cells,
     bar_cells_from_chords,
@@ -13,14 +21,6 @@ from petrucci.rendering.primitives.utils import (
     flag_count,
     flag_positions_from_durations,
     place_duration_cells,
-)
-from petrucci.input.tablature.policy import (
-    gliss_span_chars,
-    hold_span_chars,
-    slur_span_chars,
-    tie_notehead_hidden_cols,
-    tie_notehead_parenthesize_cols,
-    tie_span_chars,
 )
 from petrucci.terminal.view.width import (
     _bar_compact_width,

@@ -5,6 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 from petrucci.core.model import Bar
+from petrucci.input.tablature.policy import string_label as tab_string_label
 from petrucci.rendering.primitives.utils import (
     _duration_values_by_col,
     chord_positions,
@@ -12,7 +13,6 @@ from petrucci.rendering.primitives.utils import (
     flag_positions_from_durations,
     note_type_to_denom,
 )
-from petrucci.input.tablature.policy import string_label as tab_string_label
 
 
 def _source_string_count(

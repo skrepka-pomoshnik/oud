@@ -1,3 +1,4 @@
+from oud.exports.midi import export_midi
 from oud.exports.midi.bytes import (
     BASE_NOTE_VELOCITY,
 )
@@ -34,7 +35,6 @@ from oud.exports.midi.projection import (
     build_playback_timeline,
 )
 from oud.exports.midi.serialization import _single_score_midi_note_events
-from oud.exports.midi import export_midi
 from petrucci.core.model import (
     Bar,
     Chord,

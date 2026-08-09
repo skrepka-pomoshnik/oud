@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from petrucci.terminal.canvas.framebuffer import draw_frame_rows
-from petrucci.core.imported import project_imported_staff
-from petrucci.terminal.lyrics import piece_for_lyric_display
-from petrucci.core.model import Piece
 from petrucci.adapters.piece_view import typeset_piece_score_view
+from petrucci.core.imported import project_imported_staff
+from petrucci.core.model import Piece
+from petrucci.rendering.bar.legacy import LegacyRenderRequest, render_legacy_piece
 from petrucci.rendering.primitives.helpers import apply_overrides as _apply_overrides_impl
 from petrucci.rendering.primitives.helpers import bass_strings_used as _bass_strings_used_impl
 from petrucci.rendering.primitives.helpers import clean_text as _clean_text
@@ -14,9 +13,10 @@ from petrucci.rendering.primitives.helpers import render_info as _render_info
 from petrucci.rendering.primitives.helpers import render_notes as _render_notes
 from petrucci.rendering.primitives.helpers import render_plugin as _render_plugin
 from petrucci.rendering.primitives.helpers import safe_addstr as _safe_addstr
-from petrucci.rendering.bar.legacy import LegacyRenderRequest, render_legacy_piece
 from petrucci.rendering.system.status import build_status_lines, status_attr_for_message
+from petrucci.terminal.canvas.framebuffer import draw_frame_rows
 from petrucci.terminal.canvas.screen import A_REVERSE, Screen
+from petrucci.terminal.lyrics import piece_for_lyric_display
 
 
 def _bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:
@@ -39,6 +39,7 @@ def _render_ascii_preview(
     status_line: str,
     mode: str,
     status_attr: int,
+    *,
     show_status: bool,
 ) -> None:
     height, _width = stdscr.getmaxyx()
@@ -103,7 +104,6 @@ def _render_auxiliary(
             screen,
             request.status_line,
             request.status_attr,
-            request.show_status,
             request.help_offset,
             piece,
             {**request.settings, "terminal": f"{width}x{height}"},
@@ -128,6 +128,7 @@ def _render_auxiliary(
             request.status_line,
             request.mode,
             request.status_attr,
+            show_status=request.show_status,
         )
     else:
         return False

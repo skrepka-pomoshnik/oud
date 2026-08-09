@@ -4,15 +4,6 @@ from fractions import Fraction
 
 import pytest
 
-from petrucci.engraving.layout.engine import (
-    ElementRole,
-    LayoutError,
-    LayoutViewport,
-    NotationLayoutPolicy,
-    clear_layout_cache,
-    layout_collisions,
-    layout_score,
-)
 from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
@@ -34,6 +25,15 @@ from petrucci.core.score import (
     TupletRatio,
     WrittenPitch,
     pitch_from_midi,
+)
+from petrucci.engraving.layout.engine import (
+    ElementRole,
+    LayoutError,
+    LayoutViewport,
+    NotationLayoutPolicy,
+    clear_layout_cache,
+    layout_collisions,
+    layout_score,
 )
 
 

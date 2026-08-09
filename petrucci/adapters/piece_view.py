@@ -6,16 +6,16 @@ import re
 from dataclasses import dataclass, replace
 from fractions import Fraction
 
-from petrucci.terminal.canvas.framebuffer import Frame
-from petrucci.engraving.layout.engine import ElementRole, LayoutMetrics, NotationLayoutPolicy, ScoreLayout, layout_score
-from petrucci.terminal.lyrics import piece_for_lyric_display
-from petrucci.core.model import ImportedStaff, MelodyEvent, Piece
 from petrucci.adapters.piece import notation_score_from_piece
-from petrucci.rendering.primitives.utils import bar_cells_from_chords, chord_positions, note_type_to_denom
+from petrucci.core.model import ImportedStaff, MelodyEvent, Piece
 from petrucci.core.score import NotationEvent, NotationScore, NotationStaff
+from petrucci.engraving.layout.engine import ElementRole, LayoutMetrics, NotationLayoutPolicy, ScoreLayout, layout_score
 from petrucci.engraving.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
-from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE
+from petrucci.rendering.primitives.utils import bar_cells_from_chords, chord_positions, note_type_to_denom
 from petrucci.terminal.api import GlyphMode, SemanticFrame, paint_score
+from petrucci.terminal.canvas.framebuffer import Frame
+from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE
+from petrucci.terminal.lyrics import piece_for_lyric_display
 
 _SOURCE_EVENT_ID = re.compile(r":bar:(?P<bar>\d+):event:(?P<onset>\d+):(?P<voice>\d+)$")
 

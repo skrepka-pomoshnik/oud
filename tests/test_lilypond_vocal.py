@@ -214,8 +214,8 @@ def test_export_lilypond_preserves_imported_beams_and_fermata(tmp_path) -> None:
     path = tmp_path / "beam_fermata.ly"
     export_lilypond(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
     text = path.read_text(encoding="utf-8")
-    assert "c8[" in text
-    assert "d8]\\fermata" in text
+    assert "c'8[" in text
+    assert "d'8]\\fermata" in text
 
 
 def test_export_lilypond_uses_imported_vocal_staff_over_bar_fallback_when_present(tmp_path) -> None:
@@ -262,7 +262,7 @@ def test_export_lilypond_uses_imported_vocal_staff_over_bar_fallback_when_presen
     text = path.read_text(encoding="utf-8")
     assert "\\new TabStaff" in text
     assert "  r4" in text
-    assert "fis4" in text
+    assert "fis'4" in text
     assert '"Rest" "sharp"' in text
 
 
@@ -316,8 +316,8 @@ def test_export_lilypond_aligns_sparse_imported_lyrics_by_source_bar(tmp_path) -
     )
     text = path.read_text(encoding="utf-8")
     assert "  c4" not in text
-    assert text.count("  b4") == 1
-    assert text.count("  a4") == 1
+    assert text.count("  b'4") == 1
+    assert text.count("  a'4") == 1
     assert '_ _ "late"' in text
 
 

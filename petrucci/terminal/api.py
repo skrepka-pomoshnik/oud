@@ -6,10 +6,10 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import NoReturn
 
-from petrucci.terminal.display import clip_display, display_width, split_display_clusters
-from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.engraving.layout.engine import ElementRole, LayoutElement, LayoutViewport, ScoreLayout
+from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.terminal.canvas.screen import A_DIM
+from petrucci.terminal.display import clip_display, display_width, split_display_clusters
 
 
 class GlyphMode(StrEnum):

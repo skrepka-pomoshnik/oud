@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from petrucci.terminal.canvas.framebuffer import Frame, FrameBuffer
-from petrucci.core.model import Piece
 from petrucci.adapters.piece_view import typeset_piece_score_view
+from petrucci.core.model import Piece
 from petrucci.rendering.api import render_piece
+from petrucci.terminal.canvas.framebuffer import Frame, FrameBuffer
 
 DEFAULT_TYPESET_SETTINGS: dict[str, str] = {
     "style": "french",

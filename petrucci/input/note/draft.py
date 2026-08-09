@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
+from petrucci.core.score import (
+    LyricSyllable,
+    NotationEvent,
+    NotationMeasure,
+    NotationScore,
+    NotationSpan,
+    NotationStaff,
+)
 from petrucci.input.note.types import NoteInputError, ScorePosition
-from petrucci.core.score import LyricSyllable, NotationEvent, NotationMeasure, NotationScore, NotationSpan, NotationStaff
 
 
 @dataclass(slots=True)

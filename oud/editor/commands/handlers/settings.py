@@ -11,8 +11,8 @@ from oud.editor.editing.primitives.tablature import (
     italian_to_fret,
 )
 from oud.settings import DEFAULT_SETTINGS, save_settings
-from petrucci.input.tablature.policy import apply_tabnotation_preset
 from petrucci.core.music.tuning import tuning_preset
+from petrucci.input.tablature.policy import apply_tabnotation_preset
 
 SetHandler = Callable[[EditorState, str], bool]
 

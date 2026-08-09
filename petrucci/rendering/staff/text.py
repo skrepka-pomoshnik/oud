@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Protocol
 
-from petrucci.core.music.key_signature import key_signature_count
-from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent
-from petrucci.core.music.time import parse_time_signature_value
 from petrucci.adapters.vocal import chord_top_pitch, infer_vocal_events, token_pitch_value
+from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent
+from petrucci.core.music.key_signature import key_signature_count
+from petrucci.core.music.time import parse_time_signature_value
 
 MELODY_NOTEHEAD_GLYPH = "◊"
 MELODY_FILLED_NOTEHEAD_GLYPH = "◆"

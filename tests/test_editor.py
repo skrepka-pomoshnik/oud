@@ -7,9 +7,9 @@ from oud.editor.editing.primitives import tablature as ops
 from oud.editor.editing.primitives import undo as undo_ops
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.rendering.api import render_piece
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 
 
 def _state() -> EditorState:

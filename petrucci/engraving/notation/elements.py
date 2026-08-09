@@ -4,17 +4,6 @@ from collections.abc import Iterable
 from fractions import Fraction
 from typing import NoReturn
 
-from petrucci.terminal.display import display_width
-from petrucci.engraving.layout.engine import (
-    ElementKey,
-    ElementRole,
-    LayoutElement,
-    LayoutError,
-    NotationLayoutPolicy,
-    Rect,
-    StaffRows,
-)
-from petrucci.engraving.notation.state import _chord_offsets, _diatonic_number, _staff_position
 from petrucci.core.score import (
     AccidentalDisplay,
     BeamKind,
@@ -26,6 +15,17 @@ from petrucci.core.score import (
     WrittenPitch,
     duration_notation,
 )
+from petrucci.engraving.layout.engine import (
+    ElementKey,
+    ElementRole,
+    LayoutElement,
+    LayoutError,
+    NotationLayoutPolicy,
+    Rect,
+    StaffRows,
+)
+from petrucci.engraving.notation.state import _chord_offsets, _diatonic_number, _staff_position
+from petrucci.terminal.display import display_width
 
 _BEAM_LANE_HEIGHT = 3
 

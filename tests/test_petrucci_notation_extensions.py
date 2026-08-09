@@ -1,8 +1,8 @@
 from fractions import Fraction
 
 from oud.exports.lilypond.voices.vocal import _append_imported_melody_bar
-from petrucci.core.model import ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Piece
 from petrucci.adapters.piece import notation_score_from_piece
+from petrucci.core.model import ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Piece
 from petrucci.core.score import SpanKind, StemDirection
 from petrucci.engraving.score_typeset import ScoreTypesetOptions, typeset_score
 from petrucci.terminal.api import GlyphMode
@@ -49,7 +49,7 @@ def test_imported_notation_extensions_emit_lilypond_tokens() -> None:
     bar = piece.imported_score.staffs[0].bars[0]
     body: list[str] = []
 
-    _append_imported_melody_bar(body, bar, None)
+    _append_imported_melody_bar(body, bar, None, Fraction(1, 2))
 
     text = "\n".join(body)
     assert r"\scaleDurations 2/3 {" in text

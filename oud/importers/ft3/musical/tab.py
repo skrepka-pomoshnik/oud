@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from oud.importers.ft3.musical.duration import (
-    note_type_to_denominator,
-    parse_time_signature,
-)
 from oud.importers.ft3.extras import decode_ft3_extras
 from oud.importers.ft3.metadata import (
     _embedded_plain_text,
     _embedded_rtf_blocks,
+)
+from oud.importers.ft3.musical.duration import (
+    note_type_to_denominator,
+    parse_time_signature,
 )
 from oud.importers.ft3.text.codec import (
     is_ft3_text_record,

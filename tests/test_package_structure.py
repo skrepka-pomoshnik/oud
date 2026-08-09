@@ -1,5 +1,5 @@
-from pathlib import Path
 import ast
+from pathlib import Path
 
 _PACKAGE_ROOTS = (Path("oud"), Path("petrucci"))
 
@@ -8,8 +8,7 @@ def _package_entities(directory: Path) -> list[Path]:
     return sorted(
         path
         for path in directory.iterdir()
-        if path.name != "__pycache__"
-        and (path.suffix == ".py" or (path.is_dir() and (path / "__init__.py").is_file()))
+        if path.name != "__pycache__" and (path.suffix == ".py" or (path.is_dir() and (path / "__init__.py").is_file()))
     )
 
 
@@ -60,15 +59,9 @@ def _imported_modules(path: Path) -> set[str]:
 
 
 def test_lilypond_export_and_import_layers_are_independent() -> None:
-    importer_modules = {
-        module
-        for path in Path("oud/importers").rglob("*.py")
-        for module in _imported_modules(path)
-    }
+    importer_modules = {module for path in Path("oud/importers").rglob("*.py") for module in _imported_modules(path)}
     exporter_modules = {
-        module
-        for path in Path("oud/exports/lilypond").rglob("*.py")
-        for module in _imported_modules(path)
+        module for path in Path("oud/exports/lilypond").rglob("*.py") for module in _imported_modules(path)
     }
     assert not any(module.startswith("oud.exports") for module in importer_modules)
     assert not any(module.startswith("oud.importers") for module in exporter_modules)

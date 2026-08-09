@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 
 from oud.presentation.ui.adapter import Screen
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from petrucci.rendering.api import render_piece
 from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from petrucci.rendering.staff.vocal import melody_row_count
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from tests.render_test_utils import first_lyric_row as _first_lyric_row
 from tests.render_test_utils import first_melody_row_idx as _first_melody_row_idx
 

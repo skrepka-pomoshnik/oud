@@ -20,15 +20,15 @@ from oud.exports.midi.bytes import (
 )
 from oud.services.playback.timeline import PlaybackCursor, build_timeline_from_events
 from petrucci.adapters.duet import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
+from petrucci.adapters.vocal import VocalEvent, infer_vocal_events
 from petrucci.core.model import Bar, Chord, Note, Piece
-from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 from petrucci.core.music.tuning import (
     default_bass_strings,
     default_tuning_pitches,
     parse_bass_strings,
     tuning_count,
 )
-from petrucci.adapters.vocal import VocalEvent, infer_vocal_events
+from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
 
 def _note_type_to_denom(note_type: int) -> int | None:

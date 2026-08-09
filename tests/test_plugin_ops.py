@@ -176,7 +176,9 @@ def test_plugin_download_guards_and_failures(monkeypatch) -> None:
     assert state.message == "Plugin does not support downloads"
 
     state.plugin_name = "lutemusic"
-    monkeypatch.setattr("oud.services.plugins.lutemusic.download_tab", lambda _item, _dest: (_ for _ in ()).throw(OSError("no")))
+    monkeypatch.setattr(
+        "oud.services.plugins.lutemusic.download_tab", lambda _item, _dest: (_ for _ in ()).throw(OSError("no"))
+    )
     assert download_plugin_item(state) is None
     assert state.message == "Download failed: no"
 

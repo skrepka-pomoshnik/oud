@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 
 from oud.importers.ft3 import build_durations
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.core.model import Bar, Chord, Note, Piece
-from petrucci.rendering.api import render_piece
 from petrucci.input.tablature.policy import apply_tabnotation_preset
+from petrucci.rendering.api import render_piece
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from tests.helpers_regression_cases import (
     dense_auftact_piece,
     dense_flag_alignment_piece,

@@ -48,7 +48,8 @@ def test_complete_command_basic(tmp_path) -> None:
     assert state.cmdline == "q"
     state.cmdline = "w"
     assert complete_command(state) is True
-    assert state.message.startswith("Matches:")
+    assert state.cmdline == "w "
+    assert state.message == ""
 
     file_path = tmp_path / "file.tab"
     file_path.write_text("x", encoding="utf-8")

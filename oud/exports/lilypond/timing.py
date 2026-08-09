@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from fractions import Fraction
-from typing import Iterable, Protocol
+from typing import Protocol
 
 from oud.exports.lilypond.common import _normalized_time_sig_or_none
 from petrucci.rendering.primitives.utils import note_type_to_denom
 
 
 class TimedItem(Protocol):
-    note_type: int | None
-    dotted: bool
+    @property
+    def note_type(self) -> int | None: ...
+
+    @property
+    def dotted(self) -> bool: ...
 
 
 def notated_duration(note_type: int | None, dotted: bool) -> Fraction:

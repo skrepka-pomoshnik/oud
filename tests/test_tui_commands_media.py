@@ -362,6 +362,7 @@ def test_apply_command_dispatch_executes_all_registered_specs(  # noqa: C901
         "cmd_set",
         "cmd_dark",
         "cmd_light",
+        "cmd_hide",
         "cmd_convert",
         "cmd_midi",
         "cmd_play",

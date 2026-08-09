@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import NoReturn
 
-from petrucci.core.music.key_signature import key_signature_count
 from petrucci.core.model import Bar, ImportedBarContent, ImportedStaff, LyricEvent, MelodyEvent, Piece
-from petrucci.rendering.primitives.utils import note_type_to_denom
+from petrucci.core.music.key_signature import key_signature_count
 from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
@@ -34,6 +33,7 @@ from petrucci.core.score import (
     TupletRatio,
     WrittenPitch,
 )
+from petrucci.rendering.primitives.utils import note_type_to_denom
 
 
 class PieceAdapterError(ValueError):

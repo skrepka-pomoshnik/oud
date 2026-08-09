@@ -1,7 +1,7 @@
 from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.core.music.tuning import default_bass_strings
 from petrucci.rendering.api import _apply_overrides, _bass_strings_used
 from petrucci.rendering.primitives.geometry import _scale_chord_row
-from petrucci.rendering.staff.playback import _playback_scaled_col_for_chords
 from petrucci.rendering.primitives.spacing import (
     build_chord_scale_map as _build_chord_scale_map,
 )
@@ -9,7 +9,7 @@ from petrucci.rendering.primitives.spacing import (
     chord_positions_distinct as _chord_positions_distinct,
 )
 from petrucci.rendering.primitives.utils import bar_cells_from_chords
-from petrucci.core.music.tuning import default_bass_strings
+from petrucci.rendering.staff.playback import _playback_scaled_col_for_chords
 from petrucci.terminal.view.model import (
     _bar_display_width,
     _bars_fit,

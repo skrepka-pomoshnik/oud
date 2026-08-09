@@ -14,32 +14,7 @@ from petrucci.core.flow import (
     adapt_flow_events,
     adapt_flow_measures,
 )
-from petrucci.terminal.canvas.framebuffer import Frame
-from petrucci.engraving.layout.engine import (
-    ElementKey,
-    ElementRole,
-    EventLocation,
-    LayoutElement,
-    LayoutError,
-    LayoutMetrics,
-    LayoutViewport,
-    OnsetPosition,
-    Rect,
-    ScoreLayout,
-    ScoreSystem,
-    StaffRows,
-    layout_collisions,
-)
 from petrucci.core.model import Bar
-from petrucci.input.note.types import (
-    EnterNote,
-    EnterRest,
-    InputPitch,
-    NotatedDuration,
-    NoteInputError,
-    NoteInputTransaction,
-    ScorePosition,
-)
 from petrucci.core.score import (
     EventKind,
     KeySignature,
@@ -61,6 +36,30 @@ from petrucci.core.score import (
     pitch_from_midi,
 )
 from petrucci.engraving.cues import PitchCue, PitchCueError, paint_pitch_cues
+from petrucci.engraving.layout.engine import (
+    ElementKey,
+    ElementRole,
+    EventLocation,
+    LayoutElement,
+    LayoutError,
+    LayoutMetrics,
+    LayoutViewport,
+    OnsetPosition,
+    Rect,
+    ScoreLayout,
+    ScoreSystem,
+    StaffRows,
+    layout_collisions,
+)
+from petrucci.input.note.types import (
+    EnterNote,
+    EnterRest,
+    InputPitch,
+    NotatedDuration,
+    NoteInputError,
+    NoteInputTransaction,
+    ScorePosition,
+)
 from petrucci.input.tablature.mutation import (
     EditableTablature,
     TabEdit,
@@ -78,6 +77,7 @@ from petrucci.input.tablature.mutation import (
     set_tab_duration,
 )
 from petrucci.terminal.api import GlyphMode, SemanticFrame
+from petrucci.terminal.canvas.framebuffer import Frame
 
 
 def _rejects(error: type[Exception], factory: Callable[[], object], match: str | None = None) -> None:

@@ -58,9 +58,9 @@ from oud.editor.services.media.operations import cmd_midicmd_default as _cmd_mid
 from oud.editor.services.media.operations import cmd_musicxml as _cmd_musicxml
 from oud.editor.services.media.operations import cmd_play as _cmd_play
 from oud.editor.services.media.operations import print_pdf as _print_pdf
-from oud.exports.midi.runtime import _midi_command
 from oud.exports.lilypond import export_lilypond, print_lilypond_pdf
 from oud.exports.midi import export_midi
+from oud.exports.midi.runtime import _midi_command
 from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.importers.ft3 import build_durations, load_ft3
 from oud.importers.tab import load_tab, load_tab_data
@@ -190,7 +190,7 @@ def cmd_musicxml(state: EditorState, args: str, config_path: str) -> None:
 
 
 def cmd_pdf(state: EditorState, args: str, config_path: str) -> None:
-    _ = (_args, config_path)
+    _ = config_path
     _print_pdf(
         state,
         args,

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "source_manifests": [
-    "corpus/ft3-note-input-100.json",
-    "corpus/ft3-random-75-v2.json"
+    "tests/fixtures/ft3/manifests/ft3-note-input-100.json",
+    "tests/fixtures/ft3/manifests/ft3-random-75-v2.json"
   ],
   "selection": "Four fixed-corpus scores selected for complementary source-supported Petrucci features.",
   "available_features": [
@@ -23,7 +23,7 @@
   "excerpts": [
     {
       "id": "la-couperin-trio",
-      "source_manifest": "corpus/ft3-note-input-100.json",
+      "source_manifest": "tests/fixtures/ft3/manifests/ft3-note-input-100.json",
       "path": "note-input-100/044/la_couperin_trio.ft3",
       "source_url": "https://browse.lutemusic.org/composers/Forqueray/la_couperin_trio.ft3",
       "source_sha256": "b0b7c4765273c8c2607cdc61e96a90639d3f5d2c3e3c54baaffeaec7e7b73345",
@@ -60,13 +60,13 @@
         "render_sha256": "faafc8b46002a5ce0e9a45489a4c4367d155ff827ed429892c81ea0dfe8d3771",
         "tab_sha256": "7acf32dd4a48b94ebc228ecd2ca529f5405ad282eb7b7772721f5e90f806bc6e",
         "tab_projection_sha256": "435c4d4e31bd6fbd4bb2d8c04fda7961ef37de524077ea2a33305a730c29dcf1",
-        "lilypond_sha256": "97b042e2d91cdb6d1615f12f0486a087faf47ee6780d41484b239a924736f8da",
+        "lilypond_sha256": "d949ca8b0aad1a64cd0f5d3ee8718f72f6add34e070345f7d775a98a7424248f",
         "midi_sha256": "5640c4a36ecba1ec3fa76abce10d61e6944b803336034125189f9e33829fc1ed"
       }
     },
     {
       "id": "o-felice-01",
-      "source_manifest": "corpus/ft3-note-input-100.json",
+      "source_manifest": "tests/fixtures/ft3/manifests/ft3-note-input-100.json",
       "path": "note-input-100/024/o_felice_01.ft3",
       "source_url": "https://browse.lutemusic.org/composers/Ortiz/o_felice_01.ft3",
       "source_sha256": "cf61786e494890d9cc0e0bdf4e5af5ab0ef76614a70d4030f8443108d052323f",
@@ -101,13 +101,13 @@
         "render_sha256": "4e4197bd8efa7f35b9bb9d9cedd0280372d81e79bbca7f2b35787e274db07b90",
         "tab_sha256": "ea249aa32dfa7c4766cd39cd9df5baeac757af0806c9ce5afbd446a438778b96",
         "tab_projection_sha256": "3c8bc61a58dcc175802d798857a4ef4d7f6c3e7fbb3562e0d7b105f7f59ad291",
-        "lilypond_sha256": "6bca179eb73e4ad6038aef60700962f8a18e075ec0b4fb3b6bf7b63ccd903887",
+        "lilypond_sha256": "4bc3aca2d4693a938d06597cabbecae8e1f80cf23a81e0ab98f79ad6270e623d",
         "midi_sha256": "2211961f298627e248e4b06d185b8dbbf2a4996f54ab2b61ff38f29cdcf69a23"
       }
     },
     {
       "id": "almain-11",
-      "source_manifest": "corpus/ft3-note-input-100.json",
+      "source_manifest": "tests/fixtures/ft3/manifests/ft3-note-input-100.json",
       "path": "note-input-100/002/almain_11.ft3",
       "source_url": "https://browse.lutemusic.org/composers/RJohnson/almain_11.ft3",
       "source_sha256": "2324ed71e60d0bc331669cbc7482c78b2e71e3ecf56ee7ae73b06ebf5ac44ce3",
@@ -141,13 +141,13 @@
         "render_sha256": "72b78bcadd2350005e4083d56c9734286e8ddb8ce83bd28b157727c7be7a3c27",
         "tab_sha256": "3691b5ae1244d5c9a1a9638b0a4f47b12635107f76a1482f35a94e22f9ab4fd7",
         "tab_projection_sha256": "0ccc3b613fe14e2085929a43953ae404358af4efd63c18f4977404272d6d0a77",
-        "lilypond_sha256": "2f21183435cc3583101b045b05b8696772bea3eea1b507ec145af4f0cd48946b",
+        "lilypond_sha256": "f6a1cf81730d0748542e333523a8b996badcd715567fdca5f1857e40e776af67",
         "midi_sha256": "bbc10a30f63a197e75dd9448e8ca957ecc261ec051ac7946684e726e82c79277"
       }
     },
     {
       "id": "recit-de-la-beaute-double",
-      "source_manifest": "corpus/ft3-random-75-v2.json",
+      "source_manifest": "tests/fixtures/ft3/manifests/ft3-random-75-v2.json",
       "path": "random-75-v2/060/recit_de_la_beaute_double.ft3",
       "source_url": "https://browse.lutemusic.org/composers/Lully/recit_de_la_beaute_double.ft3",
       "source_sha256": "04aa7b732b053d6868e435738de864157b12ae931e6da299f2fd19651eba483c",
@@ -184,7 +184,7 @@
         "render_sha256": "74554d81ffb6b13ee388e737c8f3cf2fad5fc43340a1a59e8cf6f7aa05e80aa7",
         "tab_sha256": "ac569c72fa5dcf32301996e530ff996652044f09095e018dc74bdb7adcfd66bd",
         "tab_projection_sha256": "d9ff0d9180f587121579549e306a7e7a870ab741130041a3dbda2f0c282e159f",
-        "lilypond_sha256": "236aabfe58b4f3bdedfc554bb854319ac0b55c21a95588c55939df8e4e8d0e80",
+        "lilypond_sha256": "6e29a3c512434adcca2c3b1e7440ab7a08f3ad2dbb0a1e1622e8f87b37ef5498",
         "midi_sha256": "9c7b708819ab22d712eb4029c5ca87e5f1699651e07a656c9c9024c648bf3565"
       }
     }

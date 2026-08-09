@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from petrucci.core.model import Bar, Piece
+from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 from petrucci.rendering.primitives.utils import (
     bar_cells,
     bar_cells_from_chords,
@@ -13,7 +14,6 @@ from petrucci.rendering.primitives.utils import (
     format_fret,
     note_type_to_denom,
 )
-from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
 
 class TabExportError(ValueError):

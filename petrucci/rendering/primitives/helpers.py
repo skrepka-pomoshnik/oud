@@ -3,9 +3,9 @@ from __future__ import annotations
 import unicodedata
 from importlib.metadata import PackageNotFoundError, version
 
-from petrucci.terminal.help import help_lines
 from petrucci.core.model import Piece
 from petrucci.terminal.canvas.screen import CursesError, Screen
+from petrucci.terminal.help import help_lines
 
 try:
     _PACKAGE_VERSION = version("oud")

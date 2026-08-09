@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from petrucci.core.model import Piece
+from petrucci.core.music.time import parse_time_signature_value
 from petrucci.rendering.primitives.utils import note_type_to_denom
 from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
-from petrucci.core.music.time import parse_time_signature_value
 from petrucci.terminal.view.model import chord_positions
 
 

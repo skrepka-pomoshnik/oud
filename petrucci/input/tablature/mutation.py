@@ -10,8 +10,8 @@ from fractions import Fraction
 from typing import NoReturn
 
 from petrucci.core.model import Bar, Chord, Note
-from petrucci.rendering.primitives.utils import chord_slot_positions
 from petrucci.input.tablature.input import CellKey
+from petrucci.rendering.primitives.utils import chord_slot_positions
 
 DotKey = tuple[int, int]
 

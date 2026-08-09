@@ -17,15 +17,6 @@ from petrucci.adapters.duet import (
     split_duet_triplet_map,
     split_duet_triplet_set,
 )
-from petrucci.terminal.canvas.framebuffer import (
-    Frame,
-    FrameBuffer,
-    draw_frame_rows,
-    frame_diff_rows,
-    iter_attr_runs,
-    overlay_dirty_rows,
-    overlay_frame,
-)
 from petrucci.core.model import Bar, Chord, Piece
 from petrucci.rendering.primitives.geometry import (
     _anchor_destination,
@@ -36,6 +27,15 @@ from petrucci.rendering.primitives.geometry import (
     _interpolated_anchor_destination,
     _place_duration_cells_aligned,
     _scale_chord_row,
+)
+from petrucci.terminal.canvas.framebuffer import (
+    Frame,
+    FrameBuffer,
+    draw_frame_rows,
+    frame_diff_rows,
+    iter_attr_runs,
+    overlay_dirty_rows,
+    overlay_frame,
 )
 from petrucci.terminal.canvas.screen import Screen
 from petrucci.terminal.view.width import (

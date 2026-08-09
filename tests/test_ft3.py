@@ -2,12 +2,14 @@ import gzip
 
 import pytest
 
+from oud.importers.ft3 import FT3FormatError, load_ft3
 from oud.importers.ft3.musical.duration import (
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
     note_type_to_denominator,
 )
 from oud.importers.ft3.musical.note_records import _melody_event_from_ft3
+from oud.importers.ft3.musical.tab import _decode_ft3_note_position, parse_bar
 from oud.importers.ft3.score import (
     _classify_unknown_score_chunk,
     _is_tab_layout_record,
@@ -16,8 +18,6 @@ from oud.importers.ft3.score import (
     _plain_score_annotations,
     _tab_heading_texts,
 )
-from oud.importers.ft3.musical.tab import _decode_ft3_note_position, parse_bar
-from oud.importers.ft3 import FT3FormatError, load_ft3
 from petrucci.core.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 

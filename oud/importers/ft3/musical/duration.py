@@ -4,12 +4,12 @@ import re
 from dataclasses import replace
 from statistics import median
 
-from petrucci.core.music.key_signature import key_signature_accidentals
 from petrucci.core.model import (
     Bar,
     MelodyEvent,
     Piece,
 )
+from petrucci.core.music.key_signature import key_signature_accidentals
 
 
 def _time_signature_sixteenth_units(time_sig: str | None) -> int | None:

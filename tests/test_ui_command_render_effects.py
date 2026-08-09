@@ -4,11 +4,11 @@ import pytest
 
 from oud.editor.core.state import EditorState
 from oud.importers.ft3 import load_ft3
-from oud.settings import DEFAULT_SETTINGS
 from oud.presentation.tui.commands import apply_command
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from oud.settings import DEFAULT_SETTINGS
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.rendering.api import render_piece
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 
 
 def _state() -> EditorState:

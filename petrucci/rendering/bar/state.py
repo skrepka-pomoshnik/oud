@@ -1,6 +1,16 @@
 from __future__ import annotations
 
 from petrucci.engraving.layout.placement import place_parenthesize_tie_cues as _place_parenthesize_tie_cues
+from petrucci.input.tablature.policy import (
+    gliss_span_chars,
+    hold_span_chars,
+    show_time_cue_for_bar,
+    slur_span_chars,
+    tie_notehead_hidden_cols,
+    tie_notehead_parenthesize_cols,
+    tie_span_chars,
+    time_cue_side_pad,
+)
 from petrucci.rendering.primitives.helpers import apply_overrides
 from petrucci.rendering.primitives.marks import (
     _imported_ft3_mark_target_rows,
@@ -11,19 +21,18 @@ from petrucci.rendering.primitives.marks import (
 )
 from petrucci.rendering.primitives.spacing import chord_positions_distinct as _chord_positions_distinct
 from petrucci.rendering.primitives.spacing import note_event_columns as _note_event_columns
-from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar as _required_auto_display_width_for_bar
+from petrucci.rendering.primitives.spacing import (
+    required_auto_display_width_for_bar as _required_auto_display_width_for_bar,
+)
 from petrucci.rendering.primitives.spacing import required_duration_content_width as _required_duration_content_width
 from petrucci.rendering.primitives.spacing import required_flag_content_width as _required_flag_content_width
-from petrucci.rendering.system.types import BarBasics, BarLayout, BarMarks, BarMetadata, SystemLayout, SystemRenderContext
-from petrucci.input.tablature.policy import (
-    gliss_span_chars,
-    hold_span_chars,
-    show_time_cue_for_bar,
-    slur_span_chars,
-    tie_notehead_hidden_cols,
-    tie_notehead_parenthesize_cols,
-    tie_span_chars,
-    time_cue_side_pad,
+from petrucci.rendering.system.types import (
+    BarBasics,
+    BarLayout,
+    BarMarks,
+    BarMetadata,
+    SystemLayout,
+    SystemRenderContext,
 )
 from petrucci.terminal.view.model import (
     _bar_annotations,

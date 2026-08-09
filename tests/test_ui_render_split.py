@@ -11,12 +11,12 @@ from petrucci.adapters.duet import (
     duet_storage_mode,
     split_duet_piece_staff,
 )
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from petrucci.rendering.api import _apply_overrides, render_piece
-from petrucci.rendering.system.status import status_attr_for_message
 from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from petrucci.rendering.staff.vocal import melody_row_count
+from petrucci.rendering.system.status import status_attr_for_message
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 
 
 class _Screen(Screen):

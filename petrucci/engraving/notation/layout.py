@@ -4,6 +4,19 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from petrucci.core.score import (
+    Clef,
+    EventKind,
+    LyricLine,
+    LyricSyllable,
+    NotationEvent,
+    NotationMeasure,
+    NotationScore,
+    NotationStaff,
+    SpanKind,
+    StemDirection,
+    iter_score_events,
+)
 from petrucci.engraving.layout.engine import (
     ElementKey,
     ElementRole,
@@ -18,6 +31,7 @@ from petrucci.engraving.layout.engine import (
     ScoreSystem,
     StaffRows,
 )
+from petrucci.engraving.layout.fitting import BoxSystem
 from petrucci.engraving.notation.annotations import (
     _lyric_connector_elements,
     _lyric_line_elements,
@@ -55,20 +69,6 @@ from petrucci.engraving.notation.types import (
     _PositionedMeasureEvents,
     _StaffVerticalNeeds,
 )
-from petrucci.core.score import (
-    Clef,
-    EventKind,
-    LyricLine,
-    LyricSyllable,
-    NotationEvent,
-    NotationMeasure,
-    NotationScore,
-    NotationStaff,
-    SpanKind,
-    StemDirection,
-    iter_score_events,
-)
-from petrucci.engraving.layout.fitting import BoxSystem
 
 _BEAM_LANE_HEIGHT = 3
 

@@ -4,14 +4,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from oud.importers.ft3.musical.duration import (
-    _apply_legacy_duration_fix,
-    _bar_uses_raw_vocal_fallback,
-    _fill_missing_time_signatures,
-    _normalize_vocal_event_accidentals,
-    build_durations,
-)
-from oud.importers.ft3.musical.lyric_scope import apply_ft3_lyric_scopes
 from oud.importers.ft3.metadata import (
     _apply_annotations,
     _apply_preamble_notes,
@@ -22,6 +14,18 @@ from oud.importers.ft3.metadata import (
     _strip_rtf,
     extract_text,
     read_ft3,
+)
+from oud.importers.ft3.musical.duration import (
+    _apply_legacy_duration_fix,
+    _bar_uses_raw_vocal_fallback,
+    _fill_missing_time_signatures,
+    _normalize_vocal_event_accidentals,
+    build_durations,
+)
+from oud.importers.ft3.musical.lyric_scope import apply_ft3_lyric_scopes
+from oud.importers.ft3.musical.tab import (
+    _apply_embedded_sections,
+    parse_bar,
 )
 from oud.importers.ft3.score import (
     _BodyEntry,
@@ -39,10 +43,6 @@ from oud.importers.ft3.score import (
     _parallel_note_tab_plan,
     _parse_score_text_record,
     _record_has_content,
-)
-from oud.importers.ft3.musical.tab import (
-    _apply_embedded_sections,
-    parse_bar,
 )
 from oud.importers.ft3.text.codec import (
     FT3TextRecord,

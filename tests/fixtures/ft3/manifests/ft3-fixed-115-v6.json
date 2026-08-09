@@ -438,7 +438,7 @@
         "note": 1
       },
       "notation_events": 102,
-      "lyrics": 114
+      "lyrics": 111
     },
     {
       "path": "note-input-100/012/23_chiarenzana_la_madalena.ft3",
@@ -653,7 +653,7 @@
         "note": 1
       },
       "notation_events": 42,
-      "lyrics": 62
+      "lyrics": 82
     },
     {
       "path": "note-input-100/013/fantasie.ft3",
@@ -1876,7 +1876,7 @@
         "note": 4
       },
       "notation_events": 323,
-      "lyrics": 65
+      "lyrics": 75
     },
     {
       "path": "05_a_fancy.ft3",

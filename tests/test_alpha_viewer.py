@@ -8,7 +8,8 @@ from petrucci.core.model import Piece
 from petrucci.engraving.typeset import TypesetOptions, typeset_piece
 from scripts.corpus.fetch import load_manifest, manifest_paths
 
-CORPUS = Path("lutemusic")
+CORPUS = Path("tests/fixtures/ft3/corpus").resolve()
+REGRESSION_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-regression.json")
 VIEWER_CASES = (
     "01_felice_fu_quel_anon.ft3",
     "05_can_she_excuse/can_she_excuse_4_part.ft3",
@@ -19,7 +20,7 @@ VIEWER_CASES = (
 
 @pytest.fixture(scope="module")
 def loaded_corpus() -> list[tuple[Path, Piece]]:
-    manifest = load_manifest(Path("tests/fixtures/ft3/manifests/ft3-regression.json"))
+    manifest = load_manifest(REGRESSION_MANIFEST)
     paths = [path for path in manifest_paths(manifest) if path.is_relative_to(CORPUS.resolve())]
     missing = [path for path in paths if not path.is_file()]
     if missing:
@@ -40,7 +41,7 @@ def _typeset(path: str, *, playback: tuple[int, int] | None = None):
 def test_local_ft3_corpus_has_no_unresolved_viewer_warnings(
     loaded_corpus: list[tuple[Path, Piece]],
 ) -> None:
-    assert len(loaded_corpus) == 17
+    assert len(loaded_corpus) == len(load_manifest(REGRESSION_MANIFEST).files)
     warned: dict[str, list[str]] = {}
     for path, piece in loaded_corpus:
         warnings = piece.import_warnings

@@ -13,8 +13,8 @@ from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key
 from oud.editor.navigation.viewport import ensure_cursor_visible
 from oud.presentation.tui.commands import apply_command
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.rendering.api import render_piece
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.terminal.canvas.screen import A_REVERSE
 from tests.helpers_keyscript import keyscript_state
 

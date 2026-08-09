@@ -117,7 +117,7 @@ def _build_main_blocks(  # noqa: C901
                     lyric_bodies,
                     show_lyrics=show_lyrics,
                     identifier="melody" if index == 0 else f"melody{index + 1}",
-                label=note_staff.label if len(imported_note_staffs) > 1 else None,
+                    label=note_staff.label if len(imported_note_staffs) > 1 else None,
                 ),
             )
     elif has_imported_notation or has_imported_lyrics:

@@ -5,6 +5,17 @@ from __future__ import annotations
 from dataclasses import replace
 from fractions import Fraction
 
+from petrucci.core.score import (
+    EventKind,
+    LyricSyllable,
+    NotationEvent,
+    NotationScore,
+    NotationSpan,
+    ScoreValidationError,
+    SpanKind,
+    TupletRatio,
+    WrittenPitch,
+)
 from petrucci.input.note.draft import (
     EventLocation,
     ScoreDraft,
@@ -36,17 +47,6 @@ from petrucci.input.note.types import (
     RemoveSlur,
     RemoveTie,
     ReplacePitch,
-)
-from petrucci.core.score import (
-    EventKind,
-    LyricSyllable,
-    NotationEvent,
-    NotationScore,
-    NotationSpan,
-    ScoreValidationError,
-    SpanKind,
-    TupletRatio,
-    WrittenPitch,
 )
 
 

@@ -6,7 +6,6 @@ import pytest
 
 from oud.editor.navigation.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.importers.ft3 import build_durations
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.rendering.api import render_piece
 from petrucci.rendering.primitives.geometry import _scale_chord_row
@@ -18,6 +17,7 @@ from petrucci.rendering.primitives.spacing import (
     chord_positions_distinct as _chord_positions_distinct,
 )
 from petrucci.rendering.primitives.utils import bar_cells_from_chords, smart_group_map
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.terminal.view.model import _filter_redundant_positions, _scale_col
 from tests.helpers_regression_cases import (
     dense_auftact_piece,

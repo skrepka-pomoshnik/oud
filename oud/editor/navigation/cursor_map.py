@@ -8,17 +8,17 @@ from oud.editor.navigation.layout import (
     system_range,
 )
 from petrucci.core.model import Bar
+from petrucci.input.tablature.policy import (
+    bar_has_multifret_tokens,
+    multifret_event_gap,
+    system_display_indices_for_bars,
+)
 from petrucci.rendering.primitives.utils import (
     chord_positions,
     smart_group_map,
     soft_beat_snap_map,
     spread_flag_positions,
     trim_right_slack_for_onsets,
-)
-from petrucci.input.tablature.policy import (
-    bar_has_multifret_tokens,
-    multifret_event_gap,
-    system_display_indices_for_bars,
 )
 from petrucci.terminal.view.model import _filter_redundant_positions, _parse_time_signature, _scale_col
 

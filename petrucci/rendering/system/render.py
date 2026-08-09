@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from petrucci.core.music.tuning import parse_tuning_pitches
+from petrucci.input.tablature.style import resolve_tab_style_policy
 from petrucci.rendering.staff.playback import PlaybackOverlayCache
 from petrucci.rendering.system.loop import render_system_sequence
 from petrucci.rendering.system.types import SystemRenderContext
 from petrucci.terminal.canvas.screen import Screen
-from petrucci.input.tablature.style import resolve_tab_style_policy
-from petrucci.core.music.tuning import parse_tuning_pitches
 
 
 def render_systems(

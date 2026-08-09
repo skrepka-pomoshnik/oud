@@ -16,6 +16,7 @@ from oud.presentation.tui.input import handle_search as handle_search_input
 from oud.presentation.tui.keycodes import keycodes_from_curses
 from oud.presentation.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
 from petrucci.adapters.duet import is_duet_score_piece
+from petrucci.rendering.api import render_piece
 from petrucci.terminal.canvas.framebuffer import (
     FrameBuffer,
     draw_frame_rows,
@@ -23,7 +24,6 @@ from petrucci.terminal.canvas.framebuffer import (
     overlay_dirty_rows,
     overlay_frame,
 )
-from petrucci.rendering.api import render_piece
 
 _MAX_INPUT_BATCH = 64
 

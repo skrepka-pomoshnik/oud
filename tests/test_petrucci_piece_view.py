@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from petrucci.adapters.piece_view import typeset_piece_score_view
 from petrucci.core.model import (
     Bar,
     Chord,
@@ -13,7 +14,6 @@ from petrucci.core.model import (
     Note,
     Piece,
 )
-from petrucci.adapters.piece_view import typeset_piece_score_view
 from petrucci.engraving.typeset import TypesetOptions, typeset_piece
 
 SETTINGS = {

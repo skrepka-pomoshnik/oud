@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from petrucci.engraving.layout.engine import ElementKey, ElementRole, LayoutElement, Rect, StaffRows
-from petrucci.engraving.notation.types import _ScoreState
 from petrucci.core.score import (
     AccidentalDisplay,
     Clef,
@@ -14,6 +12,8 @@ from petrucci.core.score import (
     TimeSignature,
     WrittenPitch,
 )
+from petrucci.engraving.layout.engine import ElementKey, ElementRole, LayoutElement, Rect, StaffRows
+from petrucci.engraving.notation.types import _ScoreState
 
 
 def _state_at(staff: NotationStaff, measure_index: int) -> _ScoreState:

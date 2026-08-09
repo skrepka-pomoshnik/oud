@@ -17,7 +17,7 @@ def start_pdf_job(state: EditorState, target: str, build: Callable[[], str]) -> 
     def worker() -> None:
         try:
             state.message = build()
-        except Exception as exc:  # noqa: BLE001 - background boundary must report failures
+        except Exception as exc:
             state.message = f"PDF build failed: {exc}"
 
     state.message = f"Building PDF: {Path(target).name}"

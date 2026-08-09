@@ -28,8 +28,8 @@ from petrucci import (
     pitch_from_midi,
     typeset_score,
 )
-from petrucci.terminal.display import display_width
 from petrucci.engraving.layout.engine import ElementRole
+from petrucci.terminal.display import display_width
 
 
 def _event(event_id: str, onset: int, midi: int | None, duration: Fraction = Fraction(1, 4)) -> NotationEvent:

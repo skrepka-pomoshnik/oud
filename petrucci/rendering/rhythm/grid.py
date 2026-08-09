@@ -7,11 +7,11 @@ from petrucci.rendering.primitives.geometry import (
     _place_duration_cells_aligned,
 )
 from petrucci.rendering.primitives.helpers import pad_row, safe_addstr
-from petrucci.rendering.rhythm.cues import draw_span_rows
-from petrucci.rendering.rhythm.types import FlagRowPlan, RhythmRenderContext, RhythmRenderResult
 from petrucci.rendering.primitives.spacing import build_chord_scale_map as _build_chord_scale_map
 from petrucci.rendering.primitives.spacing import note_event_columns as _note_event_columns
 from petrucci.rendering.primitives.utils import spread_flag_positions
+from petrucci.rendering.rhythm.cues import draw_span_rows
+from petrucci.rendering.rhythm.types import FlagRowPlan, RhythmRenderContext, RhythmRenderResult
 from petrucci.terminal.view.model import (
     FlagPositionRequest,
     _bar_durations,

@@ -131,6 +131,30 @@ def _completion_message(entries: list[Path], diagnostic: str | None) -> str:
     return f"{diagnostic}; {matches}" if diagnostic else matches
 
 
+def _complete_path_entries(
+    state: EditorState,
+    cmd: str,
+    cmdline: str,
+    *,
+    expanded: Path,
+    entries: list[Path],
+    diagnostic: str | None,
+) -> Completion:
+    if not entries:
+        return cmdline, diagnostic
+    if len(entries) == 1:
+        suffix = os.sep if entries[0].is_dir() else ""
+        return f"{cmd} {entries[0]}{suffix}", diagnostic
+    if state.settings.get("completion", "prefix") == "fzf":
+        return cmdline, _completion_message(entries, diagnostic)
+    common = os.path.commonprefix([str(entry) for entry in entries])
+    if common and common != str(expanded):
+        completed = f"{cmd} {common}"
+        if completed != cmdline:
+            return completed, diagnostic
+    return cmdline, _completion_message(entries, diagnostic)
+
+
 def _complete_path(state: EditorState, cmd: str, rest: str, cmdline: str) -> Completion:
     base = _path_completion_base(rest)
     if base is None:
@@ -140,18 +164,14 @@ def _complete_path(state: EditorState, cmd: str, rest: str, cmdline: str) -> Com
         entries, diagnostic = _matching_path_entries(state, _path_entries(base_dir), base_prefix)
     except OSError:
         return cmdline, None
-    if not entries:
-        return cmdline, diagnostic
-    if len(entries) == 1:
-        suffix = os.sep if entries[0].is_dir() else ""
-        return f"{cmd} {entries[0]}{suffix}", diagnostic
-    if state.settings.get("completion", "prefix") != "fzf":
-        common = os.path.commonprefix([str(entry) for entry in entries])
-        if common and common != str(expanded):
-            completed = f"{cmd} {common}"
-            if completed != cmdline:
-                return completed, diagnostic
-    return cmdline, _completion_message(entries, diagnostic)
+    return _complete_path_entries(
+        state,
+        cmd,
+        cmdline,
+        expanded=expanded,
+        entries=entries,
+        diagnostic=diagnostic,
+    )
 
 
 def complete_command_text(state: EditorState, cmdline: str) -> Completion:

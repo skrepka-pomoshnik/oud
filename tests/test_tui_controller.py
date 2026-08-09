@@ -1,6 +1,6 @@
 from oud.editor.core.state import EditorState
-from oud.services.plugins.model import RemoteTab
 from oud.presentation.tui.controller import handle_key
+from oud.services.plugins.model import RemoteTab
 from petrucci.core.model import Bar, Piece
 
 

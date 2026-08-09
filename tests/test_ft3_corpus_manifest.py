@@ -10,9 +10,9 @@ import pytest
 from oud.importers.ft3 import load_ft3
 from petrucci import PieceAdapterError, notation_score_from_piece
 from petrucci.core.model import Piece
-from scripts.corpus.fetch import fetch_manifest, load_manifest, manifest_paths
-from scripts.corpus.audit import audit_piece
 from scripts.corpus import fetch as fetch_ft3_corpus
+from scripts.corpus.audit import audit_piece
+from scripts.corpus.fetch import fetch_manifest, load_manifest, manifest_paths
 
 RANDOM_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-75.json")
 EXPANDED_RANDOM_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-75-v2.json")

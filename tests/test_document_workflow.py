@@ -11,8 +11,8 @@ from oud.editor.services.io.files import cmd_write_ascii
 from oud.editor.services.status import status_line
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.input import handle_command
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from petrucci.rendering.primitives.helpers import render_help
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from tests.helpers_keyscript import press_keys
 
 PURE_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
@@ -106,21 +106,19 @@ def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -
 
 
 @pytest.mark.parametrize("command", ["wq", "x"])
-def test_write_quit_uses_same_save_as_prompt_and_exits_only_after_write(
+def test_write_quit_uses_sibling_default_and_exits_after_write(
     tmp_path: Path,
     command: str,
 ) -> None:
     config = str(tmp_path / "config.toml")
-    target = tmp_path / "projection.tab"
-    state = init_state(PURE_FT3, config_path=config)
+    source = tmp_path / "source.ft3"
+    source.write_bytes(Path(PURE_FT3).read_bytes())
+    target = source.with_suffix(".tab")
+    state = init_state(str(source), config_path=config)
     state.modified = True
 
-    apply_command(state, command, config)
-    assert state.mode == "command"
-    assert state.cmdline == f"{command} "
-
     with pytest.raises(SystemExit):
-        _submit_command_path(state, target, config)
+        apply_command(state, command, config)
     assert target.exists()
     assert state.modified is False
 

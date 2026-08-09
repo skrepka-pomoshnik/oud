@@ -2,8 +2,19 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from petrucci.terminal.display import display_width
+from petrucci.core.score import (
+    BeamKind,
+    Clef,
+    EventKind,
+    LyricSyllable,
+    NotationEvent,
+    NotationMeasure,
+    NotationScore,
+    NotationStaff,
+    WrittenPitch,
+)
 from petrucci.engraving.layout.engine import LayoutError, LayoutMetrics, LayoutViewport, NotationLayoutPolicy
+from petrucci.engraving.layout.fitting import BoxFitOptions, MeasuredBox, fit_measured_boxes
 from petrucci.engraving.notation.annotations import _lyric_lines_by_measure, _lyrics_by_event
 from petrucci.engraving.notation.elements import (
     _accidental_width,
@@ -20,18 +31,7 @@ from petrucci.engraving.notation.state import (
     _visible_accidentals,
 )
 from petrucci.engraving.notation.types import _HorizontalPlan, _MeasureGeometry, _OnsetGroup
-from petrucci.core.score import (
-    BeamKind,
-    Clef,
-    EventKind,
-    LyricSyllable,
-    NotationEvent,
-    NotationMeasure,
-    NotationScore,
-    NotationStaff,
-    WrittenPitch,
-)
-from petrucci.engraving.layout.fitting import BoxFitOptions, MeasuredBox, fit_measured_boxes
+from petrucci.terminal.display import display_width
 
 
 def _horizontal_plan(

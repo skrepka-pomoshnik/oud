@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from oud.exports.lilypond.timing import meter_duration, timed_items_duration
-from petrucci.core.model import Piece
+from petrucci.core.model import Bar, Piece
 
 _DENSE_LYRIC_ROWS = 8
 _DENSE_BARS_PER_SYSTEM = 4
@@ -145,39 +145,51 @@ def _editorial_marks(piece: Piece) -> tuple[tuple[str, ...], ...]:
     return tuple(
         tuple(
             dict.fromkeys(
-                text
-                for text in row
-                if text.strip() and text.strip().casefold().rstrip(".") not in _FONT_CONTROL_TEXT
+                text for text in row if text.strip() and text.strip().casefold().rstrip(".") not in _FONT_CONTROL_TEXT
             ),
         )
         for row in marks
     )
 
 
-def _canonical_measure_durations(piece: Piece) -> tuple[Fraction, ...]:
+def _imported_measure_durations(piece: Piece) -> dict[int, Fraction]:
     imported: dict[int, Fraction] = {}
-    if piece.imported_score is not None:
-        for staff in piece.imported_score.staffs:
-            if staff.kind != "note":
-                continue
-            for bar in staff.bars:
-                duration = timed_items_duration(bar.melody_events)
-                if duration:
-                    imported.setdefault(bar.source_bar_index, duration)
+    if piece.imported_score is None:
+        return imported
+    for staff in piece.imported_score.staffs:
+        if staff.kind != "note":
+            continue
+        for bar in staff.bars:
+            duration = timed_items_duration(bar.melody_events)
+            if duration:
+                imported.setdefault(bar.source_bar_index, duration)
+    return imported
+
+
+def _measure_duration(bar: Bar | None, imported: Fraction, time_signature: str | None) -> Fraction:
+    if imported:
+        return imported
+    if bar is not None:
+        duration = timed_items_duration(bar.melody_events)
+        if duration:
+            return duration
+    duration = meter_duration(time_signature)
+    if duration:
+        return duration
+    if bar is not None:
+        return timed_items_duration(bar.chords, fallback=Fraction(1, 4))
+    return Fraction(1, 4)
+
+
+def _canonical_measure_durations(piece: Piece) -> tuple[Fraction, ...]:
+    imported = _imported_measure_durations(piece)
     current_time = getattr(piece, "time_sig", None)
     durations: list[Fraction] = []
     for index in range(_source_bar_count(piece)):
         bar = piece.bars[index] if index < len(piece.bars) else None
         if bar is not None and bar.time_sig:
             current_time = bar.time_sig
-        duration = imported.get(index, Fraction())
-        if not duration and bar is not None:
-            duration = timed_items_duration(bar.melody_events)
-        if not duration:
-            duration = meter_duration(current_time)
-        if not duration and bar is not None:
-            duration = timed_items_duration(bar.chords)
-        durations.append(duration or Fraction(1, 4))
+        durations.append(_measure_duration(bar, imported.get(index, Fraction()), current_time))
     return tuple(durations)
 
 

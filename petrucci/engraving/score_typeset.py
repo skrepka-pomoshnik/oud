@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import NoReturn
 
-from petrucci.terminal.canvas.framebuffer import Frame
+from petrucci.core.score import NotationScore
+from petrucci.engraving.cues import PitchCue, paint_pitch_cues
 from petrucci.engraving.layout.engine import (
     LayoutMetrics,
     LayoutViewport,
@@ -13,9 +14,8 @@ from petrucci.engraving.layout.engine import (
     ScoreLayout,
     layout_score,
 )
-from petrucci.core.score import NotationScore
-from petrucci.engraving.cues import PitchCue, paint_pitch_cues
 from petrucci.terminal.api import GlyphMode, SemanticFrame, TerminalNoteheads, paint_score
+from petrucci.terminal.canvas.framebuffer import Frame
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from petrucci.core.model import Piece
-from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar
 from petrucci.engraving.layout.spacing import (
     auto_bar_plan,
     collision_base_bar_widths,
@@ -16,6 +15,7 @@ from petrucci.input.tablature.policy import (
     show_time_cue_for_bar,
     time_cue_side_pad,
 )
+from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar
 from petrucci.terminal.view.model import _infer_time_signature, _next_system_start, _parse_time_signature
 
 

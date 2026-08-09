@@ -8,8 +8,8 @@ from oud.editor.core.state import EditorState, UndoAction
 from oud.editor.editing.primitives.edits import record_action, undo_group
 from oud.editor.editing.primitives.tablature import french_to_fret, fret_to_french, fret_to_italian, italian_to_fret
 from oud.editor.editing.tab.assignment import AssignmentPolicy, assign_chord_pitches
-from petrucci.rendering.primitives.utils import chord_positions
 from petrucci.core.music.tuning import parse_tuning_pitches, tuning_preset
+from petrucci.rendering.primitives.utils import chord_positions
 
 
 @dataclass

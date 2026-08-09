@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from petrucci.adapters.piece import PieceAdapterError, notation_score_from_piece, written_pitch_from_token
 from petrucci.core.flow import (
     FlowAdapterError,
     FlowBeamPolicy,
@@ -15,25 +16,6 @@ from petrucci.core.flow import (
     FlowSegmentMap,
     adapt_flow_events,
     adapt_flow_measures,
-)
-from petrucci.engraving.layout.engine import (
-    ElementKey,
-    ElementRole,
-    EventLocation,
-    LayoutCollision,
-    LayoutElement,
-    LayoutError,
-    LayoutMetrics,
-    LayoutViewport,
-    NotationLayoutPolicy,
-    OnsetPosition,
-    Rect,
-    ScoreLayout,
-    ScoreSystem,
-    StaffRows,
-    clear_layout_cache,
-    layout_collisions,
-    layout_score,
 )
 from petrucci.core.model import (
     Bar,
@@ -48,32 +30,6 @@ from petrucci.core.model import (
     Note,
     Piece,
 )
-from petrucci.input.note.operations import apply_note_input, resolve_input_pitch
-from petrucci.input.note.types import (
-    AddLyric,
-    AddSlur,
-    AddTie,
-    ChangeDuration,
-    DeleteEvent,
-    EnterNote,
-    EnterRest,
-    EventInputStyle,
-    InputPitch,
-    NotatedDuration,
-    NoteInputChange,
-    NoteInputChangeKind,
-    NoteInputContext,
-    NoteInputError,
-    NoteInputOperation,
-    NoteInputResult,
-    NoteInputTransaction,
-    RemoveLyric,
-    RemoveSlur,
-    RemoveTie,
-    ReplacePitch,
-    ScorePosition,
-)
-from petrucci.adapters.piece import PieceAdapterError, notation_score_from_piece, written_pitch_from_token
 from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
@@ -101,6 +57,50 @@ from petrucci.core.score import (
     pitch_from_midi,
 )
 from petrucci.engraving.cues import PitchCue, PitchCueError, paint_pitch_cues
+from petrucci.engraving.layout.engine import (
+    ElementKey,
+    ElementRole,
+    EventLocation,
+    LayoutCollision,
+    LayoutElement,
+    LayoutError,
+    LayoutMetrics,
+    LayoutViewport,
+    NotationLayoutPolicy,
+    OnsetPosition,
+    Rect,
+    ScoreLayout,
+    ScoreSystem,
+    StaffRows,
+    clear_layout_cache,
+    layout_collisions,
+    layout_score,
+)
+from petrucci.input.note.operations import apply_note_input, resolve_input_pitch
+from petrucci.input.note.types import (
+    AddLyric,
+    AddSlur,
+    AddTie,
+    ChangeDuration,
+    DeleteEvent,
+    EnterNote,
+    EnterRest,
+    EventInputStyle,
+    InputPitch,
+    NotatedDuration,
+    NoteInputChange,
+    NoteInputChangeKind,
+    NoteInputContext,
+    NoteInputError,
+    NoteInputOperation,
+    NoteInputResult,
+    NoteInputTransaction,
+    RemoveLyric,
+    RemoveSlur,
+    RemoveTie,
+    ReplacePitch,
+    ScorePosition,
+)
 from petrucci.input.tablature.input import CellKey, editor_event_columns, editor_fret_at
 from petrucci.input.tablature.mutation import (
     EditableTablature,
@@ -124,8 +124,8 @@ from petrucci.input.tablature.mutation import (
 
 if TYPE_CHECKING:
     from petrucci.engraving.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
-    from petrucci.terminal.api import GlyphMode, SemanticFrame, TerminalNoteheads
     from petrucci.engraving.typeset import TypesetOptions, TypesetResult
+    from petrucci.terminal.api import GlyphMode, SemanticFrame, TerminalNoteheads
 
 __all__ = [
     "AccidentalDisplay",

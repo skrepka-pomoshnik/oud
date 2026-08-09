@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from petrucci.rendering.primitives.helpers import safe_addstr
-from petrucci.rendering.staff.playback import PlaybackOverlayCache, _playback_overlay_ops_for_bar
 from petrucci.rendering.staff.grid import record_cursor_display_map, render_staff_grid
+from petrucci.rendering.staff.playback import PlaybackOverlayCache, _playback_overlay_ops_for_bar
 from petrucci.rendering.staff.vocal_rows import render_vocal_rows
 from petrucci.terminal.canvas.screen import Screen
 

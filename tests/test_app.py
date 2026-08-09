@@ -14,8 +14,8 @@ from oud.presentation.tui.input import handle_command as handle_command_input
 from oud.presentation.tui.input import handle_search as handle_search_input
 from oud.presentation.tui.input import history_next, history_prev, parse_search
 from oud.presentation.tui.loop import _read_input_batch, run_loop
-from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.core.model import Bar, ImportedScore, Piece
+from petrucci.terminal.canvas.framebuffer import Frame
 
 
 def _state() -> EditorState:

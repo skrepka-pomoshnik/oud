@@ -17,8 +17,8 @@ from petrucci.adapters.duet import (
     split_duet_triplet_map,
     split_duet_triplet_set,
 )
-from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height
 from petrucci.core.model import Piece
+from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height
 from petrucci.rendering.primitives.helpers import safe_addstr
 from petrucci.rendering.staff.playback import PlaybackOverlayCache
 from petrucci.rendering.system.render import render_systems

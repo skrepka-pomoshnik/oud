@@ -6,12 +6,12 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import NoReturn
 
-from petrucci.terminal.canvas.framebuffer import overlay_frame
+from petrucci.core.score import NotationMeasure, NotationScore, NotationStaff, WrittenPitch
 from petrucci.engraving.layout.engine import ElementRole, LayoutViewport, OnsetPosition, ScoreLayout, StaffRows
 from petrucci.engraving.notation.state import _staff_position, _state_at
-from petrucci.core.score import NotationMeasure, NotationScore, NotationStaff, WrittenPitch
-from petrucci.terminal.canvas.screen import A_DIM
 from petrucci.terminal.api import GlyphMode, SemanticFrame
+from petrucci.terminal.canvas.framebuffer import overlay_frame
+from petrucci.terminal.canvas.screen import A_DIM
 
 
 class PitchCueError(ValueError):

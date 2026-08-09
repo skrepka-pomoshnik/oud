@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 
-from petrucci.engraving.layout.engine import LayoutElement, NotationLayoutPolicy, OnsetPosition, StaffRows
 from petrucci.core.score import Clef, KeySignature, LyricSyllable, NotationEvent, TimeSignature, WrittenPitch
+from petrucci.engraving.layout.engine import LayoutElement, NotationLayoutPolicy, OnsetPosition, StaffRows
 from petrucci.engraving.layout.fitting import BoxSystem
 
 

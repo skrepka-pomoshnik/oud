@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from petrucci.input.tablature.policy import bar_has_multifret_tokens, multifret_event_gap
 from petrucci.rendering.bar.render import build_flag_rows
 from petrucci.rendering.primitives.geometry import (
     _event_display_onset_cols,
@@ -8,8 +9,6 @@ from petrucci.rendering.primitives.geometry import (
     _place_duration_cells_aligned,
 )
 from petrucci.rendering.primitives.helpers import pad_row, safe_addstr
-from petrucci.rendering.rhythm.cues import draw_span_rows, overlay_annotation_cues
-from petrucci.rendering.rhythm.types import FlagRowPlan, RhythmRenderContext, RhythmRenderResult
 from petrucci.rendering.primitives.spacing import build_chord_scale_map as _build_chord_scale_map
 from petrucci.rendering.primitives.spacing import note_event_columns as _note_event_columns
 from petrucci.rendering.primitives.utils import (
@@ -18,8 +17,9 @@ from petrucci.rendering.primitives.utils import (
     spread_flag_positions,
     trim_right_slack_for_onsets,
 )
+from petrucci.rendering.rhythm.cues import draw_span_rows, overlay_annotation_cues
+from petrucci.rendering.rhythm.types import FlagRowPlan, RhythmRenderContext, RhythmRenderResult
 from petrucci.terminal.canvas.screen import A_BOLD
-from petrucci.input.tablature.policy import bar_has_multifret_tokens, multifret_event_gap
 from petrucci.terminal.view.model import _beamified_chord_flag_positions, _scale_col, duration_display
 
 

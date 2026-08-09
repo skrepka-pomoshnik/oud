@@ -51,37 +51,43 @@ def _metadata_comments(piece: Piece) -> list[str]:
     return comments
 
 
+def _append_header_field(
+    header: list[str],
+    name: str,
+    value: str | None,
+    *,
+    single_line: bool = True,
+) -> None:
+    if not value:
+        return
+    rendered = _single_line(value) if single_line else value
+    header.append(f'  {name} = "{_escape_lilypond(rendered)}"')
+
+
 def _lilypond_header(
     piece: Piece,
     version: str = "2.26",
     *,
     include_source_heading: bool = True,
-) -> list[str]:  # noqa: C901
+) -> list[str]:
     title = piece.title or "Untitled"
     composer = piece.composer or piece.author or ""
     source_version = "2.24.0" if version == "2.24" else "2.26.0"
     header = [f'\\version "{source_version}"', *_metadata_comments(piece), r"\header {"]
     header.append(f'  title = "{_escape_lilypond(title)}"')
-    if piece.subtitle:
-        header.append(f'  subtitle = "{_escape_lilypond(_single_line(piece.subtitle))}"')
-    if composer:
-        header.append(f'  composer = "{_escape_lilypond(composer)}"')
-    if piece.author and piece.author != composer:
-        header.append(f'  poet = "{_escape_lilypond(_single_line(piece.author))}"')
-    if piece.arranger:
-        header.append(f'  arranger = "{_escape_lilypond(_single_line(piece.arranger))}"')
-    if include_source_heading and (piece.piece_type or piece.part):
-        description = " | ".join(value for value in (piece.piece_type, piece.part) if value)
-        header.append(f'  piece = "{_escape_lilypond(_single_line(description))}"')
-    if include_source_heading and piece.volume:
-        header.append(f'  opus = "{_escape_lilypond(_single_line(piece.volume))}"')
+    description = (
+        " | ".join(value for value in (piece.piece_type, piece.part) if value) if include_source_heading else None
+    )
     source = ", page ".join(value for value in (piece.source, piece.page) if value)
-    if source:
-        header.append(f'  source = "{_escape_lilypond(_single_line(source))}"')
-    if piece.publisher:
-        header.append(f'  copyright = "{_escape_lilypond(_single_line(piece.publisher))}"')
-    if piece.footnote:
-        header.append(f'  tagline = "{_escape_lilypond(_single_line(piece.footnote))}"')
+    _append_header_field(header, "subtitle", piece.subtitle)
+    _append_header_field(header, "composer", composer, single_line=False)
+    _append_header_field(header, "poet", piece.author if piece.author != composer else None)
+    _append_header_field(header, "arranger", piece.arranger)
+    _append_header_field(header, "piece", description)
+    _append_header_field(header, "opus", piece.volume if include_source_heading else None)
+    _append_header_field(header, "source", source)
+    _append_header_field(header, "copyright", piece.publisher)
+    _append_header_field(header, "tagline", piece.footnote)
     header.append("}")
     return header
 

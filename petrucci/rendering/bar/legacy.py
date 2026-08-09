@@ -5,21 +5,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from petrucci.adapters.duet import is_duet_score_piece
-from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height
 from petrucci.core.model import Piece
+from petrucci.core.music.tuning import default_bass_strings, parse_bass_strings, tuning_count
+from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height
+from petrucci.input.tablature.style import resolve_tab_style_policy
+from petrucci.rendering.primitives.helpers import bass_strings_used, clean_text, render_help, safe_addstr
+from petrucci.rendering.staff.playback import PlaybackOverlayCache
+from petrucci.rendering.staff.vocal import melody_row_count
 from petrucci.rendering.system.duet import (
     DuetRenderRequest,
     duet_score_hint,
     render_duet_score_view,
 )
-from petrucci.rendering.primitives.helpers import bass_strings_used, clean_text, render_help, safe_addstr
-from petrucci.rendering.staff.playback import PlaybackOverlayCache
-from petrucci.rendering.system.status import bar_meter_integrity_marker, build_status_lines, resolve_duration_text
 from petrucci.rendering.system.render import render_systems
-from petrucci.rendering.staff.vocal import melody_row_count
+from petrucci.rendering.system.status import bar_meter_integrity_marker, build_status_lines, resolve_duration_text
 from petrucci.terminal.canvas.screen import Screen
-from petrucci.input.tablature.style import resolve_tab_style_policy
-from petrucci.core.music.tuning import default_bass_strings, parse_bass_strings, tuning_count
 from petrucci.terminal.view.model import _tuning_labels
 
 Triplet = tuple[int, int, int]

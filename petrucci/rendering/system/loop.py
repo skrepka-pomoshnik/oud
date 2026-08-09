@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height, layout_block_rows
+from petrucci.engraving.layout.systems import AutoSystemPlanOptions, plan_auto_system, plan_fixed_system
+from petrucci.input.tablature.policy import system_display_indices_for_bars, visual_row_indices
 from petrucci.rendering.bar.state import (
     prepare_bar_basics,
     prepare_bar_layout,
@@ -12,8 +14,6 @@ from petrucci.rendering.primitives.helpers import safe_addstr
 from petrucci.rendering.rhythm.rows import _render_rhythm_rows
 from petrucci.rendering.staff.rows import _render_staff_and_playback
 from petrucci.rendering.system.types import SystemLayout, SystemRenderContext
-from petrucci.engraving.layout.systems import AutoSystemPlanOptions, plan_auto_system, plan_fixed_system
-from petrucci.input.tablature.policy import system_display_indices_for_bars, visual_row_indices
 from petrucci.terminal.view.model import _string_label
 
 

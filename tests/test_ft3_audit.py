@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from scripts.corpus.audit import audit_file
 from scripts.corpus import audit as ft3_audit
+from scripts.corpus.audit import audit_file
 
 
 def test_ft3_audit_reports_typed_source_records_without_unresolved_values() -> None:

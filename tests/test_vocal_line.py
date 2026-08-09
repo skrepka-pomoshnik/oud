@@ -1,5 +1,5 @@
-from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
 from petrucci.adapters.vocal import infer_vocal_events, token_pitch_value
+from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note
 
 
 def test_token_pitch_value_distinguishes_b_from_b_flat() -> None:

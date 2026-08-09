@@ -17,7 +17,14 @@ RUFF = Path(sys.executable).with_name("ruff")
 MAX_COMPLEXITY = 7
 MAX_MODULE_LINES = 1_000
 SOURCE_ROOTS = ("oud", "petrucci", "scripts", "tests")
-UI_INDEPENDENT_ROOTS = ("oud/editor", "oud/exports", "oud/importers", "oud/services/playback", "oud/services/plugins", "petrucci")
+UI_INDEPENDENT_ROOTS = (
+    "oud/editor",
+    "oud/exports",
+    "oud/importers",
+    "oud/services/playback",
+    "oud/services/plugins",
+    "petrucci",
+)
 UI_ONLY_MODULES = ("curses", "oud.presentation.tui")
 COMPLEXITY_RE = re.compile(r"`(?P<name>[^`]+)` is too complex \((?P<score>\d+) > \d+\)")
 

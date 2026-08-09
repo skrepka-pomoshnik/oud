@@ -101,7 +101,8 @@ def test_export_lilypond_extends_6_course_tuning_for_8_course_piece_in_low_to_hi
         settings={"tuning": "g2c3f3a3d4g4"},
     )
     text = path.read_text(encoding="utf-8")
-    assert r"stringTunings = \stringTuning <e, f, g, c f a d' g'>" in text
+    assert r"stringTunings = \stringTuning <g, c f a d' g'>" in text
+    assert r"additionalBassStrings = \stringTuning <e, f,>" in text
     # Regression: extra-course note must not be silently dropped from the exported chord.
     assert "<" in text and ">" in text
     chord_line = next(line for line in text.splitlines() if line.strip().startswith("<"))
