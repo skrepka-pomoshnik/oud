@@ -3,9 +3,9 @@ from typing import cast
 
 import pytest
 
-from oud.editor.normal_actions import handle_normal
-from oud.editor.state import EditorState
-from oud.editor.viewport import ensure_cursor_visible
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.normal.actions import handle_normal
+from oud.editor.navigation.viewport import ensure_cursor_visible
 from oud.playback.timeline import PlaybackCursor
 from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from tests.helpers_regression_cases import (

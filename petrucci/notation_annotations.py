@@ -18,12 +18,12 @@ from petrucci.notation_elements import _layout_fail
 from petrucci.score import LyricLine, LyricSyllable, NotationScore, NotationStaff, SpanKind, Syllabic
 
 
-def _span_lane_map(staff: NotationStaff, *, kind: SpanKind) -> dict[str, int]:
+def _span_lane_map(staff: NotationStaff, *, kinds: frozenset[SpanKind]) -> dict[str, int]:
     event_order = {
         event.id: index for index, event in enumerate(event for measure in staff.measures for event in measure.events)
     }
     spans = sorted(
-        (span for span in staff.spans if span.kind is kind),
+        (span for span in staff.spans if span.kind in kinds),
         key=lambda span: (event_order[span.start_event_id], event_order[span.end_event_id], span.id),
     )
     lane_ends: list[int] = []
@@ -132,7 +132,11 @@ def _with_score_spans(
     onset_map = {onset.event_id: onset for onset in onsets}
     extra: dict[int, list[LayoutElement]] = {}
     for staff in score.staffs:
-        lane_maps = {kind: _span_lane_map(staff, kind=kind) for kind in SpanKind}
+        lane_maps = {
+            SpanKind.TIE: _span_lane_map(staff, kinds=frozenset({SpanKind.TIE})),
+            SpanKind.SLUR: _span_lane_map(staff, kinds=frozenset({SpanKind.SLUR, SpanKind.GLISSANDO})),
+        }
+        lane_maps[SpanKind.GLISSANDO] = lane_maps[SpanKind.SLUR]
         for span in staff.spans:
             start = onset_map.get(span.start_event_id)
             end = onset_map.get(span.end_event_id)
@@ -161,7 +165,11 @@ def _span_segments(
     systems: tuple[ScoreSystem, ...],
     lane: int,
 ) -> tuple[tuple[int, LayoutElement], ...]:
-    role = ElementRole.TIE if kind is SpanKind.TIE else ElementRole.SLUR
+    role = {
+        SpanKind.TIE: ElementRole.TIE,
+        SpanKind.SLUR: ElementRole.SLUR,
+        SpanKind.GLISSANDO: ElementRole.GLISSANDO,
+    }[kind]
     segments: list[tuple[int, LayoutElement]] = []
     segment_index = 0
     for system_index in range(start.system_index, end.system_index + 1):
@@ -213,7 +221,7 @@ def _staff_horizontal_bounds(system: ScoreSystem, staff_id: str) -> tuple[int, i
 
 def _span_row(system: ScoreSystem, *, staff_id: str, role: ElementRole, lane: int) -> int:
     rows = next(row for row in system.staff_rows if row.staff_id == staff_id)
-    if role is ElementRole.SLUR:
+    if role in {ElementRole.SLUR, ElementRole.GLISSANDO}:
         if not rows.slur_rows:
             _layout_fail(f"staff {staff_id!r} requires an unallocated slur row")
         if lane >= len(rows.slur_rows):

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.editor.plugin_ops import (
+from oud.editor.commands.plugins.operations import (
     download_plugin_folder_recursive,
     download_plugin_item,
     enter_plugin_mode,
     handle_plugin_key,
     open_plugin_item,
 )
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from oud.plugins.model import RemoteTab
 from petrucci.model import Bar, Piece
 
@@ -238,7 +238,7 @@ def test_plugin_help_empty_and_exit_paths(monkeypatch) -> None:
     def fake_show_help(current: EditorState) -> None:
         calls.append(current)
 
-    monkeypatch.setattr("oud.editor.command_ops.show_help", fake_show_help)
+    monkeypatch.setattr("oud.editor.commands.dispatch.show_help", fake_show_help)
     handle_plugin_key(state, ord("?"))
     assert calls == [state]
 

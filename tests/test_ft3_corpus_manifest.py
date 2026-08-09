@@ -20,6 +20,8 @@ RANDOM_50_V3_MANIFEST = Path("corpus/ft3-random-50-v3.json")
 RANDOM_63_V4_MANIFEST = Path("corpus/ft3-random-63-v4.json")
 RANDOM_37_V5_MANIFEST = Path("corpus/ft3-random-37-v5.json")
 FIXED_115_V6_MANIFEST = Path("corpus/ft3-fixed-115-v6.json")
+FIXED_85_V7_MANIFEST = Path("corpus/ft3-fixed-85-v7.json")
+FIXED_14_V8_MANIFEST = Path("corpus/ft3-fixed-14-v8.json")
 NOTE_INPUT_MANIFEST = Path("corpus/ft3-note-input-100.json")
 REGRESSION_MANIFEST = Path("corpus/ft3-regression.json")
 FIXED_RANDOM_MANIFESTS = (
@@ -29,6 +31,8 @@ FIXED_RANDOM_MANIFESTS = (
     RANDOM_63_V4_MANIFEST,
     RANDOM_37_V5_MANIFEST,
     FIXED_115_V6_MANIFEST,
+    FIXED_85_V7_MANIFEST,
+    FIXED_14_V8_MANIFEST,
 )
 
 
@@ -126,7 +130,7 @@ def test_random_63_v4_manifest_is_a_new_fixed_composer_stratified_selection() ->
 def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
     raw = json.loads(RANDOM_37_V5_MANIFEST.read_text(encoding="utf-8"))
     expanded = load_manifest(RANDOM_37_V5_MANIFEST)
-    previous_paths = (REGRESSION_MANIFEST, *FIXED_RANDOM_MANIFESTS[:-2], NOTE_INPUT_MANIFEST)
+    previous_paths = (REGRESSION_MANIFEST, *FIXED_RANDOM_MANIFESTS[:4], NOTE_INPUT_MANIFEST)
     previous = [entry for path in previous_paths for entry in load_manifest(path).files]
 
     assert raw["selection"]["selected"] == 37
@@ -137,7 +141,7 @@ def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
     assert "one-time" in raw["selection"]["method"]
     assert "never repeated" in raw["selection"]["method"]
     assert len(expanded.files) == 37
-    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS[:-1]) == 300
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS[:5]) == 300
     assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
     assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
     assert all(
@@ -149,13 +153,13 @@ def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
 def test_fixed_115_v6_expands_compatibility_corpus_to_415() -> None:
     raw = json.loads(FIXED_115_V6_MANIFEST.read_text(encoding="utf-8"))
     expanded = load_manifest(FIXED_115_V6_MANIFEST)
-    previous = [entry for path in FIXED_RANDOM_MANIFESTS[:-1] for entry in load_manifest(path).files]
+    previous = [entry for path in FIXED_RANDOM_MANIFESTS[:5] for entry in load_manifest(path).files]
 
     assert raw["selection"]["selected"] == 115
     assert raw["selection"]["candidate_count"] == 115
     assert "checksum-ordered" in raw["selection"]["method"]
     assert len(expanded.files) == 115
-    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS) == 415
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS[:6]) == 415
     assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
     assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
     assert all(
@@ -164,7 +168,45 @@ def test_fixed_115_v6_expands_compatibility_corpus_to_415() -> None:
     )
 
 
-@pytest.mark.parametrize("manifest_path", (RANDOM_37_V5_MANIFEST, FIXED_115_V6_MANIFEST))
+def test_fixed_85_v7_expands_compatibility_corpus_to_500() -> None:
+    raw = json.loads(FIXED_85_V7_MANIFEST.read_text(encoding="utf-8"))
+    expanded = load_manifest(FIXED_85_V7_MANIFEST)
+    previous = [entry for path in FIXED_RANDOM_MANIFESTS[:6] for entry in load_manifest(path).files]
+
+    assert raw["selection"]["selected"] == 85
+    assert raw["selection"]["candidate_count"] == 87
+    assert raw["selection"]["composer_index_size"] == 195
+    assert raw["selection"]["unique_composers"] == 10
+    assert "SHA-256 URL-ordered" in raw["selection"]["method"]
+    assert "never repeated" in raw["selection"]["method"]
+    assert len(expanded.files) == 85
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS[:7]) == 500
+    assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
+    assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
+    assert all(
+        {"format", "bars", "strings", "style", "tab_chords", "staff_kinds", "notation_events", "lyrics"} <= entry.keys()
+        for entry in raw["files"]
+    )
+
+
+def test_fixed_14_v8_closes_every_direct_index_semantic_variant() -> None:
+    raw = json.loads(FIXED_14_V8_MANIFEST.read_text(encoding="utf-8"))
+    expanded = load_manifest(FIXED_14_V8_MANIFEST)
+    previous = [entry for path in FIXED_RANDOM_MANIFESTS[:-1] for entry in load_manifest(path).files]
+
+    assert raw["selection"]["selected"] == 14
+    assert raw["selection"]["candidate_count"] == 14
+    assert "previously unresolved" in raw["selection"]["method"]
+    assert len(expanded.files) == 14
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS) == 514
+    assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
+    assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
+
+
+@pytest.mark.parametrize(
+    "manifest_path",
+    (RANDOM_37_V5_MANIFEST, FIXED_115_V6_MANIFEST, FIXED_85_V7_MANIFEST, FIXED_14_V8_MANIFEST),
+)
 def test_expansion_metadata_matches_verified_payloads(
     manifest_path: Path,
     fixed_pieces: dict[Path, Piece],
@@ -193,6 +235,18 @@ def test_expansion_metadata_matches_verified_payloads(
         assert expected["staff_kinds"] == dict(sorted(staff_kinds.items()))
         assert expected["notation_events"] == notation_events
         assert expected["lyrics"] == lyrics
+
+
+def test_v7_pdf_confirmed_postfix_ornaments_are_fully_decoded(fixed_pieces: dict[Path, Piece]) -> None:
+    paths = manifest_paths(load_manifest(FIXED_85_V7_MANIFEST))
+    notes = [note for path in paths for bar in fixed_pieces[path].bars for chord in bar.chords for note in chord.notes]
+    plus_notes = [note for note in notes if note.ft3_extras and note.ft3_extras & 0xFE00 == 0x0A00]
+    star_notes = [note for note in notes if note.ft3_extras and note.ft3_extras & 0xFE00 == 0x4000]
+
+    assert plus_notes
+    assert len(star_notes) == 9
+    assert all(note.right_ornament == "+" and note.ft3_extra_residual is None for note in plus_notes)
+    assert all(note.right_ornament == "*" and note.ft3_extra_residual is None for note in star_notes)
 
 
 def test_ft3_payload_suffixes_are_ignored() -> None:
@@ -343,7 +397,7 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
         except PieceAdapterError as exc:
             rejected[_relative(path)] = str(exc)
 
-    assert len(notation) == 43
+    assert len(notation) == 49
     assert rejected == {
         "lutemusic/note-input-100/028/disperate_speranze_S.ft3": (
             "tie target 'piece:staff:1:bar:12:event:2:0' has no preceding event with a shared pitch"
@@ -367,7 +421,7 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),
         "lutemusic/random-63-v4/043/rondeau_130.ft3": (
-            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+            "tie target 'piece:staff:0:bar:26:event:4:0' has no preceding event with a shared pitch"
         ),
         "lutemusic/random-63-v4/050/passacaille_B.ft3": (
             "tie target 'piece:staff:0:bar:0:event:0:0' has no preceding event with a shared pitch"

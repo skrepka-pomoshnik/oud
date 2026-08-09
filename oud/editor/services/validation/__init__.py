@@ -1,0 +1,1 @@
+"""Deterministic editor validation rules."""

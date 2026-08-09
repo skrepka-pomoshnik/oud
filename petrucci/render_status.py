@@ -7,7 +7,34 @@ from petrucci.time_utils import parse_time_signature_value
 from petrucci.view_model import chord_positions
 
 
-def resolve_duration_text(  # noqa: C901
+def _manual_duration_at(
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar: int,
+    col: int,
+    preferred_string: int,
+    strings: int,
+) -> int | None:
+    preferred = durations.get((bar, preferred_string, col))
+    if preferred is not None:
+        return preferred
+    return next((durations[(bar, string, col)] for string in range(strings) if (bar, string, col) in durations), None)
+
+
+def _chord_duration_at(piece: Piece, *, bar: int, col: int, width: int, default_duration: int) -> int | None:
+    if not 0 <= bar < len(piece.bars) or not piece.bars[bar].chords:
+        return None
+    return next(
+        (
+            denominator
+            for position, denominator, _dot in chord_positions(piece.bars[bar], width, default_duration)
+            if position == col
+        ),
+        None,
+    )
+
+
+def resolve_duration_text(
     *,
     piece: Piece,
     durations: dict[tuple[int, int, int], int],
@@ -18,24 +45,23 @@ def resolve_duration_text(  # noqa: C901
     bar_width: int,
     default_duration: int = 4,
 ) -> str | None:
-    dur_key = (cursor_bar, actual_cursor_string, cursor_col)
-    dur_text: str | int | None = durations.get(dur_key)
-    if dur_text is None:
-        for s_idx in range(piece.strings):
-            alt_key = (cursor_bar, s_idx, cursor_col)
-            if alt_key in durations:
-                dur_text = durations[alt_key]
-                break
+    dur_text: str | int | None = _manual_duration_at(
+        durations,
+        bar=cursor_bar,
+        col=cursor_col,
+        preferred_string=actual_cursor_string,
+        strings=piece.strings,
+    )
     if dur_text is not None and (cursor_bar, cursor_col) in dotted:
         dur_text = f"{dur_text}."
-    if dur_text is None and 0 <= cursor_bar < len(piece.bars):
-        bar = piece.bars[cursor_bar]
-        if bar.chords:
-            positions = chord_positions(bar, bar_width, default_duration)
-            for col, denom, _dot in positions:
-                if col == cursor_col:
-                    dur_text = denom
-                    break
+    if dur_text is None:
+        dur_text = _chord_duration_at(
+            piece,
+            bar=cursor_bar,
+            col=cursor_col,
+            width=bar_width,
+            default_duration=default_duration,
+        )
     return str(dur_text) if dur_text is not None else None
 
 
@@ -72,7 +98,27 @@ def _chord_bar_sum_quarter_beats(
     return total
 
 
-def _manual_bar_sum_quarter_beats(  # noqa: C901
+def _manual_duration_at_column(
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar_index: int,
+    strings: int,
+    col: int,
+) -> int | None:
+    values = (
+        durations[(bar_index, string_index, col)]
+        for string_index in range(strings)
+        if (bar_index, string_index, col) in durations
+    )
+    return max(values, default=None)
+
+
+def _quarter_beats(denominator: int, *, dotted: bool) -> float:
+    beats = 4.0 / denominator
+    return beats * 1.5 if dotted else beats
+
+
+def _manual_bar_sum_quarter_beats(
     *,
     piece: Piece,
     bar_index: int,
@@ -84,22 +130,18 @@ def _manual_bar_sum_quarter_beats(  # noqa: C901
     last: int | None = None
     last_dot = False
     for col in range(bar_width):
-        found = None
-        for s_idx in range(piece.strings):
-            val = durations.get((bar_index, s_idx, col))
-            if val is None:
-                continue
-            if found is None or val > found:
-                found = val
+        found = _manual_duration_at_column(
+            durations,
+            bar_index=bar_index,
+            strings=piece.strings,
+            col=col,
+        )
         if found is None:
             continue
         is_dot = (bar_index, col) in dotted
         if found == last and is_dot == last_dot:
             continue
-        dur = 4.0 / found
-        if is_dot:
-            dur *= 1.5
-        total += dur
+        total += _quarter_beats(found, dotted=is_dot)
         last = found
         last_dot = is_dot
     return total
@@ -149,7 +191,17 @@ def bar_meter_integrity_marker(
     return "M"
 
 
-def build_status_lines(  # noqa: C901
+def _mode_status(mode: str, cmdline: str, searchline: str) -> str:
+    if mode == "command":
+        return f":{cmdline}"
+    if mode == "search":
+        return f"/{searchline}"
+    if mode == "help":
+        return "help  j/k scroll  q close"
+    return mode
+
+
+def build_status_lines(
     *,
     mode: str,
     cmdline: str,
@@ -159,13 +211,7 @@ def build_status_lines(  # noqa: C901
     dur_text: str | None,
     integrity_marker: str | None = None,
 ) -> str:
-    status = mode
-    if mode == "command":
-        status = f":{cmdline}"
-    if mode == "search":
-        status = f"/{searchline}"
-    if mode == "help":
-        status = "help  j/k scroll  q close"
+    status = _mode_status(mode, cmdline, searchline)
     if dur_text and not message and mode not in ("command", "search"):
         status = f"{status}  len:{dur_text}"
     if message and mode not in ("command", "search"):

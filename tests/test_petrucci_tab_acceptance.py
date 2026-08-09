@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor.controller_utils import string_index
-from oud.editor.edit_ops import apply_tab_transaction
-from oud.editor.undo_ops import redo, undo
+from oud.editor.core.coordinates import string_index
+from oud.editor.editing.primitives.edits import apply_tab_transaction
+from oud.editor.editing.primitives.undo import redo, undo
 from oud.exports.export_tab import export_tab
 from oud.importers.tab import load_tab
 from petrucci import (

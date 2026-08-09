@@ -132,6 +132,8 @@ def _append_ft3_note(bar: Bar, chord: Chord, data: bytes, ptr: int) -> None:
         arpeggio=decoded.arpeggio,
         ft3_extras=extras if extras else None,
         ft3_extra_residual=decoded.residual,
+        editorial_brackets=decoded.editorial_brackets,
+        ft3_layout_flags=decoded.layout_flags,
     )
     bar.notes.append(note)
     chord.notes.append(note)

@@ -33,6 +33,12 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 | Long solo layout | `lutemusic/random-50-v3/017/hierusalem.ft3` | [Hierusalem luge](https://browse.lutemusic.org/composers/Borrono/pdf/hierusalem.pdf) | The 222 numbered bars remain continuous across three pages. The interleaved 74-byte object has no musical bar and is preserved as a typed placement-layout record rather than an unknown staff. |
 | Under-note ornament | `lutemusic/random-63-v4/019/2_suite_18_courante.ft3` | [Suite 18 in G minor, Courante](https://browse.lutemusic.org/composers/Froberger/pdf/2_suite_18_courante.pdf) | The sole `2400` value is the printed `v` below the first-course fret in bar 5; it now renders and exports as an under-`v` ornament. |
 | Combined fingering bits | `lutemusic/random-63-v4/031/Folle_cor_T.ft3` | [Folle cor](https://browse.lutemusic.org/composers/Mazzocchi/pdf/Folle_cor_T.pdf) | All 36 bars and tablature agree. The isolated `00c0` source value composes known left-finger bits 2 and 3; the PDF hides fingerings, so Oud preserves `2+3` without claiming a visible PDF mark. |
+| Right plus ornament | `lutemusic/fixed-85-v7/001/milano_028.ft3` | [28. Ricercar](https://browse.lutemusic.org/composers/Milano/pdf/milano_028.pdf) | The `0a00` notes print `+` after the fret, symmetrically with the existing left-side `0800` form. The source value now renders as a right ornament without residual bits. |
+| Right star ornament | `lutemusic/fixed-85-v7/012/amant_malheureux.ft3` | [L'Amant malheureux](https://browse.lutemusic.org/composers/GallotJ/pdf/amant_malheureux.pdf) | All nine `4000` notes print a postfix star, including the first two notes after the opening repeat. The star remains distinct from standard-notation editorial-bracket flags. |
+| Later right-hand fingering | `lutemusic/fixed-14-v8/008/galliard.ft3` | [Galliard](https://browse.lutemusic.org/composers/Morlaye/pdf/galliard.pdf) | The repeated `4800` layer is the printed one-dot right-hand fingering on chords; O'Brian's exercises additionally establish `5a00` as two dots and `5800` as placement metadata. |
+| Editorial tab brackets and barre | `lutemusic/fixed-14-v8/006/milano_065.ft3` | [65. Ricercar](https://browse.lutemusic.org/composers/Milano/pdf/milano_065.pdf) | `3600` brackets the editorial beta while retaining the low finger dot. Holborne's isolated `3a00` is the same source family's barre-placement variant, not a pitch or ornament. |
+| One-staff notation-only mapping | `lutemusic/fixed-14-v8/005/la_couperin_viol_1.ft3` | [La Couperin, bass viol 1](https://browse.lutemusic.org/composers/Forqueray/pdf/la_couperin_viol_1.pdf) | The selected bass-viol part maps sequentially to one notation staff. Two eight-byte padding records remain layout provenance and are never reparsed as fake tablature notes. |
+| Exercise layout and annotations | `lutemusic/fixed-14-v8/002/righthand_85.ft3` | [Right-hand exercises](https://browse.lutemusic.org/composers/Exercises/pdf/righthand_85.pdf) | The source has 60 musical bars interleaved with compact placement records; the six-page PDF confirms that projection. Numeric exercise labels and `Etc.` records remain typed editorial text. |
 
 ## Findings
 
@@ -43,7 +49,7 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 - Barline ASCII control fragments remain inspectable control rows instead of
   becoming fake pitches. Tablature payload fragments such as `_6(` no longer
   create synthetic notation staffs.
-- In the fixed 415-file corpus, at least 38 files contain typed notation records. Thirty
+- In the fixed 514-file corpus, at least 38 files contain typed notation records. Thirty
   adapt strictly with lyrics. Seven are rejected with concrete inconsistent-
   duration or invalid-tie diagnostics; the adapter does not silently scale
   conflicting same-onset events or invent tie targets.
@@ -57,6 +63,25 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 
 The focused matrix therefore has semantic import parity, not pixel-identical
 engraving parity. It does not establish general FT3 or Fronimo parity.
+
+## Companion MIDI playback evidence
+
+The six local companion MIDI files are checked as note-on evidence normalized
+by each file's pulses-per-quarter value. These are semantic comparisons, not
+byte comparisons; tempo, channels, note-off encoding, and event ordering may
+differ.
+
+| FT3 case | Reference notes | Exported notes | Exact onset/pitch overlap | Finding |
+| --- | ---: | ---: | ---: | --- |
+| `chromatica_pavana` | 1278 | 1278 | 1277 | Effective parity; one event differs. |
+| `01_felice_fu_quel_anon` | 133 | 133 | 120 | Counts align; 13 pitches/onsets remain bounded differences. |
+| `menuett` | 234 | 226 | 193 | Eight notes and 41 onset/pitch events remain different. |
+| `can_she_excuse` | 524 | 532 | 444 | Eight extra exports; pitch-only overlap is 508. |
+| `phrygian_fantasy` | 380 | 380 | 380 | Exact note-on parity. |
+| `Folle_cor` | 0 | 1030 | 0 | Companion file has tempo/program events but no notes; rejected as parity evidence. |
+
+Executable regressions preserve these measurements and prevent an empty MIDI
+reference from being mistaken for successful playback parity.
 
 ## Fixed 300-file expansion
 

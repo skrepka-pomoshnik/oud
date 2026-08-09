@@ -4,6 +4,7 @@ from petrucci.model import Bar, Chord, Note, Piece
 from petrucci.render import render_piece
 from petrucci.render_utils import chord_positions, flag_row
 from petrucci.view_model import (
+    FlagPositionRequest,
     _bar_durations,
     _bar_flags,
     _bar_number_for_index,
@@ -79,11 +80,13 @@ def test_bar_flags_show_all_when_redundant_disabled() -> None:
 
 def test_flag_positions_all_returns_each_column() -> None:
     positions = _flag_positions_all(
-        durations={},
-        bar_index=0,
-        strings=6,
-        bar_width=4,
-        default_duration=4,
+        FlagPositionRequest(
+            durations={},
+            bar_index=0,
+            strings=6,
+            bar_width=4,
+            default_duration=4,
+        )
     )
     assert positions == [(0, 4, False), (1, 4, False), (2, 4, False), (3, 4, False)]
 

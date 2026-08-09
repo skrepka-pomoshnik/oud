@@ -13,9 +13,9 @@ from oud.cli_convert import (
     convert_command,
 )
 from oud.command_io import OutputExistsError, atomic_write_text
-from oud.editor.actions import handle_insert, handle_normal
-from oud.editor.file_ops import render_ascii_snapshot
-from oud.editor.init import init_state
+from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
+from oud.editor.services.bootstrap import init_state
+from oud.editor.services.io.files import render_ascii_snapshot
 from oud.tui.commands import apply_command
 from oud.tui.loop import run_loop
 

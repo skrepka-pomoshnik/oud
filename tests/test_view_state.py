@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.editor.state import EditorState
-from oud.editor.view_state import (
+from oud.editor.core.state import EditorState
+from oud.editor.navigation.view.state import (
     view_commit_frame,
     view_mark_dirty_rows,
     view_merge_dirty,

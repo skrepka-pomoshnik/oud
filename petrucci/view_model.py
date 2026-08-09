@@ -121,6 +121,16 @@ class _BeamFlagState:
     group_dot: bool | None = None
 
 
+@dataclass(frozen=True)
+class FlagPositionRequest:
+    durations: dict[tuple[int, int, int], int]
+    bar_index: int
+    strings: int
+    bar_width: int
+    default_duration: int
+    dotted: set[tuple[int, int]] | None = None
+
+
 def _beam_flag_visible(
     marker: str | None,
     index: int,
@@ -224,7 +234,41 @@ def _bar_number_for_index(
     return None
 
 
-def _bar_durations(  # noqa: C901
+def _duration_at_column(
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar_index: int,
+    strings: int,
+    col: int,
+) -> int | None:
+    values = (
+        durations[(bar_index, string_index, col)]
+        for string_index in range(strings)
+        if (bar_index, string_index, col) in durations
+    )
+    return max(values, default=None)
+
+
+def _place_bar_duration(
+    row: list[str],
+    col: int,
+    found: int | None,
+    *,
+    default_duration: int,
+    is_dotted: bool,
+    hide_redundant: bool,
+    previous: tuple[int | None, bool],
+) -> tuple[int | None, bool]:
+    if hide_redundant and found is None:
+        return previous
+    denominator = found if found is not None else default_duration
+    if not hide_redundant or (denominator, is_dotted) != previous:
+        place_duration_cells(row, col, denominator, is_dotted)
+        return denominator, is_dotted
+    return previous
+
+
+def _bar_durations(
     durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
@@ -238,46 +282,30 @@ def _bar_durations(  # noqa: C901
     last: int | None = None
     last_dot = False
     for col in range(bar_width):
-        found = None
-        for s_idx in range(strings):
-            key = (bar_index, s_idx, col)
-            if key in durations:
-                denom = durations[key]
-                if found is None or denom > found:
-                    found = denom
-        denom = found if found is not None else default_duration
-        if hide_redundant:
-            if found is None:
-                continue
-            is_dotted = dotted is not None and (bar_index, col) in dotted
-            if denom != last or is_dotted != last_dot:
-                place_duration_cells(row, col, denom, is_dotted)
-                last = denom
-                last_dot = is_dotted
-        else:
-            is_dotted = dotted is not None and (bar_index, col) in dotted
-            place_duration_cells(row, col, denom, is_dotted)
+        found = _duration_at_column(durations, bar_index=bar_index, strings=strings, col=col)
+        last, last_dot = _place_bar_duration(
+            row,
+            col,
+            found,
+            default_duration=default_duration,
+            is_dotted=dotted is not None and (bar_index, col) in dotted,
+            hide_redundant=hide_redundant,
+            previous=(last, last_dot),
+        )
     return row
 
 
-def _flag_positions_all(  # noqa: PLR0917 - legacy grid projection pending a typed input record
-    durations: dict[tuple[int, int, int], int],
-    bar_index: int,
-    strings: int,
-    bar_width: int,
-    default_duration: int,
-    dotted: set[tuple[int, int]] | None = None,
-) -> list[tuple[int, int, bool]]:
-    has_duration = any(b == bar_index for (b, _s, _c) in durations)
+def _flag_positions_all(request: FlagPositionRequest) -> list[tuple[int, int, bool]]:
+    has_duration = any(b == request.bar_index for (b, _s, _c) in request.durations)
     if not has_duration:
-        return [(col, default_duration, False) for col in range(bar_width)]
+        return [(col, request.default_duration, False) for col in range(request.bar_width)]
     return flag_positions_from_durations(
-        durations,
-        bar_index=bar_index,
-        strings=strings,
-        bar_width=bar_width,
-        default_duration=default_duration,
-        dotted=dotted,
+        request.durations,
+        bar_index=request.bar_index,
+        strings=request.strings,
+        bar_width=request.bar_width,
+        default_duration=request.default_duration,
+        dotted=request.dotted,
     )
 
 
@@ -385,7 +413,23 @@ def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
     return out
 
 
-def _bar_imported_ft3_annotations(  # noqa: C901
+def _chord_fingering(chord, *, fingering_mode: str) -> str | None:
+    glyph = next(
+        (
+            glyph
+            for note in chord.notes
+            if (glyph := _ft3_display_fingering_for_note(note, fingering_mode=fingering_mode))
+        ),
+        None,
+    )
+    if glyph is None and any(
+        getattr(note, "barre", False) or getattr(note, "editorial_brackets", False) for note in chord.notes
+    ):
+        return "["
+    return glyph
+
+
+def _bar_imported_ft3_annotations(
     bar: Bar,
     *,
     bar_width: int,
@@ -396,25 +440,27 @@ def _bar_imported_ft3_annotations(  # noqa: C901
     if fingering_mode == "off" or not bar.chords:
         return row
     positions = chord_positions(bar, bar_width, default_duration)
-    for idx, chord in enumerate(bar.chords):
-        if idx >= len(positions):
-            break
-        col = positions[idx][0]
+    for chord, (col, _denominator, _dotted) in zip(bar.chords, positions, strict=False):
         if not (0 <= col < bar_width):
             continue
-        glyph = None
-        for note in chord.notes:
-            glyph = _ft3_display_fingering_for_note(note, fingering_mode=fingering_mode)
-            if glyph:
-                break
-        if glyph is None and any(getattr(note, "barre", False) for note in chord.notes):
-            glyph = "["
+        glyph = _chord_fingering(chord, fingering_mode=fingering_mode)
         if glyph and row[col] == " ":
             row[col] = glyph
     return row
 
 
-def _bar_imported_ft3_ornaments(  # noqa: C901
+def _chord_ornament(chord, *, ornament_mode: str) -> str | None:
+    if any(note.arpeggio for note in chord.notes):
+        return ":"
+    for note in chord.notes:
+        picked = _pick_side_value(left=note.left_ornament, right=note.right_ornament, mode=ornament_mode)
+        glyph = _ft3_ornament_glyph(picked)
+        if glyph:
+            return glyph
+    return None
+
+
+def _bar_imported_ft3_ornaments(
     bar: Bar,
     *,
     bar_width: int,
@@ -425,24 +471,10 @@ def _bar_imported_ft3_ornaments(  # noqa: C901
     if ornament_mode == "off" or not bar.chords:
         return row
     positions = chord_positions(bar, bar_width, default_duration)
-    for idx, chord in enumerate(bar.chords):
-        if idx >= len(positions):
-            break
-        col = positions[idx][0]
+    for chord, (col, _denominator, _dotted) in zip(bar.chords, positions, strict=False):
         if not (0 <= col < bar_width):
             continue
-        glyph = ":" if any(note.arpeggio for note in chord.notes) else None
-        for note in chord.notes:
-            if glyph:
-                break
-            picked = _pick_side_value(
-                left=note.left_ornament,
-                right=note.right_ornament,
-                mode=ornament_mode,
-            )
-            glyph = _ft3_ornament_glyph(picked)
-            if glyph:
-                break
+        glyph = _chord_ornament(chord, ornament_mode=ornament_mode)
         if glyph and row[col] == " ":
             row[col] = glyph
     return row

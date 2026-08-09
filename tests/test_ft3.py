@@ -7,10 +7,14 @@ from oud.importers._ft3_duration import (
     _normalize_vocal_event_accidentals,
     note_type_to_denominator,
 )
+from oud.importers._ft3_note_records import _melody_event_from_ft3
 from oud.importers._ft3_score import (
     _classify_unknown_score_chunk,
+    _is_tab_layout_record,
     _parallel_mixed_score_prefix_count,
     _parallel_raw_bar_targets,
+    _plain_score_annotations,
+    _tab_heading_texts,
 )
 from oud.importers._ft3_tab import _decode_ft3_note_position, parse_bar
 from oud.importers.ft3 import FT3FormatError, load_ft3
@@ -173,6 +177,62 @@ def test_parse_bar_decodes_ft3_confirmed_exact_extras_subset() -> None:
 
     note = parse_bar(_ft3_bar_with_one_note(extras=0x0E00)).notes[0]
     assert note.right_ornament == "x"
+
+    plus = parse_bar(_ft3_bar_with_one_note(extras=0x0A00)).notes[0]
+    star = parse_bar(_ft3_bar_with_one_note(extras=0x4000)).notes[0]
+    assert plus.right_ornament == "+"
+    assert star.right_ornament == "*"
+    assert plus.ft3_extra_residual is None
+    assert star.ft3_extra_residual is None
+
+
+def test_parse_bar_decodes_later_fingering_bracket_and_layout_variants() -> None:
+    high_dot1 = parse_bar(_ft3_bar_with_one_note(extras=0x4800)).notes[0]
+    high_dot2 = parse_bar(_ft3_bar_with_one_note(extras=0x5A00)).notes[0]
+    thumb_layout = parse_bar(_ft3_bar_with_one_note(extras=0x5802)).notes[0]
+    left_layout = parse_bar(_ft3_bar_with_one_note(extras=0x8100)).notes[0]
+    bracketed = parse_bar(_ft3_bar_with_one_note(extras=0x3604)).notes[0]
+    barre_variant = parse_bar(_ft3_bar_with_one_note(extras=0x3A00)).notes[0]
+
+    assert (high_dot1.right_fingering, high_dot2.right_fingering) == ("dot1", "dot2")
+    assert (thumb_layout.right_fingering, thumb_layout.ft3_layout_flags) == ("thumb", 0x5800)
+    assert (left_layout.left_fingering, left_layout.ft3_layout_flags) == ("4", 0x8000)
+    assert bracketed.editorial_brackets is True
+    assert barre_variant.barre is True
+    assert all(
+        note.ft3_extra_residual is None
+        for note in (high_dot1, high_dot2, thumb_layout, left_layout, bracketed, barre_variant)
+    )
+
+
+def test_ft3_later_layout_and_annotation_records_remain_nonmusical() -> None:
+    compact = bytearray(59)
+    compact[2:7] = b"\x04\x11\x00\x00\xff"
+    compact[28:33] = b"\x00\x00\x00\x02\x00"
+    assert _is_tab_layout_record(bytes(compact))
+    assert _is_tab_layout_record(b"\x00\x00\x04\x11\x00\x00\xff\x00")
+
+    heading = bytearray(48)
+    heading[2:7] = b"\x04\x11\x78\x00\x00"
+    heading[32:36] = b"\x01\x00\x00\x00"
+    heading[36:43] = b"\x01\x00\x00\x01\x00\x012"
+    assert _tab_heading_texts(bytes(heading)) == ["2"]
+
+    annotation = bytes(40) + b"Times New Roman\x00'Early Italian articulation, as in Dalza"
+    assert _plain_score_annotations(annotation) == ["Early Italian articulation, as in Dalza"]
+
+
+def test_ft3_standard_note_placement_flag_does_not_change_pitch_semantics() -> None:
+    event = _melody_event_from_ft3(
+        pitch_row=4,
+        raw_flags=0x0802,
+        layout_flags=0,
+        onset_index=0,
+        note_type=4,
+    )
+    assert event.text == "g#"
+    assert event.accidental_flags == 0x0002
+    assert event.ft3_layout_flags == 0x0800
 
 
 def test_parse_bar_decodes_ft3_postfix_and_under_note_ornaments() -> None:

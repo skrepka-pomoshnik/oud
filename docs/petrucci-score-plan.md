@@ -90,6 +90,11 @@ The Piece adapters preserve Oud's established tablature and imported-score
 behavior. Another application should adapt directly to `NotationScore` or
 `FlowEvent`; it must not depend on Piece, FT3, editor, or TUI modules.
 
+`NotationLayoutPolicy.justify` controls ordinary nonfinal systems.
+`justify_last_system=True` independently fills the final or only system to the
+available measure width. It defaults to `False`, and nonfinal forced breaks
+remain natural-width.
+
 ## Supported notation
 
 The canonical score path supports treble and bass staffs, notes, chords, rests,

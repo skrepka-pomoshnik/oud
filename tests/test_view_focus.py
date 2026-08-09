@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from oud.editor.init import init_state
-from oud.editor.status import status_line
-from oud.editor.view_focus import current_view_staff, visible_view_staffs
+from oud.editor.navigation.view.focus import current_view_staff, visible_view_staffs
+from oud.editor.services.bootstrap import init_state
+from oud.editor.services.status import status_line
 from oud.importers.ft3 import load_ft3
 from petrucci.duet_score import duet_bar_mapping
 from petrucci.imported_score import project_imported_staff

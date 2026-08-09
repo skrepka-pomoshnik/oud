@@ -1,8 +1,13 @@
 from pathlib import Path
 
-from oud.editor.init import init_state
-from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
-from oud.editor.navigation import (
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.normal.actions import handle_normal
+from oud.editor.navigation.cursor_map import (
+    bar_content_width_for_cursor,
+    cursor_display_map_for_bar,
+)
+from oud.editor.navigation.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
+from oud.editor.navigation.steps import (
     jump_row_visual,
     move_left,
     move_left_note,
@@ -11,12 +16,7 @@ from oud.editor.navigation import (
     move_right_note,
     move_right_visual,
 )
-from oud.editor.normal_actions import handle_normal
-from oud.editor.state import EditorState
-from oud.editor.visual_cursor_map import (
-    bar_content_width_for_cursor,
-    cursor_display_map_for_bar,
-)
+from oud.editor.services.bootstrap import init_state
 from petrucci.model import Bar, Chord, Note, Piece
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
@@ -158,8 +158,10 @@ def test_visual_move_steps_one_display_cell_and_lands_on_cell_note(
     state.bar_width = 6
     state.overrides[(0, 0, 1)] = "a"
 
-    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
-    monkeypatch.setattr("oud.editor.motions.cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4])
+    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr(
+        "oud.editor.navigation.motions.cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4]
+    )
 
     # The note at col 1 shares display cell 0 with the cursor; moving right
     # must advance the drawn cursor to the next display cell instead of
@@ -181,9 +183,9 @@ def test_visual_move_left_wraps_at_bar_start(
     state.cursor_col = 0
     state.bar_width = 6
 
-    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
     monkeypatch.setattr(
-        "oud.editor.motions.cursor_display_map_for_bar",
+        "oud.editor.navigation.motions.cursor_display_map_for_bar",
         lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
     )
 
@@ -203,9 +205,9 @@ def test_visual_move_left_stops_on_note_inside_duplicate_render_column(
     state.bar_width = 6
     state.overrides[(0, 0, 1)] = "a"
 
-    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
     monkeypatch.setattr(
-        "oud.editor.motions.cursor_display_map_for_bar",
+        "oud.editor.navigation.motions.cursor_display_map_for_bar",
         lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
     )
 

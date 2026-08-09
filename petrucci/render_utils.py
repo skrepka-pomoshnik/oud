@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from petrucci.model import Bar
+from petrucci.model import Bar, Note
 from petrucci.tab_policy import fret_label
 
 
@@ -22,7 +22,30 @@ def format_fret(
     )
 
 
-def bar_cells(  # noqa: C901, PLR0917 - public compatibility; replace options with a typed tab policy
+def _place_legacy_note(
+    cells: list[list[str]],
+    next_col: list[int],
+    note: Note,
+    *,
+    strings: int,
+    bar_width: int,
+    style: str,
+    french_c_shape: str,
+    label_mode: str,
+) -> None:
+    string_index = note.string - 1
+    if not (0 <= string_index < strings):
+        return
+    col = next_col[string_index]
+    if col >= bar_width:
+        return
+    text = format_fret(style, note.fret, french_c_shape=french_c_shape, label_mode=label_mode)[-2:]
+    for offset, char in enumerate(text[: bar_width - col]):
+        cells[string_index][col + offset] = char
+    next_col[string_index] = min(bar_width, col + max(1, len(text)) + 1)
+
+
+def bar_cells(  # noqa: PLR0917 - public compatibility; replace options with a typed tab policy
     bar: Bar,
     strings: int,
     bar_width: int,
@@ -38,25 +61,16 @@ def bar_cells(  # noqa: C901, PLR0917 - public compatibility; replace options wi
     next_col = [0 for _ in range(strings)]
 
     for note in bar.notes:
-        s_idx = note.string - 1
-        if s_idx < 0 or s_idx >= strings:
-            continue
-        col = next_col[s_idx]
-        if col >= bar_width:
-            continue
-        text = format_fret(
-            style,
-            note.fret,
+        _place_legacy_note(
+            cells,
+            next_col,
+            note,
+            strings=strings,
+            bar_width=bar_width,
+            style=style,
             french_c_shape=french_c_shape,
             label_mode=label_mode,
         )
-        if len(text) > 2:
-            text = text[-2:]
-        for offset, ch in enumerate(text):
-            if col + offset >= bar_width:
-                break
-            cells[s_idx][col + offset] = ch
-        next_col[s_idx] = min(bar_width, col + max(1, len(text)) + 1)
 
     return cells
 
@@ -414,7 +428,42 @@ def flag_positions_from_durations(  # noqa: PLR0917 - legacy grid projection pen
     return positions
 
 
-def _duration_values_by_col(  # noqa: C901
+def _dense_duration_values(
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar_index: int,
+    strings: int,
+    columns: range | list[int],
+) -> dict[int, int]:
+    values: dict[int, int] = {}
+    for col in columns:
+        denominators = (
+            durations[(bar_index, string_index, col)]
+            for string_index in range(strings)
+            if (bar_index, string_index, col) in durations
+        )
+        denominator = max(denominators, default=None)
+        if denominator is not None:
+            values[col] = denominator
+    return values
+
+
+def _sparse_duration_values(
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar_index: int,
+    strings: int,
+    columns: range | list[int],
+) -> dict[int, int]:
+    values: dict[int, int] = {}
+    for (duration_bar, string_index, col), denominator in durations.items():
+        if duration_bar != bar_index or not (0 <= string_index < strings) or col not in columns:
+            continue
+        values[col] = max(values.get(col, denominator), denominator)
+    return values
+
+
+def _duration_values_by_col(
     durations: dict[tuple[int, int, int], int],
     *,
     bar_index: int,
@@ -423,24 +472,20 @@ def _duration_values_by_col(  # noqa: C901
 ) -> dict[int, int]:
     if strings <= 0 or not columns:
         return {}
-    values: dict[int, int] = {}
     if len(columns) * strings <= len(durations):
-        for col in columns:
-            for string_index in range(strings):
-                denominator = durations.get((bar_index, string_index, col))
-                if denominator is not None:
-                    values[col] = max(values.get(col, denominator), denominator)
-        return values
-
-    allowed_columns = columns if isinstance(columns, range) else set(columns)
-    for (duration_bar, string_index, col), denominator in durations.items():
-        if duration_bar != bar_index or not (0 <= string_index < strings) or col not in allowed_columns:
-            continue
-        values[col] = max(values.get(col, denominator), denominator)
-    return values
+        return _dense_duration_values(durations, bar_index=bar_index, strings=strings, columns=columns)
+    return _sparse_duration_values(durations, bar_index=bar_index, strings=strings, columns=columns)
 
 
-def smart_group_map(  # noqa: C901
+def _distributed_group_gaps(targets: list[int], extra: int, *, start: int = 0) -> dict[int, int]:
+    gaps: dict[int, int] = {}
+    for index in range(extra):
+        target = targets[(index + start) % len(targets)]
+        gaps[target] = gaps.get(target, 0) + 1
+    return gaps
+
+
+def smart_group_map(
     all_positions: list[tuple[int, int, bool]],
     group_positions: list[tuple[int, int, bool]],
     content_width: int,
@@ -461,22 +506,9 @@ def smart_group_map(  # noqa: C901
     gap = max(1, min_gap)
     base_span = (len(raw_cols) - 1) * gap
     extra = max(0, content_width - (base_span + 1))
-    gap_before: dict[int, int] = {}
-
-    if boundaries and extra > 0:
-        idx = 0
-        while extra > 0:
-            key = boundaries[idx % len(boundaries)]
-            gap_before[key] = gap_before.get(key, 0) + 1
-            extra -= 1
-            idx += 1
-    elif extra > 0:
-        idx = 1
-        while extra > 0:
-            key = raw_cols[idx % len(raw_cols)]
-            gap_before[key] = gap_before.get(key, 0) + 1
-            extra -= 1
-            idx += 1
+    targets = boundaries or raw_cols
+    start = 0 if boundaries else 1
+    gap_before = _distributed_group_gaps(targets, extra, start=start) if extra > 0 else {}
 
     mapping: dict[int, int] = {}
     cursor = 0
@@ -536,7 +568,40 @@ def soft_beat_snap_map(
     return {raw: col for raw, (col, _denom, _dot) in zip(raw_cols, spread, strict=False)}
 
 
-def trim_right_slack_for_onsets(  # noqa: C901
+def _scaled_onset_map(
+    source: dict[int, int],
+    raws: list[int],
+    *,
+    first_col: int,
+    current_last: int,
+    target_last: int,
+    content_width: int,
+    min_gap: int,
+) -> dict[int, int]:
+    current_span = max(1, current_last - first_col)
+    target_span = max(1, target_last - first_col)
+    seeded = [
+        (
+            max(
+                0,
+                min(
+                    content_width - 1,
+                    first_col + ((source[raw] - first_col) * target_span) // current_span,
+                ),
+            ),
+            4,
+            False,
+        )
+        for raw in raws
+    ]
+    spread = spread_flag_positions(seeded, content_width, min_gap=max(0, min_gap))
+    trimmed = dict(source)
+    for raw, (col, _denom, _dot) in zip(raws, spread, strict=False):
+        trimmed[raw] = col
+    return trimmed
+
+
+def trim_right_slack_for_onsets(
     src_to_dest: dict[int, int],
     *,
     all_positions: list[tuple[int, int, bool]],
@@ -566,16 +631,13 @@ def trim_right_slack_for_onsets(  # noqa: C901
         return src_to_dest
     target_last = max(first_col, (content_width - 1) - required_slack)
     if first_col <= 1 and current_last > first_col and target_last > current_last:
-        curr_span = max(1, current_last - first_col)
-        target_span = max(1, target_last - first_col)
-        seeded = []
-        for raw in ordered_raws:
-            col = src_to_dest[raw]
-            scaled = first_col + ((col - first_col) * target_span) // curr_span
-            seeded.append((max(0, min(content_width - 1, scaled)), 4, False))
-        spread = spread_flag_positions(seeded, content_width, min_gap=max(0, min_gap))
-        trimmed = dict(src_to_dest)
-        for raw, (col, _denom, _dot) in zip(ordered_raws, spread, strict=False):
-            trimmed[raw] = col
-        return trimmed
+        return _scaled_onset_map(
+            src_to_dest,
+            ordered_raws,
+            first_col=first_col,
+            current_last=current_last,
+            target_last=target_last,
+            content_width=content_width,
+            min_gap=min_gap,
+        )
     return {raw: min(content_width - 1, col + shift) for raw, col in src_to_dest.items()}

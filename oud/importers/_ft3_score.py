@@ -33,6 +33,7 @@ from petrucci.model import (
 )
 
 _MATRIX_COORDINATES = frozenset(b"0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+_SCORE_ANNOTATION_FONTS = frozenset(("arial", "times new roman"))
 
 
 def _is_tab_bar(bar: Bar) -> bool:
@@ -204,7 +205,7 @@ def _is_note_score_entry(entry: _BodyEntry) -> bool:
     return entry.score_kind in {"note-staff-raw", "note-lyric-raw"}
 
 
-def _parallel_note_tab_plan(  # noqa: C901
+def _parallel_note_tab_plan(
     entries: list[_BodyEntry],
     annotations: dict[str, str],
 ) -> tuple[list[_BodyEntry], list[_MappedScoreEntry], list[str]] | None:
@@ -218,9 +219,7 @@ def _parallel_note_tab_plan(  # noqa: C901
     note_entries = [entry for entry in prefix if _is_note_score_entry(entry)]
     if not note_entries or len(note_entries) % len(tab_entries):
         return None
-    if any(entry.kind != "other" and not _is_note_score_entry(entry) for entry in prefix):
-        return None
-    if any(entry.kind == "other" and len(entry.chunk) > 32 for entry in prefix):
+    if any(not _is_note_score_entry(entry) and not _is_parallel_score_padding(entry) for entry in prefix):
         return None
 
     labels = _notation_staff_labels(annotations)
@@ -237,7 +236,33 @@ def _parallel_note_tab_plan(  # noqa: C901
         mapped.extend(
             _MappedScoreEntry(bar_index, staff_index, entry, voice_index) for bar_index, entry in enumerate(lane)
         )
+    mapped.extend(_parallel_padding_mappings(prefix, len(tab_entries), voices_per_staff))
     return tab_entries, mapped, labels
+
+
+def _is_parallel_score_padding(entry: _BodyEntry) -> bool:
+    return entry.score_kind in {"layout-raw", "barline-raw"} or (entry.kind == "other" and len(entry.chunk) <= 32)
+
+
+def _parallel_padding_mappings(
+    entries: list[_BodyEntry],
+    bar_count: int,
+    voices_per_staff: int,
+) -> list[_MappedScoreEntry]:
+    mapped: list[_MappedScoreEntry] = []
+    note_index = 0
+    for entry in entries:
+        if _is_note_score_entry(entry):
+            note_index += 1
+            continue
+        if entry.score_kind is None:
+            continue
+        preceding = max(0, note_index - 1)
+        lane_index, bar_index = divmod(preceding, bar_count)
+        mapped.append(
+            _MappedScoreEntry(bar_index, lane_index // voices_per_staff, entry, lane_index % voices_per_staff),
+        )
+    return mapped
 
 
 def _map_score_only_body(
@@ -246,12 +271,39 @@ def _map_score_only_body(
 ) -> tuple[int, list[_MappedScoreEntry], list[str]] | None:
     if not entries or any(entry.kind != "raw" for entry in entries):
         return None
+    if single_staff := _map_single_staff_score_only_body(entries, annotations):
+        return single_staff
     labels = list(reversed(_ensemble_staff_labels(annotations)))
     if not labels or len(entries) % len(labels):
         return None
     bar_count = len(entries) // len(labels)
     mapped = [_MappedScoreEntry(index % bar_count, index // bar_count, entry) for index, entry in enumerate(entries)]
     return bar_count, mapped, labels
+
+
+def _map_single_staff_score_only_body(
+    entries: list[_BodyEntry],
+    annotations: dict[str, str],
+) -> tuple[int, list[_MappedScoreEntry], list[str]] | None:
+    labels = _notation_staff_labels(annotations)
+    supported = {"note-staff-raw", "note-lyric-raw", "layout-raw", "barline-raw", "text-score-raw"}
+    selected_part = annotations.get("part", "").strip()
+    has_layout = any(entry.score_kind == "layout-raw" for entry in entries)
+    if not selected_part or selected_part.lower() == "score" or not has_layout:
+        return None
+    if len(labels) != 1 or any(entry.score_kind not in supported for entry in entries):
+        return None
+    note_count = sum(_is_note_score_entry(entry) for entry in entries)
+    if not note_count:
+        return None
+    mapped: list[_MappedScoreEntry] = []
+    bar_index = 0
+    for entry in entries:
+        target = bar_index if _is_note_score_entry(entry) else max(0, bar_index - 1)
+        mapped.append(_MappedScoreEntry(target, 0, entry))
+        if _is_note_score_entry(entry):
+            bar_index += 1
+    return note_count, mapped, labels
 
 
 def _record_has_content(record: FT3TextRecord) -> bool:
@@ -397,11 +449,50 @@ def _parse_score_text_record(
 ) -> FT3TextRecord:
     payload = chunk[32:] if len(chunk) > 32 else chunk
     normalized = bytes(32) + payload
-    if text_record_cache is None:
-        return parse_ft3_text_record(normalized)
-    if payload not in text_record_cache:
-        text_record_cache[payload] = parse_ft3_text_record(normalized)
-    return text_record_cache[payload]
+    if text_record_cache is not None and payload in text_record_cache:
+        return text_record_cache[payload]
+    decoded = parse_ft3_text_record(normalized)
+    annotations = _plain_score_annotations(normalized)
+    if _use_plain_score_annotation(decoded, annotations):
+        rows = [
+            ImportedTextRow(row_index=index, kind="editorial", text=text, tokens=text.split())
+            for index, text in enumerate(annotations)
+        ]
+        decoded = replace(
+            decoded,
+            lyrics=[],
+            lyric_event_rows=[],
+            editorial_text=annotations,
+            structured_rows=rows,
+            parse_mode="structured",
+        )
+    if text_record_cache is not None:
+        text_record_cache[payload] = decoded
+    return decoded
+
+
+def _use_plain_score_annotation(decoded: FT3TextRecord, annotations: list[str]) -> bool:
+    if len(annotations) != 1 or decoded.melody_grid or decoded.melody_events or decoded.lyric_event_rows:
+        return False
+    if not decoded.lyrics:
+        return True
+    annotation = annotations[0].lower()
+    return all(annotation in lyric.lower() for lyric in decoded.lyrics)
+
+
+def _plain_score_annotations(chunk: bytes) -> list[str]:
+    annotations: list[str] = []
+    for raw in re.findall(rb"[\x20-\x7e]{4,}", chunk):
+        text = raw.decode("cp1252", errors="replace").strip()
+        text = re.sub(r"^[^A-Za-z]+", "", text).strip()
+        normalized = text.lower().rstrip(".")
+        if not text or not any(char.isalpha() for char in text):
+            continue
+        if normalized in _SCORE_ANNOTATION_FONTS or re.fullmatch(r"c[><=][0-9:;<=>?@a-z]+", normalized):
+            continue
+        if text not in annotations:
+            annotations.append(text)
+    return annotations
 
 
 def _score_record_kind(
@@ -473,7 +564,30 @@ def _is_tab_layout_record(chunk: bytes) -> bool:
         and chunk[-18:-16] == b"\x02\x00"
         and chunk[-16:] == b"\x00" * 16
     )
-    return fixed_layout or placement_layout
+    compact_placement_layout = (
+        len(chunk) in {59, 117}
+        and chunk[2:7] == b"\x04\x11\x00\x00\xff"
+        and chunk[28:33] == b"\x00\x00\x00\x02\x00"
+        and chunk[-16:] == bytes(16)
+    )
+    exercise_layout = (
+        len(chunk) == 97
+        and chunk[2:7] == b"\x04\x11\x00\x00\xff"
+        and chunk[8:10] == b"\x7e\x80"
+        and chunk[-20:] == bytes(20)
+    )
+    parenthesized_layout = (
+        len(chunk) == 95 and chunk[2:7] == b"\x04\x11\x00\x00\xff" and b"(   )" in chunk and chunk[-8:] == bytes(8)
+    )
+    padding_layout = chunk == b"\x00\x00\x04\x11\x00\x00\xff\x00"
+    return (
+        fixed_layout
+        or placement_layout
+        or compact_placement_layout
+        or exercise_layout
+        or parenthesized_layout
+        or padding_layout
+    )
 
 
 def _is_fixed_empty_tab_record(chunk: bytes) -> bool:
@@ -505,14 +619,16 @@ def _tab_heading_texts(chunk: bytes) -> list[str]:
         size = chunk[cursor + 2]
         start = cursor + 3
         end = start + size
-        if size == 0 or end > len(chunk):
+        if end > len(chunk):
             break
-        text = chunk[start:end].decode("latin1", errors="replace").strip()
-        if not text or not any(char.isalpha() for char in text):
-            break
-        values.append(text)
+        if size == 0:
+            cursor = end
+            continue
+        text = chunk[start:end].decode("latin1", errors="replace").replace("\x00", "").strip()
+        if text and any(char.isalnum() for char in text):
+            values.append(text)
         cursor = end
-    return values[1:] if len(values) > 1 else []
+    return [value for value in values if value.lower().rstrip(".") not in _SCORE_ANNOTATION_FONTS]
 
 
 def _decode_tab_heading(chunk: bytes) -> FT3TextRecord | None:
@@ -551,7 +667,8 @@ def _classify_unknown_score_chunk(
         return None
     if _has_structural_score_marker(bar):
         return "barline-raw"
-    return _classify_score_payload(chunk) if len(chunk) > 32 else None
+    payload_kind = _classify_score_payload(chunk) if len(chunk) > 32 else None
+    return "text-score-raw" if payload_kind == "unknown" and _plain_score_annotations(chunk) else payload_kind
 
 
 def _decode_raw_score_record(  # noqa: C901

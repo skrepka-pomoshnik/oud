@@ -1,5 +1,5 @@
-from oud.editor.find_ops import perform_find, repeat_find, target_find_col, target_repeat_find
-from oud.editor.state import EditorState
+from oud.editor.commands.query.find import perform_find, repeat_find, target_find_col, target_repeat_find
+from oud.editor.core.state import EditorState
 from petrucci.model import Bar, Piece
 
 

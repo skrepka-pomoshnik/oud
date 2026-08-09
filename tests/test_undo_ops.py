@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.editor.bar_ops import snapshot_bar
-from oud.editor.edit_ops import apply_override, begin_undo_group, end_undo_group, record_action
-from oud.editor.state import EditorState, UndoAction
-from oud.editor.undo_ops import apply_action, redo, undo
+from oud.editor.core.state import EditorState, UndoAction
+from oud.editor.editing.primitives.bars import snapshot_bar
+from oud.editor.editing.primitives.edits import apply_override, begin_undo_group, end_undo_group, record_action
+from oud.editor.editing.primitives.undo import apply_action, redo, undo
 from petrucci.model import Bar, Chord, Note, Piece
 
 

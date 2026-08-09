@@ -1,4 +1,5 @@
-from oud.editor.motions import (
+from oud.editor.core.state import EditorState
+from oud.editor.navigation.motions import (
     CursorMotionTarget,
     apply_counted_visual_motion,
     apply_motion_target,
@@ -21,8 +22,7 @@ from oud.editor.motions import (
     target_snap_to_chord_slot,
     target_step_display_row,
 )
-from oud.editor.navigation import jump_row_visual, move_left_note, move_right_note
-from oud.editor.state import EditorState
+from oud.editor.navigation.steps import jump_row_visual, move_left_note, move_right_note
 from petrucci.model import Bar, Piece
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
@@ -107,9 +107,9 @@ def test_counted_visual_motion_reuses_bar_geometry(monkeypatch) -> None:
         calls += 1
         return 4
 
-    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", content_width)
+    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", content_width)
     monkeypatch.setattr(
-        "oud.editor.motions.cursor_display_map_for_bar",
+        "oud.editor.navigation.motions.cursor_display_map_for_bar",
         lambda _state, _bar_index, _content_width: [0, 1, 2, 3],
     )
 
@@ -223,14 +223,14 @@ def test_target_move_right_visual_matches_wrapper_duplicate_column_case(
     state2.bar_width = 6
     state2.overrides[(0, 0, 1)] = "a"
 
-    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
     monkeypatch.setattr(
-        "oud.editor.motions.cursor_display_map_for_bar",
+        "oud.editor.navigation.motions.cursor_display_map_for_bar",
         lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
     )
 
     target = target_move_right_visual(state1)
-    from oud.editor.navigation import move_right_visual  # noqa: PLC0415
+    from oud.editor.navigation.steps import move_right_visual  # noqa: PLC0415
 
     move_right_visual(state2)
 
@@ -251,14 +251,14 @@ def test_target_move_left_visual_matches_wrapper_on_duplicate_column_case(
     state2.cursor_col = 2
     state2.bar_width = 6
 
-    monkeypatch.setattr("oud.editor.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
+    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
     monkeypatch.setattr(
-        "oud.editor.motions.cursor_display_map_for_bar",
+        "oud.editor.navigation.motions.cursor_display_map_for_bar",
         lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
     )
 
     target = target_move_left_visual(state1)
-    from oud.editor.navigation import move_left_visual  # noqa: PLC0415
+    from oud.editor.navigation.steps import move_left_visual  # noqa: PLC0415
 
     move_left_visual(state2)
 

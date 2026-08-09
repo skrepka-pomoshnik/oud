@@ -127,6 +127,8 @@ def _single_score_midi_note_events(
     pitches: list[int],
     ornaments: dict[tuple[int, int], str] | None,
     vocal_channel: int = 1,
+    include_tablature: bool = True,
+    include_vocal: bool = True,
 ) -> list[tuple[int, bytes]]:
     note_events: list[tuple[int, bytes]] = []
     show_ornaments = _show_ornaments(settings)
@@ -161,7 +163,7 @@ def _single_score_midi_note_events(
             velocity = _accent_velocity(start, beats, unit)
             note_len = max(1, int(duration * gate))
             bar_ornament = ornaments.get((b_idx, col)) if (show_ornaments and ornaments) else None
-            for note in notes:
+            for note in notes if include_tablature else ():
                 s_idx = note.string - 1
                 if s_idx < 0 or s_idx >= len(pitches):
                     continue
@@ -193,6 +195,7 @@ def _single_score_midi_note_events(
             tuning_pitches=pitches,
             settings=settings,
             channel=vocal_channel,
+            enabled=include_vocal,
         )
         current_time += max_end
     return _repeated_midi_note_events(note_events, piece=piece, settings=settings)
@@ -218,7 +221,26 @@ def _polyphonic_score_midi_note_events(
         return []
     note_indices = [index for index, staff in enumerate(imported.staffs) if staff.kind == "note"]
     events: list[tuple[int, bytes]] = []
-    for voice_index, staff_index in enumerate(note_indices):
+    if any(bar.chords or bar.notes for bar in piece.bars):
+        events.extend(
+            _single_score_midi_note_events(
+                piece,
+                overrides=overrides,
+                durations=durations,
+                bar_width=bar_width,
+                style=style,
+                default_duration=default_duration,
+                start_bar=start_bar,
+                dotted=dotted,
+                settings=settings,
+                gate=gate,
+                pitches=pitches,
+                ornaments=ornaments,
+                include_vocal=False,
+            ),
+        )
+    channel_offset = 0
+    for staff_index in note_indices:
         projected = project_imported_staff(piece, staff_index)
         events.extend(
             _single_score_midi_note_events(
@@ -234,7 +256,10 @@ def _polyphonic_score_midi_note_events(
                 gate=gate,
                 pitches=pitches,
                 ornaments=ornaments,
-                vocal_channel=_VOCAL_CHANNELS[voice_index % len(_VOCAL_CHANNELS)],
+                vocal_channel=_VOCAL_CHANNELS[channel_offset % len(_VOCAL_CHANNELS)],
+                include_tablature=False,
             ),
         )
+        voices = {event.voice for bar in projected.bars for event in bar.melody_events}
+        channel_offset += max(voices, default=0) + 1
     return events

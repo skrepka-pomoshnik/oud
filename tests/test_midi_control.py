@@ -3,15 +3,15 @@ from __future__ import annotations
 import subprocess
 from typing import cast
 
-from oud.editor.midi_control import midi_output_path, start_midi, stop_midi
-from oud.editor.playback import (
+from oud.editor.core.state import EditorState
+from oud.editor.services.media.midi import midi_output_path, start_midi, stop_midi
+from oud.editor.services.media.playback import (
     advance_playback_cursor,
     prime_playback_animation,
     reset_playback_animation,
     start_playback_clock,
     update_playback_animation,
 )
-from oud.editor.state import EditorState
 from oud.playback.timeline import PlaybackCursor
 from petrucci.model import Bar, Chord, ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Note, Piece
 
@@ -59,9 +59,9 @@ def test_start_midi(monkeypatch) -> None:
     def _play_midi(_path: str, *_, **__) -> tuple[str, _Proc]:
         return ("Playing", _Proc())
 
-    monkeypatch.setattr("oud.editor.midi_control.export_midi", _export_midi)
-    monkeypatch.setattr("oud.editor.midi_control.play_midi", _play_midi)
-    monkeypatch.setattr("oud.editor.midi_control.time.monotonic", lambda: 123.5)
+    monkeypatch.setattr("oud.editor.services.media.midi.export_midi", _export_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.play_midi", _play_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.time.monotonic", lambda: 123.5)
     start_midi(state, start_bar=1, path="out.mid", bpm=120)
     messages.append(state.message)
     assert state.midi_proc is not None
@@ -91,9 +91,9 @@ def test_start_midi_without_end_bar_plays_to_piece_end(monkeypatch) -> None:
     def _play_midi(_path: str, *_, **__) -> tuple[str, _Proc]:
         return ("Playing", _Proc())
 
-    monkeypatch.setattr("oud.editor.midi_control.export_midi", _export_midi)
-    monkeypatch.setattr("oud.editor.midi_control.play_midi", _play_midi)
-    monkeypatch.setattr("oud.editor.midi_control.time.monotonic", lambda: 123.5)
+    monkeypatch.setattr("oud.editor.services.media.midi.export_midi", _export_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.play_midi", _play_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.time.monotonic", lambda: 123.5)
 
     start_midi(state, start_bar=1)
 
@@ -123,9 +123,9 @@ def test_start_midi_can_loop_selected_bar_range(monkeypatch) -> None:
     def _play_midi(_path: str, *_, **__) -> tuple[str, _Proc]:
         return ("Playing", _Proc())
 
-    monkeypatch.setattr("oud.editor.midi_control.export_midi", _export_midi)
-    monkeypatch.setattr("oud.editor.midi_control.play_midi", _play_midi)
-    monkeypatch.setattr("oud.editor.midi_control.time.monotonic", lambda: 123.5)
+    monkeypatch.setattr("oud.editor.services.media.midi.export_midi", _export_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.play_midi", _play_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.time.monotonic", lambda: 123.5)
 
     start_midi(state, start_bar=1, end_bar=2, loop_count=2)
 
@@ -163,20 +163,21 @@ def test_start_midi_exports_and_tracks_the_focused_vocal_staff(monkeypatch) -> N
     )
     state = EditorState(piece, {"style": "french", "tempo": "90", "soundfont": ""})
     state.view_staff_index = 1
-    exported: list[list[str]] = []
+    exported: list[list[str | None]] = []
 
     def _export_midi(_path: str, selected: Piece, *_args: object, **_kwargs: object) -> str:
-        exported.append([event.text for event in selected.bars[0].melody_events])
+        assert selected.imported_score is not None
+        exported.append([staff.label for staff in selected.imported_score.staffs if staff.kind == "note"])
         return "Exported"
 
-    monkeypatch.setattr("oud.editor.midi_control.export_midi", _export_midi)
-    monkeypatch.setattr("oud.editor.midi_control.play_midi", lambda *_args, **_kwargs: ("Playing", _Proc()))
-    monkeypatch.setattr("oud.editor.midi_control.time.monotonic", lambda: 123.5)
+    monkeypatch.setattr("oud.editor.services.media.midi.export_midi", _export_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.play_midi", lambda *_args, **_kwargs: ("Playing", _Proc()))
+    monkeypatch.setattr("oud.editor.services.media.midi.time.monotonic", lambda: 123.5)
 
     start_midi(state, start_bar=0)
 
-    assert exported == [["g3", "a3"]]
-    assert [cursor.col for cursor in state.playback.timeline] == [0, 1]
+    assert exported == [["soprano", "tenor"]]
+    assert [cursor.col for cursor in state.playback.timeline] == [0]
 
 
 def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
@@ -188,14 +189,14 @@ def test_update_playback_animation_tracks_cursor(monkeypatch) -> None:
     state.playback_started_at = 100.0
     state.playback_index = 0
     state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
-    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.25)
+    monkeypatch.setattr("oud.editor.services.media.playback.time.monotonic", lambda: 100.25)
     assert update_playback_animation(state) is True
     assert state.playback_bar == 0
     assert state.playback_col == 1
     assert state.playback.markers == [(0, 1)]
-    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.3)
+    monkeypatch.setattr("oud.editor.services.media.playback.time.monotonic", lambda: 100.3)
     assert update_playback_animation(state) is False
-    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.75)
+    monkeypatch.setattr("oud.editor.services.media.playback.time.monotonic", lambda: 100.75)
     assert update_playback_animation(state) is True
     assert state.playback_col == 4
 
@@ -209,7 +210,7 @@ def test_update_playback_animation_accepts_legacy_tuple_entries(monkeypatch) -> 
     state.playback_started_at = 100.0
     state.playback_index = 0
     state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
-    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 100.6)
+    monkeypatch.setattr("oud.editor.services.media.playback.time.monotonic", lambda: 100.6)
     assert update_playback_animation(state) is True
     assert state.playback_col == 5
 
@@ -252,6 +253,6 @@ def test_update_playback_animation_tracks_simultaneous_markers(monkeypatch) -> N
     state.playback_started_at = 10.0
     state.playback_index = 0
     state.midi_proc = cast(subprocess.Popen[bytes], _Proc())
-    monkeypatch.setattr("oud.editor.playback.time.monotonic", lambda: 10.25)
+    monkeypatch.setattr("oud.editor.services.media.playback.time.monotonic", lambda: 10.25)
     assert update_playback_animation(state) is True
     assert state.playback.markers == [(0, 1), (2, 3)]

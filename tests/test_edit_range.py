@@ -1,4 +1,5 @@
-from oud.editor.edit_range import (
+from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives.ranges import (
     BarRange,
     ChordRange,
     bar_range_from_cursor,
@@ -6,7 +7,6 @@ from oud.editor.edit_range import (
     chord_range_at_col_count,
     deletable_bar_range_from_cursor,
 )
-from oud.editor.state import EditorState
 from petrucci.model import Bar, Chord, Note, Piece
 
 

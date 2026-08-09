@@ -206,9 +206,10 @@ def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side
     cursor_display_maps: dict[int, list[int]] | None = None,
     message_level: str = "info",
     focused_imported_staff_index: int | None = None,
+    playback_verse: int | None = None,
 ) -> None:
     piece = project_imported_staff(piece, focused_imported_staff_index)
-    piece = piece_for_lyric_display(piece, settings)
+    piece = piece_for_lyric_display(piece, settings, active_verse_index=playback_verse)
     stdscr.erase()
     height, width = stdscr.getmaxyx()
     status_attr = status_attr_for_message(message_level) if message else A_REVERSE

@@ -91,10 +91,11 @@ def typeset_piece_score_view(
     playback: tuple[int, int] | None,
     settings: dict[str, str],
     focused_imported_staff_index: int | None = None,
+    active_verse_index: int | None = None,
 ) -> PieceScoreView | None:
     """Render a Piece notation-focused view, or return ``None`` for tablature."""
 
-    piece = piece_for_lyric_display(piece, settings)
+    piece = piece_for_lyric_display(piece, settings, active_verse_index=active_verse_index)
     score_view = settings.get("scoreview", "auto")
     staff_indices = _canonical_staff_indices(piece, focused_imported_staff_index, score_view=score_view)
     if settings.get("showmelody", "on") != "on" or staff_indices == ():
@@ -127,13 +128,14 @@ def typeset_piece_score_view(
         focused_imported_staff_index,
         tab_is_focus=mixed_default and focused_imported_staff_index is None,
     )
-    active_event = _source_event(
+    active_events = _source_events(
         piece,
         score,
         *active_position,
         preferred_staff_id=focused_staff_id,
         temporal_tab_position=playback is not None and _has_tablature(piece),
     )
+    active_event = active_events[0] if active_events else None
     system_offset = _system_offset(layout, score, bar_offset=bar_offset, active_event=active_event)
     y_offset = _vertical_offset(
         layout,
@@ -165,7 +167,7 @@ def typeset_piece_score_view(
             settings=settings,
             playback=playback,
         )
-    if active_event is not None:
+    for active_event in active_events:
         semantic_frame = _with_event_attr(
             semantic_frame,
             active_event.id,
@@ -450,7 +452,7 @@ def _focused_staff_id(piece: Piece, focused_index: int | None, *, tab_is_focus: 
     return f"piece:staff:{note_index}" if note_index is not None else None
 
 
-def _source_event(
+def _source_events(
     piece: Piece,
     score: NotationScore,
     bar_index: int,
@@ -458,24 +460,25 @@ def _source_event(
     *,
     preferred_staff_id: str | None,
     temporal_tab_position: bool = False,
-) -> NotationEvent | None:
-    onset_index = _source_onset_index(
-        piece,
-        bar_index,
-        onset_index,
-        preferred_staff_id=preferred_staff_id,
-        temporal_tab_position=temporal_tab_position,
-    )
+) -> tuple[NotationEvent, ...]:
     staffs = sorted(score.staffs, key=lambda staff: staff.id != preferred_staff_id)
+    matches: list[NotationEvent] = []
     for staff in staffs:
+        staff_onset = _source_onset_index(
+            piece,
+            bar_index,
+            onset_index,
+            preferred_staff_id=staff.id,
+            temporal_tab_position=temporal_tab_position,
+        )
         for measure in staff.measures:
             if measure.number != bar_index + 1:
                 continue
             for event in measure.events:
                 match = _SOURCE_EVENT_ID.search(event.id)
-                if match is not None and int(match["onset"]) == onset_index:
-                    return event
-    return None
+                if match is not None and int(match["onset"]) == staff_onset:
+                    matches.append(event)
+    return tuple(matches)
 
 
 def _source_onset_index(

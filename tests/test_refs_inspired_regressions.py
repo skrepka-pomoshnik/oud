@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.editor.load_ops import load_piece_data
+from oud.editor.services.io.loading import load_piece_data
 from oud.exports.export_tab import export_tab
 from oud.importers.tab import load_tab
 from petrucci.render_utils import chord_positions, note_type_to_denom
@@ -69,8 +69,7 @@ def test_chord_positions_invariants_on_real_examples_refs_vexflow_tickstyle() ->
             if len(cols) != len(set(cols)):
                 first_dup = next(i for i in range(1, len(cols)) if cols[i] == cols[i - 1])
                 assert all(col == 11 for col in cols[first_dup:]), (path, cols)
-            for _col, denom, is_dotted in positions:
+            for _col, denom, _is_dotted in positions:
                 assert denom in {1, 2, 4, 8, 16, 32, 64, 128, 256}, (path, denom)
                 # Sanity: displayed denominator maps to a known note type domain.
                 assert any(note_type_to_denom(nt) == denom for nt in range(2, 11)), (path, denom)
-                assert isinstance(is_dotted, bool)

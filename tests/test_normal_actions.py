@@ -2,14 +2,14 @@ from dataclasses import fields
 
 import pytest
 
-from oud.editor import motions
-from oud.editor.controller_utils import MAX_KEY_COUNT
-from oud.editor.keycodes import DEFAULT_KEYCODES
-from oud.editor.keymap import insert_bindings, normal_action_bindings, normal_bindings
-from oud.editor.normal_actions import handle_normal
-from oud.editor.state import EditorState
-from oud.editor.status import status_line
-from oud.editor.undo_ops import undo
+from oud.editor.core.coordinates import MAX_KEY_COUNT
+from oud.editor.core.input.keycodes import DEFAULT_KEYCODES
+from oud.editor.core.input.keymap import insert_bindings, normal_action_bindings, normal_bindings
+from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives.undo import undo
+from oud.editor.interaction.normal.actions import handle_normal
+from oud.editor.navigation import motions
+from oud.editor.services.status import status_line
 from petrucci.model import Bar, Piece
 
 
@@ -218,10 +218,10 @@ def test_every_terminal_key_is_bounded_after_oversized_count_prefix(
     key_profile: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("oud.editor.normal_commands.start_midi", lambda _state: None)
-    monkeypatch.setattr("oud.editor.normal_commands.stop_midi", lambda _state: None)
-    monkeypatch.setattr("oud.editor.normal_movement.start_midi", lambda _state, **_kwargs: None)
-    monkeypatch.setattr("oud.editor.command_ops.print_pdf", lambda _state: None)
+    monkeypatch.setattr("oud.editor.interaction.normal.commands.start_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.interaction.normal.commands.stop_midi", lambda _state: None)
+    monkeypatch.setattr("oud.editor.interaction.normal.movement.start_midi", lambda _state, **_kwargs: None)
+    monkeypatch.setattr("oud.editor.commands.dispatch.print_pdf", lambda _state: None)
     terminal_keys = {*range(256), *vars(DEFAULT_KEYCODES).values()}
 
     for key in terminal_keys:
@@ -495,7 +495,7 @@ def test_visual_mode_play_loops_selected_bar_range(monkeypatch) -> None:
             },
         )
 
-    monkeypatch.setattr("oud.editor.normal_movement.start_midi", _start_midi)
+    monkeypatch.setattr("oud.editor.interaction.normal.movement.start_midi", _start_midi)
 
     state.cursor_bar = 1
     handle_normal(state, ord("v"))

@@ -14,7 +14,7 @@ editor assignment policy without a coherent owner. It has been removed:
 - FT3, TAB, and MusicXML readers live in `oud.importers`;
 - playback cursor/timeline contracts live in `oud.playback`;
 - plugin transport records live in `oud.plugins.model`;
-- tablature pitch assignment lives in `oud.editor.tab_assignment`;
+- tablature pitch assignment lives in `oud.editor.editing.tab.assignment`;
 - Petrucci is a top-level package and imports no `oud` module.
 
 Editor state transitions and viewport/history logic import neither `curses` nor
@@ -46,7 +46,7 @@ FT3 loading now has explicit metadata, body-decoding, and finalization phases;
 TAB export has separate header, event-projection, and serialization ownership.
 Petrucci score validation, layout validation, collision scanning, and tuning
 parsing now delegate to focused domain operations below the complexity ceiling.
-The highest remaining findings include `oud.editor.insert_actions.handle_insert`
+The highest remaining findings include `oud.editor.interaction.insert.actions.handle_insert`
 (31), `oud.tui.input.complete_command_text` (31), and
 `oud.importers.tab.parse_tab_lines_data` (30).
 

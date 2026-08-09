@@ -10,7 +10,7 @@ from fractions import Fraction
 
 import pytest
 
-from oud.editor.tab_assignment import AssignmentPolicy, assign_chord_pitches
+from oud.editor.editing.tab.assignment import AssignmentPolicy, assign_chord_pitches
 from petrucci import (
     AddTie,
     EnterNote,

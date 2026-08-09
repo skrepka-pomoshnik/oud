@@ -1,7 +1,7 @@
 import pytest
 
-from oud.editor.state import EditorState
-from oud.editor.verify_ops import bar_duration_sum, verify_bar, verify_render_bar
+from oud.editor.core.state import EditorState
+from oud.editor.services.validation.verify import bar_duration_sum, verify_bar, verify_render_bar
 from petrucci.model import Bar, Chord, Note, Piece
 
 
@@ -71,6 +71,8 @@ def test_verify_render_bar_ok_for_simple_chord() -> None:
 def test_verify_render_bar_detects_non_monotonic_cursor_map(monkeypatch: pytest.MonkeyPatch) -> None:
     state = _state()
     state.piece.bars[0].chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])]
-    monkeypatch.setattr("oud.editor.verify_ops.bar_content_width_for_cursor", lambda *_args: 8)
-    monkeypatch.setattr("oud.editor.verify_ops.cursor_display_map_for_bar", lambda *_args: [0, 2, 1, 3, 4, 5, 6, 7])
+    monkeypatch.setattr("oud.editor.services.validation.verify.bar_content_width_for_cursor", lambda *_args: 8)
+    monkeypatch.setattr(
+        "oud.editor.services.validation.verify.cursor_display_map_for_bar", lambda *_args: [0, 2, 1, 3, 4, 5, 6, 7]
+    )
     assert verify_render_bar(state, 0) == "Render map is non-monotonic"

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     apply_set_command,
     cmd_ascii,
     cmd_convert,
@@ -20,64 +20,64 @@ from oud.editor.command_ops import (
     parse_time_signature,
     tuning_preset_value,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_bar as _cmd_bar,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_barline as _cmd_barline,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_chord as _cmd_chord,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_col as _cmd_col,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_cursor as _cmd_cursor,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_ending as _cmd_ending,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_info as _cmd_info,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_notes as _cmd_notes,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_open as _cmd_open,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_pause as _cmd_pause,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_plugins as _cmd_plugins,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_repeat as _cmd_repeat,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_source as _cmd_source,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_stave as _cmd_stave,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_time as _cmd_time,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_tool as _cmd_tool,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_verify as _cmd_verify,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_vocal as _cmd_vocal,
 )
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     show_help as _show_help,
 )
-from oud.editor.commands import (
+from oud.editor.commands.metadata import (
     cmd_author,
     cmd_composer,
     cmd_footnote,
@@ -85,8 +85,8 @@ from oud.editor.commands import (
     cmd_subtitle,
     cmd_title,
 )
-from oud.editor.messages import READ_ONLY_VIEWER, UNSAVED_QUIT_CMD, MessageLevel
-from oud.editor.state import EditorState
+from oud.editor.core.feedback.messages import READ_ONLY_VIEWER, UNSAVED_QUIT_CMD, MessageLevel
+from oud.editor.core.state import EditorState
 
 READ_ONLY_BLOCKED_COMMANDS = frozenset(
     {
@@ -244,49 +244,49 @@ def cmd_ending(state: EditorState, args: str) -> None:
 
 
 def cmd_dynamic(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_dynamic as _cmd_dynamic_local
+    from oud.editor.commands.dispatch import cmd_dynamic as _cmd_dynamic_local
 
     _cmd_dynamic_local(state, args.strip())
 
 
 def cmd_fermata(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_fermata as _cmd_fermata_local
+    from oud.editor.commands.dispatch import cmd_fermata as _cmd_fermata_local
 
     _cmd_fermata_local(state, args.strip())
 
 
 def cmd_arpeggio(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_arpeggio as _cmd_arpeggio_local
+    from oud.editor.commands.dispatch import cmd_arpeggio as _cmd_arpeggio_local
 
     _cmd_arpeggio_local(state, args.strip())
 
 
 def cmd_separee(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_separee as _cmd_separee_local
+    from oud.editor.commands.dispatch import cmd_separee as _cmd_separee_local
 
     _cmd_separee_local(state, args.strip())
 
 
 def cmd_tuplet(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_tuplet as _cmd_tuplet_local
+    from oud.editor.commands.dispatch import cmd_tuplet as _cmd_tuplet_local
 
     _cmd_tuplet_local(state, args.strip())
 
 
 def cmd_transpose(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_transpose as _cmd_transpose_local
+    from oud.editor.commands.dispatch import cmd_transpose as _cmd_transpose_local
 
     _cmd_transpose_local(state, args.strip())
 
 
 def cmd_retune(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_retune as _cmd_retune_local
+    from oud.editor.commands.dispatch import cmd_retune as _cmd_retune_local
 
     _cmd_retune_local(state, args.strip())
 
 
 def cmd_courseshift(state: EditorState, args: str) -> None:
-    from oud.editor.command_ops import cmd_courseshift as _cmd_courseshift_local
+    from oud.editor.commands.dispatch import cmd_courseshift as _cmd_courseshift_local
 
     _cmd_courseshift_local(state, args.strip())
 
@@ -312,13 +312,13 @@ def cmd_pause(state: EditorState, _args: str) -> None:
 
 
 def cmd_undo(state: EditorState, _args: str, config_path: str) -> None:
-    from oud.editor.undo_ops import undo
+    from oud.editor.editing.primitives.undo import undo
 
     undo(state, config_path=config_path)
 
 
 def cmd_redo(state: EditorState, _args: str, config_path: str) -> None:
-    from oud.editor.undo_ops import redo
+    from oud.editor.editing.primitives.undo import redo
 
     redo(state, config_path=config_path)
 
@@ -332,49 +332,49 @@ def cmd_write_ascii(state: EditorState, args: str) -> None:
 
 
 def _set_ornament(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_ornament
+    from oud.editor.commands.dispatch import set_ornament
 
     set_ornament(state, value)
 
 
 def _set_annotation(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_annotation
+    from oud.editor.commands.dispatch import set_annotation
 
     set_annotation(state, value)
 
 
 def _set_highlight(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_highlight
+    from oud.editor.commands.dispatch import set_highlight
 
     set_highlight(state, value)
 
 
 def _set_slur(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_slur
+    from oud.editor.commands.dispatch import set_slur
 
     set_slur(state, value)
 
 
 def _set_tie(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_tie
+    from oud.editor.commands.dispatch import set_tie
 
     set_tie(state, value)
 
 
 def _set_hold(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_hold
+    from oud.editor.commands.dispatch import set_hold
 
     set_hold(state, value)
 
 
 def _set_barline(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_barline
+    from oud.editor.commands.dispatch import set_barline
 
     set_barline(state, value)
 
 
 def _set_repeat(state: EditorState, value: str) -> None:
-    from oud.editor.command_ops import set_repeat
+    from oud.editor.commands.dispatch import set_repeat
 
     set_repeat(state, value)
 

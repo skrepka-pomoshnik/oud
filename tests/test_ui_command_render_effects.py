@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from oud.importers.ft3 import load_ft3
 from oud.settings import DEFAULT_SETTINGS
 from oud.tui.commands import apply_command

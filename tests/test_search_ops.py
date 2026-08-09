@@ -1,4 +1,4 @@
-from oud.editor.search_ops import (
+from oud.editor.commands.query.search import (
     jump_mark,
     jump_match,
     repeat_word_search,
@@ -9,7 +9,7 @@ from oud.editor.search_ops import (
     target_repeat_word_search,
     target_search_word_under_cursor,
 )
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from petrucci.model import Bar, Piece
 
 

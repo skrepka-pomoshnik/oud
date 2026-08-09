@@ -1,6 +1,6 @@
 import os
 
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from oud.tui.input import complete_command
 from petrucci.model import Bar, Piece
 

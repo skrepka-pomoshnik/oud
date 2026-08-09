@@ -114,6 +114,22 @@ def test_forced_break_is_first_class_and_final_system_stays_natural() -> None:
     assert layout.systems[0].measure_boxes[0].width < 80
 
 
+def test_layout_policy_can_justify_final_or_only_system() -> None:
+    score = _score(3)
+    viewport = LayoutViewport(width=120, height=30)
+
+    natural = layout_score(score, viewport=viewport)
+    justified = layout_score(
+        score,
+        viewport=viewport,
+        policy=NotationLayoutPolicy(justify_last_system=True),
+    )
+
+    natural_right = natural.systems[-1].measure_boxes[-1]
+    justified_right = justified.systems[-1].measure_boxes[-1]
+    assert justified_right.x + justified_right.width > natural_right.x + natural_right.width
+
+
 def test_layout_uses_one_onset_coordinate_for_note_and_lyric_lane() -> None:
     note = _event("same-pitch-1", 0, 60)
     repeated = _event("same-pitch-2", 1, 60)

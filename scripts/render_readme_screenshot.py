@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from oud.editor.init import init_state  # noqa: E402
+from oud.editor.services.bootstrap import init_state  # noqa: E402
 from petrucci import TypesetOptions, typeset_piece  # noqa: E402
 
 

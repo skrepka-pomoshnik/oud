@@ -278,7 +278,7 @@ low-byte fingering bits with one high-byte mark:
 | `0004`, `0008`, `0010` | right-hand dots 1, 2, 3 |
 | `0020`, `0040`, `0080`, `0100` | left fingers 1, 2, 3, 4 |
 | `0400`, `0800`, `0c00` | left `#`, `+`, `x` ornaments |
-| `0600`, `0e00` | right `#`, `x` ornaments |
+| `0600`, `0a00`, `0e00` | right `#`, `+`, `x` ornaments |
 | `1000`, `1400` | right comma and apostrophe ornaments |
 | `1600` | left apostrophe ornament |
 | `1800` | under-note smile ornament |
@@ -286,6 +286,7 @@ low-byte fingering bits with one high-byte mark:
 | `2000`, `2200` | right and left caret ornaments |
 | `2400` | under-note `v` ornament |
 | `2800` | under-fret hook ornament |
+| `4000` | right `*` ornament |
 | `3400` | barre; composes with low-byte fingering |
 | `3c00` | legacy open ninth-course form |
 | `0200` | single arpeggio mark |
@@ -345,7 +346,7 @@ Each fixed corpus directory must report zero unresolved files, for example:
 Scanned 75 file(s): 0 with unresolved values or records.
 ```
 
-Together the five random manifests cover 300 fixed external files. Tests
+Together the eight fixed compatibility manifests cover 514 external files. Tests
 verify their paths, URLs, SHA-256 digests, and zero-unresolved result.
 
 “Unresolved” means an unconsumed note-extra bit, unknown vocal flag, unknown

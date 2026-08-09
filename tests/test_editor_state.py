@@ -1,4 +1,4 @@
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from petrucci.model import Bar, Piece
 
 

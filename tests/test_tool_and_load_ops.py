@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oud.editor.load_ops import cmd_open, load_piece_data
-from oud.editor.state import EditorState, UndoAction
-from oud.editor.tool_ops import cmd_info, cmd_notes, cmd_plugins, cmd_tool
-from oud.editor.undo_ops import undo
+from oud.editor.commands.plugins.tools import cmd_info, cmd_notes, cmd_plugins, cmd_tool
+from oud.editor.core.state import EditorState, UndoAction
+from oud.editor.editing.primitives.undo import undo
+from oud.editor.services.io.loading import cmd_open, load_piece_data
 from petrucci.model import Bar, Piece
 
 
@@ -42,7 +42,7 @@ def test_cmd_info_and_notes_and_plugins(monkeypatch) -> None:
     def _enter_plugin_mode(_state: EditorState) -> None:
         called["ok"] = True
 
-    monkeypatch.setattr("oud.editor.plugin_ops.enter_plugin_mode", _enter_plugin_mode)
+    monkeypatch.setattr("oud.editor.commands.plugins.operations.enter_plugin_mode", _enter_plugin_mode)
     cmd_plugins(state)
     assert called["ok"] is True
 
@@ -172,7 +172,9 @@ def test_load_piece_data_returns_warning_piece_when_loader_raises(
 ) -> None:
     broken = tmp_path / "broken.ft3"
     broken.write_text("", encoding="utf-8")
-    monkeypatch.setattr("oud.editor.load_ops.load_ft3", lambda _p: (_ for _ in ()).throw(ValueError("bad parse")))
+    monkeypatch.setattr(
+        "oud.editor.services.io.loading.load_ft3", lambda _p: (_ for _ in ()).throw(ValueError("bad parse"))
+    )
     piece, overrides, durations, dotted, bar_width = load_piece_data(str(broken))
     assert piece.title == "broken"
     assert piece.import_warnings

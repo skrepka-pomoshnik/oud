@@ -38,10 +38,14 @@ class ElementRole(StrEnum):
     LEDGER_LINE = "ledger-line"
     TIE = "tie"
     SLUR = "slur"
+    GLISSANDO = "glissando"
     TUPLET = "tuplet"
     GRACE = "grace"
     FERMATA = "fermata"
     ORNAMENT = "ornament"
+    HARMONIC = "harmonic"
+    FINGERING = "fingering"
+    PROPORTION = "proportion"
     DYNAMIC = "dynamic"
     PITCH_LABEL = "pitch-label"
     PITCH_CUE = "pitch-cue"
@@ -248,6 +252,7 @@ class LayoutMetrics:
 @dataclass(frozen=True, slots=True)
 class NotationLayoutPolicy:
     justify: bool = True
+    justify_last_system: bool = False
     show_title: bool = True
     show_measure_numbers: bool = True
     show_lyrics: bool = True

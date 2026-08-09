@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor.edit_ops import apply_tab_transaction
+from oud.editor.editing.primitives.edits import apply_tab_transaction
 from oud.exports.export_tab import export_tab
 from oud.exports.lilypond import export_lilypond
 from oud.exports.midi import export_midi

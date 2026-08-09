@@ -1,4 +1,4 @@
-from oud.editor.settings_ops import set_value_options
+from oud.editor.commands.handlers.settings import set_value_options
 from oud.settings import load_settings, save_settings
 
 

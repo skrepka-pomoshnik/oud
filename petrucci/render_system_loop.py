@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from petrucci.layout_map import block_height as _block_height
-from petrucci.layout_map import layout_block_rows as _layout_block_rows
+from petrucci.layout_map import LayoutBlockPolicy, block_height, layout_block_rows
 from petrucci.render_bar_state import (
     prepare_bar_basics,
     prepare_bar_layout,
@@ -70,34 +69,22 @@ def _system_layout(context: SystemRenderContext, bar_start: int) -> SystemLayout
     )
     display_strings = len(display_indices)
     visual_indices = visual_row_indices(display_indices, reverse=context.reverse_strings)
-    rows = _layout_block_rows(
-        display_strings,
-        context.include_meta,
-        context.show_dur,
-        context.show_extras,
-        context.show_tuplets,
-        context.show_tactus,
-        context.double_stems,
+    layout_policy = LayoutBlockPolicy(
+        strings=display_strings,
+        include_meta=context.include_meta,
+        show_dur=context.show_dur,
+        show_extras=context.show_extras,
+        show_tuplets=context.show_tuplets,
+        show_tactus=context.show_tactus,
+        double_stems=context.double_stems,
         show_melody=context.show_melody,
         melody_rows_count=context.melody_rows_count,
         show_lyrics=context.show_lyrics,
         lyric_rows_count=context.lyric_rows_count,
         vocal_pos=context.vocal_pos,
     )
-    block_height = _block_height(
-        context.include_meta,
-        display_strings,
-        context.show_dur,
-        context.show_extras,
-        context.show_tuplets,
-        context.show_tactus,
-        context.double_stems,
-        show_melody=context.show_melody,
-        melody_rows_count=context.melody_rows_count,
-        show_lyrics=context.show_lyrics,
-        lyric_rows_count=context.lyric_rows_count,
-        vocal_pos=context.vocal_pos,
-    )
+    rows = layout_block_rows(layout_policy)
+    content_height = block_height(layout_policy)
     lyric_base = rows.get("lyric")
     lyric_offsets = (
         tuple((lyric_base or 0) + index for index in range(max(0, context.lyric_rows_count)))
@@ -111,7 +98,7 @@ def _system_layout(context: SystemRenderContext, bar_start: int) -> SystemLayout
         display_strings,
         visual_indices,
         rows,
-        block_height,
+        content_height,
         lyric_offsets,
     )
 

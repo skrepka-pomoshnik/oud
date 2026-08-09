@@ -69,6 +69,7 @@ class OrnamentKind(StrEnum):
 class SpanKind(StrEnum):
     TIE = "tie"
     SLUR = "slur"
+    GLISSANDO = "glissando"
 
 
 class Syllabic(StrEnum):
@@ -156,6 +157,16 @@ class TupletRatio:
 
 
 @dataclass(frozen=True, slots=True)
+class ProportionRatio:
+    numerator: int
+    denominator: int
+
+    def __post_init__(self) -> None:
+        if self.numerator <= 0 or self.denominator <= 0:
+            _fail("proportion values must be positive")
+
+
+@dataclass(frozen=True, slots=True)
 class NotationEvent:
     id: str
     onset: Fraction
@@ -171,6 +182,8 @@ class NotationEvent:
     ornament: OrnamentKind | None = None
     editorial_brackets: bool = False
     grace: bool = False
+    harmonic: bool = False
+    fingering: str | None = None
 
     def __post_init__(self) -> None:
         _validate_id(self.id, "event")
@@ -204,6 +217,16 @@ def _validate_event_options(event: NotationEvent) -> None:
         _fail("event grace must be a bool")
     if event.kind is EventKind.REST and event.grace:
         _fail(f"rest event {event.id!r} cannot be a grace note")
+    _validate_event_techniques(event)
+
+
+def _validate_event_techniques(event: NotationEvent) -> None:
+    if not isinstance(event.harmonic, bool):
+        _fail("event harmonic must be a bool")
+    if event.kind is EventKind.REST and (event.harmonic or event.fingering is not None):
+        _fail(f"rest event {event.id!r} cannot have a harmonic or fingering")
+    if event.fingering is not None and (not isinstance(event.fingering, str) or not event.fingering.strip()):
+        _fail("event fingering must contain visible text")
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +294,7 @@ class NotationMeasure:
     ending_numbers: tuple[int, ...] = ()
     forced_break_after: bool = False
     irregular: bool = False
+    proportion: ProportionRatio | None = None
 
     def __post_init__(self) -> None:
         _validate_id(self.id, "measure")
@@ -282,6 +306,8 @@ class NotationMeasure:
         _validate_ending_numbers(self.ending_numbers)
         if not isinstance(self.irregular, bool):
             _fail("measure irregular must be a bool")
+        if self.proportion is not None and not isinstance(self.proportion, ProportionRatio):
+            _fail("measure proportion must be a ProportionRatio")
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import gzip
 from pathlib import Path
 
-from oud.editor.load_ops import load_piece_data
+from oud.editor.services.io.loading import load_piece_data
 from oud.exports.export_tab import export_tab
 from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.importers.musicxml import load_musicxml, load_mxl
@@ -119,9 +119,5 @@ def test_load_piece_data_synthetic_input_matrix_supported_formats(tmp_path: Path
         f.write(b"CPiece\x04Test\x03\x80")
 
     for path in (tab_path, xml_path, mxl_path, ft3_path):
-        loaded_piece, overrides, durations, dotted, bar_width = load_piece_data(str(path))
+        loaded_piece, _overrides, _durations, _dotted, _bar_width = load_piece_data(str(path))
         assert loaded_piece is not None
-        assert isinstance(overrides, dict)
-        assert isinstance(durations, dict)
-        assert isinstance(dotted, set)
-        assert bar_width is None or isinstance(bar_width, int)

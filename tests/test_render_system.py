@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
+from oud.editor.navigation.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from petrucci.model import Bar, Chord, LyricEvent, Note
 from petrucci.render_bar import build_flag_rows
 from petrucci.render_geometry import _grid_display_map, _place_duration_cells_aligned, _scale_chord_row

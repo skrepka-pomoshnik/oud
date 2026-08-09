@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import curses
 
-from oud.editor.keycodes import KeyCodes
+from oud.editor.core.input.keycodes import KeyCodes
 
 
 def keycodes_from_curses() -> KeyCodes:

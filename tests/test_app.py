@@ -2,12 +2,12 @@ import curses
 import subprocess
 from typing import cast
 
-from oud.editor.actions import handle_insert, handle_normal
-from oud.editor.command_ops import cmd_bar, cmd_stave
-from oud.editor.commands import cmd_footnote, cmd_header_template, cmd_subtitle, cmd_title
-from oud.editor.document import configure_document
-from oud.editor.state import EditorState
-from oud.editor.status import status_line
+from oud.editor.commands.dispatch import cmd_bar, cmd_stave
+from oud.editor.commands.metadata import cmd_footnote, cmd_header_template, cmd_subtitle, cmd_title
+from oud.editor.core.document import configure_document
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
+from oud.editor.services.status import status_line
 from oud.tui.commands import apply_command, apply_set_command
 from oud.tui.controller import handle_key
 from oud.tui.input import handle_command as handle_command_input

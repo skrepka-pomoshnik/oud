@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from oud.editor.init import init_state
+from oud.editor.services.bootstrap import init_state
 from petrucci.model import Piece
 
 
@@ -58,7 +58,7 @@ def test_init_state_invalid_file_falls_back_to_new_piece_with_warning(
     broken.write_text("not a real ft3", encoding="utf-8")
     warned = Piece(title="broken", bars=[])
     warned.import_warnings.append("Could not open broken.ft3: bad parse")
-    monkeypatch.setattr("oud.editor.init.load_piece_data", lambda _path: (warned, {}, {}, set(), None))
+    monkeypatch.setattr("oud.editor.services.bootstrap.load_piece_data", lambda _path: (warned, {}, {}, set(), None))
     state = init_state(str(broken), config_path=str(cfg))
     assert state.path is None
     assert len(state.piece.bars) == 8

@@ -40,39 +40,41 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
 - [x] Expand the deterministic, stratified compatibility manifest from 263 to
   300 public FT3 files with a fixed one-time selection, checksums, metadata,
   zero semantic-audit residuals, and no committed downloaded payloads.
-- [ ] Continue the fixed compatibility corpus from 415 to at least 1,000 public
+- [ ] Continue the fixed compatibility corpus from 514 to at least 1,000 public
   FT3 files without repeating random selection at test time.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section,
     German, Italian, French, and Spanish/Neapolitan examples.
   - Record URL, checksum, format/version, expected metadata, and staff-kind
     counts; require zero crashes and actionable warnings or unknown records.
-  - Offline progress is 415 checksum-unique, semantically clean payloads. The
-    current cache contains only 441 unique payloads, so reaching 1,000 requires
-    extending the public source index rather than repeating cached selections.
-- [ ] Complete at least 25 stratified manual comparisons against published PDF
-  and MIDI evidence in `docs/ft3-parity.md` (19 PDF comparisons are recorded;
-  MIDI evidence remains incomplete).
+  - Offline progress is 514 checksum-unique, semantically clean payloads. The
+    direct composer index supplies additional URL candidates; future manifests
+    must remain checksum-disjoint and audit-clean.
 - [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real
   fixtures, or reject each unsupported style with a precise visible diagnostic.
+- [x] Decode every FT3 semantic variant found across the direct composer-index audit.
+  - The 14 formerly unresolved files are fixed as the v8 corpus: source layout,
+    exercise labels, editorial text, later fingering/bracket/barre variants, and
+    one-staff notation-only mapping are now typed without fake tablature notes.
 - [x] Add LilyPond/MuseScore-inspired semantic regression cases for partial and
   grace beams, grouped tuplets, cross-system ties/slurs, fermatas, ornaments,
   endings, and repeat barlines without vendoring upstream fixtures.
-- [ ] Close the remaining notation gaps with real-file evidence: polyphonic
+- [ ] Confirm the remaining notation constructs against real FT3 encodings:
   TabVoice collision precedence, mensural proportions, harmonics, glissandi,
   and notation-staff fingerings.
-  - Each construct needs a typed model field, importer regression, terminal
-    rendering regression, and LilyPond assertion.
+  - Typed source-independent fields, imported-score regressions, terminal
+    rendering, and LilyPond assertions are complete; raw FT3 bit meanings still
+    require evidence before the importer may set them.
   - Unknown values must remain visible in `:info` and fail the semantic audit
     instead of being silently discarded.
 
 ### Playback and acceptance
 
-- [ ] Play all mapped voices and staffs with synchronized cursor movement.
+- [x] Play all mapped voices and staffs with synchronized cursor movement.
   - Compare MIDI note-on events, voice/channel assignment, repeats/endings,
     tempo, and start-bar behavior for the representative viewer matrix.
   - Keep pause/stop/restart and missing-synth diagnostics deterministic; never
     report playback success when no player started.
-- [ ] Make `lyricmode=current` follow the active stanza automatically while
+- [x] Make `lyricmode=current` follow the active stanza automatically while
   `playverses=all`; preserve an explicitly selected `lyricverse` while stopped.
 - [ ] Add the macOS-only terminal acceptance pass.
   - Cover first run, open failure, solo/mixed/polyphonic/duet navigation,
@@ -158,12 +160,11 @@ CI enforces complexity 7 and a 1,000-line module ceiling against the exact
 non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
 targets are in `docs/architecture-debt.md`.
 
-- [ ] Retire the remaining 109 function-level C901 findings without raising
+- [ ] Retire the remaining non-Petrucci function-level C901 findings without raising
   limits, broad per-file ignores, compatibility wrappers, or count-only helper
-  modules. Continue with `oud.editor.insert_actions.handle_insert` (31),
-  `oud.tui.input.complete_command_text` (31), and
-  then continue through the next highest domain coordinators.
-- [ ] Replace the 31 narrowly suppressed production `PLR0917` surfaces with
+  modules. Insert dispatch and command completion are split; continue through
+  the next highest domain coordinators.
+- [ ] Replace the 28 narrowly suppressed production `PLR0917` surfaces with
   typed render, layout, playback, and export request records as their owning
   modules are split; do not add per-file ignores or forwarding wrappers.
 
@@ -187,8 +188,13 @@ These items refine the existing FT3, terminal-viewer, and publication work. They
 
 ### P1: separate source testimony from interpretation
 
-- [ ] Define typed diplomatic records for the historical signs currently supported by FT3: stable source identity and order, source coordinates, written pitch/shape, mensuration and proportion signs, coloration, ligature membership, dots, accidentals/ficta, and text association.
-- [ ] Represent editorial decisions separately from diplomatic records: effective onset and duration, perfection/imperfection or alteration where applicable, dot meaning, ficta decisions, and voice synchronization. Derivation must be deterministic and must not mutate source testimony.
+- [ ] Extend the implemented stable diplomatic identity, source order/coordinates,
+  mensuration, and proportion records to written pitch/shape, coloration,
+  ligature membership, dots, accidentals/ficta, and text association.
+- [ ] Extend the separate mensuration/proportion editorial decisions to effective
+  onset and duration, perfection/imperfection or alteration, dot meaning, ficta
+  decisions, and voice synchronization. Derivation must remain deterministic
+  and must not mutate source testimony.
 - [ ] Preserve one stable object identity and source location through import, interpretation, `NotationScore`, `ScoreLayout`, terminal semantic cells, playback diagnostics, and LilyPond export.
 - [ ] Add one small end-to-end fixture for every historical construct we claim to support. Start with mensuration and proportion from real FT3 files; require diplomatic display, interpreted timing, terminal rendering, LilyPond output, and MIDI timing assertions.
 - [ ] Add an alternative-interpretation regression case proving that two explicit editorial decisions can share the same diplomatic source without duplicating or rewriting it.

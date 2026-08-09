@@ -31,7 +31,7 @@ from petrucci.score import (
     NotationStaff,
     WrittenPitch,
 )
-from petrucci.system_fitting import MeasuredBox, fit_measured_boxes
+from petrucci.system_fitting import BoxFitOptions, MeasuredBox, fit_measured_boxes
 
 
 def _horizontal_plan(
@@ -58,10 +58,13 @@ def _horizontal_plan(
     boxes = _measure_boxes(score, metrics=metrics, policy=policy)
     systems = fit_measured_boxes(
         boxes,
-        available_width=available,
-        gap=metrics.measure_gap,
-        justify=policy.justify,
-        max_stretch_per_box=metrics.max_measure_stretch,
+        options=BoxFitOptions(
+            available_width=available,
+            gap=metrics.measure_gap,
+            justify=policy.justify,
+            justify_last_system=policy.justify_last_system,
+            max_stretch_per_box=metrics.max_measure_stretch,
+        ),
     )
     return _HorizontalPlan(label_width, staff_x, measure_x, available, systems)
 
@@ -258,7 +261,8 @@ def _event_width(
         editorial_width = 2 if event.editorial_brackets else 0
         notation_width = accidental + editorial_width + 1 + chord_offset + dots
     pitch_label_width = display_width(_event_pitch_label(event)) if show_pitch_labels else 0
-    return max(notation_width, display_width(event.dynamic or ""), pitch_label_width)
+    mark_width = int(event.ornament is not None) + int(event.harmonic) + display_width(event.fingering or "")
+    return max(notation_width, display_width(event.dynamic or ""), pitch_label_width, mark_width)
 
 
 def _event_lane_width(event: NotationEvent, width: int, *, show_stems: bool) -> int:
@@ -285,9 +289,14 @@ def _natural_onset_gap(left: Fraction, right: Fraction, base: int) -> int:
 
 
 def _measure_change_width(staff: NotationStaff, index: int) -> int:
-    if index == 0:
-        return 0
     measure = staff.measures[index]
+    proportion_width = (
+        len(f"{measure.proportion.numerator}:{measure.proportion.denominator}") + 1
+        if measure.proportion is not None
+        else 0
+    )
+    if index == 0:
+        return proportion_width
     previous = _state_at(staff, index - 1)
     width = 0
     if measure.clef is not None and measure.clef != previous.clef:
@@ -296,4 +305,4 @@ def _measure_change_width(staff: NotationStaff, index: int) -> int:
         width += max(1, abs(measure.key_signature.fifths)) + 1
     if measure.time_signature is not None and measure.time_signature != previous.time:
         width += 4
-    return width
+    return width + proportion_width

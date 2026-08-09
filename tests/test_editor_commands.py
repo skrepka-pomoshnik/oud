@@ -1,4 +1,4 @@
-from oud.editor.commands import (
+from oud.editor.commands.metadata import (
     cmd_author,
     cmd_composer,
     cmd_footnote,
@@ -6,7 +6,7 @@ from oud.editor.commands import (
     cmd_subtitle,
     cmd_title,
 )
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from petrucci.model import Bar, Piece
 
 

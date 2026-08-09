@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from petrucci.duet_score import is_duet_score_piece
-from petrucci.layout_map import block_height
+from petrucci.layout_map import LayoutBlockPolicy, block_height
 from petrucci.model import Piece
 from petrucci.render_duet_view import (
     DuetRenderRequest,
@@ -203,18 +203,20 @@ def _display_plan(request: LegacyRenderRequest, tuning_text: str) -> _DisplayPla
         bass=(bass_tokens or None) if used_bass else None,
     )
     minimum_height = block_height(
-        True,
-        base_strings,
-        show_dur,
-        show_extras,
-        show_tuplets,
-        show_tactus,
-        True,
-        show_melody=show_melody,
-        melody_rows_count=melody_rows,
-        show_lyrics=show_lyrics,
-        lyric_rows_count=lyric_rows,
-        vocal_pos=vocal_pos,
+        LayoutBlockPolicy(
+            strings=base_strings,
+            include_meta=True,
+            show_dur=show_dur,
+            show_extras=show_extras,
+            show_tuplets=show_tuplets,
+            show_tactus=show_tactus,
+            double_stems=True,
+            show_melody=show_melody,
+            melody_rows_count=melody_rows,
+            show_lyrics=show_lyrics,
+            lyric_rows_count=lyric_rows,
+            vocal_pos=vocal_pos,
+        )
     )
     return _DisplayPlan(
         show_dur,

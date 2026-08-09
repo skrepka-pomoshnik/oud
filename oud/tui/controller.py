@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from oud.editor.controller import handle_key as dispatch_key
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
 
 
 def handle_key(

@@ -1,9 +1,12 @@
 import pytest
 
-from oud.editor import actions, edit_ops, ops, undo_ops
-from oud.editor import command_ops as cmd_ops
-from oud.editor.controller import handle_key as dispatch_key
-from oud.editor.state import EditorState
+from oud.editor.commands import dispatch as cmd_ops
+from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives import edits as edit_ops
+from oud.editor.editing.primitives import tablature as ops
+from oud.editor.editing.primitives import undo as undo_ops
+from oud.editor.interaction.dispatch import actions
+from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
 from petrucci.framebuffer import FrameBuffer
 from petrucci.model import Bar, Chord, Note, Piece
 from petrucci.render import render_piece

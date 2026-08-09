@@ -26,6 +26,7 @@ from petrucci.score import (
     NotationStaff,
     OrnamentKind,
     PitchStep,
+    ProportionRatio,
     SpanKind,
     StemDirection,
     Syllabic,
@@ -55,6 +56,7 @@ class _BarData:
     fermata: bool
     clef: str | None
     key_signature: str | None
+    proportion: tuple[int, int] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,7 @@ class _BarEvents:
     tie_targets: frozenset[str]
     slur_starts: frozenset[str]
     slur_ends: frozenset[str]
+    glissando_targets: frozenset[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,8 +86,6 @@ def notation_score_from_piece(
 ) -> NotationScore:
     """Normalize Piece note staffs, strictly including lyrics unless explicitly omitted."""
 
-    if not isinstance(include_lyrics, bool):
-        _fail("include_lyrics must be a bool")
     sources = _staff_sources(piece, staff_indices=staff_indices, include_lyrics=include_lyrics)
     if not sources:
         _fail("piece does not contain a normalized standard-notation staff")
@@ -210,6 +211,7 @@ def _merged_imported_bar(
         fermata=bool(structure and structure.fermata),
         clef=structure.clef if structure is not None else None,
         key_signature=structure.key_signature if structure is not None else None,
+        proportion=structure.proportion if structure is not None else None,
     )
 
 
@@ -229,6 +231,7 @@ def _piece_bar_data(source_index: int, bar: Bar, *, include_lyrics: bool) -> _Ba
         fermata=bar.fermata,
         clef=bar.clef,
         key_signature=bar.key_signature,
+        proportion=bar.proportion,
     )
 
 
@@ -239,6 +242,7 @@ def _notation_staff(source: _StaffSource, *, piece: Piece) -> NotationStaff:
     tie_targets: set[str] = set()
     slur_starts: set[str] = set()
     slur_ends: set[str] = set()
+    glissando_targets: set[str] = set()
     initial_key = _key_signature(piece.key)
     current_time = TimeSignature()
     for sequence, bar in enumerate(source.bars):
@@ -248,6 +252,7 @@ def _notation_staff(source: _StaffSource, *, piece: Piece) -> NotationStaff:
         tie_targets.update(normalized.tie_targets)
         slur_starts.update(normalized.slur_starts)
         slur_ends.update(normalized.slur_ends)
+        glissando_targets.update(normalized.glissando_targets)
         bar_lyrics, bar_lyric_lines = _bar_lyrics(
             bar,
             prefix=prefix,
@@ -276,6 +281,7 @@ def _notation_staff(source: _StaffSource, *, piece: Piece) -> NotationStaff:
                 ending_numbers=bar.ending_numbers,
                 forced_break_after=bar.system_break or _next_bar_starts_page(source.bars, sequence),
                 irregular=any(event.onset + event.duration > current_time.duration for event in normalized.events),
+                proportion=ProportionRatio(*bar.proportion) if bar.proportion is not None else None,
             ),
         )
     measure_tuple = tuple(measures)
@@ -285,12 +291,36 @@ def _notation_staff(source: _StaffSource, *, piece: Piece) -> NotationStaff:
         clef=source.clef,
         measures=measure_tuple,
         lyrics=tuple(lyrics),
-        spans=(*_tie_spans(measure_tuple, tie_targets), *_slur_spans(measure_tuple, slur_starts, slur_ends)),
+        spans=(
+            *_tie_spans(measure_tuple, tie_targets),
+            *_slur_spans(measure_tuple, slur_starts, slur_ends),
+            *_glissando_spans(measure_tuple, glissando_targets),
+        ),
         lyric_lines=tuple(lyric_lines),
     )
 
 
-def _bar_events(  # noqa: C901
+def _record_source_marks(
+    sources: tuple[MelodyEvent, ...],
+    event_id: str,
+    *,
+    tie_targets: set[str],
+    slur_starts: set[str],
+    slur_ends: set[str],
+    glissando_targets: set[str],
+) -> None:
+    targets = (
+        ("tie_from_previous", tie_targets),
+        ("slur_start", slur_starts),
+        ("slur_end", slur_ends),
+        ("glissando_from_previous", glissando_targets),
+    )
+    for attribute, target in targets:
+        if any(getattr(source, attribute) for source in sources):
+            target.add(event_id)
+
+
+def _bar_events(
     bar: _BarData,
     *,
     prefix: str,
@@ -303,6 +333,7 @@ def _bar_events(  # noqa: C901
     tie_targets: set[str] = set()
     slur_starts: set[str] = set()
     slur_ends: set[str] = set()
+    glissando_targets: set[str] = set()
     polyphonic = len(by_voice) > 1
     for voice, voice_events in sorted(by_voice.items()):
         onset = Fraction(0)
@@ -319,12 +350,14 @@ def _bar_events(  # noqa: C901
                 polyphonic=polyphonic,
             )
             out.append(event)
-            if any(item.tie_from_previous for item in sources):
-                tie_targets.add(event_id)
-            if any(item.slur_start for item in sources):
-                slur_starts.add(event_id)
-            if any(item.slur_end for item in sources):
-                slur_ends.add(event_id)
+            _record_source_marks(
+                sources,
+                event_id,
+                tie_targets=tie_targets,
+                slur_starts=slur_starts,
+                slur_ends=slur_ends,
+                glissando_targets=glissando_targets,
+            )
             event_ids_by_onset.setdefault(onset_index, event_id)
             if not event.grace:
                 onset += duration
@@ -334,6 +367,7 @@ def _bar_events(  # noqa: C901
         tie_targets=frozenset(tie_targets),
         slur_starts=frozenset(slur_starts),
         slur_ends=frozenset(slur_ends),
+        glissando_targets=frozenset(glissando_targets),
     )
 
 
@@ -376,6 +410,8 @@ def _notation_event(
         ornament=_group_ornament(sources, event_id=event_id),
         editorial_brackets=any(item.editorial_brackets for item in sources),
         grace=_group_grace(sources, event_id=event_id),
+        harmonic=_group_harmonic(sources, event_id=event_id),
+        fingering=_group_fingering(sources, event_id=event_id),
     )
 
 
@@ -450,6 +486,24 @@ def _slur_spans(
     return tuple(spans)
 
 
+def _glissando_spans(
+    measures: tuple[NotationMeasure, ...],
+    targets: set[str],
+) -> tuple[NotationSpan, ...]:
+    previous_by_voice: dict[int, NotationEvent] = {}
+    spans: list[NotationSpan] = []
+    for measure in measures:
+        for event in sorted(measure.events, key=lambda item: (item.onset, item.voice, item.id)):
+            if event.id in targets:
+                previous = previous_by_voice.get(event.voice)
+                if previous is None:
+                    _fail(f"glissando target {event.id!r} has no preceding note in voice {event.voice}")
+                spans.append(NotationSpan(f"{event.id}:glissando", SpanKind.GLISSANDO, previous.id, event.id))
+            if event.kind is EventKind.NOTE:
+                previous_by_voice[event.voice] = event
+    return tuple(spans)
+
+
 def _same_written_pitch(left: WrittenPitch, right: WrittenPitch) -> bool:
     return (left.step, left.octave, left.alter) == (right.step, right.octave, right.alter)
 
@@ -478,6 +532,20 @@ def _group_grace(sources: tuple[MelodyEvent, ...], *, event_id: str) -> bool:
     if len(values) > 1:
         _fail(f"event group {event_id!r} mixes grace and measured notes")
     return values.pop()
+
+
+def _group_harmonic(sources: tuple[MelodyEvent, ...], *, event_id: str) -> bool:
+    values = {source.harmonic for source in sources}
+    if len(values) > 1:
+        _fail(f"event group {event_id!r} mixes harmonic and ordinary noteheads")
+    return values.pop()
+
+
+def _group_fingering(sources: tuple[MelodyEvent, ...], *, event_id: str) -> str | None:
+    values = {source.fingering for source in sources if source.fingering is not None}
+    if len(values) > 1:
+        _fail(f"event group {event_id!r} has conflicting notation fingerings")
+    return values.pop() if values else None
 
 
 def _group_ornament(sources: tuple[MelodyEvent, ...], *, event_id: str) -> OrnamentKind | None:

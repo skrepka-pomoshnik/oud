@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from oud.editor import actions
-from oud.editor.controller import handle_key as dispatch_key
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.dispatch import actions
+from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
 from oud.settings import DEFAULT_SETTINGS
 from petrucci.framebuffer import FrameBuffer
 from petrucci.model import Bar, Piece

@@ -85,7 +85,30 @@ def _melody_playback_col(
     return onset_cols[-1]
 
 
-def _tab_playback_highlight_ops(  # noqa: C901
+def _tab_highlight_cell(
+    row_text: str,
+    playback_cell_idx: int,
+    *,
+    chord_mode: bool,
+    actual_string: int,
+    note_strings: set[int],
+) -> tuple[int, str] | None:
+    row_clusters = _split_display_clusters(row_text)
+    if not (0 <= playback_cell_idx < len(row_clusters)):
+        return None
+    target_idx = playback_cell_idx
+    if chord_mode:
+        if actual_string not in note_strings:
+            return None
+        nearest = _nearest_note_cell_idx(row_text, playback_cell_idx)
+        if nearest is None:
+            return None
+        target_idx = nearest
+    char = row_clusters[target_idx]
+    return None if char in {" ", "-", "|"} else (target_idx, char)
+
+
+def _tab_playback_highlight_ops(
     *,
     bar,
     playback_col: int,
@@ -122,20 +145,16 @@ def _tab_playback_highlight_ops(  # noqa: C901
         actual = system_visual_indices[display_idx]
         y = row_start + (rows["staff"] or 0) + display_idx
         row_text = rendered_staff_rows[display_idx] if display_idx < len(rendered_staff_rows) else ""
-        row_clusters = _split_display_clusters(row_text)
-        if not (0 <= playback_cell_idx < len(row_clusters)):
+        cell = _tab_highlight_cell(
+            row_text,
+            playback_cell_idx,
+            chord_mode=bool(bar.chords),
+            actual_string=actual,
+            note_strings=note_strings,
+        )
+        if cell is None:
             continue
-        target_idx = playback_cell_idx
-        if bar.chords:
-            if actual not in note_strings:
-                continue
-            nearest = _nearest_note_cell_idx(row_text, playback_cell_idx)
-            if nearest is None:
-                continue
-            target_idx = nearest
-        ch = row_clusters[target_idx]
-        if ch in {" ", "-", "|"}:
-            continue
+        target_idx, ch = cell
         ops.append((y, bar_x + target_idx, ch, A_REVERSE))
     return ops, scaled_play_col
 

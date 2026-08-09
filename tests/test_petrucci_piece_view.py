@@ -104,7 +104,7 @@ def test_vocal_only_view_keeps_all_staffs_while_focus_selects_active_voice(width
     if height >= 40:
         assert "soprano" in view.result.text
         assert soprano_cells
-        assert all(view.result.frame.attrs[row][column] == 0 for row, column in soprano_cells)
+        assert any(view.result.frame.attrs[row][column] != 0 for row, column in soprano_cells)
     else:
         assert not soprano_cells
     assert any(view.result.frame.attrs[row][column] != 0 for row, column in bass_cells)

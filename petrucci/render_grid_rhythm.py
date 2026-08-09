@@ -13,6 +13,7 @@ from petrucci.render_spacing import build_chord_scale_map as _build_chord_scale_
 from petrucci.render_spacing import note_event_columns as _note_event_columns
 from petrucci.render_utils import spread_flag_positions
 from petrucci.view_model import (
+    FlagPositionRequest,
     _bar_durations,
     _filter_redundant_positions,
     _flag_positions_all,
@@ -51,12 +52,14 @@ def _grid_flag_positions(
         flags = []
     else:
         flags = _flag_positions_all(
-            context.durations,
-            context.abs_bar,
-            context.total_strings,
-            context.bar_width,
-            context.default_duration,
-            dotted=context.dotted,
+            FlagPositionRequest(
+                durations=context.durations,
+                bar_index=context.abs_bar,
+                strings=context.total_strings,
+                bar_width=context.bar_width,
+                default_duration=context.default_duration,
+                dotted=context.dotted,
+            )
         )
     return _anchor_flag_positions_to_note_cols(flags, visible_cols)
 

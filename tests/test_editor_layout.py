@@ -1,12 +1,12 @@
-from oud.editor import layout as layout_module
-from oud.editor.layout import (
+from oud.editor.core.state import EditorState
+from oud.editor.navigation import layout as layout_module
+from oud.editor.navigation.layout import (
     auto_system_bar_plan_with_gaps,
     bars_per_line,
     dynamic_system_starts,
     jump_system_row,
     jump_system_row_dynamic,
 )
-from oud.editor.state import EditorState
 from petrucci.model import Bar, Chord, Note, Piece
 
 

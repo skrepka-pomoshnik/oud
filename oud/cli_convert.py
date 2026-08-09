@@ -15,7 +15,7 @@ from oud.command_io import (
     ensure_output_available,
     publish_existing,
 )
-from oud.editor.load_ops import load_piece_data
+from oud.editor.services.io.loading import load_piece_data
 from oud.exports.export_tab import export_ascii, export_tab
 from oud.exports.lilypond import lilypond_text, print_lilypond_pdf
 from oud.exports.midi import export_midi

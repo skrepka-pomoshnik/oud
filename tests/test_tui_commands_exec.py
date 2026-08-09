@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor import command_ops as cmd_ops
-from oud.editor.file_ops import render_ascii_snapshot
-from oud.editor.ops import french_to_fret
-from oud.editor.state import EditorState
+from oud.editor.commands import dispatch as cmd_ops
+from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives.tablature import french_to_fret
+from oud.editor.services.io.files import render_ascii_snapshot
 from oud.importers.tab import TabData
 from oud.tui import commands as cmd
 from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
@@ -622,16 +622,16 @@ def test_cmd_open_tab_and_ft3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     state = _state()
     tab_piece = Piece(title="Tab", bars=[Bar()], strings=6)
     tab_data = TabData(tab_piece, {(0, 0, 0): "a"}, {(0, 0, 0): 4}, set(), 8)
-    monkeypatch.setattr("oud.editor.command_ops.load_tab_data", lambda _path: tab_data)
+    monkeypatch.setattr("oud.editor.commands.dispatch.load_tab_data", lambda _path: tab_data)
     cmd.cmd_open(state, str(tmp_path / "file.tab"))
     assert state.piece.title == "Tab"
     assert state.bar_width == 8
-    monkeypatch.setattr("oud.editor.command_ops.load_tab_data", lambda _path: None)
-    monkeypatch.setattr("oud.editor.command_ops.load_tab", lambda _path: tab_piece)
+    monkeypatch.setattr("oud.editor.commands.dispatch.load_tab_data", lambda _path: None)
+    monkeypatch.setattr("oud.editor.commands.dispatch.load_tab", lambda _path: tab_piece)
     cmd.cmd_open(state, str(tmp_path / "other.tab"))
     assert state.piece.title == "Tab"
     ft3_piece = Piece(title="Ft3", bars=[Bar()], strings=6)
-    monkeypatch.setattr("oud.editor.command_ops.load_ft3", lambda _path: ft3_piece)
+    monkeypatch.setattr("oud.editor.commands.dispatch.load_ft3", lambda _path: ft3_piece)
     cmd.cmd_open(state, str(tmp_path / "file.ft3"))
     assert state.piece.title == "Ft3"
 

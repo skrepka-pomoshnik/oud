@@ -19,7 +19,7 @@ from oud.exports._lilypond_common import (
     _repeat_mark_token,
     _with_imported_bar_structure,
 )
-from petrucci.model import Bar, ImportedBarContent, ImportedStaff, Piece
+from petrucci.model import Bar, ImportedBarContent, ImportedStaff, MelodyEvent, Piece
 from petrucci.render_utils import note_type_to_denom
 from petrucci.vocal_line import infer_vocal_events
 
@@ -95,7 +95,31 @@ def _matching_imported_lyric_staff(
     return lyric_staffs[index] if index < len(lyric_staffs) else None
 
 
-def _append_imported_melody_bar(  # noqa: C901
+def _imported_event_suffix(
+    event: MelodyEvent,
+    *,
+    glissando_to_next: bool,
+    dynamic: str | None,
+) -> str:
+    suffix = {"start": "[", "end": "]"}.get(event.beam, "")
+    if event.fermata:
+        suffix += r"\fermata"
+    if event.ornament:
+        ornament = _escape_lilypond(_ft3_ornament_text(event.ornament) or event.ornament)
+        suffix += f'^\\markup {{ \\tiny "{ornament}" }}'
+    if event.harmonic:
+        suffix += r"\flageolet"
+    if event.fingering:
+        fingering = _escape_lilypond(event.fingering)
+        suffix += f"-{fingering}" if fingering.isdigit() else f'^\\markup {{ "{fingering}" }}'
+    if glissando_to_next:
+        suffix += r"\glissando"
+    if dynamic:
+        suffix += f"\\{dynamic}"
+    return suffix
+
+
+def _append_imported_melody_bar(
     melody_body: list[str],
     note_bar: ImportedBarContent,
     current_time_sig: str | None,
@@ -113,29 +137,31 @@ def _append_imported_melody_bar(  # noqa: C901
     repeat_mark = _repeat_mark_token(bar_like)
     if repeat_mark:
         melody_body.append(f"  {repeat_mark}")
+    if note_bar.proportion is not None:
+        numerator, denominator = note_bar.proportion
+        melody_body.append(f"  \\scaleDurations {denominator}/{numerator} {{")
     event_count = 0
-    for event in note_bar.melody_events:
+    for event_index, event in enumerate(note_bar.melody_events):
         is_rest = getattr(event, "is_rest", False)
         lily = "r" if is_rest else _lily_note_from_event_text(event.text)
         note_type = event.note_type or 4
         duration = _duration_token(note_type_to_denom(note_type) or 4, event.dotted)
-        suffix = ""
-        if event.beam == "start":
-            suffix += "["
-        elif event.beam == "end":
-            suffix += "]"
-        if event.fermata:
-            suffix += r"\fermata"
-        if event.ornament:
-            ornament = _escape_lilypond(_ft3_ornament_text(event.ornament) or event.ornament)
-            suffix += f'^\\markup {{ \\tiny "{ornament}" }}'
-        if event_count == 0 and note_bar.dynamic:
-            suffix += f"\\{note_bar.dynamic}"
+        glissando_to_next = (
+            event_index + 1 < len(note_bar.melody_events)
+            and note_bar.melody_events[event_index + 1].glissando_from_previous
+        )
+        suffix = _imported_event_suffix(
+            event,
+            glissando_to_next=glissando_to_next,
+            dynamic=note_bar.dynamic if event_count == 0 else None,
+        )
         melody_body.append(f"  {(lily or 'r')}{duration}{suffix}")
         event_count += 1
     if event_count == 0:
         melody_body.append("  r4")
         melody_body.extend(f"  {mark}" for mark in _bar_sign_mark_tokens(bar_like))
+    if note_bar.proportion is not None:
+        melody_body.append("  }")
     bar_marker = _barline_token(bar_like)
     melody_body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
     if note_bar.system_break:

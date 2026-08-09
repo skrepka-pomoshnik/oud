@@ -1,4 +1,4 @@
-from oud.editor.list_menu import (
+from oud.editor.core.input.menu import (
     MenuNavBindings,
     MenuNavState,
     menu_find_index,

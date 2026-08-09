@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import cast
 
 import pytest
 
@@ -280,11 +279,6 @@ def test_piece_adapter_preserves_irregular_grace_tuplet_slur_and_mid_score_chang
     assert second.clef is Clef.BASS
     assert second.key_signature is not None and second.key_signature.fifths == -1
     assert second.irregular is True
-
-
-def test_piece_adapter_rejects_non_boolean_lyric_policy() -> None:
-    with pytest.raises(PieceAdapterError, match="include_lyrics must be a bool"):
-        notation_score_from_piece(_imported_piece(), include_lyrics=cast(bool, 1))
 
 
 def test_piece_adapter_preserves_minor_key_and_page_break_semantics() -> None:

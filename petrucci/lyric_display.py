@@ -14,7 +14,7 @@ class LyricDisplay:
     verse_index: int | None
 
 
-def lyric_display(settings: dict[str, str]) -> LyricDisplay:
+def lyric_display(settings: dict[str, str], *, active_verse_index: int | None = None) -> LyricDisplay:
     """Resolve terminal lyric visibility and the selected zero-based stanza."""
 
     if settings.get("showlyrics", "on") != "on":
@@ -25,15 +25,22 @@ def lyric_display(settings: dict[str, str]) -> LyricDisplay:
         return LyricDisplay(enabled=True, mode=mode, verse_index=None)
     if mode == "first":
         return LyricDisplay(enabled=True, mode=mode, verse_index=0)
+    if active_verse_index is not None:
+        return LyricDisplay(enabled=True, mode=mode, verse_index=max(0, active_verse_index))
     verse_text = settings.get("lyricverse", "1")
     verse = int(verse_text) if verse_text.isdigit() else 1
     return LyricDisplay(enabled=True, mode=mode, verse_index=max(1, verse) - 1)
 
 
-def piece_for_lyric_display(piece: Piece, settings: dict[str, str]) -> Piece:
+def piece_for_lyric_display(
+    piece: Piece,
+    settings: dict[str, str],
+    *,
+    active_verse_index: int | None = None,
+) -> Piece:
     """Return a shallow display projection containing only selected lyric rows."""
 
-    display = lyric_display(settings)
+    display = lyric_display(settings, active_verse_index=active_verse_index)
     if not display.enabled or display.verse_index is None:
         return piece
     bars = [_select_bar_verse(bar, display.verse_index) for bar in piece.bars]

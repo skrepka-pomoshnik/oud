@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from oud.editor.load_ops import load_piece_data
+from oud.editor.services.io.loading import load_piece_data
 from oud.exports.musicxml import export_musicxml
 from petrucci.model import Piece
 

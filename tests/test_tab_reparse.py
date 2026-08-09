@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from oud.editor.init import init_state
-from oud.editor.state import EditorState
-from oud.editor.tab_reparse import apply_tab_reparse_delta
+from oud.editor.core.state import EditorState
+from oud.editor.editing.tab.reparse import apply_tab_reparse_delta
+from oud.editor.services.bootstrap import init_state
 from oud.importers.tab import parse_tab_text_data
 from petrucci.model import Bar, Piece
 

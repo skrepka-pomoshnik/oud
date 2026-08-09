@@ -8,10 +8,10 @@ TUI loop and assert the drawn cursor never stalls.
 
 from __future__ import annotations
 
-from oud.editor import actions
-from oud.editor.controller import handle_key
-from oud.editor.state import EditorState
-from oud.editor.viewport import ensure_cursor_visible
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.dispatch import actions
+from oud.editor.interaction.dispatch.controller import handle_key
+from oud.editor.navigation.viewport import ensure_cursor_visible
 from oud.tui.commands import apply_command
 from petrucci.framebuffer import FrameBuffer
 from petrucci.render import render_piece

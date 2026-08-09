@@ -291,7 +291,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 - `petrucci/`: canonical score model, spacing policies, framebuffer, and tab/note renderer.
 - `oud/importers/`: file parsers and format-specific import semantics.
-- `oud/editor/`: state + editing ops + command ops + undo/redo.
+- `oud/editor/`: layered editor domains; see `docs/editor-architecture.md`.
 - `oud/tui/`: input/prompt/controller/main loop.
 - `oud/ui/`: curses adapter.
 - `oud/exports/`: TAB/LilyPond/MIDI exporters.

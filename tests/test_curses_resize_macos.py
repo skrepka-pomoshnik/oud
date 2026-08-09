@@ -16,9 +16,9 @@ from typing import Any
 
 import pytest
 
-from oud.editor.actions import handle_insert, handle_normal
-from oud.editor.document import display_path
-from oud.editor.status import status_line
+from oud.editor.core.document import display_path
+from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
+from oud.editor.services.status import status_line
 from oud.tui.commands import apply_command
 from oud.tui.loop import run_loop
 

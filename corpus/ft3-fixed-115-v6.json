@@ -1139,6 +1139,7 @@
       "tab_chords": 171,
       "staff_kinds": {
         "comment": 1,
+        "layout": 1,
         "lyrics": 2,
         "note": 2
       },

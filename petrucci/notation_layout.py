@@ -293,13 +293,13 @@ def _system_staff_needs(
         lower_beam_depth=max((lower_depth for _upper_depth, lower_depth in beam_depths), default=0),
         slur_lanes=_system_span_lane_count(
             staff,
-            kind=SpanKind.SLUR,
+            kinds=frozenset({SpanKind.SLUR, SpanKind.GLISSANDO}),
             measure_start=measure_start,
             measure_end=measure_end,
         ),
         tie_lanes=_system_span_lane_count(
             staff,
-            kind=SpanKind.TIE,
+            kinds=frozenset({SpanKind.TIE}),
             measure_start=measure_start,
             measure_end=measure_end,
         ),
@@ -311,7 +311,9 @@ def _system_staff_needs(
         has_grace=any(event.grace for measure in staff.measures[measure_start:measure_end] for event in measure.events),
         has_ending=any(measure.ending_numbers for measure in staff.measures[measure_start:measure_end]),
         has_ornament=any(
-            event.ornament for measure in staff.measures[measure_start:measure_end] for event in measure.events
+            event.ornament or event.harmonic or event.fingering
+            for measure in staff.measures[measure_start:measure_end]
+            for event in measure.events
         ),
         has_fermata=any(
             event.fermata for measure in staff.measures[measure_start:measure_end] for event in measure.events
@@ -331,19 +333,19 @@ def _system_staff_needs(
 def _system_span_lane_count(
     staff: NotationStaff,
     *,
-    kind: SpanKind,
+    kinds: frozenset[SpanKind],
     measure_start: int,
     measure_end: int,
 ) -> int:
     event_measures = {
         event.id: measure_index for measure_index, measure in enumerate(staff.measures) for event in measure.events
     }
-    lanes = _span_lane_map(staff, kind=kind)
+    lanes = _span_lane_map(staff, kinds=kinds)
     return max(
         (
             lanes[span.id] + 1
             for span in staff.spans
-            if span.kind is kind
+            if span.kind in kinds
             if event_measures[span.start_event_id] < measure_end and event_measures[span.end_event_id] >= measure_start
         ),
         default=0,
@@ -705,7 +707,7 @@ def _change_elements(
     rows: StaffRows,
 ) -> tuple[tuple[LayoutElement, ...], int]:
     if measure_index == system_start:
-        return (), x
+        return _proportion_elements(measure, x=x, rows=rows)
     previous = _state_at(staff, measure_index - 1)
     elements: list[LayoutElement] = []
     cursor = x
@@ -736,7 +738,26 @@ def _change_elements(
             ),
         )
         cursor += 4
+    proportion, cursor = _proportion_elements(measure, x=cursor, rows=rows)
+    elements.extend(proportion)
     return tuple(elements), cursor
+
+
+def _proportion_elements(
+    measure: NotationMeasure,
+    *,
+    x: int,
+    rows: StaffRows,
+) -> tuple[tuple[LayoutElement, ...], int]:
+    if measure.proportion is None:
+        return (), x
+    value = f"{measure.proportion.numerator}:{measure.proportion.denominator}"
+    element = LayoutElement(
+        ElementKey(measure.id, ElementRole.PROPORTION),
+        Rect(x, rows.line_rows[2] - 1, len(value)),
+        value,
+    )
+    return (element,), x + len(value) + 1
 
 
 def _group_positions(

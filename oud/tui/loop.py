@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import curses
 
-from oud.editor.init import init_state
-from oud.editor.playback import update_playback_animation
-from oud.editor.status import status_line
-from oud.editor.transient_message import decay_transient_message
-from oud.editor.view_focus import current_view_staff
-from oud.editor.view_state import view_commit_frame, view_merge_dirty, view_resize
-from oud.editor.viewport import ensure_cursor_visible
+from oud.editor.core.feedback.transient import decay_transient_message
+from oud.editor.navigation.view.focus import current_view_staff
+from oud.editor.navigation.view.state import view_commit_frame, view_merge_dirty, view_resize
+from oud.editor.navigation.viewport import ensure_cursor_visible
+from oud.editor.services.bootstrap import init_state
+from oud.editor.services.media.playback import update_playback_animation
+from oud.editor.services.status import status_line
 from oud.exports.export_tab import export_ascii
 from oud.tui.controller import handle_key as handle_key_impl
 from oud.tui.input import handle_command as handle_command_input
@@ -200,6 +200,7 @@ def run_loop(  # noqa: C901
                 focused_imported_staff_index=(
                     focused_staff.source_index if not focused_staff.key.startswith("duet-") else None
                 ),
+                playback_verse=state.playback.verse,
             )
             base_frame = frame_buffer.snapshot()
             state.last_base_frame = base_frame

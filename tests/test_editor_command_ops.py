@@ -1,4 +1,4 @@
-from oud.editor.command_ops import (
+from oud.editor.commands.dispatch import (
     cmd_bar,
     cmd_chord,
     cmd_stave,
@@ -7,8 +7,8 @@ from oud.editor.command_ops import (
     show_help,
     yank_bar,
 )
-from oud.editor.state import EditorState
-from oud.editor.undo_ops import redo, undo
+from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives.undo import redo, undo
 from petrucci.model import Bar, Piece
 
 
@@ -175,12 +175,12 @@ def test_show_help_uses_less(monkeypatch) -> None:
     state = _state()
     calls: list[list[str]] = []
 
-    monkeypatch.setattr("oud.editor.command_ops.shutil.which", lambda _name: "less")
+    monkeypatch.setattr("oud.editor.commands.dispatch.shutil.which", lambda _name: "less")
 
     def fake_run(args, check=False):  # noqa: ARG001
         calls.append(list(args))
 
-    monkeypatch.setattr("oud.editor.command_ops.subprocess.run", fake_run)
+    monkeypatch.setattr("oud.editor.commands.dispatch.subprocess.run", fake_run)
     show_help(state)
     assert calls
     assert calls[0][0] == "less"

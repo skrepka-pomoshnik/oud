@@ -15,7 +15,46 @@ from petrucci.render_utils import (
 from petrucci.tab_policy import string_label as tab_string_label
 
 
-def _bar_compact_width(  # noqa: C901, PLR0917 - legacy grid projection pending typed bar inputs
+def _source_string_count(
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_index: int,
+) -> int:
+    override_max = max((string for bar, string, _col in overrides if bar == bar_index), default=5)
+    duration_max = max((string for bar, string, _col in durations if bar == bar_index), default=5)
+    return max(override_max, duration_max) + 1
+
+
+def _bar_flag_positions(
+    bar: Bar,
+    *,
+    bar_index: int,
+    strings: int,
+    bar_width: int,
+    durations: dict[tuple[int, int, int], int],
+    default_duration: int,
+    dotted: set[tuple[int, int]] | None,
+) -> list[tuple[int, int, bool]]:
+    if bar.chords:
+        return chord_positions(bar, max(bar_width, len(bar.chords)), default_duration)
+    return flag_positions_from_durations(
+        durations,
+        bar_index,
+        strings,
+        bar_width,
+        default_duration,
+        dotted=dotted,
+    )
+
+
+def _positions_width(positions: list[tuple[int, int, bool]], *, tail_pad: int = 0) -> int:
+    return max(
+        (col + 2 + flag_count(denominator) + int(is_dotted) + tail_pad for col, denominator, is_dotted in positions),
+        default=0,
+    )
+
+
+def _bar_compact_width(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     bar_width: int,
@@ -24,14 +63,7 @@ def _bar_compact_width(  # noqa: C901, PLR0917 - legacy grid projection pending 
     default_duration: int,
     dotted: set[tuple[int, int]] | None = None,
 ) -> int:
-    max_string = 5
-    for b, s, _c in overrides:
-        if b == bar_index:
-            max_string = max(max_string, s)
-    for b, s, _c in durations:
-        if b == bar_index:
-            max_string = max(max_string, s)
-    strings = max_string + 1
+    strings = _source_string_count(overrides, durations, bar_index)
     max_slash, max_dot = _bar_flag_span(
         bar,
         bar_index,
@@ -42,30 +74,32 @@ def _bar_compact_width(  # noqa: C901, PLR0917 - legacy grid projection pending 
         dotted,
     )
     min_flag_width = 2 + max_slash + max_dot
-    width_needed = min_flag_width
-    tail_pad = 1
-    if bar.chords:
-        chord_width = max(bar_width, len(bar.chords))
-        positions = chord_positions(bar, chord_width, default_duration)
-        for col, denom, dot in positions:
-            span = 1 + flag_count(denom) + (1 if dot else 0)
-            width_needed = max(width_needed, col + span + 1 + tail_pad)
-    else:
-        positions = flag_positions_from_durations(
-            durations,
-            bar_index,
-            strings,
-            bar_width,
-            default_duration,
-            dotted=dotted,
-        )
-        for col, denom, dot in positions:
-            span = 1 + flag_count(denom) + (1 if dot else 0)
-            width_needed = max(width_needed, col + span + 1 + tail_pad)
+    positions = _bar_flag_positions(
+        bar,
+        bar_index=bar_index,
+        strings=strings,
+        bar_width=bar_width,
+        durations=durations,
+        default_duration=default_duration,
+        dotted=dotted,
+    )
+    width_needed = max(min_flag_width, _positions_width(positions, tail_pad=1))
     return max(3, width_needed)
 
 
-def _infer_time_signature(bar: Bar, default_duration: int = 4) -> str | None:  # noqa: C901
+def _time_signature_for_duration(total: Fraction, *, max_denom: int) -> str | None:
+    if total <= 0:
+        return None
+    if total == Fraction(3, 8) and max_denom <= 8:
+        return "3/4"
+    for unit in (4, 8, 2, 1):
+        beats = total * unit
+        if beats.denominator == 1 and 1 <= beats.numerator <= 12:
+            return f"{beats.numerator}/{unit}"
+    return None
+
+
+def _infer_time_signature(bar: Bar, default_duration: int = 4) -> str | None:
     if not bar.chords:
         return None
     total = Fraction(0, 1)
@@ -77,17 +111,7 @@ def _infer_time_signature(bar: Bar, default_duration: int = 4) -> str | None:  #
         if chord.dotted:
             dur = dur * Fraction(3, 2)
         total += dur
-    if total <= 0:
-        return None
-    if total == Fraction(3, 8) and max_denom <= 8:
-        return "3/4"
-    for unit in (4, 8, 2, 1):
-        beats = total * unit
-        if beats.denominator == 1:
-            beats_int = int(beats.numerator)
-            if 1 <= beats_int <= 12:
-                return f"{beats_int}/{unit}"
-    return None
+    return _time_signature_for_duration(total, max_denom=max_denom)
 
 
 def _parse_pitch_labels(text: str, *, show_octaves: bool, limit: int | None = None) -> list[str]:
@@ -246,7 +270,7 @@ def _bar_note_columns(
     return cols
 
 
-def _bar_display_width(  # noqa: C901, PLR0917 - legacy grid projection pending typed bar inputs
+def _bar_display_width(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
     bar: Bar,
     bar_index: int,
     bar_width: int,
@@ -255,14 +279,7 @@ def _bar_display_width(  # noqa: C901, PLR0917 - legacy grid projection pending 
     default_duration: int,
     dotted: set[tuple[int, int]] | None = None,
 ) -> int:
-    max_string = 5
-    for b, s, _c in overrides:
-        if b == bar_index:
-            max_string = max(max_string, s)
-    for b, s, _c in durations:
-        if b == bar_index:
-            max_string = max(max_string, s)
-    strings = max_string + 1
+    strings = _source_string_count(overrides, durations, bar_index)
     max_slash, max_dot = _bar_flag_span(
         bar,
         bar_index,
@@ -275,25 +292,16 @@ def _bar_display_width(  # noqa: C901, PLR0917 - legacy grid projection pending 
     count = _bar_note_count(bar, bar_index, bar_width, overrides, durations, default_duration)
     count = max(1, count)
     min_flag_width = 2 + max_slash + max_dot
-    width_needed = min_flag_width
-    if bar.chords:
-        chord_width = max(bar_width, len(bar.chords))
-        positions = chord_positions(bar, chord_width, default_duration)
-        for col, denom, dot in positions:
-            span = 1 + flag_count(denom) + (1 if dot else 0)
-            width_needed = max(width_needed, col + span + 1)
-    else:
-        positions = flag_positions_from_durations(
-            durations,
-            bar_index,
-            strings,
-            bar_width,
-            default_duration,
-            dotted=dotted,
-        )
-        for col, denom, dot in positions:
-            span = 1 + flag_count(denom) + (1 if dot else 0)
-            width_needed = max(width_needed, col + span + 1)
+    positions = _bar_flag_positions(
+        bar,
+        bar_index=bar_index,
+        strings=strings,
+        bar_width=bar_width,
+        durations=durations,
+        default_duration=default_duration,
+        dotted=dotted,
+    )
+    width_needed = max(min_flag_width, _positions_width(positions))
     min_unit = max(2, 2 + max_slash + max_dot)
     return max(3, width_needed, (count * min_unit) + 1)
 

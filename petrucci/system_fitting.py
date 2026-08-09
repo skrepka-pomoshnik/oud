@@ -39,68 +39,58 @@ class BoxSystem:
     filled: bool
 
 
-def _validate_fit_request(
-    boxes: tuple[MeasuredBox, ...],
-    available_width: int,
-    gap: int,
-    max_stretch_per_box: int,
-) -> None:
-    """Pack natural boxes into systems, then apply bounded justification."""
+@dataclass(frozen=True, slots=True)
+class BoxFitOptions:
+    available_width: int
+    gap: int = 0
+    justify: bool = True
+    justify_last_system: bool = False
+    max_stretch_per_box: int = 6
 
-    if available_width <= 0:
-        _invalid("available width must be positive")
-    if gap < 0:
-        _invalid("box gap must be non-negative")
-    if max_stretch_per_box < 0:
-        _invalid("maximum stretch must be non-negative")
-    _validate_unique_ids(boxes)
+    def __post_init__(self) -> None:
+        if self.available_width <= 0:
+            _invalid("available width must be positive")
+        if self.gap < 0:
+            _invalid("box gap must be non-negative")
+        if self.max_stretch_per_box < 0:
+            _invalid("maximum stretch must be non-negative")
 
 
 def fit_measured_boxes(
     boxes: tuple[MeasuredBox, ...],
     *,
-    available_width: int,
-    gap: int = 0,
-    justify: bool = True,
-    max_stretch_per_box: int = 6,
+    options: BoxFitOptions,
 ) -> tuple[BoxSystem, ...]:
-    _validate_fit_request(boxes, available_width, gap, max_stretch_per_box)
+    """Pack natural boxes, justifying ordinary and final systems independently."""
 
+    _validate_unique_ids(boxes)
     systems: list[BoxSystem] = []
     current: list[MeasuredBox] = []
-    for box in boxes:
-        if current and _natural_width((*current, box), gap) > available_width:
-            systems.append(
-                _place_system(
-                    tuple(current),
-                    available_width=available_width,
-                    gap=gap,
-                    fill=justify,
-                    max_stretch_per_box=max_stretch_per_box,
-                ),
-            )
+    for index, box in enumerate(boxes):
+        if current and _natural_width((*current, box), options.gap) > options.available_width:
+            systems.append(_place_system(tuple(current), options=options, fill=options.justify))
             current = []
         current.append(box)
         if box.break_after:
+            is_final = index == len(boxes) - 1
+            fill_final = options.justify_last_system and is_final
             systems.append(
                 _place_system(
                     tuple(current),
-                    available_width=available_width,
-                    gap=gap,
-                    fill=False,
-                    max_stretch_per_box=max_stretch_per_box,
-                ),
+                    options=options,
+                    fill=fill_final,
+                    unbounded_stretch=fill_final,
+                )
             )
             current = []
     if current:
         systems.append(
             _place_system(
                 tuple(current),
-                available_width=available_width,
-                gap=gap,
-                fill=False,
-                max_stretch_per_box=max_stretch_per_box,
-            ),
+                options=options,
+                fill=options.justify_last_system,
+                unbounded_stretch=options.justify_last_system,
+            )
         )
     return tuple(systems)
 
@@ -108,22 +98,23 @@ def fit_measured_boxes(
 def _place_system(
     boxes: tuple[MeasuredBox, ...],
     *,
-    available_width: int,
-    gap: int,
+    options: BoxFitOptions,
     fill: bool,
-    max_stretch_per_box: int,
+    unbounded_stretch: bool = False,
 ) -> BoxSystem:
+    available_width = options.available_width
     widths = [min(box.natural_width, available_width) for box in boxes]
-    base_width = sum(widths) + (gap * max(0, len(widths) - 1))
+    base_width = sum(widths) + (options.gap * max(0, len(widths) - 1))
     slack = max(0, available_width - base_width)
     if fill and slack:
-        _distribute_stretch(widths, boxes, slack=slack, cap=max_stretch_per_box)
+        stretch_cap = available_width if unbounded_stretch else options.max_stretch_per_box
+        _distribute_stretch(widths, boxes, slack=slack, cap=stretch_cap)
     placed: list[PlacedBox] = []
     x = 0
     for box, width in zip(boxes, widths, strict=True):
         placed.append(PlacedBox(id=box.id, x=x, width=width, clipped=box.natural_width > width))
-        x += width + gap
-    total = max(0, x - gap) if placed else 0
+        x += width + options.gap
+    total = max(0, x - options.gap) if placed else 0
     return BoxSystem(boxes=tuple(placed), width=total, filled=fill and total == available_width)
 
 

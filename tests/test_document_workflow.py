@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor.document import DocumentMode
-from oud.editor.file_ops import cmd_write_ascii
-from oud.editor.init import init_state
-from oud.editor.messages import MessageLevel, infer_message_level
-from oud.editor.status import status_line
+from oud.editor.core.document import DocumentMode
+from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
+from oud.editor.services.bootstrap import init_state
+from oud.editor.services.io.files import cmd_write_ascii
+from oud.editor.services.status import status_line
 from oud.tui.commands import apply_command
 from oud.tui.input import handle_command
 from petrucci.framebuffer import FrameBuffer

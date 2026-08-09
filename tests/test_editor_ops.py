@@ -1,4 +1,4 @@
-from oud.editor.ops import (
+from oud.editor.editing.primitives.tablature import (
     chord_index_at_col,
     delete_chord,
     denom_to_note_type,

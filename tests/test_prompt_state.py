@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from oud.editor.prompt_state import (
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.prompt.state import (
     command_history_commit,
     command_history_next,
     command_history_prev,
@@ -8,7 +9,6 @@ from oud.editor.prompt_state import (
     search_history_commit,
     search_history_reset_nav,
 )
-from oud.editor.state import EditorState
 from petrucci.model import Bar, Piece
 
 

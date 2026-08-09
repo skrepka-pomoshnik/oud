@@ -1,5 +1,17 @@
 # DONE
 
+- 2026-08-09: Replaced the flat `oud.editor` namespace with six directional domain packages: core, navigation, editing, services, commands, and interaction. Canonical imports and architecture-debt paths now use the hierarchy, obsolete flat modules were removed rather than wrapped, and a structural regression enforces at most seven direct entities per package. Validation: Ruff, Ruff format, Ty, and 1,530 tests pass with one platform skip and 95.07% Petrucci coverage.
+
+- 2026-08-09: Added public `NotationLayoutPolicy.justify_last_system` control for final and one-system notation layouts. Final justification fills the available measure width, remains opt-in, and does not stretch nonfinal forced-break systems. Replaced positional box-fitting options with a typed request and added generic fitting plus public layout regressions. Validation: Ruff, Ruff format, Ty, and 1,530 tests pass with one platform skip and 95.07% Petrucci coverage.
+
+- 2026-08-09: Published six companion-MIDI playback comparisons, including an explicit invalid empty reference; introduced source-independent diplomatic mensuration/proportion records and separate editorial meanings with stable identities; split insert dispatch and command completion complexity; and replaced three high-arity layout/rhythm surfaces with typed requests. Validation: Ruff, Ruff format, Ty, and 1,530 tests pass with one platform skip and 95.07% Petrucci coverage.
+
+- 2026-08-09: Resolved all 14 remaining FT3 variants from the complete direct composer-index audit. Added PDF-confirmed later right-hand fingerings, bracket/barre variants, source layout flags, compact page/exercise records, editorial annotations, and a conservative one-staff notation-only mapper that prevents Couperin viol bytes from becoming fake tablature. The locally cached v8 fixtures expand the fixed corpus to 514. Validation: Ruff, Ruff format, Ty, and 1,517 tests pass with one Darwin-only skip and 95.13% Petrucci coverage; a checksum-new `04v_allison_spanish_measures.ft3` audit reports zero unresolved values, records, warnings, or load errors.
+
+- 2026-08-09: Expanded the fixed FT3 compatibility corpus from 415 to 500 checksum-disjoint public scores and decoded PDF-confirmed right-side `+` (`0a00`) and `*` (`4000`) tablature ornaments. The v7 audit also bounded, rather than hid, layered exercise records and four remaining note-extra families. Validation pending at user request boundary.
+
+- 2026-08-09: Added typed proportions, harmonics, glissandi, and notation fingerings with compact terminal and LilyPond output; synchronized all mapped MIDI staffs and polyphonic voice clocks/highlights; made current lyrics follow playback stanzas; retired five Petrucci complexity findings. Validation: mandatory Ruff, format, Ty, and pytest gate.
+
 - 2026-08-09: Expanded the deterministic FT3 compatibility corpus from 300 to 415 semantically clean public payloads and retired five Petrucci framebuffer, lyric, geometry, bass-course, and playback complexity findings. Validation: mandatory Ruff, format, Ty, and pytest gate.
 - 2026-08-09: Retired five Petrucci text and lyric complexity findings by separating notes sections, measure number policy, proportional text placement, lyric-event placement, and inter-syllable cue drawing. Validation: mandatory Ruff, format, Ty, and pytest gate.
 - 2026-08-09: Retired the next five highest Petrucci complexity findings, consolidated duplicated tie-cue placement, and split framebuffer, rhythm-flag, and span-priority operations below the enforced ceiling. Validation: mandatory Ruff, format, Ty, and pytest gate.
@@ -327,7 +339,7 @@ Technical change log. Keep short, append newest on top.
 - Tightened bottom vocal layout by removing the extra spacer row between tablature and note staff while keeping playback marker visibility.
 
 ## 2026-02-07
-- Added reprise marker support end-to-end: `:repeat` now accepts structural + cue variants (`both`, `dc/ds`, `fine/coda`, `*alfine/*alcoda`) with normalization and limit handling in `oud/editor/notation_ops.py`.
+- Added reprise marker support end-to-end: `:repeat` now accepts structural + cue variants (`both`, `dc/ds`, `fine/coda`, `*alfine/*alcoda`) with normalization and limit handling in `oud/editor/editing/score/notation.py`.
 - Added reprise export/render coverage: repeat cue marks are emitted in LilyPond export and tested in `tests/test_lilypond.py`.
 - Finalized ASCII save parity check: `:wascii` output is validated against framebuffer snapshot in `tests/test_tui_commands_media.py`.
 - Implemented and tested bars-per-line behavior (`:set barsperline=<n>`, `0=auto`) with new layout/render tests (`tests/test_editor_layout.py`, `tests/test_ui_render_split.py`).
@@ -335,17 +347,17 @@ Technical change log. Keep short, append newest on top.
   - `tests/test_tui_prompt.py` (prompt/update behavior paths),
   - `tests/test_render_matrix.py` (spacing/style/bass/marker matrix scenarios).
 - Ran full quality under `.venv`: `ruff`, `ty`, and `pytest` all pass (`322 passed`, coverage `80.60%`).
-- Continued command-layer split: moved media/playback/export command helpers into `oud/editor/media_ops.py` (`cmd_midi`, `cmd_lilypond`, `cmd_pdf`, `cmd_play`, `cmd_midicmd`, `print_pdf`) with wrappers kept in `command_ops.py`.
-- Continued command-layer split: moved score-edit operations (`yank/paste`, `cmd_bar`, `cmd_stave`, `cmd_chord`) into `oud/editor/score_ops.py` and kept wrappers in `command_ops.py`.
+- Continued command-layer split: moved media/playback/export command helpers into `oud/editor/services/media/operations.py` (`cmd_midi`, `cmd_lilypond`, `cmd_pdf`, `cmd_play`, `cmd_midicmd`, `print_pdf`) with wrappers kept in `command_ops.py`.
+- Continued command-layer split: moved score-edit operations (`yank/paste`, `cmd_bar`, `cmd_stave`, `cmd_chord`) into `oud/editor/editing/score/operations.py` and kept wrappers in `command_ops.py`.
 - Added direct tests for split modules in `tests/test_tool_and_load_ops.py` (`cmd_info`, `cmd_plugins`, `cmd_tool`, and basic `cmd_open` path cases).
-- Continued command-layer split: moved `cmd_open` into `oud/editor/load_ops.py` with injected loader functions so test monkeypatch behavior stays unchanged.
-- Continued command-layer split: extracted tool/view commands into `oud/editor/tool_ops.py` (`cmd_tool`, `cmd_info`, `cmd_plugins`) with wrappers retained in `oud/editor/command_ops.py`.
-- Continued command-layer split: extracted notation/time/repeat/ornament helpers into `oud/editor/notation_ops.py` with compatibility wrappers in `oud/editor/command_ops.py`.
-- Continued command-layer split: extracted file/source/ascii write handlers into `oud/editor/file_ops.py` and kept thin wrappers in `oud/editor/command_ops.py`.
+- Continued command-layer split: moved `cmd_open` into `oud/editor/services/io/loading.py` with injected loader functions so test monkeypatch behavior stays unchanged.
+- Continued command-layer split: extracted tool/view commands into `oud/editor/commands/plugins/tools.py` (`cmd_tool`, `cmd_info`, `cmd_plugins`) with wrappers retained in `oud/editor/commands/dispatch.py`.
+- Continued command-layer split: extracted notation/time/repeat/ornament helpers into `oud/editor/editing/score/notation.py` with compatibility wrappers in `oud/editor/commands/dispatch.py`.
+- Continued command-layer split: extracted file/source/ascii write handlers into `oud/editor/services/io/files.py` and kept thin wrappers in `oud/editor/commands/dispatch.py`.
 - Kept compatibility for existing tests/monkeypatch paths by preserving public `command_ops` entrypoints.
 - Re-ran full quality under `.venv`: `ruff`, `ty`, and `pytest` all pass (`233 passed`).
 - Added `/Users/s/Documents/Python/frnm/DOCS.md` with full current feature/usage reference and workflows.
-- Started command-layer split by extracting `:set` and style-conversion logic into `oud/editor/settings_ops.py` (slimming `command_ops.py`).
+- Started command-layer split by extracting `:set` and style-conversion logic into `oud/editor/commands/handlers/settings.py` (slimming `command_ops.py`).
 - Added Vim word-search parity in normal mode: `*`, `#`, `n`, `N`.
 - Added `%` jump for tab matching (slur/tie/hold endpoints and repeat start/end markers).
 - Added mark support in normal mode: `m{char}` to set, `' {char}` / `` ` {char}`` to jump.
@@ -395,3 +407,10 @@ Technical change log. Keep short, append newest on top.
 - Translated applicable LilyPond 2.24.4 and MuseScore 4.6.0 software-test invariants into deterministic public-API tests without copying upstream fixtures.
 - Extended typed duration support through 128th notes and four dots, added reversible half/double duration operations, and accepted enharmonic ties while preserving spelling.
 - Corrected tablature minimum-fret handling for open strings and added generated tuning/string/fret round-trip coverage, extended-bass, duplicate-pitch, and explicit-failure cases.
+## 2026-08-09
+
+- Made the coverage-enabled default pytest gate serial and capped Linux test-process address space at 8 GiB to prevent xdist coverage OOMs.
+- Enforced 95% package-wide Petrucci line coverage in the default pytest command, without source exclusions.
+- Removed assertion-only type tests and redundant runtime type guards from typed Petrucci composition and rendering APIs.
+- Retired all remaining Petrucci C901 debt by extracting focused duration, mark, width, playback, and paint operations.
+- Passed the full quality gate: Ruff check, Ruff format check, Ty, and 1,507 tests with one skip; Petrucci line coverage is 95.13%.

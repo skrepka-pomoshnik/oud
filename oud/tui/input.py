@@ -3,27 +3,27 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from oud.editor.insert_session import set_mode
-from oud.editor.keymap import command_bindings, search_bindings
-from oud.editor.prompt_state import (
-    command_history_commit,
-    command_history_reset_nav,
-    search_history_commit,
-    search_history_reset_nav,
-)
-from oud.editor.prompt_state import (
-    command_history_next as command_history_next_state,
-)
-from oud.editor.prompt_state import (
-    command_history_prev as command_history_prev_state,
-)
-from oud.editor.settings_ops import (
+from oud.editor.commands.handlers.settings import (
     is_bool_set_token,
     set_key_names,
     set_preset_names,
     set_value_options,
 )
-from oud.editor.state import EditorState
+from oud.editor.core.input.keymap import command_bindings, search_bindings
+from oud.editor.core.session import set_mode
+from oud.editor.core.state import EditorState
+from oud.editor.interaction.prompt.state import (
+    command_history_commit,
+    command_history_reset_nav,
+    search_history_commit,
+    search_history_reset_nav,
+)
+from oud.editor.interaction.prompt.state import (
+    command_history_next as command_history_next_state,
+)
+from oud.editor.interaction.prompt.state import (
+    command_history_prev as command_history_prev_state,
+)
 from oud.tui.commands import command_names, no_space_commands, path_commands
 from oud.tui.prompt import PromptBindings, update_prompt
 
@@ -47,99 +47,118 @@ def history_next(state: EditorState) -> str | None:
     return command_history_next_state(state)
 
 
-def complete_command_text(  # noqa: PLR0911, C901, PLR0912
-    _state: EditorState,
-    cmdline: str,
-) -> tuple[str, str | None]:
-    commands = command_names()
-    if " " not in cmdline:
-        if cmdline in commands and cmdline not in no_space_commands():
-            return cmdline + " ", None
-        matches = [cmd for cmd in commands if cmd.startswith(cmdline)]
-        if not matches:
-            return cmdline, None
-        if len(matches) == 1:
-            match = matches[0]
-            return match + (" " if match not in no_space_commands() else ""), None
-        return cmdline, "Matches: " + " ".join(matches)
-
-    cmd, rest = cmdline.split(" ", 1)
-    if cmd == "set":
-        keys = sorted(set(set_key_names()))
-        presets = list(set_preset_names())
-        token = rest.strip()
-        if not token:
-            options = sorted(keys + presets)
-            return cmdline, "Options: " + " ".join(options[:8])
-        if "=" in token:
-            key, value_prefix = token.split("=", 1)
-            if not key:
-                return cmdline, None
-            options = [opt for opt in set_value_options(key) if opt.startswith(value_prefix)]
-            if not options:
-                return cmdline, None
-            if len(options) == 1:
-                return f"{cmd} {key}={options[0]}", None
-            common = os.path.commonprefix(options)
-            if common and common != value_prefix:
-                return f"{cmd} {key}={common}", None
-            return cmdline, "Options: " + " ".join(options[:8])
-        matches = sorted([key for key in keys if key.startswith(token)])
-        matches.extend([name for name in presets if name.startswith(token)])
-        if not matches:
-            return cmdline, None
-        if len(matches) == 1:
-            match = matches[0]
-            if match in presets:
-                return f"{cmd} {match} ", None
-            if is_bool_set_token(match):
-                return f"{cmd} {match} ", None
-            return f"{cmd} {match}=", None
-        return cmdline, "Options: " + " ".join(matches[:8])
-    if cmd not in path_commands():
-        return cmdline, None
-    if rest.rstrip().endswith(os.sep + ".") or rest.strip() in (".", "./"):
-        return cmdline, None
-    expanded = Path(rest).expanduser()
-    if rest.endswith(os.sep) and expanded.is_dir():
-        base_dir = expanded
-        base_prefix = ""
-    else:
-        base_dir = expanded.parent
-        base_prefix = expanded.name
-    if base_prefix.startswith("."):
-        return cmdline, None
-    try:
-        entries = sorted(base_dir.iterdir())
-    except OSError:
-        return cmdline, None
-    matches: list[str] = []
-    display_matches: list[str] = []
-    for entry in entries:
-        if entry.name.startswith("."):
-            continue
-        if not entry.name.startswith(base_prefix):
-            continue
-        path = base_dir / entry.name
-        if path.is_file():
-            name = entry.name.lower()
-            if not name.endswith((".tab", ".ft3", ".ft3.gz")):
-                continue
-        matches.append(str(path))
-        display_matches.append(str(path) + os.sep if path.is_dir() else str(path))
+def _complete_command_name(cmdline: str, commands: list[str]) -> tuple[str, str | None]:
+    if cmdline in commands and cmdline not in no_space_commands():
+        return cmdline + " ", None
+    matches = [cmd for cmd in commands if cmd.startswith(cmdline)]
     if not matches:
         return cmdline, None
     if len(matches) == 1:
-        path = matches[0]
-        if Path(path).is_dir():
-            path = path + os.sep
+        match = matches[0]
+        return match + (" " if match not in no_space_commands() else ""), None
+    return cmdline, "Matches: " + " ".join(matches)
+
+
+def _complete_set_value(cmd: str, key: str, value_prefix: str, cmdline: str) -> tuple[str, str | None]:
+    if not key:
+        return cmdline, None
+    options = [opt for opt in set_value_options(key) if opt.startswith(value_prefix)]
+    if not options:
+        return cmdline, None
+    if len(options) == 1:
+        return f"{cmd} {key}={options[0]}", None
+    common = os.path.commonprefix(options)
+    if common and common != value_prefix:
+        return f"{cmd} {key}={common}", None
+    return cmdline, "Options: " + " ".join(options[:8])
+
+
+def _complete_set_token(
+    cmd: str,
+    token: str,
+    cmdline: str,
+    keys: list[str],
+    presets: list[str],
+) -> tuple[str, str | None]:
+    matches = sorted(key for key in keys if key.startswith(token))
+    matches.extend(name for name in presets if name.startswith(token))
+    if not matches:
+        return cmdline, None
+    if len(matches) != 1:
+        return cmdline, "Options: " + " ".join(matches[:8])
+    match = matches[0]
+    if match in presets or is_bool_set_token(match):
+        return f"{cmd} {match} ", None
+    return f"{cmd} {match}=", None
+
+
+def _complete_set(cmd: str, rest: str, cmdline: str) -> tuple[str, str | None]:
+    keys = sorted(set(set_key_names()))
+    presets = list(set_preset_names())
+    token = rest.strip()
+    if not token:
+        return cmdline, "Options: " + " ".join(sorted(keys + presets)[:8])
+    if "=" in token:
+        key, value_prefix = token.split("=", 1)
+        return _complete_set_value(cmd, key, value_prefix, cmdline)
+    return _complete_set_token(cmd, token, cmdline, keys, presets)
+
+
+def _path_completion_base(rest: str) -> tuple[Path, str, Path] | None:
+    if rest.rstrip().endswith(os.sep + ".") or rest.strip() in (".", "./"):
+        return None
+    expanded = Path(rest).expanduser()
+    if rest.endswith(os.sep) and expanded.is_dir():
+        return expanded, "", expanded
+    if expanded.name.startswith("."):
+        return None
+    return expanded.parent, expanded.name, expanded
+
+
+def _path_completion_candidates(base_dir: Path, base_prefix: str) -> tuple[list[str], list[str]]:
+    matches: list[str] = []
+    display_matches: list[str] = []
+    for entry in sorted(base_dir.iterdir()):
+        if entry.name.startswith(".") or not entry.name.startswith(base_prefix):
+            continue
+        path = base_dir / entry.name
+        if path.is_file() and not entry.name.lower().endswith((".tab", ".ft3", ".ft3.gz")):
+            continue
+        matches.append(str(path))
+        display_matches.append(str(path) + os.sep if path.is_dir() else str(path))
+    return matches, display_matches
+
+
+def _complete_path(cmd: str, rest: str, cmdline: str) -> tuple[str, str | None]:
+    base = _path_completion_base(rest)
+    if base is None:
+        return cmdline, None
+    base_dir, base_prefix, expanded = base
+    try:
+        matches, display_matches = _path_completion_candidates(base_dir, base_prefix)
+    except OSError:
+        return cmdline, None
+    if not matches:
+        return cmdline, None
+    if len(matches) == 1:
+        path = matches[0] + (os.sep if Path(matches[0]).is_dir() else "")
         return f"{cmd} {path}", None
     common = os.path.commonprefix(matches)
     if common and common != str(expanded):
-        new_cmdline = f"{cmd} {common}"
-        if new_cmdline != cmdline:
-            return new_cmdline, None
+        return f"{cmd} {common}", None
     return cmdline, "Matches: " + " ".join(display_matches[:8])
+
+
+def complete_command_text(_state: EditorState, cmdline: str) -> tuple[str, str | None]:
+    commands = command_names()
+    if " " not in cmdline:
+        return _complete_command_name(cmdline, commands)
+    cmd, rest = cmdline.split(" ", 1)
+    if cmd == "set":
+        return _complete_set(cmd, rest, cmdline)
+    if cmd in path_commands():
+        return _complete_path(cmd, rest, cmdline)
+    return cmdline, None
 
 
 def complete_command(state: EditorState) -> bool:

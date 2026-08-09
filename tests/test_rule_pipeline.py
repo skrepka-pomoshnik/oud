@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from oud.editor.rule_pipeline import RuleContext, RuleIssue, run_rules
-from oud.editor.state import EditorState
-from oud.editor.verify_ops import verify_bar_issues
+from oud.editor.core.state import EditorState
+from oud.editor.services.validation.rules import RuleContext, RuleIssue, run_rules
+from oud.editor.services.validation.verify import verify_bar_issues
 from petrucci.model import Bar, Piece
 
 

@@ -465,6 +465,8 @@ def _note_left_fingering_text_for_export(note) -> str | None:
 def _note_barre_text_for_export(note) -> str | None:
     if getattr(note, "barre", False):
         return "barre"
+    if getattr(note, "editorial_brackets", False):
+        return "[ ]"
     return None
 
 

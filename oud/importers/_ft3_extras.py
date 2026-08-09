@@ -13,6 +13,8 @@ class DecodedFT3Extras:
     left_ornament: str | None = None
     arpeggio: str | None = None
     bass_course: int | None = None
+    editorial_brackets: bool = False
+    layout_flags: int | None = None
     residual: int | None = None
 
 
@@ -38,6 +40,7 @@ _LEFT_ORNAMENT_HIGH_BYTES = {
 }
 _RIGHT_ORNAMENT_HIGH_BYTES = {
     0x0600: "#",
+    0x0A00: "+",
     0x0E00: "x",
     0x1000: ",",
     0x1400: "'",
@@ -45,6 +48,7 @@ _RIGHT_ORNAMENT_HIGH_BYTES = {
     0x2000: "caret",
     0x2400: "under-v",
     0x2800: "under-hook",
+    0x4000: "*",
 }
 _ARPEGGIO_HIGH_BYTE_PATTERNS = {
     0x0200: "single",
@@ -52,6 +56,11 @@ _ARPEGGIO_HIGH_BYTE_PATTERNS = {
     0x4E00: "middle",
     0x5200: "top",
 }
+_HIGH_RIGHT_FINGERING_PATTERNS = {
+    0x4800: "dot1",
+    0x5A00: "dot2",
+}
+_LAYOUT_HIGH_BYTE_PATTERNS = frozenset((0x5800, 0x8000))
 
 
 def _pick_single_flag(extras: int, flags: tuple[tuple[int, str], ...]) -> tuple[str | None, int]:
@@ -79,16 +88,25 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         return DecodedFT3Extras(raw=extras)
 
     consumed = 0
-    # The high-byte barre marker composes with low-byte fingering flags.
-    barre = (extras & 0xFE00) == 0x3400
+    high_byte = extras & 0xFE00
+    # Barre and bracket placement variants compose with low-byte fingering flags.
+    barre = high_byte in {0x3400, 0x3A00}
     if barre:
-        consumed |= 0x3400
+        consumed |= high_byte
     right_fingering, used = _pick_single_flag(extras, _RIGHT_FINGERING_BITS)
     consumed |= used
     left_fingering, used = _pick_fingering_flags(extras, _LEFT_FINGERING_BITS)
     consumed |= used
 
-    high_byte = extras & 0xFE00
+    high_right_fingering = _HIGH_RIGHT_FINGERING_PATTERNS.get(high_byte)
+    if right_fingering is None and high_right_fingering is not None:
+        right_fingering = high_right_fingering
+        consumed |= high_byte
+    layout_flags = high_byte if high_byte in _LAYOUT_HIGH_BYTE_PATTERNS else 0
+    consumed |= layout_flags
+    editorial_brackets = high_byte == 0x3600
+    if editorial_brackets:
+        consumed |= high_byte
     bass_course = 9 if high_byte == 0x3C00 else None
     if bass_course is not None:
         consumed |= high_byte
@@ -109,5 +127,7 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         left_ornament=left_ornament,
         arpeggio=arpeggio,
         bass_course=bass_course,
+        editorial_brackets=editorial_brackets,
+        layout_flags=layout_flags or None,
         residual=residual or None,
     )

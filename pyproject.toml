@@ -39,7 +39,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-n 4 --dist loadscope"
+addopts = "--cov=petrucci --cov-report=term-missing --cov-fail-under=95"
 pythonpath = ["."]
 
 [tool.ty]

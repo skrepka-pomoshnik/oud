@@ -17,6 +17,8 @@ class Note:
     arpeggio: str | None = None
     ft3_extras: int | None = None
     ft3_extra_residual: int | None = None
+    editorial_brackets: bool = False
+    ft3_layout_flags: int | None = None
 
 
 @dataclass
@@ -40,6 +42,7 @@ class ImportedBarContent:
     fermata: bool = False
     clef: str | None = None
     key_signature: str | None = None
+    proportion: tuple[int, int] | None = None
     lyrics: list[str] = field(default_factory=list)
     melody_events: list[MelodyEvent] = field(default_factory=list)
     lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
@@ -93,6 +96,9 @@ class MelodyEvent:
     slur_end: bool = False
     grace: bool = False
     source_id: str | None = None
+    harmonic: bool = False
+    glissando_from_previous: bool = False
+    fingering: str | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +126,7 @@ class Bar:
     fermata: bool = False
     clef: str | None = None
     key_signature: str | None = None
+    proportion: tuple[int, int] | None = None
     chords: list[Chord] = field(default_factory=list)
     melody_grid: str | None = None
     lyrics: list[str] = field(default_factory=list)

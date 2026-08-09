@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oud.editor.plugin_state import (
+from oud.editor.commands.plugins.state import (
     plugin_apply_nav,
     plugin_enter_root,
     plugin_open_list,
@@ -12,7 +12,7 @@ from oud.editor.plugin_state import (
     plugin_search_finish,
     plugin_search_start,
 )
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from oud.plugins.model import RemoteTab
 from petrucci.model import Bar, Piece
 

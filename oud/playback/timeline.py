@@ -10,6 +10,9 @@ class PlaybackCursor:
     end: float
     bar: int
     col: int
+    staff: int = 0
+    voice: int = 0
+    verse: int = 0
 
     def contains(self, elapsed: float) -> bool:
         return self.start <= elapsed <= self.end
@@ -36,12 +39,13 @@ def build_timeline_from_events(
     events: list[PlaybackEvent],
     *,
     sec_per_tick: float,
+    verse: int = 0,
 ) -> list[PlaybackCursor]:
     timeline: list[PlaybackCursor] = []
     for bar, start_tick, duration_ticks, col in events:
         start = start_tick * sec_per_tick
         end = (start_tick + duration_ticks) * sec_per_tick
-        timeline.append(PlaybackCursor(start=start, end=end, bar=bar, col=col))
+        timeline.append(PlaybackCursor(start=start, end=end, bar=bar, col=col, verse=verse))
     return timeline
 
 

@@ -5,8 +5,8 @@ from typing import cast
 
 import pytest
 
-from oud.editor import command_ops as cmd_ops
-from oud.editor.state import EditorState
+from oud.editor.commands import dispatch as cmd_ops
+from oud.editor.core.state import EditorState
 from oud.tui import commands as cmd
 from petrucci.model import Bar, Piece
 
@@ -81,7 +81,7 @@ def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901
     monkeypatch.setattr(cmd_ops, "export_mxl", _export_mxl)
     monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
-    monkeypatch.setattr("oud.editor.midi_control.start_midi", _start_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.start_midi", _start_midi)
 
     cmd.cmd_midi(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Midi ok"
@@ -160,7 +160,7 @@ def test_cmd_play_loop_uses_visual_or_cursor_range(
             },
         )
 
-    monkeypatch.setattr("oud.editor.midi_control.start_midi", _start_midi)
+    monkeypatch.setattr("oud.editor.services.media.midi.start_midi", _start_midi)
 
     state.cursor_bar = 2
     cmd.cmd_play(state, "loop", str(tmp_path / "cfg.toml"))
@@ -227,7 +227,6 @@ def test_cmd_pdf_forces_full_tabnotation_only_for_pdf_export(
     cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Pdf ok"
     exported_settings_obj = captured["settings"]
-    assert isinstance(exported_settings_obj, dict)
     exported_settings = cast("dict[str, str]", exported_settings_obj)
     assert exported_settings["tabnotation"] == "full"
     # Editor settings are not mutated/persisted by :pdf defaulting behavior.

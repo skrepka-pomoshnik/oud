@@ -150,31 +150,68 @@ def _event_mark_elements(
     x: int,
     rows: StaffRows,
 ) -> tuple[LayoutElement, ...]:
-    elements: list[LayoutElement] = []
+    return (
+        *_dynamic_elements(event, x=x, rows=rows),
+        *_fermata_elements(event, x=x, rows=rows),
+        *_ornament_elements(event, x=x, rows=rows),
+        *_technique_elements(event, x=x, rows=rows),
+    )
+
+
+def _dynamic_elements(event: NotationEvent, *, x: int, rows: StaffRows) -> tuple[LayoutElement, ...]:
     if event.dynamic:
         if rows.dynamic_row is None:
             _layout_fail(f"event {event.id!r} requires an unallocated dynamic row")
-        elements.append(
+        return (
             LayoutElement(
                 ElementKey(event.id, ElementRole.DYNAMIC),
                 Rect(x, rows.dynamic_row, max(1, display_width(event.dynamic))),
                 event.dynamic,
             ),
         )
+    return ()
+
+
+def _fermata_elements(event: NotationEvent, *, x: int, rows: StaffRows) -> tuple[LayoutElement, ...]:
     if event.fermata:
         if rows.fermata_row is None:
             _layout_fail(f"event {event.id!r} requires an unallocated fermata row")
-        elements.append(
-            LayoutElement(ElementKey(event.id, ElementRole.FERMATA), Rect(x, rows.fermata_row)),
-        )
+        return (LayoutElement(ElementKey(event.id, ElementRole.FERMATA), Rect(x, rows.fermata_row)),)
+    return ()
+
+
+def _ornament_elements(event: NotationEvent, *, x: int, rows: StaffRows) -> tuple[LayoutElement, ...]:
     if event.ornament is not None:
         if rows.ornament_row is None:
             _layout_fail(f"event {event.id!r} requires an unallocated ornament row")
-        elements.append(
+        return (
             LayoutElement(
                 ElementKey(event.id, ElementRole.ORNAMENT),
                 Rect(x, rows.ornament_row),
                 event.ornament.value,
+            ),
+        )
+    return ()
+
+
+def _technique_elements(event: NotationEvent, *, x: int, rows: StaffRows) -> tuple[LayoutElement, ...]:
+    elements: list[LayoutElement] = []
+    mark_x = x + int(event.ornament is not None)
+    if event.harmonic:
+        if rows.ornament_row is None:
+            _layout_fail(f"event {event.id!r} requires an unallocated ornament row")
+        elements.append(
+            LayoutElement(ElementKey(event.id, ElementRole.HARMONIC), Rect(mark_x, rows.ornament_row), "H"),
+        )
+        mark_x += 1
+    if event.fingering is not None:
+        if rows.ornament_row is None:
+            _layout_fail(f"event {event.id!r} requires an unallocated ornament row")
+        elements.append(
+            LayoutElement(
+                ElementKey(event.id, ElementRole.FINGERING),
+                Rect(mark_x, rows.ornament_row, max(1, display_width(event.fingering))),
+                event.fingering,
             ),
         )
     return tuple(elements)

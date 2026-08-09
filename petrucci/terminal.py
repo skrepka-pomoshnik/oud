@@ -294,17 +294,38 @@ def paint_score(
 
 
 def _glyph_inventory(glyph_mode: GlyphMode, noteheads: TerminalNoteheads | None) -> _GlyphInventory:
-    if not isinstance(glyph_mode, GlyphMode):
-        _fail("glyph mode must be a GlyphMode")
-    if noteheads is not None and not isinstance(noteheads, TerminalNoteheads):
-        _fail("terminal noteheads must be TerminalNoteheads or None")
     glyphs = _PRETTY if glyph_mode is GlyphMode.PRETTY else _SAFE
     if noteheads is None:
         return glyphs
     return replace(glyphs, filled_notehead=noteheads.filled, open_notehead=noteheads.open)
 
 
-def _paint_element(  # noqa: C901
+def _paint_special_element(
+    canvas: _SemanticCanvas,
+    element: LayoutElement,
+    *,
+    y: int,
+    glyphs: _GlyphInventory,
+) -> bool:
+    role = element.key.role
+    if role in {ElementRole.STEM, ElementRole.BARLINE}:
+        text = _vertical_glyph(element, glyphs)
+        for row in range(element.rect.height):
+            _write(canvas, element, y=y + row, text=text)
+        return True
+    if role is ElementRole.TIME_SIGNATURE:
+        _paint_time_signature(canvas, element, y=y)
+        return True
+    if role is ElementRole.ENDING:
+        _write(canvas, element, y=y, text=_ending_text(element, glyphs))
+        return True
+    if role in {ElementRole.TIE, ElementRole.SLUR, ElementRole.GLISSANDO}:
+        _write(canvas, element, y=y, text=_span_text(element, glyphs))
+        return True
+    return False
+
+
+def _paint_element(
     canvas: _SemanticCanvas,
     element: LayoutElement,
     *,
@@ -313,19 +334,7 @@ def _paint_element(  # noqa: C901
 ) -> None:
     role = element.key.role
     y = element.rect.y - y_offset
-    if role in {ElementRole.STEM, ElementRole.BARLINE}:
-        text = _vertical_glyph(element, glyphs)
-        for row in range(element.rect.height):
-            _write(canvas, element, y=y + row, text=text)
-        return
-    if role is ElementRole.TIME_SIGNATURE:
-        _paint_time_signature(canvas, element, y=y)
-        return
-    if role is ElementRole.ENDING:
-        _write(canvas, element, y=y, text=_ending_text(element, glyphs))
-        return
-    if role in {ElementRole.TIE, ElementRole.SLUR}:
-        _write(canvas, element, y=y, text=_span_text(element, glyphs))
+    if _paint_special_element(canvas, element, y=y, glyphs=glyphs):
         return
     text = _element_text(element, glyphs)
     if not text:
@@ -399,6 +408,9 @@ def _element_text(element: LayoutElement, glyphs: _GlyphInventory) -> str:
         ElementRole.LYRIC_LINE,
         ElementRole.DYNAMIC,
         ElementRole.PITCH_LABEL,
+        ElementRole.HARMONIC,
+        ElementRole.FINGERING,
+        ElementRole.PROPORTION,
     }
     if role in literal_roles:
         return element.value
@@ -422,6 +434,12 @@ def _notation_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str:
 
 
 def _span_text(element: LayoutElement, glyphs: _GlyphInventory) -> str:
+    if element.key.role is ElementRole.GLISSANDO:
+        return "/" * element.rect.width
+    return _curved_span_text(element, glyphs)
+
+
+def _curved_span_text(element: LayoutElement, glyphs: _GlyphInventory) -> str:
     if element.key.role is ElementRole.SLUR:
         left, fill, right = glyphs.slur_left, glyphs.slur_fill, glyphs.slur_right
     else:
@@ -558,6 +576,7 @@ def _priority(role: ElementRole) -> int:
         ElementRole.BEAM: 30,
         ElementRole.TIE: 32,
         ElementRole.SLUR: 32,
+        ElementRole.GLISSANDO: 32,
         ElementRole.CLEF: 40,
         ElementRole.KEY_SIGNATURE: 40,
         ElementRole.TIME_SIGNATURE: 40,
@@ -569,6 +588,9 @@ def _priority(role: ElementRole) -> int:
         ElementRole.FERMATA: 52,
         ElementRole.GRACE: 52,
         ElementRole.ORNAMENT: 52,
+        ElementRole.HARMONIC: 52,
+        ElementRole.FINGERING: 52,
+        ElementRole.PROPORTION: 40,
         ElementRole.CLIP_MARKER: 55,
     }.get(role, 35)
 

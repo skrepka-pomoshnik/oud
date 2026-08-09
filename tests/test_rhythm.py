@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from oud.editor.rhythm import (
+from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives.rhythm import (
     advance_if_bar_full,
     advance_if_overflow,
     advance_to_next_bar,
@@ -11,7 +12,6 @@ from oud.editor.rhythm import (
     expected_beats,
     row_duration_sum,
 )
-from oud.editor.state import EditorState
 from petrucci.model import Bar, Chord, Note, Piece
 
 

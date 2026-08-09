@@ -17,7 +17,7 @@ from petrucci.duet_score import (
     split_duet_triplet_map,
     split_duet_triplet_set,
 )
-from petrucci.layout_map import block_height
+from petrucci.layout_map import LayoutBlockPolicy, block_height
 from petrucci.model import Piece
 from petrucci.render_helpers import safe_addstr
 from petrucci.render_playback import PlaybackOverlayCache
@@ -328,14 +328,15 @@ class _DuetRenderer:
             f"{labels[staff_index]} only"[: max(0, request.width - 1)],
         )
         content_height = block_height(
-            request.include_meta,
-            min(6, payload.piece.strings),
-            request.show_dur,
-            request.show_extras,
-            request.show_tuplets,
-            request.show_tactus,
-            request.double_stems,
-            lyric_rows_count=0,
+            LayoutBlockPolicy(
+                strings=min(6, payload.piece.strings),
+                include_meta=request.include_meta,
+                show_dur=request.show_dur,
+                show_extras=request.show_extras,
+                show_tuplets=request.show_tuplets,
+                show_tactus=request.show_tactus,
+                double_stems=request.double_stems,
+            )
         )
         available = max(0, request.height - 2 - (request.header_row + 2))
         local_playback: PlaybackOverlayCache | None = {} if request.playback_cache is not None else None
@@ -411,14 +412,15 @@ class _DuetRenderer:
         payloads = (_split_payload(request, 0), _split_payload(request, 1))
         total_strings = request.piece.strings
         content_height = block_height(
-            request.include_meta,
-            min(6, total_strings),
-            request.show_dur,
-            request.show_extras,
-            request.show_tuplets,
-            request.show_tactus,
-            request.double_stems,
-            lyric_rows_count=0,
+            LayoutBlockPolicy(
+                strings=min(6, total_strings),
+                include_meta=request.include_meta,
+                show_dur=request.show_dur,
+                show_extras=request.show_extras,
+                show_tuplets=request.show_tuplets,
+                show_tactus=request.show_tactus,
+                double_stems=request.double_stems,
+            )
         )
         block = content_height + 1
         pair_height = block * 2

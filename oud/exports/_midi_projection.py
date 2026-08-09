@@ -316,12 +316,13 @@ def _bar_chord_events(  # noqa: PLR0917 - legacy grid projection pending typed e
         for start, duration, col, notes in manual:
             events.append((start, duration, col, notes))
         if not events:
-            time = 0
+            voice_times: dict[int, int] = {}
             for event in bar.melody_events:
                 denom = _note_type_to_denom(event.note_type or default_duration) or default_duration
                 duration = _duration_ticks(denom, event.dotted)
-                events.append((time, duration, event.onset_index, []))
-                time += duration
+                start = voice_times.get(event.voice, 0)
+                events.append((start, duration, event.onset_index, []))
+                voice_times[event.voice] = start + duration
         return events
     time = 0
     positions = _chord_positions(bar.chords, bar_width, default_duration)
@@ -576,7 +577,10 @@ def _append_vocal_messages(  # noqa: C901
     tuning_pitches: list[int],
     settings: dict[str, str],
     channel: int = 1,
+    enabled: bool = True,
 ) -> None:
+    if not enabled:
+        return
     has_explicit_melody = bool(
         (getattr(bar, "melody_events", None) or []) or (getattr(bar, "melody_grid", None) or "").strip(),
     )
@@ -586,11 +590,7 @@ def _append_vocal_messages(  # noqa: C901
     vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_pitches)
     if not vocal_events:
         return
-    gate_text = settings.get("midigate", "85")
-    gate_percent = 85
-    if gate_text.isdigit():
-        gate_percent = max(10, min(100, int(gate_text)))
-    gate = gate_percent / 100.0
+    gate = _vocal_gate(settings)
     for event, start, duration in _timed_vocal_events(
         vocal_events,
         chord_events,
@@ -605,13 +605,19 @@ def _append_vocal_messages(  # noqa: C901
             note_len = max(note_len, int(duration * 1.5))
         _append_note_messages(
             events,
-            channel=channel,
+            channel=_vocal_channel(channel, event.voice),
             start_tick=base_time + start,
             note_len=note_len,
             pitch=event.pitch,
             velocity=min(127, BASE_NOTE_VELOCITY + 4),
             ornament_symbol=None,
         )
+
+
+def _vocal_gate(settings: dict[str, str]) -> float:
+    gate_text = settings.get("midigate", "85")
+    gate_percent = max(10, min(100, int(gate_text))) if gate_text.isdigit() else 85
+    return gate_percent / 100.0
 
 
 def _timed_vocal_events(
@@ -622,18 +628,28 @@ def _timed_vocal_events(
 ) -> list[tuple[VocalEvent, int, int]]:
     if has_explicit_melody:
         timed: list[tuple[VocalEvent, int, int]] = []
-        start = 0
+        voice_starts: dict[int, int] = {}
         for event in vocal_events:
             denominator = _note_type_to_denom(event.note_type) or 4
             duration = _duration_ticks(denominator, event.dotted)
+            start = voice_starts.get(event.voice, 0)
             timed.append((event, start, duration))
-            start += duration
+            voice_starts[event.voice] = start + duration
         return timed
     return [
         (event, chord_events[event.chord_index][0], chord_events[event.chord_index][1])
         for event in vocal_events
         if 0 <= event.chord_index < len(chord_events)
     ]
+
+
+def _vocal_channel(base_channel: int, voice: int) -> int:
+    channels = tuple(channel for channel in range(1, 16) if channel != 9)
+    try:
+        base_index = channels.index(base_channel)
+    except ValueError:
+        base_index = 0
+    return channels[(base_index + max(0, voice)) % len(channels)]
 
 
 def _playverse_count(piece: Piece, settings: dict[str, str]) -> int:
@@ -711,11 +727,11 @@ def build_playback_timeline(  # noqa: C901
         )
         pass_count = _playverse_count(piece, settings)
         pass_ticks = _timeline_total_ticks(base_events)
+        timeline: list[PlaybackCursor] = []
         for pass_idx in range(pass_count):
-            timeline_events.extend(
-                _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks),
-            )
-        return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
+            shifted = _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks)
+            timeline.extend(build_timeline_from_events(shifted, sec_per_tick=sec_per_tick, verse=pass_idx))
+        return timeline
     current_time = 0
     bar_order = _repeat_play_order(
         len(piece.bars),
@@ -754,9 +770,9 @@ def build_playback_timeline(  # noqa: C901
     pass_count = _playverse_count(piece, settings)
     pass_ticks = _timeline_total_ticks(base_events)
     if pass_count > 1 and pass_ticks > 0:
-        timeline_events = []
+        timeline: list[PlaybackCursor] = []
         for pass_idx in range(pass_count):
-            timeline_events.extend(
-                _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks),
-            )
+            shifted = _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks)
+            timeline.extend(build_timeline_from_events(shifted, sec_per_tick=sec_per_tick, verse=pass_idx))
+        return timeline
     return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)

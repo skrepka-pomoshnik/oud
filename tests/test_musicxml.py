@@ -1,6 +1,6 @@
 import zipfile
 
-from oud.editor.load_ops import load_piece_data
+from oud.editor.services.io.loading import load_piece_data
 from oud.exports.musicxml import export_musicxml, export_mxl
 from oud.importers.musicxml import load_musicxml, load_mxl
 from petrucci.model import Bar, Chord, Note, Piece

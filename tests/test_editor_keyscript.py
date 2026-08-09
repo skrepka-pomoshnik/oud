@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from petrucci.model import Bar, Piece
 from tests.helpers_keyscript import (
     collect_cursor_cols_after_key,

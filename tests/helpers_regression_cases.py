@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oud.editor.state import EditorState
+from oud.editor.core.state import EditorState
 from petrucci.model import Bar, Chord, Note, Piece
 
 

@@ -1,9 +1,10 @@
 [run]
-branch = True
-source = .
+branch = False
+source = petrucci
 omit =
     tests/*
 
 [report]
+fail_under = 95
 show_missing = True
 skip_covered = True

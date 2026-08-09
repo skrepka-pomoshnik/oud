@@ -4,7 +4,7 @@ from itertools import pairwise
 
 import pytest
 
-from oud.editor.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
+from oud.editor.navigation.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.importers.ft3 import build_durations
 from petrucci.framebuffer import FrameBuffer
 from petrucci.model import Bar, Chord, Note, Piece

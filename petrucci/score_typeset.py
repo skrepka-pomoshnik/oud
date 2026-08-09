@@ -33,13 +33,6 @@ class ScoreTypesetOptions:
     pitch_cues: tuple[PitchCue, ...] = ()
 
     def __post_init__(self) -> None:
-        _validate_display_options(self)
-        if not isinstance(self.metrics, LayoutMetrics):
-            _type_fail("score typeset metrics must be LayoutMetrics")
-        if not isinstance(self.policy, NotationLayoutPolicy):
-            _type_fail("score typeset policy must be NotationLayoutPolicy")
-        if any(not isinstance(cue, PitchCue) for cue in self.pitch_cues):
-            _type_fail("score typeset pitch cues must contain PitchCue values")
         viewport = self.viewport
         layout_width = self.resolved_layout_width
         if layout_width < viewport.width:
@@ -64,13 +57,6 @@ class ScoreTypesetOptions:
     @property
     def layout_viewport(self) -> LayoutViewport:
         return LayoutViewport(width=self.resolved_layout_width, height=self.height)
-
-
-def _validate_display_options(options: ScoreTypesetOptions) -> None:
-    if not isinstance(options.glyph_mode, GlyphMode):
-        _type_fail("glyph mode must be a GlyphMode")
-    if options.noteheads is not None and not isinstance(options.noteheads, TerminalNoteheads):
-        _type_fail("score typeset noteheads must be TerminalNoteheads or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,8 +87,6 @@ def typeset_score(
 ) -> ScoreTypesetResult:
     """Lay out and paint a canonical score without Oud editor state."""
 
-    if options is not None and not isinstance(options, ScoreTypesetOptions):
-        _type_fail("score typeset options must be ScoreTypesetOptions")
     active = options or ScoreTypesetOptions()
     layout = layout_score(
         score,
@@ -121,10 +105,6 @@ def typeset_layout(
 ) -> ScoreTypesetResult:
     """Paint an existing layout, allowing a host to select a system without relayout."""
 
-    if not isinstance(layout, ScoreLayout):
-        _type_fail("score layout must be a ScoreLayout")
-    if options is not None and not isinstance(options, ScoreTypesetOptions):
-        _type_fail("score typeset options must be ScoreTypesetOptions")
     active = options or ScoreTypesetOptions(width=layout.width)
     if active.x_offset >= layout.width:
         _type_fail("score horizontal offset must stay inside the existing layout")

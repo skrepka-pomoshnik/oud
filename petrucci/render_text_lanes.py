@@ -309,28 +309,29 @@ def _event_pitch_map(events: list[MelodyEvent] | None) -> dict[int, int]:
     return mapping
 
 
-def _event_accidental_map(events: list[MelodyEvent] | None) -> dict[int, str]:  # noqa: C901
+def _event_accidental(event: MelodyEvent) -> str | None:
+    flags = event.accidental_flags or 0
+    for mask, accidental in ((0x1000, "b"), (0x0002, "#"), (0x2000, "n")):
+        if flags & mask:
+            return _display_accidental(accidental, event)
+    token = event.text.strip()
+    if "#" in token:
+        return _display_accidental("#", event)
+    if "b" in token[1:]:
+        return _display_accidental("b", event)
+    return None
+
+
+def _event_accidental_map(events: list[MelodyEvent] | None) -> dict[int, str]:
     mapping: dict[int, str] = {}
     for ev in events or []:
         if ev.onset_index in mapping:
             continue
         if ev.is_rest:
             continue
-        flags = ev.accidental_flags or 0
-        if flags & 0x1000:
-            mapping[ev.onset_index] = _display_accidental("b", ev)
-            continue
-        if flags & 0x0002:
-            mapping[ev.onset_index] = _display_accidental("#", ev)
-            continue
-        if flags & 0x2000:
-            mapping[ev.onset_index] = _display_accidental("n", ev)
-            continue
-        token = ev.text.strip()
-        if "#" in token:
-            mapping[ev.onset_index] = _display_accidental("#", ev)
-        elif "b" in token[1:]:
-            mapping[ev.onset_index] = _display_accidental("b", ev)
+        accidental = _event_accidental(ev)
+        if accidental is not None:
+            mapping[ev.onset_index] = accidental
     return mapping
 
 
@@ -641,7 +642,21 @@ def _melody_notehead_glyph(note_type: int) -> str:
     return MELODY_NOTEHEAD_GLYPH
 
 
-def _draw_vocal_stem(  # noqa: C901
+def _draw_vocal_flags(row: list[str], col: int, count: int) -> None:
+    for idx in range(1, count + 1):
+        tail_col = col + idx
+        if tail_col >= len(row):
+            break
+        row[tail_col] = "\\"
+
+
+def _draw_vocal_dot(row: list[str], col: int, *, flags: int, dotted: bool) -> None:
+    dot_col = col + flags + 1
+    if dotted and 0 <= dot_col < len(row):
+        row[dot_col] = "."
+
+
+def _draw_vocal_stem(
     rows: list[list[str]],
     *,
     row: int,
@@ -660,18 +675,22 @@ def _draw_vocal_stem(  # noqa: C901
         rows[stem_row][col] = stem_glyph
     flag_row = stem_top
     flags = max(0, note_type - 4)
-    for idx in range(1, flags + 1):
-        tail_col = col + idx
-        if tail_col >= len(rows[flag_row]):
-            break
-        rows[flag_row][tail_col] = "\\"
-    if dotted:
-        dot_col = col + flags + 1
-        if 0 <= dot_col < len(rows[flag_row]):
-            rows[flag_row][dot_col] = "."
+    _draw_vocal_flags(rows[flag_row], col, flags)
+    _draw_vocal_dot(rows[flag_row], col, flags=flags, dotted=dotted)
 
 
-def _draw_vocal_beams(rows: list[list[str]], points: list[tuple[str, int, int]]) -> None:  # noqa: C901
+def _draw_vocal_beam_group(rows: list[list[str]], group: list[tuple[int, int]]) -> None:
+    beam_row = min(max(0, note_row - _MELODY_STEM_LEN) for note_row, _note_col in group)
+    for note_row, note_col in group:
+        for stem_row in range(beam_row, max(beam_row, note_row)):
+            rows[stem_row][note_col] = "|"
+    start_col = min(note_col for _note_row, note_col in group)
+    end_col = max(note_col for _note_row, note_col in group)
+    for beam_col in range(start_col + 1, end_col):
+        rows[beam_row][beam_col] = "="
+
+
+def _draw_vocal_beams(rows: list[list[str]], points: list[tuple[str, int, int]]) -> None:
     group: list[tuple[int, int]] = []
     for beam, row, col in points:
         if beam == "start":
@@ -684,14 +703,7 @@ def _draw_vocal_beams(rows: list[list[str]], points: list[tuple[str, int, int]])
             group = []
             continue
         group.append((row, col))
-        beam_row = min(max(0, note_row - _MELODY_STEM_LEN) for note_row, _note_col in group)
-        for note_row, note_col in group:
-            for stem_row in range(beam_row, max(beam_row, note_row)):
-                rows[stem_row][note_col] = "|"
-        start_col = min(note_col for _note_row, note_col in group)
-        end_col = max(note_col for _note_row, note_col in group)
-        for beam_col in range(start_col + 1, end_col):
-            rows[beam_row][beam_col] = "="
+        _draw_vocal_beam_group(rows, group)
         group = []
 
 
