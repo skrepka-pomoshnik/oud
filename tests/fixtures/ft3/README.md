@@ -20,6 +20,18 @@ uv run python -m scripts.corpus.fetch \
 This verifies every payload against its checked-in SHA-256. Selection is not
 repeated during fetch or testing.
 
+Fetch and compare every available companion MIDI without adding external
+payloads to Git:
+
+```bash
+uv run python -m scripts.corpus.midi
+```
+
+Reference and generated MIDIs, cached 404 markers, and the JSON parity report
+are written below ignored `downloads/ft3-midi/`. The comparison normalizes MIDI
+resolution, tracks, patches, and absolute timing while preserving onset order,
+chord pitches, note counts, and detected global transposition.
+
 The underlying Renaissance music is in the public domain; the typesettings are
 licensed under the
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International

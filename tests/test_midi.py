@@ -77,6 +77,28 @@ def test_export_midi_writes_track_and_eot(tmp_path) -> None:
     assert track_data[-4:] == b"\x00\xff\x2f\x00"
 
 
+def test_source_tuning_precedes_editor_default() -> None:
+    piece = Piece(tuning="d-2e-2f2a-2b-2f3b-3d4g4", strings=9)
+
+    resolved = _resolved_tuning_for_piece(piece, {"tuning": "g2c3f3a3d4g4"})
+
+    assert resolved == piece.tuning
+
+
+def test_export_midi_plays_notation_only_bar_without_tab_anchors(tmp_path) -> None:
+    bar = Bar(
+        melody_events=[
+            MelodyEvent("d,", 0, note_type=4),
+            MelodyEvent("d,,", 0, note_type=4),
+        ],
+    )
+    path = tmp_path / "notation-only.mid"
+
+    export_midi(str(path), Piece(bars=[bar]), {}, {}, 8)
+
+    assert _track_data(path).count(bytes([0x91])) == 2
+
+
 def test_export_midi_start_bar_and_tempo(tmp_path) -> None:
     bar0 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])
     bar1 = Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)])])
@@ -413,6 +435,23 @@ def test_polyphonic_imported_score_exports_every_voice_on_its_own_channel(tmp_pa
     assert all(status in track for status in (b"\x91", b"\x92", b"\x93"))
 
 
+def test_single_imported_notation_staff_exports_without_tablature(tmp_path) -> None:
+    staff = ImportedStaff(
+        kind="note",
+        label="bass",
+        bars=[ImportedBarContent(0, melody_events=[MelodyEvent("d,,", 0, note_type=4)])],
+    )
+    piece = Piece(
+        bars=[Bar()],
+        imported_score=ImportedScore("ft3", [staff]),
+    )
+    path = tmp_path / "notation-staff.mid"
+
+    export_midi(str(path), piece, overrides={}, durations={}, bar_width=8, settings={})
+
+    assert b"\x91" in _track_data(path)
+
+
 def test_build_playback_timeline_uses_chord_index_for_marker_col() -> None:
     bar = Bar(
         chords=[
@@ -583,6 +622,19 @@ def test_build_playback_timeline_unfolds_structural_repeats() -> None:
         dotted=None,
     )
     assert [cursor.bar for cursor in timeline] == [0, 1, 2, 0, 1, 2, 3]
+
+
+def test_build_playback_timeline_advances_between_implicit_repeat_sections() -> None:
+    piece = Piece(
+        bars=[
+            Bar(chords=[Chord(4, False, None, [Note(1, fret, 0)])], repeat=repeat)
+            for fret, repeat in ((0, None), (1, ":."), (2, None), (3, ":."))
+        ],
+    )
+
+    timeline = build_playback_timeline(piece, {}, {}, 8, {"maxrepeats": "4"})
+
+    assert [cursor.bar for cursor in timeline] == [0, 1, 0, 1, 2, 3, 2, 3]
 
 
 def test_export_midi_repeats_structural_section_once(tmp_path) -> None:

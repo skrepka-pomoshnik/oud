@@ -44,6 +44,7 @@ from oud.importers.ft3.score import (
     _parse_score_text_record,
     _record_has_content,
 )
+from oud.importers.ft3.source_profiles import apply_ft3_source_tuning
 from oud.importers.ft3.text.codec import (
     FT3TextRecord,
     is_ft3_text_record,
@@ -310,6 +311,7 @@ def _finalize_piece(piece: Piece, metadata: _DocumentMetadata, state: _BodyState
             "FT3 contains non-tab score data that is not decoded yet; imported as unknown staves.",
         )
     _apply_annotations(piece, metadata.annotations)
+    apply_ft3_source_tuning(piece)
     _apply_preamble_notes(piece, metadata.preamble_notes)
     for bar in piece.bars:
         _normalize_vocal_event_accidentals(

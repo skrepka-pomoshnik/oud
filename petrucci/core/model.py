@@ -173,6 +173,7 @@ class Piece:
     imported_score: ImportedScore | None = None
     import_warnings: list[str] = field(default_factory=list)
     tuning: str | None = None
+    tuning_source: str | None = None
     style: str | None = None
     bars: list[Bar] = field(default_factory=list)
     strings: int = 6

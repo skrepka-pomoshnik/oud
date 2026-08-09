@@ -74,6 +74,43 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
     tempo, and start-bar behavior for the representative viewer matrix.
   - Keep pause/stop/restart and missing-synth diagnostics deterministic; never
     report playback success when no player started.
+- [ ] Close the corpus-wide companion-MIDI semantic gaps.
+  - The normalized 514-score baseline has 224 exact scores, 420 at or above
+    0.90 onset-chord similarity, 11 best-fit global transpositions, and 22 below
+    0.50 similarity; never treat PPQ, patch, track, or count-in differences as
+    pitch/rhythm agreement.
+  - First resolve source-tuning metadata for the five transposition-only exact
+    sequences, then classify the zero/sparse generated parts and mixed-score
+    voice-count differences without inventing source events.
+  - Decode the collapsed full-score registration cases where one imported staff
+    bar still represents an entire piece; do not hide these behind timing or
+    tuning profiles.
+    Regressions: `sonata_CM_01_moderato.ft3`, `come_raggio_del_sol_G.ft3`, and
+    `courant_duet.ft3` must retain source-record order while mapping notation to
+    the corresponding tablature bars and repeat passes.
+  - Correct independent note-staff onset grouping in completely mapped scores,
+    especially `sonata_01.ft3`, `pavan_3.ft3`, and
+    `o_death_rock_me_asleep_mens.ft3`; preserve simultaneous voices without
+    collapsing sequential notes onto shared onset chords.
+  - Classify incomplete-source versus decoder loss before changing note counts.
+    `passacaille_B.ft3` contains 108 sounding imported events against 387 in its
+    fuller companion arrangement; Couperin viol/duet/trio companions likewise
+    require part and arrangement provenance rather than invented source notes.
+  - Decode exercise and technique records that still export only fragments in
+    `grounds16.ft3`, `lefthand1.ft3`, `righthand_85.ft3`, and
+    `right_hand_obrian.ft3`; distinguish instructions, fingering demonstrations,
+    and sounding events explicitly.
+  - Resolve the remaining 11 best-fit transpositions only from source tuning or
+    instrument provenance. The current cases are Abel's two full scores,
+    `000_beck_katherine_ogie.ft3`, mensural *O Death*, `sonata_01.ft3`, Gesualdo's
+    galliard, `disperate_speranze_4.ft3`, `arabesque_T.ft3`, Reusner's
+    passacaglia, `battle_pavane.ft3`, and `courant_duet.ft3`.
+  - Store companion MIDI checksum and retrieval provenance in audit reports so
+    stale optional evidence is diagnosed before parity assertions run.
+  - Danyel's *Leaves Be Green* is corrected to zero transposition and reaches
+    0.960 onset similarity / 0.932 pitch overlap. Its remaining 75 companion-only
+    attacks are realized diminutions without encoded FT3 note or ornament
+    testimony; add them only if a source representation and provenance are found.
 - [x] Make `lyricmode=current` follow the active stanza automatically while
   `playverses=all`; preserve an explicitly selected `lyricverse` while stopped.
 - [ ] Add the macOS-only terminal acceptance pass.

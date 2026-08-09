@@ -68,14 +68,7 @@ def export_midi(  # noqa: PLR0917 - public compatibility; replace options with a
             ornaments=ornaments,
             max_repeat_hops=max_repeat_hops,
         )
-    elif (
-        piece.imported_score is not None
-        and any(staff.kind == "note" for staff in piece.imported_score.staffs)
-        and (
-            sum(staff.kind == "note" for staff in piece.imported_score.staffs) > 1
-            or any(bar.chords or bar.notes for bar in piece.bars)
-        )
-    ):
+    elif piece.imported_score is not None and any(staff.kind == "note" for staff in piece.imported_score.staffs):
         note_events = _polyphonic_score_midi_note_events(
             piece,
             overrides=overrides,

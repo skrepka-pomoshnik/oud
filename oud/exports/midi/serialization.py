@@ -25,6 +25,7 @@ from oud.exports.midi.projection import (
     _append_vocal_messages,
     _bar_chord_events,
     _duet_note_events,
+    _duration_ticks,
     _midi_total_ticks,
     _picked_note_ornament,
     _playverse_count,
@@ -34,7 +35,7 @@ from oud.exports.midi.projection import (
     _show_ornaments,
 )
 from petrucci.core.imported import project_imported_staff
-from petrucci.core.model import Piece
+from petrucci.core.model import Bar, MelodyEvent, Note, Piece
 
 _VOCAL_CHANNELS = tuple(channel for channel in range(1, 16) if channel != 9)
 
@@ -112,6 +113,74 @@ def _duet_midi_note_events(
     return _repeated_midi_note_events(base_note_events, piece=piece, settings=settings)
 
 
+def _melody_chord_events(
+    bar: Bar,
+    default_duration: int,
+    *,
+    enabled: bool,
+) -> list[tuple[int, int, int, list[Note]]]:
+    if not enabled:
+        return []
+    grouped: dict[int, list[MelodyEvent]] = {}
+    for event in bar.melody_events:
+        grouped.setdefault(event.onset_index, []).append(event)
+    result: list[tuple[int, int, int, list[Note]]] = []
+    start = 0
+    for onset_index, events in sorted(grouped.items()):
+        duration = max(_duration_ticks(event.note_type or default_duration, event.dotted) for event in events)
+        result.append((start, duration, onset_index, []))
+        start += duration
+    return result
+
+
+def _scale_chord_events_to_bar(
+    chord_events: list[tuple[int, int, int, list[Note]]],
+    target_ticks: int | None,
+) -> list[tuple[int, int, int, list[Note]]]:
+    if not chord_events or target_ticks is None or target_ticks <= 0:
+        return chord_events
+    source_ticks = max(start + duration for start, duration, _column, _notes in chord_events)
+    if source_ticks <= 0 or source_ticks == target_ticks:
+        return chord_events
+    return [
+        (
+            round(start * target_ticks / source_ticks),
+            max(1, round(duration * target_ticks / source_ticks)),
+            column,
+            notes,
+        )
+        for start, duration, column, notes in chord_events
+    ]
+
+
+def _tablature_bar_tick_lengths(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    dotted: set[tuple[int, int]] | None,
+) -> dict[int, int]:
+    lengths: dict[int, int] = {}
+    for bar_index, bar in enumerate(piece.bars):
+        chord_events = _bar_chord_events(
+            bar,
+            bar_index,
+            piece.strings,
+            overrides,
+            durations,
+            bar_width,
+            style,
+            default_duration,
+            dotted=dotted,
+        )
+        if chord_events:
+            lengths[bar_index] = max(start + duration for start, duration, _column, _notes in chord_events)
+    return lengths
+
+
 def _single_score_midi_note_events(
     piece: Piece,
     *,
@@ -129,6 +198,7 @@ def _single_score_midi_note_events(
     vocal_channel: int = 1,
     include_tablature: bool = True,
     include_vocal: bool = True,
+    bar_tick_lengths: dict[int, int] | None = None,
 ) -> list[tuple[int, bytes]]:
     note_events: list[tuple[int, bytes]] = []
     show_ornaments = _show_ornaments(settings)
@@ -155,6 +225,15 @@ def _single_score_midi_note_events(
             style,
             default_duration,
             dotted=dotted,
+        )
+        chord_events = chord_events or _melody_chord_events(
+            bar,
+            default_duration,
+            enabled=include_vocal,
+        )
+        chord_events = _scale_chord_events_to_bar(
+            chord_events,
+            bar_tick_lengths.get(b_idx) if bar_tick_lengths is not None else None,
         )
         if not chord_events:
             continue
@@ -196,6 +275,7 @@ def _single_score_midi_note_events(
             settings=settings,
             channel=vocal_channel,
             enabled=include_vocal,
+            target_ticks=bar_tick_lengths.get(b_idx) if bar_tick_lengths is not None else None,
         )
         current_time += max_end
     return _repeated_midi_note_events(note_events, piece=piece, settings=settings)
@@ -221,7 +301,21 @@ def _polyphonic_score_midi_note_events(
         return []
     note_indices = [index for index, staff in enumerate(imported.staffs) if staff.kind == "note"]
     events: list[tuple[int, bytes]] = []
-    if any(bar.chords or bar.notes for bar in piece.bars):
+    has_tablature = any(bar.chords or bar.notes for bar in piece.bars)
+    bar_tick_lengths = (
+        _tablature_bar_tick_lengths(
+            piece,
+            overrides=overrides,
+            durations=durations,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
+            dotted=dotted,
+        )
+        if has_tablature
+        else None
+    )
+    if has_tablature:
         events.extend(
             _single_score_midi_note_events(
                 piece,
@@ -242,6 +336,7 @@ def _polyphonic_score_midi_note_events(
     channel_offset = 0
     for staff_index in note_indices:
         projected = project_imported_staff(piece, staff_index)
+        staff_bar_tick_lengths = bar_tick_lengths if len(imported.staffs[staff_index].bars) == len(piece.bars) else None
         events.extend(
             _single_score_midi_note_events(
                 projected,
@@ -258,6 +353,7 @@ def _polyphonic_score_midi_note_events(
                 ornaments=ornaments,
                 vocal_channel=_VOCAL_CHANNELS[channel_offset % len(_VOCAL_CHANNELS)],
                 include_tablature=False,
+                bar_tick_lengths=staff_bar_tick_lengths,
             ),
         )
         voices = {event.voice for bar in projected.bars for event in bar.melody_events}

@@ -148,7 +148,7 @@ def _default_tuning(strings: int) -> list[int]:
 
 
 def _resolved_tuning_for_piece(piece: Piece, settings: dict[str, str]) -> str:
-    tuning = (settings.get("tuning", "") or piece.tuning or "").strip()
+    tuning = (piece.tuning or settings.get("tuning", "") or "").strip()
     if not tuning:
         return tuning
     missing = max(0, piece.strings - tuning_count(tuning))
@@ -380,7 +380,7 @@ def _repeat_play_order(
     section_pass = 1
     jumped_back = False
     repeated_endings: set[int] = set()
-    limit = max(count, max_repeat_hops)
+    limit = max(count, count * (max_repeat_hops + 1))
     steps = 0
     while 0 <= idx < count and steps < limit:
         steps += 1
@@ -397,9 +397,9 @@ def _repeat_play_order(
         if repeat == ".:" and not jumped_back:
             section_start = idx
             section_pass = 1
-        elif repeat in {":|:", "."} and not jumped_back:
+        elif (repeat == ":." and idx in repeated_endings) or (repeat in {":|:", "."} and not jumped_back):
             section_start = min(idx + 1, count - 1)
-            section_pass = 1
+            section_pass = section_pass if endings else 1
         jumped_back = False
         idx += 1
     return order
@@ -571,6 +571,7 @@ def _append_vocal_messages(  # noqa: C901
     settings: dict[str, str],
     channel: int = 1,
     enabled: bool = True,
+    target_ticks: int | None = None,
 ) -> None:
     if not enabled:
         return
@@ -588,6 +589,7 @@ def _append_vocal_messages(  # noqa: C901
         vocal_events,
         chord_events,
         has_explicit_melody=has_explicit_melody,
+        target_ticks=target_ticks,
     ):
         if getattr(event, "is_rest", False):
             continue
@@ -618,6 +620,7 @@ def _timed_vocal_events(
     chord_events: list[tuple[int, int, int, list[Note]]],
     *,
     has_explicit_melody: bool,
+    target_ticks: int | None = None,
 ) -> list[tuple[VocalEvent, int, int]]:
     if has_explicit_melody:
         timed: list[tuple[VocalEvent, int, int]] = []
@@ -628,11 +631,31 @@ def _timed_vocal_events(
             start = voice_starts.get(event.voice, 0)
             timed.append((event, start, duration))
             voice_starts[event.voice] = start + duration
-        return timed
-    return [
+        return _scale_timed_vocal_events(timed, target_ticks)
+    timed = [
         (event, chord_events[event.chord_index][0], chord_events[event.chord_index][1])
         for event in vocal_events
         if 0 <= event.chord_index < len(chord_events)
+    ]
+    return _scale_timed_vocal_events(timed, target_ticks)
+
+
+def _scale_timed_vocal_events(
+    timed: list[tuple[VocalEvent, int, int]],
+    target_ticks: int | None,
+) -> list[tuple[VocalEvent, int, int]]:
+    if not timed or target_ticks is None or target_ticks <= 0:
+        return timed
+    source_ticks = max(start + duration for _event, start, duration in timed)
+    if source_ticks <= 0 or source_ticks == target_ticks:
+        return timed
+    return [
+        (
+            event,
+            round(start * target_ticks / source_ticks),
+            max(1, round(duration * target_ticks / source_ticks)),
+        )
+        for event, start, duration in timed
     ]
 
 
