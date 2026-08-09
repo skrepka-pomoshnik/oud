@@ -1,5 +1,7 @@
 # DONE
 
+- 2026-08-09: Made LilyPond 2.26 the explicit publication baseline while retaining a configured 2.24 compatibility target; added TOML binary selection, registered manual barlines, deterministic timing resets, beam normalization, lyric cleanup, role-appropriate clefs, legal line breaks, pinned paper spacing, and dual-engine compiler regressions. Validation: all four curated FT3 publications compile without warnings under both engines; Ruff, Ruff format, Ty, and 1,537 tests pass with one platform skip and 95.07% Petrucci coverage.
+
 - 2026-08-09: Established an export-only linked engraving program: a shared Petrucci/LilyPond quality matrix records translated LilyPond 2.24.4 and MuseScore 4.6.0 invariants; `lyprofile=petrucci` applies the default publication hierarchy with `classic` as a diagnostic fallback; and generated output has an executable compiler/warning regression. Validation: Ruff, Ruff format, Ty, and 1,533 tests pass with one platform skip and 95.07% Petrucci coverage.
 
 - 2026-08-09: Replaced the flat `oud.editor` namespace with six directional domain packages: core, navigation, editing, services, commands, and interaction. Canonical imports and architecture-debt paths now use the hierarchy, obsolete flat modules were removed rather than wrapped, and a structural regression enforces at most seven direct entities per package. Validation: Ruff, Ruff format, Ty, and 1,530 tests pass with one platform skip and 95.07% Petrucci coverage.

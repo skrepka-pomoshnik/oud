@@ -162,7 +162,7 @@ def lilypond_text(
 ) -> str:
     _ = (bar_width, ornaments, annotations, slurs, ties, holds)
     settings = settings or {}
-    header = _lilypond_header(piece)
+    header = _lilypond_header(piece, settings.get("lilypondversion", "2.26"))
 
     layout: list[str] = [r"\layout {", r"  \context {", r"    \Score"]
     style = settings.get("style") or "french"
@@ -235,10 +235,15 @@ def export_lilypond(
     return f"Wrote {path}"
 
 
-def print_lilypond_pdf(ly_path: str, output_base: str | None = None) -> str:
-    lilypond = shutil.which("lilypond")
+def print_lilypond_pdf(
+    ly_path: str,
+    output_base: str | None = None,
+    *,
+    binary: str = "lilypond",
+) -> str:
+    lilypond = shutil.which(binary)
     if lilypond is None:
-        return "LilyPond not found on PATH"
+        return f"LilyPond binary not found: {binary}"
     ly_file = Path(ly_path)
     out_base = Path(output_base) if output_base else ly_file.with_suffix("")
     workdir = (out_base.parent if output_base else ly_file.parent) or Path()

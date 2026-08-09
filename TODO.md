@@ -147,6 +147,9 @@ algorithm that preserves sounding pitch and produces playable tablature.
   invariant rather than upstream output bytes.
 - [ ] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
   internal representation.
+- [ ] Expand dual-engine PDF comparisons from the curated FT3 corpus to every
+  shared engraving-matrix microcase; 2.26 is authoritative and 2.24 differences
+  must be documented as compatibility limitations.
 
 - [ ] Add explicit LilyPond executable/version selection and retain structured,
   actionable compiler diagnostics.

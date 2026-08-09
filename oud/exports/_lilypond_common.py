@@ -51,10 +51,11 @@ def _metadata_comments(piece: Piece) -> list[str]:
     return comments
 
 
-def _lilypond_header(piece: Piece) -> list[str]:  # noqa: C901
+def _lilypond_header(piece: Piece, version: str = "2.26") -> list[str]:  # noqa: C901
     title = piece.title or "Untitled"
     composer = piece.composer or piece.author or ""
-    header = [r'\version "2.24.0"', *_metadata_comments(piece), r"\header {"]
+    source_version = "2.24.0" if version == "2.24" else "2.26.0"
+    header = [f'\\version "{source_version}"', *_metadata_comments(piece), r"\header {"]
     header.append(f'  title = "{_escape_lilypond(title)}"')
     if piece.subtitle:
         header.append(f'  subtitle = "{_escape_lilypond(_single_line(piece.subtitle))}"')
@@ -750,3 +751,10 @@ def _append_bar_time_change(body: list[str], bar: Bar, current_time_sig: str | N
         body.append(f"  \\time {bar_time_sig}")
         return bar_time_sig
     return current_time_sig
+
+
+def _append_barline(body: list[str], bar: Bar) -> None:
+    """Print a source barline and register the following bar at measure zero."""
+    body.append(f'  \\bar "{_barline_token(bar)}"')
+    body.append(r"  \set Timing.measurePosition = #ZERO-MOMENT")
+    body.append(r"  \allowBreak")

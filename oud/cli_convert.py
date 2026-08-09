@@ -324,7 +324,11 @@ def _write_pdf(target: Path, context: ConversionContext, *, overwrite: bool) -> 
     atomic_write_text(lilypond_source, _render_text("lilypond", context), overwrite=overwrite)
     with tempfile.TemporaryDirectory(prefix=f".{target.stem}.", dir=target.parent) as directory:
         output_base = Path(directory) / target.stem
-        message = print_lilypond_pdf(str(lilypond_source), str(output_base))
+        message = print_lilypond_pdf(
+            str(lilypond_source),
+            str(output_base),
+            binary=context.settings.get("lilypond", "lilypond-2.26"),
+        )
         if not message.startswith("Printed "):
             raise _error(EXIT_TOOL, message)
         generated = output_base.with_suffix(".pdf")

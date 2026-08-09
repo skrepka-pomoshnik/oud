@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from oud.exports._lilypond_common import (
     _append_bar_time_change,
+    _append_barline,
     _append_global_prefix,
     _bar_sign_mark_tokens,
-    _barline_token,
     _chord_ft3_markup_suffix,
     _collect_override_chords,
     _default_tuning,
@@ -126,8 +126,7 @@ def _build_tab_body(  # noqa: C901, PLR0912
                     body.append(f"  {pitches[0]}{dur}{suffix}")
                 else:
                     body.append(f"  <{' '.join(pitches)}>{dur}{suffix}")
-        bar_marker = _barline_token(bar)
-        body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
+        _append_barline(body, bar)
         if bar.system_break:
             body.append(r"  \break")
     return body

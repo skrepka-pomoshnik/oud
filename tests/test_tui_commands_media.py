@@ -65,7 +65,7 @@ def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901
 
     pdf_called: dict[str, str] = {}
 
-    def _print_pdf(_path: str, _base: str | None = None) -> str:
+    def _print_pdf(_path: str, _base: str | None = None, **_kwargs: object) -> str:
         pdf_called["path"] = _path
         return "Pdf ok"
 
@@ -187,7 +187,7 @@ def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
         called["ly"] = path
         return f"Wrote {path}"
 
-    def _print_pdf(path: str, _base: str | None = None) -> str:
+    def _print_pdf(path: str, _base: str | None = None, **_kwargs: object) -> str:
         called["pdf"] = path
         return f"Printed {Path(path).with_suffix('.pdf')}"
 
@@ -218,7 +218,7 @@ def test_cmd_pdf_forces_full_tabnotation_only_for_pdf_export(
         captured["settings"] = kwargs["settings"]
         return "Ly ok"
 
-    def _print_pdf(_ly_path: str, _base: str | None = None) -> str:
+    def _print_pdf(_ly_path: str, _base: str | None = None, **_kwargs: object) -> str:
         return "Pdf ok"
 
     monkeypatch.setattr(cmd_ops, "export_lilypond", _export_lilypond)

@@ -12,6 +12,19 @@ restrained movable-type hierarchy to paper margins, staff rules, barlines,
 tablature noteheads, stems, and beams. `:set lyprofile=classic` selects the
 minimal unstyled LilyPond layout for comparison and diagnosis.
 
+LilyPond 2.26 is the publication baseline. LilyPond 2.24 remains a
+second-grade compatibility target using the same semantics but an explicit
+2.24 source declaration. Configure both choices in `config.toml`:
+
+```toml
+[settings]
+lilypond = "lilypond-2.26"
+lilypondversion = "2.26"
+```
+
+For compatibility testing, point `lilypond` at the older executable and set
+`lilypondversion = "2.24"`. Oud never silently falls back to another binary.
+
 Petrucci keeps small typed fixtures that reproduce transferable engraving
 invariants. It does not copy or vendor LilyPond or MuseScore fixture files.
 

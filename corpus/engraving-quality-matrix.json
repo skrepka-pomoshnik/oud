@@ -2,6 +2,10 @@
   "schema": 1,
   "scope": "Shared semantic and optical acceptance inventory for Petrucci proof rendering and LilyPond publication export.",
   "profiles": ["petrucci", "classic"],
+  "publication_engines": {
+    "baseline": "2.26",
+    "compatibility": "2.24"
+  },
   "cases": [
     {
       "id": "tab-registration-and-rhythm",

@@ -112,7 +112,7 @@ def test_cmd_convert_pdf_preserves_source_and_fails_when_lilypond_fails(
     monkeypatch.setattr(
         cli_convert,
         "print_lilypond_pdf",
-        lambda _ly_path, _out_base: "LilyPond not found on PATH",
+        lambda _ly_path, _out_base, **_kwargs: "LilyPond not found on PATH",
     )
 
     rc = oud_app._cmd_convert(str(source), str(output), "cfg.toml")

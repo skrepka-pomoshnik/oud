@@ -60,6 +60,8 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "fontstyle": "modern",
     "lynoteheads": "classic",
     "lyprofile": "petrucci",
+    "lilypond": "lilypond-2.26",
+    "lilypondversion": "2.26",
     "charstyle": "standard",
     "fretlabelmode": "auto",
     "scoreview": "score",

@@ -58,7 +58,8 @@ def test_export_lilypond_emits_vocal_staff_and_lyrics_when_enabled(tmp_path) -> 
     assert "\\new StaffGroup <<" in text
     assert '\\new Staff = "melodyStaff"' in text
     assert '\\new Lyrics \\lyricsto "melodyVoice" {' in text
-    assert '"Can" "she" "ex-" --' in text
+    assert '"Can" "she" "ex-"' in text
+    assert '"ex-" --' not in text
     assert "\\new TabStaff" in text
     assert "\\time 3/4" in text
 
@@ -140,6 +141,8 @@ def test_export_lilypond_emits_every_imported_polyphonic_staff(tmp_path) -> None
     assert text.count('\\new Staff = "melody') == 4
     for label in ("soprano", "alto", "tenor", "bass"):
         assert f'instrumentName = "{label}"' in text
+    for clef in ("alto", "tenor", "bass"):
+        assert f'\\clef "{clef}"' in text
 
 
 def test_export_lilypond_preserves_ft3_metadata_and_editorial_comments(tmp_path) -> None:

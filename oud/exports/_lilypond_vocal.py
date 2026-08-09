@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from oud.exports._lilypond_common import (
     _append_bar_time_change,
+    _append_barline,
     _append_global_prefix,
     _bar_sign_mark_tokens,
-    _barline_token,
     _coalesced_imported_bars,
     _default_tuning,
     _duration_token,
@@ -67,8 +67,7 @@ def _build_vocal_bodies(  # noqa: C901
             melody_body.append(f"  {_midi_to_lilypond(event.pitch)}{duration}")
         if not vocal_events:
             melody_body.append("  r4")
-        bar_marker = _barline_token(bar)
-        melody_body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
+        _append_barline(melody_body, bar)
 
         rows = getattr(bar, "lyric_event_rows", None) or []
         event_count = len(vocal_events)
@@ -98,10 +97,11 @@ def _matching_imported_lyric_staff(
 def _imported_event_suffix(
     event: MelodyEvent,
     *,
+    beam_suffix: str,
     glissando_to_next: bool,
     dynamic: str | None,
 ) -> str:
-    suffix = {"start": "[", "end": "]"}.get(event.beam, "")
+    suffix = beam_suffix
     if event.fermata:
         suffix += r"\fermata"
     if event.ornament:
@@ -117,6 +117,20 @@ def _imported_event_suffix(
     if dynamic:
         suffix += f"\\{dynamic}"
     return suffix
+
+
+def _beam_suffix(event: MelodyEvent, beam_open: bool, *, final_event: bool) -> tuple[str, bool]:
+    suffix = ""
+    if event.beam == "start" and not beam_open:
+        suffix = "["
+        beam_open = True
+    elif event.beam == "end" and beam_open:
+        suffix = "]"
+        beam_open = False
+    if final_event and beam_open:
+        suffix += "]"
+        beam_open = False
+    return suffix, beam_open
 
 
 def _append_imported_melody_bar(
@@ -141,6 +155,7 @@ def _append_imported_melody_bar(
         numerator, denominator = note_bar.proportion
         melody_body.append(f"  \\scaleDurations {denominator}/{numerator} {{")
     event_count = 0
+    beam_open = False
     for event_index, event in enumerate(note_bar.melody_events):
         is_rest = getattr(event, "is_rest", False)
         lily = "r" if is_rest else _lily_note_from_event_text(event.text)
@@ -150,8 +165,14 @@ def _append_imported_melody_bar(
             event_index + 1 < len(note_bar.melody_events)
             and note_bar.melody_events[event_index + 1].glissando_from_previous
         )
+        beam_suffix, beam_open = _beam_suffix(
+            event,
+            beam_open,
+            final_event=event_index == len(note_bar.melody_events) - 1,
+        )
         suffix = _imported_event_suffix(
             event,
+            beam_suffix=beam_suffix,
             glissando_to_next=glissando_to_next,
             dynamic=note_bar.dynamic if event_count == 0 else None,
         )
@@ -162,8 +183,7 @@ def _append_imported_melody_bar(
         melody_body.extend(f"  {mark}" for mark in _bar_sign_mark_tokens(bar_like))
     if note_bar.proportion is not None:
         melody_body.append("  }")
-    bar_marker = _barline_token(bar_like)
-    melody_body.append("  |" if bar_marker == "|" else f'  \\bar "{bar_marker}"')
+    _append_barline(melody_body, bar_like)
     if note_bar.system_break:
         melody_body.append(r"  \break")
     return current_time_sig, event_count
@@ -301,17 +321,26 @@ def _vocal_blocks(
             [
                 r"\with {",
                 f'  instrumentName = "{escaped}"',
-                f'  shortInstrumentName = "{escaped}"',
+                '  shortInstrumentName = ""',
                 r"}",
             ],
         )
     vocal_block.extend([r"<<", f'  \\new Voice = "{voice_name}" {{'])
+    label_text = (label or "").casefold()
+    clef = next((name for name in ("bass", "tenor", "alto") if name in label_text), None)
+    if clef is not None:
+        vocal_block.append(f'    \\clef "{clef}"')
     vocal_block.extend(melody_body)
     vocal_block.extend([r"  }", r">>"])
     lyric_blocks: list[str] = []
     if show_lyrics:
         for row in lyric_bodies:
+            tokens = [
+                item
+                for index, item in enumerate(row)
+                if item != "--" or (index + 1 < len(row) and row[index + 1] not in {"_", "__", "--"})
+            ]
             lyric_blocks.append(f'\\new Lyrics \\lyricsto "{voice_name}" {{')
-            lyric_blocks.append("  " + " ".join(row))
+            lyric_blocks.append("  " + " ".join(tokens))
             lyric_blocks.append(r"}")
     return [*vocal_block, *lyric_blocks]

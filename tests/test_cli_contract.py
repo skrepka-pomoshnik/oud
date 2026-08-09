@@ -102,7 +102,7 @@ def test_convert_refuses_overwrite_until_force_is_explicit(tmp_path: Path) -> No
     assert refused == cli_convert.EXIT_OUTPUT
     assert "refusing to overwrite" in refused_error.getvalue()
     assert replaced == 0
-    assert target.read_text(encoding="utf-8").startswith('\\version "2.24.0"')
+    assert target.read_text(encoding="utf-8").startswith('\\version "2.26.0"')
 
 
 def test_convert_does_not_create_unselected_output_directories(tmp_path: Path) -> None:
@@ -131,7 +131,7 @@ def test_pdf_success_publishes_pdf_and_lilypond_source_atomically(
     target = tmp_path / "score.pdf"
     _write_tab(source)
 
-    def compile_pdf(_ly_path: str, output_base: str) -> str:
+    def compile_pdf(_ly_path: str, output_base: str, **_kwargs: object) -> str:
         generated = Path(output_base).with_suffix(".pdf")
         generated.write_bytes(b"%PDF-test")
         return f"Printed {generated}"
@@ -147,7 +147,7 @@ def test_pdf_success_publishes_pdf_and_lilypond_source_atomically(
 
     assert status == 0
     assert target.read_bytes() == b"%PDF-test"
-    assert target.with_suffix(".ly").read_text(encoding="utf-8").startswith('\\version "2.24.0"')
+    assert target.with_suffix(".ly").read_text(encoding="utf-8").startswith('\\version "2.26.0"')
     assert stdout.getvalue() == f"Wrote {target}\n"
     assert sorted(path.name for path in tmp_path.iterdir()) == ["score.ly", "score.pdf", "source.tab"]
 

@@ -118,7 +118,10 @@ def cmd_pdf(
     cmd_lilypond_fn(state, "", config_path)
     source = state.path or "out"
     ly_path = str(Path(source).with_suffix(".ly"))
-    state.message = print_lilypond_pdf_fn(ly_path)
+    state.message = print_lilypond_pdf_fn(
+        ly_path,
+        binary=state.settings.get("lilypond", "lilypond-2.26"),
+    )
 
 
 def cmd_play(
@@ -214,7 +217,7 @@ def print_pdf(
     state: EditorState,
     *,
     export_lilypond_fn: ExportLyFn,
-    print_lilypond_pdf_fn: Callable[[str, str | None], str],
+    print_lilypond_pdf_fn: Callable[..., str],
 ) -> None:
     base = "out"
     if state.path:
@@ -238,4 +241,8 @@ def print_pdf(
         ties=state.ties,
         holds=state.holds,
     )
-    state.message = print_lilypond_pdf_fn(ly_path, base)
+    state.message = print_lilypond_pdf_fn(
+        ly_path,
+        base,
+        binary=pdf_settings.get("lilypond", "lilypond-2.26"),
+    )

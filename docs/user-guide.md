@@ -197,6 +197,7 @@ Durations are tracked per onset column and rendered according to current flag st
 - Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
+- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`

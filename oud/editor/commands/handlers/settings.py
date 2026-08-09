@@ -203,6 +203,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"classic", "petrucci"},
         "Lyprofile must be classic/petrucci",
     ),
+    "lilypondversion": (
+        {"2.24", "2.26"},
+        "Lilypondversion must be 2.24/2.26",
+    ),
     "basslabels": ({"numeric", "slash", "tuning"}, "Basslabels must be numeric/slash/tuning"),
     "italianorient": ({"normal", "reverse"}, "Italianorient must be normal/reverse"),
     "frenchc": ({"normal", "alt"}, "Frenchc must be normal/alt"),

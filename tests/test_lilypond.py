@@ -507,6 +507,19 @@ def test_print_lilypond_pdf_reports_missing_pdf_after_success(monkeypatch, tmp_p
     assert msg.startswith("LilyPond finished but PDF not found:")
 
 
+def test_print_lilypond_pdf_uses_configured_binary(monkeypatch) -> None:
+    requested: list[str] = []
+
+    def _which(name: str) -> None:
+        requested.append(name)
+
+    monkeypatch.setattr(lp.shutil, "which", _which)
+    msg = lp.print_lilypond_pdf("x.ly", binary="/opt/lilypond-2.24/bin/lilypond")
+
+    assert requested == ["/opt/lilypond-2.24/bin/lilypond"]
+    assert msg == "LilyPond binary not found: /opt/lilypond-2.24/bin/lilypond"
+
+
 def test_print_lilypond_pdf_runs_in_output_dir_and_finds_pdf(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(lp.shutil, "which", lambda _name: "/usr/bin/lilypond")
     calls: dict[str, object] = {}
