@@ -51,7 +51,43 @@ def _anchor_flag_positions_to_note_cols(
     return anchored
 
 
-def _expand_scale_map_from_anchors(  # noqa: C901
+def _interpolated_anchor_destination(
+    raw_col: int,
+    left: int,
+    right: int,
+    anchor_map: dict[int, int],
+) -> int:
+    left_dest = anchor_map[left]
+    right_dest = anchor_map[right]
+    span_dest = right_dest - left_dest
+    if span_dest <= 1:
+        return right_dest
+    destination = left_dest + round(((raw_col - left) * span_dest) / (right - left))
+    return max(left_dest + 1, min(right_dest - 1, destination))
+
+
+def _anchor_destination(
+    raw_col: int,
+    anchors: list[int],
+    anchor_map: dict[int, int],
+    *,
+    width_hint: int,
+    content_width: int,
+) -> int:
+    if raw_col in anchor_map:
+        return anchor_map[raw_col]
+    left = max((column for column in anchors if column < raw_col), default=None)
+    right = min((column for column in anchors if column > raw_col), default=None)
+    if left is not None and right is not None and right > left:
+        return _interpolated_anchor_destination(raw_col, left, right, anchor_map)
+    if left is not None:
+        return anchor_map[left] + (raw_col - left)
+    if right is not None:
+        return anchor_map[right] - (right - raw_col)
+    return _scale_col(raw_col, width_hint, content_width)
+
+
+def _expand_scale_map_from_anchors(
     all_positions: list[tuple[int, int, bool]],
     anchor_map: dict[int, int],
     *,
@@ -67,27 +103,13 @@ def _expand_scale_map_from_anchors(  # noqa: C901
     prev_dest = -1
     width_hint = max(1, raw_cols[-1] + 1)
     for raw_col in raw_cols:
-        if raw_col in anchor_map:
-            dest = anchor_map[raw_col]
-        else:
-            left = max((col for col in anchors if col < raw_col), default=None)
-            right = min((col for col in anchors if col > raw_col), default=None)
-            if left is not None and right is not None and right > left:
-                left_dest = anchor_map[left]
-                right_dest = anchor_map[right]
-                span_raw = right - left
-                span_dest = right_dest - left_dest
-                if span_dest > 1:
-                    dest = left_dest + round(((raw_col - left) * span_dest) / span_raw)
-                    dest = max(left_dest + 1, min(right_dest - 1, dest))
-                else:
-                    dest = right_dest
-            elif left is not None:
-                dest = anchor_map[left] + (raw_col - left)
-            elif right is not None:
-                dest = anchor_map[right] - (right - raw_col)
-            else:
-                dest = _scale_col(raw_col, width_hint, content_width)
+        dest = _anchor_destination(
+            raw_col,
+            anchors,
+            anchor_map,
+            width_hint=width_hint,
+            content_width=content_width,
+        )
         dest = max(0, min(content_width - 1, dest))
         dest = max(dest, prev_dest)
         out[raw_col] = dest

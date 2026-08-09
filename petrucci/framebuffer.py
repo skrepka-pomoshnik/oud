@@ -87,7 +87,34 @@ def overlay_frame(
     )
 
 
-def overlay_dirty_rows(  # noqa: C901
+def _dirty_row_ops(
+    ops: list[tuple[int, int, str, int]],
+    rows: set[int],
+) -> dict[int, list[tuple[int, int, str, int]]]:
+    grouped: dict[int, list[tuple[int, int, str, int]]] = {}
+    for operation in ops:
+        if operation[0] in rows:
+            grouped.setdefault(operation[0], []).append(operation)
+    return grouped
+
+
+def _overlay_row(
+    base_frame: Frame,
+    row: int,
+    ops: list[tuple[int, int, str, int]],
+) -> tuple[str, tuple[int, ...]]:
+    chars = _split_display_clusters(base_frame.lines[row])
+    attrs = list(base_frame.attrs[row])
+    for _y, x, text, attr in ops:
+        for offset, cluster in enumerate(_split_display_clusters(text)):
+            target_x = x + offset
+            if 0 <= target_x < len(chars):
+                chars[target_x] = cluster
+                attrs[target_x] = attr
+    return "".join(chars), tuple(attrs)
+
+
+def overlay_dirty_rows(
     current_frame: Frame,
     *,
     base_frame: Frame,
@@ -98,24 +125,11 @@ def overlay_dirty_rows(  # noqa: C901
         return current_frame
     next_lines = list(current_frame.lines)
     next_attrs = list(current_frame.attrs)
-    row_ops: dict[int, list[tuple[int, int, str, int]]] = {}
-    for y, x, text, attr in ops:
-        if y in rows:
-            row_ops.setdefault(y, []).append((y, x, text, attr))
+    row_ops = _dirty_row_ops(ops, rows)
     for row in rows:
         if row < 0 or row >= len(base_frame.lines):
             continue
-        chars = _split_display_clusters(base_frame.lines[row])
-        attrs = list(base_frame.attrs[row])
-        for _y, x, text, attr in row_ops.get(row, []):
-            for idx, cluster in enumerate(_split_display_clusters(text)):
-                target_x = x + idx
-                if target_x < 0 or target_x >= len(chars):
-                    continue
-                chars[target_x] = cluster
-                attrs[target_x] = attr
-        next_lines[row] = "".join(chars)
-        next_attrs[row] = tuple(attrs)
+        next_lines[row], next_attrs[row] = _overlay_row(base_frame, row, row_ops.get(row, []))
     return Frame(lines=next_lines, attrs=next_attrs)
 
 

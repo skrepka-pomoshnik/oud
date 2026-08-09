@@ -19,6 +19,7 @@ EXPANDED_RANDOM_MANIFEST = Path("corpus/ft3-random-75-v2.json")
 RANDOM_50_V3_MANIFEST = Path("corpus/ft3-random-50-v3.json")
 RANDOM_63_V4_MANIFEST = Path("corpus/ft3-random-63-v4.json")
 RANDOM_37_V5_MANIFEST = Path("corpus/ft3-random-37-v5.json")
+FIXED_115_V6_MANIFEST = Path("corpus/ft3-fixed-115-v6.json")
 NOTE_INPUT_MANIFEST = Path("corpus/ft3-note-input-100.json")
 REGRESSION_MANIFEST = Path("corpus/ft3-regression.json")
 FIXED_RANDOM_MANIFESTS = (
@@ -27,6 +28,7 @@ FIXED_RANDOM_MANIFESTS = (
     RANDOM_50_V3_MANIFEST,
     RANDOM_63_V4_MANIFEST,
     RANDOM_37_V5_MANIFEST,
+    FIXED_115_V6_MANIFEST,
 )
 
 
@@ -124,7 +126,7 @@ def test_random_63_v4_manifest_is_a_new_fixed_composer_stratified_selection() ->
 def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
     raw = json.loads(RANDOM_37_V5_MANIFEST.read_text(encoding="utf-8"))
     expanded = load_manifest(RANDOM_37_V5_MANIFEST)
-    previous_paths = (REGRESSION_MANIFEST, *FIXED_RANDOM_MANIFESTS[:-1], NOTE_INPUT_MANIFEST)
+    previous_paths = (REGRESSION_MANIFEST, *FIXED_RANDOM_MANIFESTS[:-2], NOTE_INPUT_MANIFEST)
     previous = [entry for path in previous_paths for entry in load_manifest(path).files]
 
     assert raw["selection"]["selected"] == 37
@@ -135,7 +137,7 @@ def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
     assert "one-time" in raw["selection"]["method"]
     assert "never repeated" in raw["selection"]["method"]
     assert len(expanded.files) == 37
-    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS) == 300
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS[:-1]) == 300
     assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
     assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
     assert all(
@@ -144,9 +146,31 @@ def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
     )
 
 
-def test_random_37_v5_metadata_matches_verified_payloads(fixed_pieces: dict[Path, Piece]) -> None:
-    raw = json.loads(RANDOM_37_V5_MANIFEST.read_text(encoding="utf-8"))
-    manifest = load_manifest(RANDOM_37_V5_MANIFEST)
+def test_fixed_115_v6_expands_compatibility_corpus_to_415() -> None:
+    raw = json.loads(FIXED_115_V6_MANIFEST.read_text(encoding="utf-8"))
+    expanded = load_manifest(FIXED_115_V6_MANIFEST)
+    previous = [entry for path in FIXED_RANDOM_MANIFESTS[:-1] for entry in load_manifest(path).files]
+
+    assert raw["selection"]["selected"] == 115
+    assert raw["selection"]["candidate_count"] == 115
+    assert "checksum-ordered" in raw["selection"]["method"]
+    assert len(expanded.files) == 115
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS) == 415
+    assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
+    assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
+    assert all(
+        {"format", "bars", "strings", "style", "tab_chords", "staff_kinds", "notation_events", "lyrics"} <= entry.keys()
+        for entry in raw["files"]
+    )
+
+
+@pytest.mark.parametrize("manifest_path", (RANDOM_37_V5_MANIFEST, FIXED_115_V6_MANIFEST))
+def test_expansion_metadata_matches_verified_payloads(
+    manifest_path: Path,
+    fixed_pieces: dict[Path, Piece],
+) -> None:
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = load_manifest(manifest_path)
     for expected, path in zip(raw["files"], manifest_paths(manifest), strict=True):
         piece = fixed_pieces[path]
         staff_kinds = (
@@ -319,8 +343,14 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
         except PieceAdapterError as exc:
             rejected[_relative(path)] = str(exc)
 
-    assert len(notation) == 31
+    assert len(notation) == 43
     assert rejected == {
+        "lutemusic/note-input-100/028/disperate_speranze_S.ft3": (
+            "tie target 'piece:staff:1:bar:12:event:2:0' has no preceding event with a shared pitch"
+        ),
+        "lutemusic/note-input-100/045/come_raggio_del_sol_D.ft3": (
+            "tie target 'piece:staff:0:bar:33:event:2:0' has no preceding event with a shared pitch"
+        ),
         "lutemusic/random-50-v3/041/sonata_CM_01_moderato.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),

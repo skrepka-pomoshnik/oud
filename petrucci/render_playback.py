@@ -140,7 +140,43 @@ def _tab_playback_highlight_ops(  # noqa: C901
     return ops, scaled_play_col
 
 
-def _playback_marker_ops(  # noqa: C901
+def _playback_marker_position(
+    *,
+    rows: dict[str, int | None],
+    row_start: int,
+    bar_x: int,
+    draw_pad: int,
+    scaled_play_col: int,
+    melody_row_base: int | None,
+) -> tuple[int, int]:
+    marker_row = rows.get("meta")
+    if marker_row is None:
+        marker_row = rows.get("flag") or 0
+    marker_y = row_start + marker_row
+    marker_x = bar_x + draw_pad + scaled_play_col
+    if melody_row_base is not None and marker_y >= melody_row_base:
+        return melody_row_base, max(0, bar_x - 2)
+    return marker_y, marker_x
+
+
+def _melody_marker_op(
+    *,
+    melody_col: int,
+    melody_row_base: int,
+    melody_x: int,
+    rendered_melody_rows: list[str] | None,
+    fallback: tuple[int, int],
+    tab_marker: tuple[int, int],
+) -> tuple[int, int, str, int] | None:
+    for relative_y, melody_row in enumerate(rendered_melody_rows or []):
+        if 0 <= melody_col < len(melody_row) and melody_row[melody_col] == " ":
+            return melody_row_base + relative_y, melody_x, "v", A_BOLD
+    if fallback != tab_marker:
+        return *fallback, "v", A_BOLD
+    return None
+
+
+def _playback_marker_ops(
     *,
     bar,
     playback_col: int,
@@ -155,14 +191,14 @@ def _playback_marker_ops(  # noqa: C901
     vocal_onset_cols: list[int],
     rendered_melody_rows: list[str] | None,
 ) -> list[tuple[int, int, str, int]]:
-    marker_row = rows.get("meta")
-    if marker_row is None:
-        marker_row = rows.get("flag") or 0
-    marker_y = row_start + marker_row
-    marker_x = bar_x + draw_pad + scaled_play_col
-    if melody_row_base is not None and marker_y >= melody_row_base:
-        marker_y = melody_row_base
-        marker_x = max(0, bar_x - 2)
+    marker_y, marker_x = _playback_marker_position(
+        rows=rows,
+        row_start=row_start,
+        bar_x=bar_x,
+        draw_pad=draw_pad,
+        scaled_play_col=scaled_play_col,
+        melody_row_base=melody_row_base,
+    )
     ops: list[tuple[int, int, str, int]] = [(marker_y, marker_x, "^", A_BOLD)]
     if melody_row_base is None:
         return ops
@@ -175,14 +211,17 @@ def _playback_marker_ops(  # noqa: C901
     if melody_col is None:
         return ops
     melody_x = bar_x + max(0, min(display_width - 1, melody_col))
-    if rendered_melody_rows:
-        for rel_y, melody_row in enumerate(rendered_melody_rows):
-            if 0 <= melody_col < len(melody_row) and melody_row[melody_col] == " ":
-                ops.append((melody_row_base + rel_y, melody_x, "v", A_BOLD))
-                return ops
     fallback = (melody_row_base, max(0, bar_x - 2))
-    if fallback != (marker_y, marker_x):
-        ops.append((*fallback, "v", A_BOLD))
+    melody_op = _melody_marker_op(
+        melody_col=melody_col,
+        melody_row_base=melody_row_base,
+        melody_x=melody_x,
+        rendered_melody_rows=rendered_melody_rows,
+        fallback=fallback,
+        tab_marker=(marker_y, marker_x),
+    )
+    if melody_op is not None:
+        ops.append(melody_op)
     return ops
 
 

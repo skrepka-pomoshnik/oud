@@ -313,22 +313,20 @@ def flag_symbols(style: str, flaglean: str = "right") -> tuple[str, str]:
     return symbols.get(style, ("|", slash_flag))
 
 
-def bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:  # noqa: C901
-    used: set[int] = set()
-    for _bar, string, _col in overrides:
-        if string >= 6:
-            used.add(string)
-    for bar in piece.bars:
-        for note in bar.notes:
-            idx = note.string - 1
-            if idx >= 6:
-                used.add(idx)
-        for chord in bar.chords:
-            for note in chord.notes:
-                idx = note.string - 1
-                if idx >= 6:
-                    used.add(idx)
-    return used
+def _override_bass_strings(overrides: dict[tuple[int, int, int], str]) -> set[int]:
+    return {string for _bar, string, _column in overrides if string >= 6}
+
+
+def _piece_bass_strings(piece: Piece) -> set[int]:
+    direct = {note.string - 1 for bar in piece.bars for note in bar.notes if note.string - 1 >= 6}
+    chordal = {
+        note.string - 1 for bar in piece.bars for chord in bar.chords for note in chord.notes if note.string - 1 >= 6
+    }
+    return direct | chordal
+
+
+def bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:
+    return _override_bass_strings(overrides) | _piece_bass_strings(piece)
 
 
 def apply_overrides(

@@ -40,12 +40,15 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
 - [x] Expand the deterministic, stratified compatibility manifest from 263 to
   300 public FT3 files with a fixed one-time selection, checksums, metadata,
   zero semantic-audit residuals, and no committed downloaded payloads.
-- [ ] Continue the fixed compatibility corpus from 300 to at least 1,000 public
+- [ ] Continue the fixed compatibility corpus from 415 to at least 1,000 public
   FT3 files without repeating random selection at test time.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section,
     German, Italian, French, and Spanish/Neapolitan examples.
   - Record URL, checksum, format/version, expected metadata, and staff-kind
     counts; require zero crashes and actionable warnings or unknown records.
+  - Offline progress is 415 checksum-unique, semantically clean payloads. The
+    current cache contains only 441 unique payloads, so reaching 1,000 requires
+    extending the public source index rather than repeating cached selections.
 - [ ] Complete at least 25 stratified manual comparisons against published PDF
   and MIDI evidence in `docs/ft3-parity.md` (19 PDF comparisons are recorded;
   MIDI evidence remains incomplete).
@@ -155,7 +158,7 @@ CI enforces complexity 7 and a 1,000-line module ceiling against the exact
 non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
 targets are in `docs/architecture-debt.md`.
 
-- [ ] Retire the remaining 114 function-level C901 findings without raising
+- [ ] Retire the remaining 109 function-level C901 findings without raising
   limits, broad per-file ignores, compatibility wrappers, or count-only helper
   modules. Continue with `oud.editor.insert_actions.handle_insert` (31),
   `oud.tui.input.complete_command_text` (31), and

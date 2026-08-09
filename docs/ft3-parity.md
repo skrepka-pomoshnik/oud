@@ -43,7 +43,7 @@ uv run python scripts/ft3_audit.py lutemusic/05_can_she_excuse
 - Barline ASCII control fragments remain inspectable control rows instead of
   becoming fake pitches. Tablature payload fragments such as `_6(` no longer
   create synthetic notation staffs.
-- In the fixed 300-file corpus, 38 files contain typed notation records. Thirty
+- In the fixed 415-file corpus, at least 38 files contain typed notation records. Thirty
   adapt strictly with lyrics. Seven are rejected with concrete inconsistent-
   duration or invalid-tie diagnostics; the adapter does not silently scale
   conflicting same-onset events or invent tie targets.

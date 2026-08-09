@@ -491,44 +491,79 @@ def _voice_stem(voice: int) -> StemDirection:
     return StemDirection.UP if voice == 0 else StemDirection.DOWN
 
 
-def _bar_lyrics(  # noqa: C901
+def _raw_lyric_lines(bar: _BarData, *, prefix: str, measure_id: str) -> tuple[LyricLine, ...] | None:
+    if not bar.raw_lyrics or bar.lyric_rows:
+        return None
+    return tuple(
+        LyricLine(f"{prefix}:lyric-line:{verse}", measure_id, text, verse)
+        for verse, text in enumerate(bar.raw_lyrics)
+        if text.strip()
+    )
+
+
+def _unmapped_lyric_line(
+    bar: _BarData,
+    row: tuple[LyricEvent, ...],
+    row_index: int,
+    *,
+    prefix: str,
+    measure_id: str,
+    event_ids_by_onset: dict[int, str],
+) -> tuple[bool, LyricLine | None]:
+    meaningful = tuple(source for source in row if source.text or source.extender)
+    if all(source.onset_index in event_ids_by_onset for source in meaningful):
+        return False, None
+    text = (
+        bar.raw_lyrics[row_index]
+        if row_index < len(bar.raw_lyrics)
+        else " ".join(source.text for source in meaningful if source.text)
+    )
+    if not text.strip():
+        return True, None
+    verse = meaningful[0].verse if meaningful else row_index
+    return True, LyricLine(f"{prefix}:lyric-line:{row_index}", measure_id, text, verse)
+
+
+def _lyric_event_id(source: LyricEvent, event_ids_by_onset: dict[int, str], *, bar_index: int) -> str | None:
+    if not source.text and not source.extender:
+        return None
+    if source.verse < 0:
+        _fail(f"lyric in bar {bar_index + 1} has negative verse {source.verse}")
+    event_id = event_ids_by_onset.get(source.onset_index)
+    if event_id is None:
+        _fail(f"lyric onset {source.onset_index} in bar {bar_index + 1} has no notation event")
+    return event_id
+
+
+def _bar_lyrics(
     bar: _BarData,
     *,
     prefix: str,
     measure_id: str,
     event_ids_by_onset: dict[int, str],
 ) -> tuple[tuple[LyricSyllable, ...], tuple[LyricLine, ...]]:
-    if bar.raw_lyrics and not bar.lyric_rows:
-        lines = tuple(
-            LyricLine(f"{prefix}:lyric-line:{verse}", measure_id, text, verse)
-            for verse, text in enumerate(bar.raw_lyrics)
-            if text.strip()
-        )
-        return (), lines
+    raw_lines = _raw_lyric_lines(bar, prefix=prefix, measure_id=measure_id)
+    if raw_lines is not None:
+        return (), raw_lines
     out: list[LyricSyllable] = []
     lines: list[LyricLine] = []
     for row_index, row in enumerate(bar.lyric_rows):
-        meaningful = tuple(source for source in row if source.text or source.extender)
-        if any(source.onset_index not in event_ids_by_onset for source in meaningful):
-            text = (
-                bar.raw_lyrics[row_index]
-                if row_index < len(bar.raw_lyrics)
-                else " ".join(source.text for source in meaningful if source.text)
-            )
-            if text.strip():
-                verse = meaningful[0].verse if meaningful else row_index
-                lines.append(LyricLine(f"{prefix}:lyric-line:{row_index}", measure_id, text, verse))
+        unmapped, line = _unmapped_lyric_line(
+            bar,
+            row,
+            row_index,
+            prefix=prefix,
+            measure_id=measure_id,
+            event_ids_by_onset=event_ids_by_onset,
+        )
+        if unmapped:
+            if line is not None:
+                lines.append(line)
             continue
         for lyric_index, source in enumerate(row):
-            if not source.text and not source.extender:
-                continue
-            if source.verse < 0:
-                _fail(f"lyric in bar {bar.source_index + 1} has negative verse {source.verse}")
-            event_id = event_ids_by_onset.get(source.onset_index)
+            event_id = _lyric_event_id(source, event_ids_by_onset, bar_index=bar.source_index)
             if event_id is None:
-                _fail(
-                    f"lyric onset {source.onset_index} in bar {bar.source_index + 1} has no notation event",
-                )
+                continue
             out.append(
                 LyricSyllable(
                     id=f"{prefix}:lyric:{row_index}:{lyric_index}",

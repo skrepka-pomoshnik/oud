@@ -403,40 +403,17 @@
         "complexity": 12
       }
     ],
-    "petrucci/framebuffer.py": [
-      {
-        "name": "overlay_dirty_rows",
-        "complexity": 9
-      }
-    ],
+    "petrucci/framebuffer.py": [],
     "petrucci/piece_adapter.py": [
       {
         "name": "_bar_events",
         "complexity": 8
-      },
-      {
-        "name": "_bar_lyrics",
-        "complexity": 9
       }
     ],
-    "petrucci/render_geometry.py": [
-      {
-        "name": "_expand_scale_map_from_anchors",
-        "complexity": 9
-      }
-    ],
-    "petrucci/render_helpers.py": [
-      {
-        "name": "bass_strings_used",
-        "complexity": 9
-      }
-    ],
+    "petrucci/render_geometry.py": [],
+    "petrucci/render_helpers.py": [],
     "petrucci/render_marks.py": [],
     "petrucci/render_playback.py": [
-      {
-        "name": "_playback_marker_ops",
-        "complexity": 9
-      },
       {
         "name": "_tab_playback_highlight_ops",
         "complexity": 8
