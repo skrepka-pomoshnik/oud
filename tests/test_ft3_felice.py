@@ -1,8 +1,8 @@
 from oud.importers.ft3 import load_ft3
-from petrucci.lyric_display import piece_for_lyric_display
-from petrucci.vocal_line import infer_vocal_events
+from petrucci.terminal.lyrics import piece_for_lyric_display
+from petrucci.adapters.vocal import infer_vocal_events
 
-FELICE = "lutemusic/01_felice_fu_quel_anon.ft3"
+FELICE = "tests/fixtures/ft3/corpus/01_felice_fu_quel_anon.ft3"
 
 
 def test_felice_positioned_lyrics_transpose_into_twelve_verses() -> None:

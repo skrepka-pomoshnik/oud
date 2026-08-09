@@ -95,8 +95,8 @@ def render_ascii_snapshot(state: EditorState) -> str:
     content = ""
     if state.screen_width > 0 and state.screen_height > 0:
         from oud.editor.services.status import status_line  # noqa: PLC0415
-        from petrucci.framebuffer import FrameBuffer  # noqa: PLC0415
-        from petrucci.render import render_piece  # noqa: PLC0415
+        from petrucci.terminal.canvas.framebuffer import FrameBuffer  # noqa: PLC0415
+        from petrucci.rendering.api import render_piece  # noqa: PLC0415
 
         frame = FrameBuffer(state.screen_height, state.screen_width)
         render_piece(

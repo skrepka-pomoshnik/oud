@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from oud.editor.services.bootstrap import init_state
-from petrucci.model import Piece
+from petrucci.core.model import Piece
 
 
 def test_init_state_new_file_defaults_to_8_bars(tmp_path: Path) -> None:
@@ -19,12 +19,12 @@ def test_init_state_missing_path_defaults_to_8_bars(tmp_path: Path) -> None:
 
 
 def test_init_state_preserves_inferred_ft3_extra_courses() -> None:
-    state = init_state("lutemusic/pavan_01_8C.ft3", config_path="config.toml")
+    state = init_state("tests/fixtures/ft3/corpus/pavan_01_8C.ft3", config_path="config.toml")
     assert state.piece.strings >= 8
 
 
 def test_init_state_loads_represented_ft3_text_without_warning() -> None:
-    state = init_state("lutemusic/can_she_excuse.ft3", config_path="config.toml")
+    state = init_state("tests/fixtures/ft3/corpus/can_she_excuse.ft3", config_path="config.toml")
     assert state.message == ""
     assert state.piece.import_warnings == []
     assert state.read_only is True

@@ -18,13 +18,13 @@ The source-independent path is:
 caller records -> NotationScore -> ScoreLayout -> SemanticFrame
 ```
 
-- `petrucci.score` owns immutable staffs, measures, events, pitches, lyrics,
+- `petrucci.core.score` owns immutable staffs, measures, events, pitches, lyrics,
   spans, exact `Fraction` timing, and validation.
-- `petrucci.flow` adapts a compact timed event stream and retains source IDs for
+- `petrucci.core.flow` adapts a compact timed event stream and retains source IDs for
   every split notation segment.
-- `petrucci.layout` returns systems, staff rows, event locations, onsets,
+- `petrucci.engraving.layout.engine` returns systems, staff rows, event locations, onsets,
   clipping metadata, structural roles, and integer geometry.
-- `petrucci.terminal` paints pretty or terminal-safe glyphs without changing
+- `petrucci.terminal.api` paints pretty or terminal-safe glyphs without changing
   identity or geometry.
 - `typeset_score()` composes layout and painting. `typeset_layout()` repaints an
   existing layout without rebuilding it.

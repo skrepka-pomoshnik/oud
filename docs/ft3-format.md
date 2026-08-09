@@ -7,16 +7,16 @@ is proprietary; this is not an official Fronimo specification.
 Status terms:
 
 - **Confirmed**: repeated corpus evidence and a regression fixture.
-- **Inferred**: consistent corpus/PDF evidence, but no vendor specification.
+- **Inferred**: consistent tests/fixtures/ft3/manifests/PDF evidence, but no vendor specification.
 - **Unsupported**: deliberately outside the importer contract.
 
 Implementation:
 
-- `oud/importers/ft3.py`: stable `load_ft3`/duration facade and container orchestration
-- `oud/importers/_ft3_metadata.py`, `_ft3_tab.py`, `_ft3_score.py`: metadata, tablature, and score assembly
+- `oud/importers/ft3/__init__.py`: stable `load_ft3`/duration facade and container orchestration
+- `oud/importers/ft3/metadata.py`, `_ft3_tab.py`, `_ft3_score.py`: metadata, tablature, and score assembly
 - `oud/importers/_ft3_text*.py`, `_ft3_note_records.py`: vocal, lyric, editorial, and note records
-- `oud/importers/_ft3_duration.py`, `_ft3_extras.py`: normalization, fingering, and ornament flags
-- `scripts/ft3_audit.py`: corpus residual and unknown-record inventory
+- `oud/importers/ft3/musical/duration.py`, `_ft3_extras.py`: normalization, fingering, and ornament flags
+- `scripts/corpus/audit.py`: corpus residual and unknown-record inventory
 
 ## 1. Container
 
@@ -337,7 +337,7 @@ mapped standard staff rather than only the first voice.
 Run:
 
 ```bash
-uv run python scripts/ft3_audit.py lutemusic
+uv run python scripts/corpus/audit.py lutemusic
 ```
 
 Each fixed corpus directory must report zero unresolved files, for example:

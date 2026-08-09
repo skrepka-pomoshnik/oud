@@ -1,5 +1,5 @@
 from oud.editor.core.state import EditorState
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def test_clamp_bounds_cursor() -> None:

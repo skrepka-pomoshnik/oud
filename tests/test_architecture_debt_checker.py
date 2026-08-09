@@ -1,6 +1,6 @@
 from collections import Counter
 
-from tools.check_architecture_debt import _complexity_improvements, _complexity_regressions
+from scripts.checks.architecture_debt import _complexity_improvements, _complexity_regressions
 
 
 def test_lower_complexity_is_an_improvement_not_a_regression() -> None:

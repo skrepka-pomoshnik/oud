@@ -1,5 +1,5 @@
-from petrucci.model import Bar, Chord, Note
-from petrucci.render_utils import (
+from petrucci.core.model import Bar, Chord, Note
+from petrucci.rendering.primitives.utils import (
     bar_cells,
     bar_cells_from_chords,
     duration_display,

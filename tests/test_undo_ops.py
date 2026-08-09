@@ -6,7 +6,7 @@ from oud.editor.core.state import EditorState, UndoAction
 from oud.editor.editing.primitives.bars import snapshot_bar
 from oud.editor.editing.primitives.edits import apply_override, begin_undo_group, end_undo_group, record_action
 from oud.editor.editing.primitives.undo import apply_action, redo, undo
-from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 
 
 def _state() -> EditorState:

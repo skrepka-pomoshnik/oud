@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.tablature import chord_index_at_col
-from petrucci.model import Bar
+from petrucci.core.model import Bar
 
 
 @dataclass(frozen=True)

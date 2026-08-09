@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oud.tui.prompt import PromptBindings, update_prompt
+from oud.presentation.tui.prompt import PromptBindings, update_prompt
 
 
 def _bindings() -> PromptBindings:

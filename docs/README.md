@@ -2,7 +2,7 @@
 
 - [User and developer guide](user-guide.md)
 - [Petrucci score-rendering plan](petrucci-score-plan.md)
-- [Architecture debt and retirement gates](architecture-debt.md)
+- [Architecture debt and retirement gates](architecture/debt.md)
 - [FT3 reverse-engineered specification](ft3-format.md)
 - [Release procedure](releasing.md)
 

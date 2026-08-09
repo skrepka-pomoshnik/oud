@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from oud.ui.adapter import CursesError, Screen
-from petrucci.model import Bar, Chord, ImportedBarContent, ImportedScore, ImportedStaff, Note, Piece
-from petrucci.render_helpers import (
+from oud.presentation.ui.adapter import CursesError, Screen
+from petrucci.core.model import Bar, Chord, ImportedBarContent, ImportedScore, ImportedStaff, Note, Piece
+from petrucci.rendering.primitives.helpers import (
     apply_overrides,
     bass_strings_used,
     clean_text,
@@ -115,7 +115,7 @@ def test_info_help_plugin_and_info_render() -> None:
     )
     lines = info_lines(
         piece,
-        {"style": "french", "time": "C", "filepath": "examples/x.ft3", "terminal": "120x38"},
+        {"style": "french", "time": "C", "filepath": "tests/fixtures/ft3/corpus/examples/x.ft3", "terminal": "120x38"},
     )
     assert lines[0] == "INFO"
     assert any(line.startswith("File:") for line in lines)
@@ -147,7 +147,7 @@ def test_info_help_plugin_and_info_render() -> None:
         1,
         0,
         piece,
-        {"style": "french", "time": "C", "filepath": "examples/x.ft3"},
+        {"style": "french", "time": "C", "filepath": "tests/fixtures/ft3/corpus/examples/x.ft3"},
     )
     render_notes(s, "notes", 1, 0, piece)
     assert s.calls

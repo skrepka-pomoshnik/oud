@@ -6,8 +6,8 @@ import pytest
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.normal.actions import handle_normal
 from oud.editor.navigation.viewport import ensure_cursor_visible
-from oud.playback.timeline import PlaybackCursor
-from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from oud.services.playback.timeline import PlaybackCursor
+from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from tests.helpers_regression_cases import (
     multi_bar_spacing_piece,
     piece_with_unused_then_used_bass_rows,

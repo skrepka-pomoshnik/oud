@@ -2,13 +2,13 @@ import gzip
 
 import pytest
 
-from oud.importers._ft3_duration import (
+from oud.importers.ft3.musical.duration import (
     _fill_missing_time_signatures,
     _normalize_vocal_event_accidentals,
     note_type_to_denominator,
 )
-from oud.importers._ft3_note_records import _melody_event_from_ft3
-from oud.importers._ft3_score import (
+from oud.importers.ft3.musical.note_records import _melody_event_from_ft3
+from oud.importers.ft3.score import (
     _classify_unknown_score_chunk,
     _is_tab_layout_record,
     _parallel_mixed_score_prefix_count,
@@ -16,9 +16,9 @@ from oud.importers._ft3_score import (
     _plain_score_annotations,
     _tab_heading_texts,
 )
-from oud.importers._ft3_tab import _decode_ft3_note_position, parse_bar
+from oud.importers.ft3.musical.tab import _decode_ft3_note_position, parse_bar
 from oud.importers.ft3 import FT3FormatError, load_ft3
-from petrucci.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
+from petrucci.core.model import Bar, Chord, ImportedTextRow, MelodyEvent, Note
 
 
 def test_load_minimal_ft3(tmp_path) -> None:
@@ -346,7 +346,7 @@ def test_classify_empty_standard_staff_record_as_note_staff() -> None:
 
 
 def test_real_can_she_excuse_combines_barre_and_left_fingering_without_residual() -> None:
-    piece = load_ft3("lutemusic/05_can_she_excuse/can_she_excuse.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse.ft3")
     combined = [note for bar in piece.bars for chord in bar.chords for note in chord.notes if note.ft3_extras == 0x3500]
     assert len(combined) == 2
     assert all(note.barre and note.left_fingering == "4" for note in combined)
@@ -354,7 +354,7 @@ def test_real_can_she_excuse_combines_barre_and_left_fingering_without_residual(
 
 
 def test_real_ft3_arpeggio_segments_and_right_x_have_no_residuals() -> None:
-    ich = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    ich = load_ft3("tests/fixtures/ft3/corpus/ich_bin_eine_blume_zu_saron_T.ft3")
     arpeggios = [
         note.arpeggio for bar in ich.bars for chord in bar.chords for note in chord.notes if note.arpeggio is not None
     ]
@@ -362,10 +362,10 @@ def test_real_ft3_arpeggio_segments_and_right_x_have_no_residuals() -> None:
     assert arpeggios.count("middle") == 5
     assert arpeggios.count("bottom") == 5
 
-    willoughby = load_ft3("lutemusic/willoughby_duet.ft3")
+    willoughby = load_ft3("tests/fixtures/ft3/corpus/willoughby_duet.ft3")
     assert willoughby.bars[1].chords[0].notes[0].arpeggio == "single"
 
-    ricercar = load_ft3("lutemusic/ricercar_galileiG.ft3")
+    ricercar = load_ft3("tests/fixtures/ft3/corpus/ricercar_galileiG.ft3")
     right_x = [
         note for bar in ricercar.bars for chord in bar.chords for note in chord.notes if note.right_ornament == "x"
     ]
@@ -374,14 +374,14 @@ def test_real_ft3_arpeggio_segments_and_right_x_have_no_residuals() -> None:
 
 
 def test_real_ft3_ending_flags_match_published_first_and_second_endings() -> None:
-    piece = load_ft3("lutemusic/01_unquiet_thoughts/unquiet_thoughts_T.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3")
     assert piece.bars[23].ending_numbers == (1,)
     assert piece.bars[24].ending_numbers == (2,)
     assert not any(bar.system_break for bar in piece.bars)
 
 
 def test_real_ft3_annotation_groups_anchor_to_following_bar() -> None:
-    piece = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/ich_bin_eine_blume_zu_saron_T.ft3")
     assert piece.bars[85].dynamic == "p"
     assert piece.bars[85].editorial_text == ["cresc. - - - ->"]
     assert not any(bar.system_break for bar in piece.bars)
@@ -489,38 +489,38 @@ def test_load_ft3_uses_filename_when_title_missing(tmp_path) -> None:
 
 
 def test_frog_galliard_bar8_includes_bass() -> None:
-    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3")
     bar = piece.bars[7]
     assert any(note.string >= 7 for note in bar.notes)
 
 
 def test_load_ft3_decodes_repeat_pair_from_bar_headers() -> None:
-    piece = load_ft3("lutemusic/wu_sol_ich_mich_hin_keren.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/wu_sol_ich_mich_hin_keren.ft3")
     assert piece.bars[1].repeat == ".:"
     assert piece.bars[4].repeat == ":."
     assert piece.bars[4].barline == "||"
 
 
 def test_load_ft3_decodes_internal_double_barlines() -> None:
-    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3")
     assert piece.bars[15].barline == "||"
     assert piece.bars[31].barline == "||"
 
 
 def test_can_she_excuse_ft3_does_not_inflate_string_count_from_invalid_bass_byte() -> None:
-    piece = load_ft3("lutemusic/can_she_excuse.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/can_she_excuse.ft3")
     assert piece.strings == 8
     assert max((note.string for bar in piece.bars for note in bar.notes), default=0) == 8
 
 
 def test_can_she_excuse_ft3_skips_interleaved_lyric_text_records() -> None:
-    piece = load_ft3("lutemusic/can_she_excuse.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/can_she_excuse.ft3")
     assert len(piece.bars) == 40
     assert all(bar.chords for bar in piece.bars)
 
 
 def test_can_she_excuse_ft3_drops_noise_token_from_second_verse_bar_38() -> None:
-    piece = load_ft3("lutemusic/can_she_excuse.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/can_she_excuse.ft3")
     bar = piece.bars[37]
     lyric_rows = [[ev.text for ev in row] for row in bar.lyric_event_rows]
     assert lyric_rows == [["come", "her", "will,", "Thy"], ["it", "was", "I", "Who"]]
@@ -726,7 +726,7 @@ def test_load_ft3_classifies_empty_row_zero_note_staff_marker(tmp_path) -> None:
 
 
 def test_load_ft3_preserves_score_settings_record_as_layout_staff() -> None:
-    piece = load_ft3("lutemusic/32_passacaglia.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/32_passacaglia.ft3")
     assert piece.imported_score is not None
     staffs = {staff.kind: staff for staff in piece.imported_score.staffs}
     assert "unknown" not in staffs
@@ -736,7 +736,7 @@ def test_load_ft3_preserves_score_settings_record_as_layout_staff() -> None:
 
 
 def test_load_ft3_decodes_embedded_appendix_page_and_editorial_note() -> None:
-    piece = load_ft3("lutemusic/32_passacaglia.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/32_passacaglia.ft3")
     assert piece.bars[14].editorial_text == [
         "Original 2 bars seem too discordant.  For originals see Appendix.",
     ]
@@ -747,7 +747,7 @@ def test_load_ft3_decodes_embedded_appendix_page_and_editorial_note() -> None:
 
 
 def test_load_ft3_builds_complete_logical_bars_for_every_polyphonic_staff() -> None:
-    piece = load_ft3("lutemusic/05_can_she_excuse/can_she_excuse_4_part.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse_4_part.ft3")
     assert piece.imported_score is not None
     note_staffs = [staff for staff in piece.imported_score.staffs if staff.kind == "note"]
     assert [staff.label for staff in note_staffs] == ["soprano", "alto", "tenor", "bass"]
@@ -819,13 +819,13 @@ def test_load_ft3_does_not_create_unknown_staff_for_font_and_control_rows_only(t
 
 
 def test_pavan_01_8c_infers_eight_courses() -> None:
-    piece = load_ft3("lutemusic/pavan_01_8C.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/pavan_01_8C.ft3")
     assert piece.strings == 8
     assert any(note.string >= 7 for bar in piece.bars for note in bar.notes)
 
 
 def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
-    piece = load_ft3("examples/26_lachrimae_galliard_in_G.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3")
     bar = piece.bars[0]
     total = 0.0
     for chord in bar.chords:
@@ -840,7 +840,7 @@ def test_lachrimae_ft3_legacy_duration_fix_applied() -> None:
 
 
 def test_forlorne_ft3_common_time_first_bar_is_metrically_consistent() -> None:
-    piece = load_ft3("examples/02_forlorne_hope_8C.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     bar = piece.bars[0]
     total = 0.0
     for chord in bar.chords:
@@ -855,7 +855,7 @@ def test_forlorne_ft3_common_time_first_bar_is_metrically_consistent() -> None:
 
 
 def test_load_ft3_extracts_section_metadata_from_real_file() -> None:
-    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3")
     assert piece.key == "GM"
     assert piece.piece_type == "galliard"
     assert piece.difficulty == "Challenge"
@@ -865,7 +865,7 @@ def test_load_ft3_extracts_section_metadata_from_real_file() -> None:
 
 
 def test_load_ft3_extracts_arranger_from_real_file() -> None:
-    piece = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/ich_bin_eine_blume_zu_saron_T.ft3")
     assert piece.composer == "Dietrich Buxtehude"
     assert piece.arranger == "Sarge Gerbode"
 
@@ -955,9 +955,9 @@ def test_load_ft3_extracts_preamble_notes_from_prefix(tmp_path) -> None:
 
 def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
     paths = [
-        "examples/02_forlorne_hope_8C.ft3",
-        "examples/26_lachrimae_galliard_in_G.ft3",
-        "lutemusic/23a_frogg_galliard_2.ft3",
+        "tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3",
+        "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",
+        "tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3",
     ]
     for path in paths:
         piece = load_ft3(path)
@@ -968,7 +968,7 @@ def test_loaded_titles_do_not_contain_rtf_artifacts() -> None:
 
 
 def test_ich_bin_blume_ft3_fills_missing_time_signatures_by_section() -> None:
-    piece = load_ft3("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/ich_bin_eine_blume_zu_saron_T.ft3")
     # Early section is triple meter (sum=1.5) and should not render against default common time.
     assert piece.bars[0].time_sig in {"O", "3/4"}
     assert piece.bars[40].time_sig in {"O", "3/4"}

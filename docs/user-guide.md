@@ -19,8 +19,8 @@ This document describes the current feature set, common use cases, and day-to-da
 Run from project root:
 
 ```bash
-python3 -m oud.app
-python3 -m oud.app examples/si_par_souffrir.tab
+python3 -m oud.presentation.app
+python3 -m oud.presentation.app examples/si_par_souffrir.tab
 ```
 
 From a checkout:
@@ -197,7 +197,7 @@ Durations are tracked per onset column and rendered according to current flag st
 - Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
-- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`
+- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`, `lypapersize=letter|a4`, `lysourceheading=on|off`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
@@ -249,7 +249,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 ## 9.1 Edit a TAB or tab-only FT3 projection, export PDF
 
 1. Open: `:e file.ft3`
-2. Check the persistent document label. `FT3->TAB?` is editable; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
+2. Check the persistent document label. `FT3 EDIT:choose :w path` is an editable projection awaiting a TAB save target; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
 3. Edit in `insert` mode (`i`).
 4. Check bar rhythm: `:verify`.
 5. Save with `:w`; imported files prompt for an explicit `.tab` destination and leave the FT3 source unchanged.
@@ -296,12 +296,12 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - `petrucci/`: canonical score model, spacing policies, framebuffer, and tab/note renderer.
 - `oud/importers/`: file parsers and format-specific import semantics.
 - `oud/editor/`: layered editor domains; see `docs/editor-architecture.md`.
-- `oud/tui/`: input/prompt/controller/main loop.
-- `oud/ui/`: curses adapter.
+- `oud/presentation/tui/`: input/prompt/controller/main loop.
+- `oud/presentation/ui/`: curses adapter.
 - `oud/exports/`: TAB/LilyPond/MIDI exporters.
-- `oud/plugins/`: plugin implementations.
+- `oud/services/plugins/`: plugin implementations.
 
-Entry point: `oud` -> `oud.app:main`.
+Entry point: `oud` -> `oud.presentation.app:main`.
 
 ## 12) FT3 Import Layer (Current)
 
@@ -446,7 +446,7 @@ portable frame to curses only in its UI adapter. External programs should adapt
 their records directly to `NotationScore` or `FlowEvent`; product integration is
 owned by the consuming repository.
 
-The former `oud.core.*` model/render and `oud.ui.*` renderer aliases were removed.
+The former `oud.core.*` model/render and `oud.presentation.ui.*` renderer aliases were removed.
 `petrucci` is the only public typesetting path.
 
 ## Timed flow scores

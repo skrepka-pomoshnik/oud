@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from petrucci.model import Bar, Piece
-from petrucci.render_utils import (
+from petrucci.core.model import Bar, Piece
+from petrucci.rendering.primitives.utils import (
     bar_cells,
     bar_cells_from_chords,
     chord_positions,
@@ -13,7 +13,7 @@ from petrucci.render_utils import (
     format_fret,
     note_type_to_denom,
 )
-from petrucci.tab_input import editor_event_columns, editor_fret_at
+from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
 
 class TabExportError(ValueError):

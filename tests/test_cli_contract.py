@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from oud import cli_convert
-from oud.cli_convert import CommandStreams, ConvertOptions, convert_command
+from oud.presentation import cli_convert
+from oud.presentation.cli_convert import CommandStreams, ConvertOptions, convert_command
 
 TAB_TEXT = "% test\n-C\n{Pipeline score}\nb\n0a-----\n\ne\n"
 

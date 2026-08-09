@@ -2,7 +2,7 @@ import pytest
 
 from oud.editor.core.state import EditorState
 from oud.editor.services.validation.verify import bar_duration_sum, verify_bar, verify_render_bar
-from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 
 
 def _state() -> EditorState:

@@ -37,12 +37,12 @@ from oud.editor.navigation.motions import (
 )
 from oud.editor.navigation.steps import move_left, move_right
 from oud.editor.services.media.midi import stop_midi
-from petrucci.render_utils import (
+from petrucci.rendering.primitives.utils import (
     chord_slot_positions,
     format_fret,
     note_type_to_denom,
 )
-from petrucci.tab_mutation import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
+from petrucci.input.tablature.mutation import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
 
 
 def _column_has_event(state: EditorState, bar_index: int, col: int) -> bool:

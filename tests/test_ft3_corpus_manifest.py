@@ -9,21 +9,21 @@ import pytest
 
 from oud.importers.ft3 import load_ft3
 from petrucci import PieceAdapterError, notation_score_from_piece
-from petrucci.model import Piece
+from petrucci.core.model import Piece
 from scripts import fetch_ft3_corpus
-from scripts.fetch_ft3_corpus import fetch_manifest, load_manifest, manifest_paths
-from scripts.ft3_audit import audit_piece
+from scripts.corpus.fetch import fetch_manifest, load_manifest, manifest_paths
+from scripts.corpus.audit import audit_piece
 
-RANDOM_MANIFEST = Path("corpus/ft3-random-75.json")
-EXPANDED_RANDOM_MANIFEST = Path("corpus/ft3-random-75-v2.json")
-RANDOM_50_V3_MANIFEST = Path("corpus/ft3-random-50-v3.json")
-RANDOM_63_V4_MANIFEST = Path("corpus/ft3-random-63-v4.json")
-RANDOM_37_V5_MANIFEST = Path("corpus/ft3-random-37-v5.json")
-FIXED_115_V6_MANIFEST = Path("corpus/ft3-fixed-115-v6.json")
-FIXED_85_V7_MANIFEST = Path("corpus/ft3-fixed-85-v7.json")
-FIXED_14_V8_MANIFEST = Path("corpus/ft3-fixed-14-v8.json")
-NOTE_INPUT_MANIFEST = Path("corpus/ft3-note-input-100.json")
-REGRESSION_MANIFEST = Path("corpus/ft3-regression.json")
+RANDOM_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-75.json")
+EXPANDED_RANDOM_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-75-v2.json")
+RANDOM_50_V3_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-50-v3.json")
+RANDOM_63_V4_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-63-v4.json")
+RANDOM_37_V5_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-37-v5.json")
+FIXED_115_V6_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-fixed-115-v6.json")
+FIXED_85_V7_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-fixed-85-v7.json")
+FIXED_14_V8_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-fixed-14-v8.json")
+NOTE_INPUT_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-note-input-100.json")
+REGRESSION_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-regression.json")
 FIXED_RANDOM_MANIFESTS = (
     RANDOM_MANIFEST,
     EXPANDED_RANDOM_MANIFEST,
@@ -399,31 +399,31 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
 
     assert len(notation) == 49
     assert rejected == {
-        "lutemusic/note-input-100/028/disperate_speranze_S.ft3": (
+        "tests/fixtures/ft3/corpus/note-input-100/028/disperate_speranze_S.ft3": (
             "tie target 'piece:staff:1:bar:12:event:2:0' has no preceding event with a shared pitch"
         ),
-        "lutemusic/note-input-100/045/come_raggio_del_sol_D.ft3": (
+        "tests/fixtures/ft3/corpus/note-input-100/045/come_raggio_del_sol_D.ft3": (
             "tie target 'piece:staff:0:bar:33:event:2:0' has no preceding event with a shared pitch"
         ),
-        "lutemusic/random-50-v3/041/sonata_CM_01_moderato.ft3": (
+        "tests/fixtures/ft3/corpus/random-50-v3/041/sonata_CM_01_moderato.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),
-        "lutemusic/random-63-v4/001/sonata_CM_02_minuetto.ft3": (
+        "tests/fixtures/ft3/corpus/random-63-v4/001/sonata_CM_02_minuetto.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),
-        "lutemusic/random-63-v4/012/disperate_speranze_4.ft3": (
+        "tests/fixtures/ft3/corpus/random-63-v4/012/disperate_speranze_4.ft3": (
             "tie target 'piece:staff:0:bar:7:event:3:0' has no preceding event with a shared pitch"
         ),
-        "lutemusic/random-63-v4/037/courant_duet.ft3": (
+        "tests/fixtures/ft3/corpus/random-63-v4/037/courant_duet.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),
-        "lutemusic/random-63-v4/040/come_raggio_del_sol_G.ft3": (
+        "tests/fixtures/ft3/corpus/random-63-v4/040/come_raggio_del_sol_G.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),
-        "lutemusic/random-63-v4/043/rondeau_130.ft3": (
+        "tests/fixtures/ft3/corpus/random-63-v4/043/rondeau_130.ft3": (
             "tie target 'piece:staff:0:bar:26:event:4:0' has no preceding event with a shared pitch"
         ),
-        "lutemusic/random-63-v4/050/passacaille_B.ft3": (
+        "tests/fixtures/ft3/corpus/random-63-v4/050/passacaille_B.ft3": (
             "tie target 'piece:staff:0:bar:0:event:0:0' has no preceding event with a shared pitch"
         ),
     }
@@ -454,9 +454,9 @@ def test_random_corpus_demotes_ascii_control_fragments_from_note_staffs(fixed_pi
 
 
 def test_couperin_duet_maps_two_note_voices_to_one_77_bar_staff(fixed_pieces: dict[Path, Piece]) -> None:
-    path = Path("lutemusic/random-75/054/la_couperin_duet.ft3")
+    path = Path("tests/fixtures/ft3/corpus/random-75/054/la_couperin_duet.ft3")
     if not path.is_file():
-        pytest.skip("fetch corpus/ft3-random-75.json before running external corpus tests")
+        pytest.skip("fetch tests/fixtures/ft3/manifests/ft3-random-75.json before running external corpus tests")
 
     piece = fixed_pieces[path.resolve()]
     assert len(piece.bars) == 77

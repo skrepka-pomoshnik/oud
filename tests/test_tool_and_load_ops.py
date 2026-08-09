@@ -6,7 +6,7 @@ from oud.editor.commands.plugins.tools import cmd_info, cmd_notes, cmd_plugins, 
 from oud.editor.core.state import EditorState, UndoAction
 from oud.editor.editing.primitives.undo import undo
 from oud.editor.services.io.loading import cmd_open, load_piece_data
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

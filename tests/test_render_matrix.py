@@ -6,11 +6,11 @@ import pytest
 
 from oud.importers.ft3 import build_durations
 from oud.settings import DEFAULT_SETTINGS
-from petrucci.framebuffer import FrameBuffer
-from petrucci.model import Bar, Chord, Note, Piece
-from petrucci.render import render_piece
-from petrucci.render_helpers import flag_symbols
-from petrucci.render_utils import flag_row_style
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.rendering.api import render_piece
+from petrucci.rendering.primitives.helpers import flag_symbols
+from petrucci.rendering.primitives.utils import flag_row_style
 from tests.helpers_regression_cases import (
     long_width_fill_piece,
     piece_with_unused_then_used_bass_rows,

@@ -19,8 +19,8 @@ import pytest
 from oud.editor.core.document import display_path
 from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
 from oud.editor.services.status import status_line
-from oud.tui.commands import apply_command
-from oud.tui.loop import run_loop
+from oud.presentation.tui.commands import apply_command
+from oud.presentation.tui.loop import run_loop
 
 _PROBE_KEY = ord("!")
 _SMALL_SIZE = (24, 80)
@@ -128,9 +128,29 @@ def _wait_for_report(  # noqa: PLR0917 - PTY polling keeps all process state exp
     pytest.fail(f"curses probe did not report {size}; exit={process.poll()} output={rendered_output!r}")
 
 
+def _wait_for_exit(
+    process: subprocess.Popen[bytes],
+    master_fd: int,
+    terminal_output: bytearray,
+    *,
+    timeout: float = 5,
+) -> int:
+    deadline = time.monotonic() + timeout
+    while process.poll() is None and time.monotonic() < deadline:
+        _drain_terminal(master_fd, terminal_output)
+        time.sleep(0.02)
+    _drain_terminal(master_fd, terminal_output)
+    if process.poll() is None:
+        process.kill()
+        process.wait()
+        rendered_output = terminal_output.decode("utf-8", errors="replace")[-2000:]
+        pytest.fail(f"curses probe did not exit after :q!; output={rendered_output!r}")
+    return process.returncode
+
+
 def _run_resize_session(tmp_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     root = Path(__file__).resolve().parents[1]
-    source = root / "lutemusic/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
+    source = root / "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
     target = tmp_path / "resize-target.tab"
     report = tmp_path / "resize-report.jsonl"
     config = tmp_path / "config.toml"
@@ -161,13 +181,12 @@ def _run_resize_session(tmp_path: Path) -> tuple[dict[str, Any], dict[str, Any]]
         large = _wait_for_report(process, master_fd, report, _LARGE_SIZE, target, terminal_output)
 
         os.write(master_fd, b":q!\n")
-        process.wait(timeout=5)
-        assert process.returncode == 0
+        assert _wait_for_exit(process, master_fd, terminal_output) == 0
         return small, large
     finally:
         if process is not None and process.poll() is None:
             process.terminate()
-            process.wait(timeout=5)
+            _wait_for_exit(process, master_fd, terminal_output)
         os.close(master_fd)
         if slave_fd >= 0:
             os.close(slave_fd)
@@ -186,7 +205,7 @@ def test_real_curses_resize_preserves_workflow_context(tmp_path: Path) -> None:
         assert report["document_mode"] == "imported-projection"
         assert Path(report["write_path"]).name == "resize-target.tab"
         assert "unquiet_thoughts_T.ft3*" in report["status"]
-        assert "[FT3->resize-target.tab]" in report["status"]
+        assert "[FT3 EDIT:resize-target.tab]" in report["status"]
         assert len(report["status"]) < width
         assert report["rows"][-1].startswith(report["status"])
         assert any(row < height - 1 for row in report["reverse_rows"])

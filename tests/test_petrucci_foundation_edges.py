@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from petrucci.duet_score import (
+from petrucci.adapters.duet import (
     duet_bar_mapping,
     duet_logical_bar_count,
     duet_raw_bar_index,
@@ -17,7 +17,7 @@ from petrucci.duet_score import (
     split_duet_triplet_map,
     split_duet_triplet_set,
 )
-from petrucci.framebuffer import (
+from petrucci.terminal.canvas.framebuffer import (
     Frame,
     FrameBuffer,
     draw_frame_rows,
@@ -26,8 +26,8 @@ from petrucci.framebuffer import (
     overlay_dirty_rows,
     overlay_frame,
 )
-from petrucci.model import Bar, Chord, Piece
-from petrucci.render_geometry import (
+from petrucci.core.model import Bar, Chord, Piece
+from petrucci.rendering.primitives.geometry import (
     _anchor_destination,
     _anchor_flag_positions_to_note_cols,
     _event_display_onset_cols,
@@ -37,8 +37,8 @@ from petrucci.render_geometry import (
     _place_duration_cells_aligned,
     _scale_chord_row,
 )
-from petrucci.screen import Screen
-from petrucci.view_width import (
+from petrucci.terminal.canvas.screen import Screen
+from petrucci.terminal.view.width import (
     _infer_time_signature,
     _nearest_free_column,
     _parse_pitch_labels,

@@ -1,15 +1,12 @@
 exclude AGENTS.md
 exclude DONE.md
 exclude TODO.md
-exclude architecture-debt.json
-prune corpus
 prune docs
 prune downloads
 prune examples
 prune refs
 prune scripts
 prune tests
-prune tools
 global-exclude *.ft3
 global-exclude *.ft3.gz
 global-exclude *.ft3.txt

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
-from oud.plugins.model import RemoteTab
+from oud.services.plugins.model import RemoteTab
 
 
 def plugin_enter_root(state: EditorState, items: list[RemoteTab]) -> None:

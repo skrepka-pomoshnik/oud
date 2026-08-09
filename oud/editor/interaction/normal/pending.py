@@ -95,7 +95,7 @@ def _add_bass_string(state: EditorState) -> None:
     if state.read_only:
         state.message = READ_ONLY_VIEWER
         return
-    from petrucci.tuning_utils import parse_bass_strings, tuning_count  # noqa: PLC0415
+    from petrucci.core.music.tuning import parse_bass_strings, tuning_count  # noqa: PLC0415
 
     tuning = state.settings.get("tuning", "")
     base = tuning_count(tuning) if tuning else state.piece.strings

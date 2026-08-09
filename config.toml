@@ -6,6 +6,7 @@ beatsnap = "soft"
 charstyle = "standard"
 chordwrap = 0
 contrast = "high"
+completion = "prefix"
 countdots = "off"
 dotplacement = "afterflag"
 duetscoreview = "auto"

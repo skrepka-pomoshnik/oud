@@ -16,9 +16,9 @@ from oud.editor.navigation.layout import (
     jump_system_row,
     jump_system_row_dynamic,
 )
-from petrucci.model import Bar
-from petrucci.render_utils import chord_slot_positions
-from petrucci.tab_policy import rows_reversed, visual_row_indices
+from petrucci.core.model import Bar
+from petrucci.rendering.primitives.utils import chord_slot_positions
+from petrucci.input.tablature.policy import rows_reversed, visual_row_indices
 
 
 @dataclass(frozen=True)

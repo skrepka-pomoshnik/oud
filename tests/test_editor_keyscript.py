@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from oud.editor.core.state import EditorState
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 from tests.helpers_keyscript import (
     collect_cursor_cols_after_key,
     find_marker,

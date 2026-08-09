@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from petrucci.duet_score import (
+from petrucci.adapters.duet import (
     duet_bar_mapping,
     duet_raw_bar_index,
     duet_staff_labels,
     is_duet_score_piece,
 )
-from petrucci.model import ImportedStaff, Piece
+from petrucci.core.model import ImportedStaff, Piece
 
 if TYPE_CHECKING:
     from oud.editor.core.state import EditorState

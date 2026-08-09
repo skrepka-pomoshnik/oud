@@ -33,17 +33,17 @@ from petrucci import (
     notation_score_from_piece,
     pitch_from_midi,
 )
-from petrucci.tuning_utils import parse_tuning_pitches, tuning_preset
-from scripts.fetch_ft3_corpus import load_manifest, manifest_paths
+from petrucci.core.music.tuning import parse_tuning_pitches, tuning_preset
+from scripts.corpus.fetch import load_manifest, manifest_paths
 
-MANIFEST = Path("corpus/ft3-note-input-100.json")
+MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-note-input-100.json")
 PREVIOUS_MANIFESTS = (
-    Path("corpus/ft3-regression.json"),
-    Path("corpus/ft3-random-75.json"),
-    Path("corpus/ft3-random-75-v2.json"),
-    Path("corpus/ft3-random-50-v3.json"),
-    Path("corpus/ft3-random-63-v4.json"),
-    Path("corpus/ft3-random-37-v5.json"),
+    Path("tests/fixtures/ft3/manifests/ft3-regression.json"),
+    Path("tests/fixtures/ft3/manifests/ft3-random-75.json"),
+    Path("tests/fixtures/ft3/manifests/ft3-random-75-v2.json"),
+    Path("tests/fixtures/ft3/manifests/ft3-random-50-v3.json"),
+    Path("tests/fixtures/ft3/manifests/ft3-random-63-v4.json"),
+    Path("tests/fixtures/ft3/manifests/ft3-random-37-v5.json"),
 )
 NOTE_TYPE_DENOMINATORS = {2: 1, 3: 2, 4: 4, 5: 8, 6: 16, 7: 32, 8: 64}
 

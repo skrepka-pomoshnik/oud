@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 from oud.editor.core.state import EditorState
-from oud.playback.timeline import cursors_at_time
+from oud.services.playback.timeline import cursors_at_time
 
 
 def clear_playback_cursor(state: EditorState) -> None:

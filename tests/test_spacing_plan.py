@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from petrucci.model import Bar, Note
-from petrucci.spacing import auto_bar_plan, collision_base_bar_widths
+from petrucci.core.model import Bar, Note
+from petrucci.engraving.layout.spacing import auto_bar_plan, collision_base_bar_widths
 
 
 def _bars(count: int) -> list[Bar]:

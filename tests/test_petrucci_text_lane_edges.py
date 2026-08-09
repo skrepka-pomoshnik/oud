@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from petrucci.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
-from petrucci.render_text_lanes import (
+from petrucci.core.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
+from petrucci.rendering.staff.text import (
     _bar_uses_raw_vocal_fallback,
     _draw_editorial_brackets,
     _draw_vocal_accidental,

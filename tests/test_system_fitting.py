@@ -1,6 +1,6 @@
 import pytest
 
-from petrucci.system_fitting import BoxFitOptions, MeasuredBox, fit_measured_boxes
+from petrucci.engraving.layout.fitting import BoxFitOptions, MeasuredBox, fit_measured_boxes
 
 
 def test_fit_measured_boxes_wraps_from_natural_width_and_justifies_nonfinal_system() -> None:

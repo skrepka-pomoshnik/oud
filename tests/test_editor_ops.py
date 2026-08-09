@@ -12,7 +12,7 @@ from oud.editor.editing.primitives.tablature import (
     italian_to_fret,
     set_chord_note,
 )
-from petrucci.model import Bar, Chord, Note
+from petrucci.core.model import Bar, Chord, Note
 
 
 def test_duration_value_maps_french_keys() -> None:

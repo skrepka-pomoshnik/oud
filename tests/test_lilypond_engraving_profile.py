@@ -12,7 +12,7 @@ from oud.exports.lilypond import export_lilypond
 from oud.settings import DEFAULT_SETTINGS
 from petrucci import Bar, Piece
 
-MATRIX = Path("corpus/engraving-quality-matrix.json")
+MATRIX = Path("tests/fixtures/ft3/manifests/engraving-quality-matrix.json")
 
 
 def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:

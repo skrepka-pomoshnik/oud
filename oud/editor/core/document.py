@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from oud.editor.core.feedback.messages import MessageLevel
-from petrucci.duet_score import is_duet_score_piece
-from petrucci.model import Piece
+from petrucci.adapters.duet import is_duet_score_piece
+from petrucci.core.model import Piece
 
 if TYPE_CHECKING:
     from oud.editor.core.state import EditorState
@@ -98,11 +98,11 @@ def document_status_label(state: EditorState) -> str:
     if state.read_only:
         return f"{fmt} VIEW" if fmt != "NEW" else "VIEW"
     if state.document_mode is DocumentMode.IMPORTED_PROJECTION:
-        target = Path(state.write_path).name if state.write_path else "TAB?"
-        return f"{fmt}->{target}"
+        target = Path(state.write_path).name if state.write_path else "choose :w path"
+        return f"{fmt} EDIT:{target}"
     if state.write_path:
         return "TAB"
-    return "NEW->TAB?"
+    return "NEW:choose :w path"
 
 
 def display_path(state: EditorState) -> str:

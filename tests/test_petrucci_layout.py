@@ -4,7 +4,7 @@ from fractions import Fraction
 
 import pytest
 
-from petrucci.layout import (
+from petrucci.engraving.layout.engine import (
     ElementRole,
     LayoutError,
     LayoutViewport,
@@ -13,7 +13,7 @@ from petrucci.layout import (
     layout_collisions,
     layout_score,
 )
-from petrucci.score import (
+from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
     BeamKind,

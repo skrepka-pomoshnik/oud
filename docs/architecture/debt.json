@@ -1,0 +1,452 @@
+{
+  "version": 1,
+  "limits": {
+    "complexity": 7,
+    "module_lines": 1000
+  },
+  "complexity": {
+    "oud/presentation/app.py": [
+      {
+        "name": "_parse_bars_spec",
+        "complexity": 8
+      }
+    ],
+    "oud/editor/interaction/dispatch/controller.py": [
+      {
+        "name": "handle_key",
+        "complexity": 14
+      }
+    ],
+    "oud/editor/core/coordinates.py": [
+      {
+        "name": "_bass_strings_used",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/commands/query/find.py": [
+      {
+        "name": "_find_target_col",
+        "complexity": 10
+      }
+    ],
+    "oud/editor/services/bootstrap.py": [
+      {
+        "name": "init_state",
+        "complexity": 19
+      }
+    ],
+    "oud/editor/navigation/layout.py": [
+      {
+        "name": "auto_system_bar_plan_with_gaps",
+        "complexity": 10
+      },
+      {
+        "name": "dynamic_system_starts",
+        "complexity": 18
+      },
+      {
+        "name": "jump_system_row_dynamic",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/services/io/loading.py": [
+      {
+        "name": "cmd_open",
+        "complexity": 8
+      },
+      {
+        "name": "load_piece_data",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/navigation/motions.py": [
+      {
+        "name": "target_jump_row_visual",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/commands/plugins/operations.py": [
+      {
+        "name": "_handle_plugin_search",
+        "complexity": 9
+      },
+      {
+        "name": "handle_plugin_key",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/editing/primitives/rhythm.py": [
+      {
+        "name": "bar_duration_sum_by_col",
+        "complexity": 12
+      },
+      {
+        "name": "row_duration_sum",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/editing/score/operations.py": [
+      {
+        "name": "_paste_one_yanked_bar",
+        "complexity": 11
+      },
+      {
+        "name": "cmd_stave",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/commands/query/search.py": [
+      {
+        "name": "target_jump_match",
+        "complexity": 12
+      }
+    ],
+    "oud/editor/commands/handlers/settings.py": [
+      {
+        "name": "_apply_bool_token",
+        "complexity": 8
+      },
+      {
+        "name": "_apply_meta_preset",
+        "complexity": 12
+      },
+      {
+        "name": "apply_set_command",
+        "complexity": 13
+      }
+    ],
+    "oud/editor/editing/tab/assignment.py": [
+      {
+        "name": "assign_chord_pitches",
+        "complexity": 16
+      }
+    ],
+    "oud/editor/editing/transforms.py": [
+      {
+        "name": "_find_cursor_grid_entries_for_shift",
+        "complexity": 8
+      },
+      {
+        "name": "_reassign_chord_notes",
+        "complexity": 8
+      },
+      {
+        "name": "_reassign_overrides",
+        "complexity": 12
+      },
+      {
+        "name": "transform_score_to_tuning",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/services/validation/verify.py": [
+      {
+        "name": "_rule_assignment_constraints",
+        "complexity": 13
+      },
+      {
+        "name": "bar_duration_sum",
+        "complexity": 12
+      },
+      {
+        "name": "verify_render_bar_issues",
+        "complexity": 9
+      }
+    ],
+    "oud/editor/navigation/viewport.py": [
+      {
+        "name": "_duet_viewport_row_mapping",
+        "complexity": 9
+      },
+      {
+        "name": "_viewport_row_mapping",
+        "complexity": 9
+      },
+      {
+        "name": "ensure_cursor_visible",
+        "complexity": 10
+      }
+    ],
+    "oud/editor/editing/visual.py": [
+      {
+        "name": "_visual_selection_ranges",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/lilypond/common.py": [
+      {
+        "name": "_chord_ft3_markup_suffix",
+        "complexity": 21
+      },
+      {
+        "name": "_collect_override_chords",
+        "complexity": 8
+      },
+      {
+        "name": "_initial_time_sig",
+        "complexity": 9
+      },
+      {
+        "name": "_lilypond_header",
+        "complexity": 10
+      },
+      {
+        "name": "_parse_tuning",
+        "complexity": 8
+      }
+    ],
+    "oud/exports/lilypond/document.py": [
+      {
+        "name": "_build_main_blocks",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/lilypond/voices/tab.py": [
+      {
+        "name": "_build_tab_body",
+        "complexity": 22
+      },
+      {
+        "name": "_tab_staff_with_block",
+        "complexity": 8
+      }
+    ],
+    "oud/exports/lilypond/voices/vocal.py": [
+      {
+        "name": "_build_vocal_bodies",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/midi/projection.py": [
+      {
+        "name": "_append_vocal_messages",
+        "complexity": 8
+      },
+      {
+        "name": "_collect_manual_chords",
+        "complexity": 8
+      },
+      {
+        "name": "_duet_note_events",
+        "complexity": 9
+      },
+      {
+        "name": "_parse_tuning",
+        "complexity": 8
+      },
+      {
+        "name": "build_playback_timeline",
+        "complexity": 9
+      }
+    ],
+    "oud/exports/midi/runtime.py": [
+      {
+        "name": "_midi_command",
+        "complexity": 10
+      }
+    ],
+    "oud/exports/musicxml.py": [
+      {
+        "name": "_add_note",
+        "complexity": 12
+      },
+      {
+        "name": "_musicxml_text",
+        "complexity": 17
+      },
+      {
+        "name": "_parse_tuning",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/ft3/musical/duration.py": [
+      {
+        "name": "_fill_missing_time_signatures",
+        "complexity": 10
+      },
+      {
+        "name": "_normalize_vocal_event_accidentals",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/ft3/metadata.py": [
+      {
+        "name": "_embedded_plain_text",
+        "complexity": 8
+      },
+      {
+        "name": "extract_text",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/ft3/score.py": [
+      {
+        "name": "_append_raw_imported_bar",
+        "complexity": 10
+      },
+      {
+        "name": "_decode_raw_score_record",
+        "complexity": 9
+      },
+      {
+        "name": "_parallel_note_tab_plan",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/ft3/text/codec.py": [
+      {
+        "name": "_lyric_events_from_line",
+        "complexity": 10
+      },
+      {
+        "name": "_parse_structured_text_record",
+        "complexity": 8
+      },
+      {
+        "name": "parse_ft3_text_record",
+        "complexity": 9
+      }
+    ],
+    "oud/importers/ft3/text/rows.py": [
+      {
+        "name": "_classify_raw_line",
+        "complexity": 9
+      },
+      {
+        "name": "_classify_structured_row",
+        "complexity": 8
+      },
+      {
+        "name": "_coalesce_raw_multi_verse_rows",
+        "complexity": 8
+      },
+      {
+        "name": "_events_from_lyric_tokens",
+        "complexity": 10
+      },
+      {
+        "name": "_lyric_tokens_from_control_row",
+        "complexity": 9
+      },
+      {
+        "name": "_split_wide_gap",
+        "complexity": 9
+      },
+      {
+        "name": "_tokenize_control_row",
+        "complexity": 8
+      }
+    ],
+    "oud/importers/musicxml.py": [
+      {
+        "name": "_parse_piece",
+        "complexity": 10
+      }
+    ],
+    "oud/services/playback/timeline.py": [
+      {
+        "name": "cursors_at_time",
+        "complexity": 8
+      }
+    ],
+    "oud/services/plugins/lutemusic.py": [
+      {
+        "name": "download_folder_ft3",
+        "complexity": 9
+      },
+      {
+        "name": "random_ft3",
+        "complexity": 10
+      }
+    ],
+    "oud/settings.py": [
+      {
+        "name": "load_settings",
+        "complexity": 9
+      }
+    ],
+    "oud/presentation/tui/commands.py": [
+      {
+        "name": "apply_command",
+        "complexity": 10
+      }
+    ],
+    "oud/presentation/tui/loop.py": [
+      {
+        "name": "run_loop",
+        "complexity": 10
+      }
+    ],
+    "oud/presentation/tui/prompt.py": [
+      {
+        "name": "update_prompt",
+        "complexity": 12
+      }
+    ],
+    "petrucci/terminal/canvas/framebuffer.py": [],
+    "petrucci/adapters/piece.py": [],
+    "petrucci/rendering/primitives/geometry.py": [],
+    "petrucci/rendering/primitives/helpers.py": [],
+    "petrucci/rendering/primitives/marks.py": [],
+    "petrucci/rendering/staff/playback.py": [],
+    "petrucci/rendering/system/status.py": [],
+    "petrucci/rendering/staff/text.py": [],
+    "petrucci/rendering/primitives/utils.py": [],
+    "petrucci/terminal/api.py": [],
+    "petrucci/terminal/view/model.py": [],
+    "petrucci/terminal/view/width.py": [],
+    "scripts/corpus/smoke.py": [
+      {
+        "name": "_collect_remote_items",
+        "complexity": 8
+      },
+      {
+        "name": "report_results",
+        "complexity": 10
+      }
+    ],
+    "tests/render_snapshot_utils.py": [
+      {
+        "name": "snapshot_signature",
+        "complexity": 9
+      }
+    ],
+    "tests/test_app.py": [
+      {
+        "name": "test_app_main_smoke",
+        "complexity": 10
+      },
+      {
+        "name": "test_app_main_smoke_interactions",
+        "complexity": 10
+      },
+      {
+        "name": "test_app_main_smoke_with_path",
+        "complexity": 10
+      }
+    ],
+    "tests/test_editor_normal.py": [
+      {
+        "name": "test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue",
+        "complexity": 9
+      }
+    ],
+    "tests/test_tui_commands_media.py": [
+      {
+        "name": "test_apply_command_dispatch_executes_all_registered_specs",
+        "complexity": 8
+      },
+      {
+        "name": "test_cmd_midi_lilypond_pdf_play_source",
+        "complexity": 9
+      }
+    ],
+    "tests/test_ui_render_split.py": [
+      {
+        "name": "_first_melody_row_idx",
+        "complexity": 9
+      }
+    ]
+  },
+  "large_modules": {}
+}

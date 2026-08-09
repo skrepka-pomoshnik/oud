@@ -13,8 +13,8 @@ from oud.editor.commands.plugins.state import (
     plugin_search_start,
 )
 from oud.editor.core.state import EditorState
-from oud.plugins.model import RemoteTab
-from petrucci.model import Bar, Piece
+from oud.services.plugins.model import RemoteTab
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

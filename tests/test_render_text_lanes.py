@@ -1,5 +1,5 @@
-from petrucci.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
-from petrucci.render_text_lanes import (
+from petrucci.core.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
+from petrucci.rendering.staff.text import (
     MELODY_FILLED_NOTEHEAD_GLYPH,
     MELODY_NOTEHEAD_GLYPH,
     draw_melody_key_signature,

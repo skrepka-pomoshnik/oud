@@ -1,5 +1,5 @@
-from petrucci.model import Bar, Chord, Note
-from petrucci.tab_policy import (
+from petrucci.core.model import Bar, Chord, Note
+from petrucci.input.tablature.policy import (
     TAB_NOTATION_PRESETS,
     apply_tabnotation_preset,
     bar_has_multifret_tokens,

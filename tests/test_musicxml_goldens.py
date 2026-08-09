@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 
 from oud.editor.services.io.loading import load_piece_data
 from oud.exports.musicxml import export_musicxml
-from petrucci.model import Piece
+from petrucci.core.model import Piece
 
 FIXTURES = Path(__file__).parent / "fixtures" / "musicxml"
 
@@ -63,7 +63,7 @@ def test_musicxml_export_matches_local_tab_golden(tmp_path: Path) -> None:
 
 def test_musicxml_export_matches_local_ft3_golden(tmp_path: Path) -> None:
     actual = _export_piece_subset_to_musicxml_text(
-        "examples/26_lachrimae_galliard_in_G.ft3",
+        "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",
         bars=2,
         tmp_path=tmp_path,
     )

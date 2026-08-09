@@ -6,7 +6,7 @@ from fractions import Fraction
 
 import pytest
 
-from petrucci.flow import (
+from petrucci.core.flow import (
     FlowAdapterError,
     FlowEvent,
     FlowMeasure,
@@ -14,8 +14,8 @@ from petrucci.flow import (
     adapt_flow_events,
     adapt_flow_measures,
 )
-from petrucci.framebuffer import Frame
-from petrucci.layout import (
+from petrucci.terminal.canvas.framebuffer import Frame
+from petrucci.engraving.layout.engine import (
     ElementKey,
     ElementRole,
     EventLocation,
@@ -30,8 +30,8 @@ from petrucci.layout import (
     StaffRows,
     layout_collisions,
 )
-from petrucci.model import Bar
-from petrucci.note_input_types import (
+from petrucci.core.model import Bar
+from petrucci.input.note.types import (
     EnterNote,
     EnterRest,
     InputPitch,
@@ -40,7 +40,7 @@ from petrucci.note_input_types import (
     NoteInputTransaction,
     ScorePosition,
 )
-from petrucci.score import (
+from petrucci.core.score import (
     EventKind,
     KeySignature,
     LyricLine,
@@ -60,8 +60,8 @@ from petrucci.score import (
     duration_notation,
     pitch_from_midi,
 )
-from petrucci.score_cues import PitchCue, PitchCueError, paint_pitch_cues
-from petrucci.tab_mutation import (
+from petrucci.engraving.cues import PitchCue, PitchCueError, paint_pitch_cues
+from petrucci.input.tablature.mutation import (
     EditableTablature,
     TabEdit,
     TabEditIntent,
@@ -77,7 +77,7 @@ from petrucci.tab_mutation import (
     set_tab_cell,
     set_tab_duration,
 )
-from petrucci.terminal import GlyphMode, SemanticFrame
+from petrucci.terminal.api import GlyphMode, SemanticFrame
 
 
 def _rejects(error: type[Exception], factory: Callable[[], object], match: str | None = None) -> None:

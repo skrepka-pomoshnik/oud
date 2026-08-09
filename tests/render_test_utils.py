@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from petrucci.render_text_lanes import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
-from petrucci.render_vocal import melody_row_count
+from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
+from petrucci.rendering.staff.vocal import melody_row_count
 
 
 def first_melody_row_idx(lines: list[str]) -> int:

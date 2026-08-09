@@ -1,5 +1,9 @@
 # DONE
 
+- 2026-08-09: Added Gerbode publication parity for Dowland's *Can she excuse my wrongs?*: FT3 vocal/lyric rows now retain two registered verse lanes without printable coordinate noise, LilyPond normalizes every staff to one canonical source-bar timeline, and the Petrucci profile emits eight five-bar systems on two letter pages with boxed end-bar numbers, six main lute courses, separate bass courses, and un-beamed rhythm flags. The LilyPond exporter now owns explicit timing, registration, style, document, and voice layers; a repository architecture test prohibits importer/exporter coupling. Validation pending at the user-request boundary.
+
+- 2026-08-09: Replaced the flat Petrucci package with six directional domains and subdivided rendering, engraving, note input, tablature input, terminal presentation, and core music ownership. Applied the same seven-direct-entity invariant to every package under `oud` and `petrucci`, grouped Oud presentation/services plus LilyPond, MIDI, and FT3 internals, and removed obsolete root test limits and generated cache/build/MIDI debris. Public `petrucci` symbols and FT3/export entry points remain canonical; no forwarding modules were retained. Validation pending at the user-request boundary.
+
 - 2026-08-09: Made Bossinensis's twelve-stanza *Felice fu quel dì* the first Gerbode/LilyPond publication benchmark. Recovered every single-row coda syllable, scoped the explicit final-only coda to the last stanza, registered intro/coda marks, added typed dense-score system/page planning, and placed voice/lyrics above tablature by default. Validation: Ruff, Ruff format, Ty, and 1,539 tests pass with one platform skip and 95.07% Petrucci coverage. Warning-free two-page A4 PDFs compile under LilyPond 2.26 in 2.47 seconds/93 MB and 2.24 in 3.03 seconds/129 MB for comparison with the public Gerbode edition.
 
 - 2026-08-09: Made LilyPond 2.26 the explicit publication baseline while retaining a configured 2.24 compatibility target; added TOML binary selection, registered manual barlines, deterministic timing resets, beam normalization, lyric cleanup, role-appropriate clefs, legal line breaks, pinned paper spacing, and dual-engine compiler regressions. Validation: all four curated FT3 publications compile without warnings under both engines; Ruff, Ruff format, Ty, and 1,537 tests pass with one platform skip and 95.07% Petrucci coverage.
@@ -74,7 +78,7 @@ Technical change log. Keep short, append newest on top.
   transaction API for fret, course, rational onset, duration, note/chord/rest,
   deletion, typed changes, and stable errors. Oud cell/rhythm clearing and entry
   now reuse Petrucci mutation primitives. Split width planning and tuning labels
-  from `petrucci/view_model.py`, retiring the final oversized module and reducing
+  from `petrucci/terminal/view/model.py`, retiring the final oversized module and reducing
   the function-level debt baseline to 147.
 - Retired five Petrucci library boundary findings without changing its public
   contracts: measure and staff validation, score-layout reference and bounds
@@ -163,7 +167,7 @@ Technical change log. Keep short, append newest on top.
   Moving `x_offset` repaints one cached layout while preserving translated
   event-cell identity; pretty and safe modes preserve identical semantic maps.
 - Moved viewport and prompt-history state into `oud.editor` and made the debt
-  gate reject `curses` or `oud.tui` imports from editor, importer, exporter,
+  gate reject `curses` or `oud.presentation.tui` imports from editor, importer, exporter,
   playback, plugin, and Petrucci modules.
 - Made `petrucci` a real top-level typed package in the Oud wheel and removed
   the ambiguous `oud.core` grouping. FT3/TAB/MusicXML import, playback timing,
@@ -283,7 +287,7 @@ Technical change log. Keep short, append newest on top.
 - Closed all five semantic failures in the fixed 75-file expansion. Decoded comma, apostrophe, smile, and caret ornaments; separated standard-note musical/layout fields; preserved chord onsets and source voices; and mapped La Couperin's two notation voices to one 77-bar bass-viol staff. The 75-file audit now has zero residuals, unknown records, or warnings.
 - Manually compared 17th Century Grounds and La Couperin with their published PDFs, bringing the documented FT3/PDF matrix to ten files.
 - Removed all Gerbode FT3 payloads and decoded dumps from the Git index, ignored FT3 suffixes repository-wide, added a CI publication guard, and retained only attribution plus URL/SHA-256 manifests. Added a deterministic fetcher that refuses unsafe URLs, path traversal, checksum drift, and implicit replacement.
-- Expanded FT3 compatibility coverage with a one-time 75-file selection fixed in `corpus/ft3-random-75.json`. All 75 load without crashing; the five semantic failures and Couperin structural warning are bounded by regression tests and recorded in `TODO.md`/`docs/ft3-parity.md`.
+- Expanded FT3 compatibility coverage with a one-time 75-file selection fixed in `tests/fixtures/ft3/manifests/ft3-random-75.json`. All 75 load without crashing; the five semantic failures and Couperin structural warning are bounded by regression tests and recorded in `TODO.md`/`docs/ft3-parity.md`.
 - Removed discarded exponential string-assignment searches from LilyPond pitch emission. The 226-bar Buxtehude fixture exports in about 0.02 seconds instead of 15.1 seconds with byte-identical output; the full coverage gate fell from 7:06 to 3:43.
 - Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, 1,157 passed with one Darwin-only test skipped on Linux, 85.33% coverage, and 112/112 local corpus files loaded without warnings.
 - Closed the remaining release-usability P0 items: the first 80x24 help page now gives a complete open/create, note entry, undo, safe save, and quit path, backed by an executable first-score regression.
@@ -298,7 +302,7 @@ Technical change log. Keep short, append newest on top.
 - Added a reproducible FT3 residual/raw-record audit and manually compared representative solo, mixed, duet, and three-verse vocal fixtures with Gerbode's published PDFs. Structural content agrees; exact source systems, pages, and edition engraving remain explicit P0 gaps. Decoded the real compositional `0x3500` barre plus left-finger value without residual loss.
 - Added explicit read-only staff focus: `j/k` cycles projected Tab/Melody/Lyrics lanes, duet focus maps to the corresponding source staff bar, and the active focus remains visible in status. Added typed info/success/warning/error/confirmation messages with distinct portable terminal attributes.
 - Fixed the macOS CI quality environment by declaring `pytest-cov` in the uv dev group and locking coverage dependencies. Applied the repository's Ruff format baseline and documented the formatter-required `COM812` exception; Ruff, format, Ty, 1109 tests, the 82.50% coverage gate, and the 37-file corpus smoke pass locally.
-- Removed the root `app.py`/`cli.py` launchers and obsolete `oud.cli`; `oud` -> `oud.app:main` is now the single command path. Removed the former `oud.core` and `oud.ui` Petrucci aliases, migrated tests/scripts to canonical imports, and retained only real parser/domain modules plus the curses adapter.
+- Removed the root `app.py`/`cli.py` launchers and obsolete `oud.cli`; `oud` -> `oud.presentation.app:main` is now the single command path. Removed the former `oud.core` and `oud.presentation.ui` Petrucci aliases, migrated tests/scripts to canonical imports, and retained only real parser/domain modules plus the curses adapter.
 - Closed the compatibility-layer static-analysis debt: Ruff and Ty pass, 1101 tests pass, and the local corpus smoke test loads 37/37 files with no errors or warnings.
 - Added explicit document modes and separate source/write-target state. Tab-only FT3 opens as an editable projection with explicit Save As; mixed, vocal-only, and duet FT3 opens read-only so visible non-TAB layers cannot be lost.
 - Replaced implicit `name.ft3.tab` writes with a shared `:w`/`:wq`/`:x` Save As flow, confirmed overwrite handling, truthful modified state, and source-preserving target reuse. ASCII export no longer marks a score saved.
@@ -307,12 +311,12 @@ Technical change log. Keep short, append newest on top.
 - Reframed the active roadmap around two user-facing alpha blockers: trustworthy FT3 edit/save semantics and persistent workflow context, with explicit macOS interaction tests and release acceptance criteria. Removed completed checklist entries from `TODO.md`; their outcomes remain recorded below.
 
 ## 2026-07-10
-- Extracted the canonical score model and complete tab/vocal/note character-cell renderer into `petrucci`, with a reusable `typeset_piece`/`typeset_text` API and compatibility aliases for former `oud.core`/`oud.ui` paths.
+- Extracted the canonical score model and complete tab/vocal/note character-cell renderer into `petrucci`, with a reusable `typeset_piece`/`typeset_text` API and compatibility aliases for former `oud.core`/`oud.presentation.ui` paths.
 - Improved import UX: malformed TAB files no longer silently replace an open score, partial TAB bars survive missing end markers, warning summaries point to `:info`, and all import warnings remain visible there.
 - Closed the bundled FT3 viewer blockers: multipart note markers crossing the raw header boundary become note staves, unknown text remains visible as comments, observed bar headers are classified, vocal/multipart playback mapping is covered, and narrow multi-verse scores retain a visible bar.
 - Closed the remaining FT3 backlog: typed the final score-settings record, eliminated unknown staffs across the bundled corpus, published duet cursor/playback maps, aligned sparse imported lyrics by source bar, and exported all supported non-tab staff variants to LilyPond.
 - Finished automatable release polish: project URLs and alpha metadata, a renderer-generated README screenshot, a documented release procedure, and an audited decision to retain the existing non-personal commit metadata.
-- Added `scripts/corpus_smoke.py` for local or bounded live lutemusic.org batches; it continues after per-file failures, classifies importer warnings, supports JSON output, and is wired into macOS CI. Release pass: 250/250 live files and 36/36 bundled files loaded with zero errors or warnings.
+- Added `scripts/corpus/smoke.py` for local or bounded live lutemusic.org batches; it continues after per-file failures, classifies importer warnings, supports JSON output, and is wired into macOS CI. Release pass: 250/250 live files and 36/36 bundled files loaded with zero errors or warnings.
 - Grouped transpose, retune, and reflow into explicit compound undo entries with regressions.
 - Added a real-piece alpha workflow regression covering enter, correction, TAB save, MIDI/LilyPond export, and reopen.
 
@@ -324,7 +328,7 @@ Technical change log. Keep short, append newest on top.
 - Added `:dark` / `:light` commands and `:set theme=auto|dark|light`: explicit fg/bg color pair plus painted window background for light-background terminals.
 
 ## 2026-06-12
-- Publication prep: scrubbed personal absolute paths from DOCS.md/FT3.md/config.toml/tests, resolved .gitignore vs tracked-file conflicts, added lutemusic.org CC BY-NC-SA 4.0 attribution (`lutemusic/README.md`), added GitHub Actions CI (ruff + pytest on ubuntu/macos), and added a pytest/ruff dev dependency group with `uv.lock`.
+- Publication prep: scrubbed personal absolute paths from DOCS.md/FT3.md/config.toml/tests, resolved .gitignore vs tracked-file conflicts, added lutemusic.org CC BY-NC-SA 4.0 attribution (`tests/fixtures/ft3/corpus/README.md`), added GitHub Actions CI (ruff + pytest on ubuntu/macos), and added a pytest/ruff dev dependency group with `uv.lock`.
 - Moved to Python 3.11+ with stdlib `tomllib`; project now has zero runtime dependencies.
 - Fixed light-theme low contrast: high-contrast mode uses bold on the terminal's default colors instead of forcing a white foreground.
 - Added `:help` command that pages help text through less with TUI suspend/resume, plus a dispatch regression test.

@@ -1,6 +1,6 @@
 # Engraving regression provenance
 
-`corpus/engraving-quality-matrix.json` is the shared acceptance inventory for
+`tests/fixtures/ft3/manifests/engraving-quality-matrix.json` is the shared acceptance inventory for
 Petrucci's terminal proof renderer and the LilyPond publication exporter. Each
 case records one semantic feature family, the proof-rendering contract, the
 publication-export contract, and the exact upstream regression family whose

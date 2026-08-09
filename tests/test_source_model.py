@@ -1,7 +1,7 @@
 from fractions import Fraction
 
-from petrucci.model import Bar, ImportedScore, ImportedSourceRecord, Piece
-from petrucci.source_model import DiplomaticSignKind, MensurationMeaning, build_source_document
+from petrucci.core.model import Bar, ImportedScore, ImportedSourceRecord, Piece
+from petrucci.core.source import DiplomaticSignKind, MensurationMeaning, build_source_document
 
 
 def _historical_piece() -> Piece:

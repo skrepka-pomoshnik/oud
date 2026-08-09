@@ -11,8 +11,8 @@ from oud.editor.editing.primitives.tablature import (
     italian_to_fret,
 )
 from oud.settings import DEFAULT_SETTINGS, save_settings
-from petrucci.tab_policy import apply_tabnotation_preset
-from petrucci.tuning_utils import tuning_preset
+from petrucci.input.tablature.policy import apply_tabnotation_preset
+from petrucci.core.music.tuning import tuning_preset
 
 SetHandler = Callable[[EditorState, str], bool]
 
@@ -46,6 +46,7 @@ _BOOL_KEYS = {
     "showtuplets",
     "showmelody",
     "showlyrics",
+    "lysourceheading",
     "showfingerings",
     "showornaments",
     "showextras",
@@ -112,6 +113,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "movementmode": (
         {"visual", "note"},
         "Movementmode must be visual/note",
+    ),
+    "completion": (
+        {"prefix", "fzf"},
+        "Completion must be prefix/fzf",
     ),
     "layout": (
         {"packed", "spread", "auto", "stretch"},
@@ -208,6 +213,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "lytabrhythm": (
         {"minimal", "full"},
         "Lytabrhythm must be minimal/full",
+    ),
+    "lypapersize": (
+        {"a4", "letter"},
+        "Lypapersize must be a4/letter",
     ),
     "lilypondversion": (
         {"2.24", "2.26"},

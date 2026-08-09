@@ -10,13 +10,13 @@ from oud.editor.core.document import DocumentMode
 from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
 from oud.editor.core.feedback.transient import DEFAULT_MESSAGE_TTL_TICKS
 from oud.editor.core.input.keycodes import DEFAULT_KEYCODES, KeyCodes
-from oud.playback.timeline import PlaybackCursor
-from petrucci.model import Bar, Chord, Piece
+from oud.services.playback.timeline import PlaybackCursor
+from petrucci.core.model import Bar, Chord, Piece
 
 if TYPE_CHECKING:
     from oud.importers.tab import TabData
-    from oud.plugins.model import RemoteTab
-    from petrucci.framebuffer import Frame
+    from oud.services.plugins.model import RemoteTab
+    from petrucci.terminal.canvas.framebuffer import Frame
 
 
 class EditorState:

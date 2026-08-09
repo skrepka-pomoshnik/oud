@@ -2,20 +2,20 @@ import json
 from pathlib import Path
 
 from scripts import ft3_audit
-from scripts.ft3_audit import audit_file
+from scripts.corpus.audit import audit_file
 
 
 def test_ft3_audit_reports_typed_source_records_without_unresolved_values() -> None:
-    can_she_excuse = audit_file(Path("lutemusic/05_can_she_excuse/can_she_excuse.ft3"))
+    can_she_excuse = audit_file(Path("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse.ft3"))
     assert can_she_excuse["note_extra_residuals"] == {}
     assert can_she_excuse["vocal_flag_residuals"] == {}
     assert can_she_excuse["source_record_kinds"] == {"note-lyrics": 40}
     assert can_she_excuse["unknown_source_records"] == 0
 
-    willoughby = audit_file(Path("lutemusic/willoughby_duet.ft3"))
+    willoughby = audit_file(Path("tests/fixtures/ft3/corpus/willoughby_duet.ft3"))
     assert willoughby["note_extra_residuals"] == {}
 
-    now_o_now = audit_file(Path("lutemusic/now_o_now.ft3"))
+    now_o_now = audit_file(Path("tests/fixtures/ft3/corpus/now_o_now.ft3"))
     assert now_o_now["source_record_kinds"] == {"note": 1, "note-lyrics": 47}
     assert now_o_now["unknown_source_records"] == 0
 

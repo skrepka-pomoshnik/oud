@@ -16,7 +16,7 @@ from oud.editor.editing.primitives.ranges import (
 from oud.editor.editing.primitives.tablature import chord_index_at_col, insert_chord
 from oud.editor.navigation.layout import bars_per_line, system_range
 from oud.editor.navigation.motions import apply_motion_target, target_home_bar
-from petrucci.model import Bar
+from petrucci.core.model import Bar
 
 
 def _inserted_chord_range(

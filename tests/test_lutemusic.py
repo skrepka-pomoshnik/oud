@@ -1,4 +1,4 @@
-from oud.plugins.lutemusic import parse_supported_links
+from oud.services.plugins.lutemusic import parse_supported_links
 
 
 def test_parse_supported_links_filters_and_titles() -> None:

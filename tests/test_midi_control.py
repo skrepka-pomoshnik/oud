@@ -12,8 +12,8 @@ from oud.editor.services.media.playback import (
     start_playback_clock,
     update_playback_animation,
 )
-from oud.playback.timeline import PlaybackCursor
-from petrucci.model import Bar, Chord, ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Note, Piece
+from oud.services.playback.timeline import PlaybackCursor
+from petrucci.core.model import Bar, Chord, ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Note, Piece
 
 
 class _Proc:

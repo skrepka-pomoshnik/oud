@@ -1,11 +1,11 @@
 from fractions import Fraction
 
-from oud.exports._lilypond_vocal import _append_imported_melody_bar
-from petrucci.model import ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Piece
-from petrucci.piece_adapter import notation_score_from_piece
-from petrucci.score import SpanKind, StemDirection
-from petrucci.score_typeset import ScoreTypesetOptions, typeset_score
-from petrucci.terminal import GlyphMode
+from oud.exports.lilypond.voices.vocal import _append_imported_melody_bar
+from petrucci.core.model import ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Piece
+from petrucci.adapters.piece import notation_score_from_piece
+from petrucci.core.score import SpanKind, StemDirection
+from petrucci.engraving.score_typeset import ScoreTypesetOptions, typeset_score
+from petrucci.terminal.api import GlyphMode
 
 
 def _extended_piece() -> Piece:

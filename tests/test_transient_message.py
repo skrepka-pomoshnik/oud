@@ -5,7 +5,7 @@ from oud.editor.core.feedback.transient import (
     decay_transient_message,
 )
 from oud.editor.core.state import EditorState
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

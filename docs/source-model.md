@@ -1,7 +1,7 @@
 # Source testimony and interpretation
 
 Petrucci keeps written source facts separate from editorial interpretation.
-`petrucci.source_model.build_source_document()` currently projects imported FT3
+`petrucci.core.source.build_source_document()` currently projects imported FT3
 mensuration and proportion signs into renderer-independent records with stable
 IDs, source order, bar, staff, and voice coordinates.
 

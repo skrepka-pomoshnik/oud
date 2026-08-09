@@ -4,7 +4,7 @@ import copy
 from contextlib import contextmanager
 
 from oud.editor.core.state import EditorState, UndoAction, UndoGroupFrame
-from petrucci.tab_mutation import (
+from petrucci.input.tablature.mutation import (
     EditableTablature,
     TabEditTransaction,
     TabMutation,

@@ -69,8 +69,8 @@ def test_musicxml_matrix_real_examples_refs_luteconv_style(tmp_path: Path) -> No
         "examples/si_par_souffrir.tab",
         "examples/2_intrada_anon.tab",
         "examples/Sarabande_de_gautier.tab",
-        "examples/02_forlorne_hope_8C.ft3",
-        "examples/26_lachrimae_galliard_in_G.ft3",
+        "tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3",
+        "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",
     ]
     for path in paths:
         _assert_musicxml_roundtrip_subset(path, tmp_path)

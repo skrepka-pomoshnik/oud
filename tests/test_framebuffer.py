@@ -1,7 +1,7 @@
 import unicodedata
 
-from oud.ui.adapter import CursesError, Screen
-from petrucci.framebuffer import Frame, draw_frame_rows, overlay_dirty_rows
+from oud.presentation.ui.adapter import CursesError, Screen
+from petrucci.terminal.canvas.framebuffer import Frame, draw_frame_rows, overlay_dirty_rows
 
 
 def _display_cols(text: str) -> int:

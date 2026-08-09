@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from petrucci.flow import (
+from petrucci.core.flow import (
     FlowAdapterError,
     FlowBeamPolicy,
     FlowEvent,
@@ -16,7 +16,7 @@ from petrucci.flow import (
     adapt_flow_events,
     adapt_flow_measures,
 )
-from petrucci.layout import (
+from petrucci.engraving.layout.engine import (
     ElementKey,
     ElementRole,
     EventLocation,
@@ -35,7 +35,7 @@ from petrucci.layout import (
     layout_collisions,
     layout_score,
 )
-from petrucci.model import (
+from petrucci.core.model import (
     Bar,
     Chord,
     ImportedBarContent,
@@ -48,8 +48,8 @@ from petrucci.model import (
     Note,
     Piece,
 )
-from petrucci.note_input import apply_note_input, resolve_input_pitch
-from petrucci.note_input_types import (
+from petrucci.input.note.operations import apply_note_input, resolve_input_pitch
+from petrucci.input.note.types import (
     AddLyric,
     AddSlur,
     AddTie,
@@ -73,8 +73,8 @@ from petrucci.note_input_types import (
     ReplacePitch,
     ScorePosition,
 )
-from petrucci.piece_adapter import PieceAdapterError, notation_score_from_piece, written_pitch_from_token
-from petrucci.score import (
+from petrucci.adapters.piece import PieceAdapterError, notation_score_from_piece, written_pitch_from_token
+from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
     BeamKind,
@@ -100,9 +100,9 @@ from petrucci.score import (
     duration_notation,
     pitch_from_midi,
 )
-from petrucci.score_cues import PitchCue, PitchCueError, paint_pitch_cues
-from petrucci.tab_input import CellKey, editor_event_columns, editor_fret_at
-from petrucci.tab_mutation import (
+from petrucci.engraving.cues import PitchCue, PitchCueError, paint_pitch_cues
+from petrucci.input.tablature.input import CellKey, editor_event_columns, editor_fret_at
+from petrucci.input.tablature.mutation import (
     EditableTablature,
     TabCellDelta,
     TabChordDelta,
@@ -123,9 +123,9 @@ from petrucci.tab_mutation import (
 )
 
 if TYPE_CHECKING:
-    from petrucci.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
-    from petrucci.terminal import GlyphMode, SemanticFrame, TerminalNoteheads
-    from petrucci.typeset import TypesetOptions, TypesetResult
+    from petrucci.engraving.score_typeset import ScoreTypesetOptions, ScoreTypesetResult
+    from petrucci.terminal.api import GlyphMode, SemanticFrame, TerminalNoteheads
+    from petrucci.engraving.typeset import TypesetOptions, TypesetResult
 
 __all__ = [
     "AccidentalDisplay",
@@ -257,28 +257,28 @@ __all__ = [
 
 def __getattr__(name: str) -> Any:
     if name in {"TypesetOptions", "TypesetResult"}:
-        from petrucci import typeset  # noqa: PLC0415
+        from petrucci.engraving import typeset  # noqa: PLC0415
 
         return getattr(typeset, name)
     if name in {"ScoreTypesetOptions", "ScoreTypesetResult"}:
-        from petrucci import score_typeset  # noqa: PLC0415
+        from petrucci.engraving import score_typeset  # noqa: PLC0415
 
         return getattr(score_typeset, name)
     if name in {"GlyphMode", "SemanticFrame", "TerminalNoteheads"}:
-        from petrucci import terminal  # noqa: PLC0415
+        from petrucci.terminal import api as terminal  # noqa: PLC0415
 
         return getattr(terminal, name)
     raise AttributeError(name)
 
 
 def typeset_piece(*args, **kwargs):
-    from petrucci.typeset import typeset_piece as _typeset_piece  # noqa: PLC0415
+    from petrucci.engraving.typeset import typeset_piece as _typeset_piece  # noqa: PLC0415
 
     return _typeset_piece(*args, **kwargs)
 
 
 def typeset_text(*args, **kwargs):
-    from petrucci.typeset import typeset_text as _typeset_text  # noqa: PLC0415
+    from petrucci.engraving.typeset import typeset_text as _typeset_text  # noqa: PLC0415
 
     return _typeset_text(*args, **kwargs)
 
@@ -288,7 +288,7 @@ def typeset_score(
     *,
     options: ScoreTypesetOptions | None = None,
 ) -> ScoreTypesetResult:
-    from petrucci.score_typeset import typeset_score as _typeset_score  # noqa: PLC0415
+    from petrucci.engraving.score_typeset import typeset_score as _typeset_score  # noqa: PLC0415
 
     return _typeset_score(score, options=options)
 
@@ -299,7 +299,7 @@ def typeset_layout(
     options: ScoreTypesetOptions | None = None,
     score: NotationScore | None = None,
 ) -> ScoreTypesetResult:
-    from petrucci.score_typeset import typeset_layout as _typeset_layout  # noqa: PLC0415
+    from petrucci.engraving.score_typeset import typeset_layout as _typeset_layout  # noqa: PLC0415
 
     return _typeset_layout(layout, options=options, score=score)
 
@@ -311,7 +311,7 @@ def paint_score(
     glyph_mode: GlyphMode | None = None,
     noteheads: TerminalNoteheads | None = None,
 ) -> SemanticFrame:
-    from petrucci.terminal import paint_score as _paint_score  # noqa: PLC0415
+    from petrucci.terminal.api import paint_score as _paint_score  # noqa: PLC0415
 
     if glyph_mode is None:
         return _paint_score(layout, viewport=viewport, noteheads=noteheads)

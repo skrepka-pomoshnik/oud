@@ -17,7 +17,7 @@ from oud.editor.navigation.steps import (
     move_right_visual,
 )
 from oud.editor.services.bootstrap import init_state
-from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 

@@ -1,4 +1,4 @@
-from petrucci.cue_placement import place_parenthesize_tie_cues
+from petrucci.engraving.layout.placement import place_parenthesize_tie_cues
 
 
 def test_parenthesized_tie_cues_use_shared_collision_priority() -> None:

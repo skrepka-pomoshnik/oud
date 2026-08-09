@@ -4,8 +4,8 @@ from oud.editor.core.document import display_path, document_status_label
 from oud.editor.core.state import EditorState
 from oud.editor.navigation.view.focus import current_view_staff, visible_view_staffs
 from oud.editor.navigation.viewport import viewport_page_label, viewport_section_label, viewport_system_range
-from petrucci.duet_score import duet_bar_mapping, is_duet_score_piece
-from petrucci.time_utils import parse_time_signature_value
+from petrucci.adapters.duet import duet_bar_mapping, is_duet_score_piece
+from petrucci.core.music.time import parse_time_signature_value
 
 
 def _compact_name(name: str, width: int) -> str:

@@ -4,12 +4,12 @@ from oud.editor.navigation.view.focus import current_view_staff, visible_view_st
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.status import status_line
 from oud.importers.ft3 import load_ft3
-from petrucci.duet_score import duet_bar_mapping
-from petrucci.imported_score import project_imported_staff
+from petrucci.adapters.duet import duet_bar_mapping
+from petrucci.core.imported import project_imported_staff
 from tests.helpers_keyscript import press_keys
 
-MIXED_FT3 = "lutemusic/can_she_excuse.ft3"
-DUET_FT3 = "lutemusic/willoughby_duet.ft3"
+MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
+DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
 
 
 def test_mixed_view_staff_focus_cycles_visible_lanes(tmp_path: Path) -> None:
@@ -42,7 +42,7 @@ def test_duet_view_staff_focus_moves_cursor_to_matching_raw_staff(tmp_path: Path
 
 def test_forced_single_staff_view_keeps_string_navigation(tmp_path: Path) -> None:
     state = init_state(
-        "examples/02_forlorne_hope_8C.ft3",
+        "tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3",
         config_path=str(tmp_path / "config.toml"),
         read_only=True,
     )
@@ -54,7 +54,7 @@ def test_forced_single_staff_view_keeps_string_navigation(tmp_path: Path) -> Non
 
 
 def test_polyphonic_ft3_focus_projects_the_selected_voice_without_mutating_piece() -> None:
-    piece = load_ft3("lutemusic/05_can_she_excuse/can_she_excuse_4_part.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse_4_part.ft3")
     staffs = visible_view_staffs(piece)
     soprano = next(staff for staff in staffs if staff.label == "soprano")
     bass = next(staff for staff in staffs if staff.label == "bass")

@@ -9,7 +9,7 @@ from oud.editor.interaction.prompt.state import (
     search_history_commit,
     search_history_reset_nav,
 )
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

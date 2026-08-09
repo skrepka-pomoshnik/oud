@@ -9,7 +9,7 @@ from oud.editor.core.state import EditorState
 from oud.importers.ft3 import load_ft3
 from oud.importers.musicxml import load_musicxml, load_mxl
 from oud.importers.tab import TabData, load_tab, load_tab_data
-from petrucci.model import Piece
+from petrucci.core.model import Piece
 
 LoadResult = tuple[
     Piece,

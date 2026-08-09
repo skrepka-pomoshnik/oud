@@ -7,7 +7,7 @@ import pytest
 from oud.editor.editing.primitives.undo import redo, undo
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write
-from petrucci.render_utils import note_type_to_denom
+from petrucci.rendering.primitives.utils import note_type_to_denom
 from tests.helpers_keyscript import keyscript_state, press_keys
 
 

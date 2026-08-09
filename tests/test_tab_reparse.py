@@ -4,7 +4,7 @@ from oud.editor.core.state import EditorState
 from oud.editor.editing.tab.reparse import apply_tab_reparse_delta
 from oud.editor.services.bootstrap import init_state
 from oud.importers.tab import parse_tab_text_data
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _base_tab_text() -> str:

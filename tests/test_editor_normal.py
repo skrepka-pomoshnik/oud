@@ -1,9 +1,9 @@
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
-from petrucci.framebuffer import FrameBuffer
-from petrucci.model import Bar, Piece
-from petrucci.render import render_piece
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.core.model import Bar, Piece
+from petrucci.rendering.api import render_piece
 
 
 def _state() -> EditorState:

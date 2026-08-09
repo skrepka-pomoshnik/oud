@@ -6,7 +6,7 @@ from typing import cast
 
 import pytest
 
-from petrucci.score import (
+from petrucci.core.score import (
     EventKind,
     LyricSyllable,
     NotationEvent,

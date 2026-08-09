@@ -27,7 +27,7 @@ Repository = "https://github.com/skrepka-pomoshnik/oud"
 Issues = "https://github.com/skrepka-pomoshnik/oud/issues"
 
 [project.scripts]
-oud = "oud.app:main"
+oud = "oud.presentation.app:main"
 
 [dependency-groups]
 dev = [
@@ -39,15 +39,81 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=petrucci --cov-report=term-missing --cov-fail-under=95"
+addopts = "--cov=petrucci"
 pythonpath = ["."]
+
+[tool.coverage.run]
+branch = false
+source = ["petrucci"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+# Fully covered modules are omitted to keep CI logs short; no tests are skipped.
+skip_covered = true
 
 [tool.ty]
 environment.python-version = "3.11"
 
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+  "C90",
+  "E",
+  "F",
+  "I",
+  "B",
+  "C4",
+  "ERA",
+  "A",
+  "ARG",
+  "COM",
+  "DTZ",
+  "FBT",
+  "G",
+  "ISC",
+  "N",
+  "PERF",
+  "PIE",
+  "PTH",
+  "S",
+  "PL",
+  "RUF",
+  "RET",
+  "TID",
+  "TRY",
+  "UP",
+  "SIM",
+]
+ignore = [
+  "COM812", # Conflicts with Ruff's formatter; retain the rest of the COM rules.
+  "FBT",
+  "PLR0913",
+  "PLR0915",
+  "PLR2004",
+  "S101",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "S101", "PLR2004"]
+
+[tool.ruff.lint.mccabe]
+# The ceiling is enforced for new code. Exact legacy C901 findings and their
+# retirement targets are tracked by docs/architecture/debt.json and TODO.md.
+max-complexity = 7
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
 [tool.setuptools.packages.find]
 include = ["oud*", "petrucci*"]
-exclude = ["refs*", "downloads*", "lutemusic*", "examples*", "tests*"]
+exclude = ["refs*", "downloads*", "examples*", "tests*"]
 
 [tool.setuptools.package-data]
 oud = ["py.typed"]

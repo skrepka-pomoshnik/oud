@@ -137,7 +137,7 @@ algorithm that preserves sounding pitch and produces playable tablature.
 
 ## P1.4: Linked Petrucci and LilyPond engraving (next after transposition)
 
-- [ ] Expand `corpus/engraving-quality-matrix.json` until every supported
+- [ ] Expand `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` until every supported
   notation feature has one source-independent microcase and at least one real
   FT3 case.
 - [ ] Drive Petrucci proof assertions and LilyPond export assertions from the
@@ -163,16 +163,18 @@ algorithm that preserves sounding pitch and produces playable tablature.
   long multi-page, and dense scores.
   - Check page count, system count, staff order, clipping, collisions, orphaned
     headings, lyric alignment, and readable scale.
-  - Extend the implemented Bossinensis twelve-stanza benchmark with bounded
-    raster-difference thresholds and further public Gerbode mixed scores.
+  - Extend the implemented Bossinensis twelve-stanza and Dowland two-verse
+    benchmarks with bounded raster-difference thresholds and further public
+    Gerbode mixed scores.
   - Record intentional differences from Gerbode/Fronimo output instead of
     claiming pixel identity.
 
 ## P2: Architecture debt retirement
 
-CI enforces complexity 7 and a 1,000-line module ceiling against the exact
-non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
-targets are in `docs/architecture-debt.md`.
+CI enforces complexity 7, a 1,000-line module ceiling, and at most seven direct
+Python entities per package. Function debt uses the exact non-growth baseline
+in `docs/architecture/debt.json`; rationale, counts, and ownership targets are in
+`docs/architecture/debt.md`.
 
 - [ ] Retire the remaining non-Petrucci function-level C901 findings without raising
   limits, broad per-file ignores, compatibility wrappers, or count-only helper

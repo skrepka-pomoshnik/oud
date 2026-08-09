@@ -10,8 +10,8 @@ from oud.editor.commands.plugins.operations import (
     open_plugin_item,
 )
 from oud.editor.core.state import EditorState
-from oud.plugins.model import RemoteTab
-from petrucci.model import Bar, Piece
+from oud.services.plugins.model import RemoteTab
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:
@@ -41,7 +41,7 @@ def test_handle_plugin_key_selects_index_item(monkeypatch) -> None:
         _ = limit
         return items
 
-    monkeypatch.setattr("oud.plugins.lutemusic.fetch_supported_tabs", _fetch)
+    monkeypatch.setattr("oud.services.plugins.lutemusic.fetch_supported_tabs", _fetch)
     handle_plugin_key(state, 10)
     assert state.plugin_title == "Lutemusic"
     assert state.plugin_items
@@ -55,7 +55,7 @@ def test_handle_plugin_key_selects_random_lutemusic_item(monkeypatch) -> None:
     enter_plugin_mode(state)
     state.plugin_items = [RemoteTab(title="Random FT3", url="lutemusic:random", is_dir=False)]
     random_item = RemoteTab(title="Rnd", url="https://example.com/rnd.ft3", is_dir=False)
-    monkeypatch.setattr("oud.plugins.lutemusic.random_ft3", lambda: random_item)
+    monkeypatch.setattr("oud.services.plugins.lutemusic.random_ft3", lambda: random_item)
     handle_plugin_key(state, 10)
     assert state.plugin_name == "lutemusic"
     assert state.plugin_items == [random_item]
@@ -67,7 +67,7 @@ def test_handle_plugin_key_downloads_item(monkeypatch, tmp_path: Path) -> None:
     enter_plugin_mode(state)
     state.plugin_name = "lutemusic"
     state.plugin_items = [RemoteTab(title="Song", url="https://example.com/song.tab", is_dir=False)]
-    monkeypatch.setattr("oud.plugins.lutemusic.download_tab", lambda _item, _dest: tmp_path / "song.tab")
+    monkeypatch.setattr("oud.services.plugins.lutemusic.download_tab", lambda _item, _dest: tmp_path / "song.tab")
     handle_plugin_key(state, ord("d"))
     assert state.message.startswith("Downloaded")
 
@@ -102,7 +102,7 @@ def test_handle_plugin_key_downloads_folder_recursively_with_confirmation(
         calls.append((item, dest))
         return [tmp_path / "a.ft3", tmp_path / "sub" / "b.ft3.gz"]
 
-    monkeypatch.setattr("oud.plugins.lutemusic.download_folder_ft3", _download_folder)
+    monkeypatch.setattr("oud.services.plugins.lutemusic.download_folder_ft3", _download_folder)
 
     handle_plugin_key(state, ord("D"))
     assert "Press D again" in state.message
@@ -110,7 +110,7 @@ def test_handle_plugin_key_downloads_folder_recursively_with_confirmation(
     handle_plugin_key(state, ord("D"))
     assert len(calls) == 1
     assert calls[0][0] == folder
-    assert calls[0][1].as_posix().endswith("lutemusic/Composer")
+    assert calls[0][1].as_posix().endswith("downloads/lutemusic/Composer")
     assert state.message.startswith("Downloaded 2 ft3 files")
 
 
@@ -176,7 +176,7 @@ def test_plugin_download_guards_and_failures(monkeypatch) -> None:
     assert state.message == "Plugin does not support downloads"
 
     state.plugin_name = "lutemusic"
-    monkeypatch.setattr("oud.plugins.lutemusic.download_tab", lambda _item, _dest: (_ for _ in ()).throw(OSError("no")))
+    monkeypatch.setattr("oud.services.plugins.lutemusic.download_tab", lambda _item, _dest: (_ for _ in ()).throw(OSError("no")))
     assert download_plugin_item(state) is None
     assert state.message == "Download failed: no"
 
@@ -199,7 +199,7 @@ def test_recursive_plugin_download_guards_and_failure(monkeypatch) -> None:
     state.plugin_items = [folder]
     assert download_plugin_folder_recursive(state) is None
     monkeypatch.setattr(
-        "oud.plugins.lutemusic.download_folder_ft3",
+        "oud.services.plugins.lutemusic.download_folder_ft3",
         lambda _item, _dest: (_ for _ in ()).throw(OSError("offline")),
     )
     assert download_plugin_folder_recursive(state) is None
@@ -220,13 +220,13 @@ def test_plugin_open_failure_messages(monkeypatch) -> None:
     assert state.message == "Failed to load plugin missing"
 
     state.plugin_items = [RemoteTab("Random", "lutemusic:random")]
-    monkeypatch.setattr("oud.plugins.lutemusic.random_ft3", lambda: None)
+    monkeypatch.setattr("oud.services.plugins.lutemusic.random_ft3", lambda: None)
     open_plugin_item(state)
     assert state.message == "No random FT3 found"
 
     state.plugin_name = "lutemusic"
     state.plugin_items = [RemoteTab("Folder", "https://example.com/folder/", is_dir=True)]
-    monkeypatch.setattr("oud.plugins.lutemusic.fetch_supported_tabs", lambda _url: [])
+    monkeypatch.setattr("oud.services.plugins.lutemusic.fetch_supported_tabs", lambda _url: [])
     open_plugin_item(state)
     assert state.message == "No supported files found"
 

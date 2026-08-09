@@ -12,7 +12,7 @@ from oud.exports.lilypond import export_lilypond
 from oud.exports.midi import export_midi
 from oud.importers.tab import load_tab
 from petrucci import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
-from petrucci.tab_input import editor_fret_at
+from petrucci.input.tablature.input import editor_fret_at
 from tests.helpers_keyscript import keyscript_state, render_lines
 
 EventSignature = tuple[tuple[tuple[int, int], ...], ...]

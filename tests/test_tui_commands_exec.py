@@ -8,9 +8,9 @@ from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.tablature import french_to_fret
 from oud.editor.services.io.files import render_ascii_snapshot
 from oud.importers.tab import TabData
-from oud.tui import commands as cmd
-from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
-from petrucci.tuning_utils import parse_tuning_pitches
+from oud.presentation.tui import commands as cmd
+from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.core.music.tuning import parse_tuning_pitches
 
 
 def _state(bars: int = 2) -> EditorState:

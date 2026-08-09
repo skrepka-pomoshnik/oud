@@ -13,8 +13,8 @@ from oud.editor.services.media.playback import (
     start_playback_clock,
 )
 from oud.exports.midi import build_playback_timeline, export_midi, play_midi
-from oud.playback.timeline import PlaybackCursor
-from petrucci.model import Piece
+from oud.services.playback.timeline import PlaybackCursor
+from petrucci.core.model import Piece
 
 T = TypeVar("T")
 

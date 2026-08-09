@@ -5,7 +5,7 @@ import pytest
 from oud.exports.lilypond import export_lilypond
 from oud.importers.ft3 import build_durations, load_ft3
 from oud.settings import DEFAULT_SETTINGS
-from petrucci.model import (
+from petrucci.core.model import (
     Bar,
     Chord,
     ImportedBarContent,
@@ -128,7 +128,7 @@ def test_export_lilypond_emits_imported_vocal_only_staffgroup(tmp_path) -> None:
 
 
 def test_export_lilypond_emits_every_imported_polyphonic_staff(tmp_path) -> None:
-    piece = load_ft3("lutemusic/05_can_she_excuse/can_she_excuse_4_part.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse_4_part.ft3")
     path = tmp_path / "four_part.ly"
     export_lilypond(
         str(path),
@@ -476,7 +476,7 @@ def test_export_lilypond_ft3_meter_mapping_and_midpiece_changes_synthetic(tmp_pa
 
 
 def test_export_lilypond_emits_midpiece_time_changes_for_real_ft3_if_available(tmp_path) -> None:
-    src = Path("lutemusic/ich_bin_eine_blume_zu_saron_T.ft3")
+    src = Path("tests/fixtures/ft3/corpus/ich_bin_eine_blume_zu_saron_T.ft3")
     if not src.exists():
         pytest.skip("local FT3 corpus file not available")
 
@@ -498,7 +498,7 @@ def test_export_lilypond_emits_midpiece_time_changes_for_real_ft3_if_available(t
 
 
 def test_export_lilypond_keeps_ft3_repeat_barlines_from_real_file_if_available(tmp_path) -> None:
-    src = Path("lutemusic/wu_sol_ich_mich_hin_keren.ft3")
+    src = Path("tests/fixtures/ft3/corpus/wu_sol_ich_mich_hin_keren.ft3")
     if not src.exists():
         pytest.skip("local FT3 corpus file not available")
 
@@ -584,7 +584,7 @@ def test_export_lilypond_real_ft3_smoke_matrix_if_available(tmp_path, src_name: 
 
 
 def test_export_lilypond_registers_dense_felice_score_like_gerbode(tmp_path) -> None:
-    piece = load_ft3("lutemusic/01_felice_fu_quel_anon.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/01_felice_fu_quel_anon.ft3")
     path = tmp_path / "felice.ly"
     settings = dict(DEFAULT_SETTINGS)
 

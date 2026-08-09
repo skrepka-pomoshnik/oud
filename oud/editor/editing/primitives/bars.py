@@ -4,7 +4,7 @@ import copy
 from typing import TypeVar
 
 from oud.editor.core.state import BarSnapshot, EditorState
-from petrucci.model import Bar
+from petrucci.core.model import Bar
 
 T = TypeVar("T")
 

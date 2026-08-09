@@ -1,9 +1,9 @@
 import subprocess
 from pathlib import Path
 
-from oud.exports import _lilypond_document as lp
+from oud.exports.lilypond import document as lp
 from oud.exports.lilypond import export_lilypond
-from petrucci.model import (
+from petrucci.core.model import (
     Bar,
     Chord,
     Note,

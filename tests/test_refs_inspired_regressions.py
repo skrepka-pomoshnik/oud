@@ -5,7 +5,7 @@ from pathlib import Path
 from oud.editor.services.io.loading import load_piece_data
 from oud.exports.export_tab import export_tab
 from oud.importers.tab import load_tab
-from petrucci.render_utils import chord_positions, note_type_to_denom
+from petrucci.rendering.primitives.utils import chord_positions, note_type_to_denom
 
 
 def _piece_signature(piece) -> tuple:
@@ -28,10 +28,10 @@ def _piece_signature(piece) -> tuple:
 def test_tab_roundtrip_matrix_on_real_fixtures_refs_luteconv_style(tmp_path: Path) -> None:
     # Test strategy inspired by refs/luteconv convert_test.cpp (fixture matrix conversion).
     paths = [
-        Path("examples/26_lachrimae_galliard_in_G.ft3"),
-        Path("examples/02_forlorne_hope_8C.ft3"),
+        Path("tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3"),
+        Path("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3"),
         Path("examples/si_par_souffrir.tab"),
-        Path("lutemusic/23a_frogg_galliard_2.ft3"),
+        Path("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3"),
     ]
     for src in paths:
         piece, overrides, durations, dotted, bar_width = load_piece_data(str(src))
@@ -56,9 +56,9 @@ def test_tab_roundtrip_matrix_on_real_fixtures_refs_luteconv_style(tmp_path: Pat
 def test_chord_positions_invariants_on_real_examples_refs_vexflow_tickstyle() -> None:
     # Test idea inspired by refs/vexflow tick/tickcontext invariants: spacing timeline must be monotonic.
     paths = [
-        "examples/26_lachrimae_galliard_in_G.ft3",
-        "examples/02_forlorne_hope_8C.ft3",
-        "lutemusic/23a_frogg_galliard_2.ft3",
+        "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",
+        "tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3",
+        "tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3",
     ]
     for path in paths:
         piece, _o, _d, _dot, _w = load_piece_data(path)

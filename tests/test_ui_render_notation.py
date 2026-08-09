@@ -4,12 +4,12 @@ import re
 
 import pytest
 
-from oud.ui.adapter import Screen
-from petrucci.framebuffer import FrameBuffer
-from petrucci.model import Bar, Chord, MelodyEvent, Note, Piece
-from petrucci.render import render_piece
-from petrucci.render_text_lanes import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
-from petrucci.render_vocal import melody_row_count
+from oud.presentation.ui.adapter import Screen
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.core.model import Bar, Chord, MelodyEvent, Note, Piece
+from petrucci.rendering.api import render_piece
+from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
+from petrucci.rendering.staff.vocal import melody_row_count
 from tests.helpers_regression_cases import repeat_and_meter_change_piece
 from tests.render_test_utils import first_melody_row_idx as _first_melody_row_idx
 
@@ -754,7 +754,7 @@ def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(m
     def _fake_render_systems(*_args, **kwargs):
         captured["show_extras"] = kwargs["show_extras"]
 
-    monkeypatch.setattr("petrucci.render_legacy.render_systems", _fake_render_systems)
+    monkeypatch.setattr("petrucci.rendering.bar.legacy.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["settings"]["showextras"] = "on"
     kwargs["settings"]["showspans"] = "off"

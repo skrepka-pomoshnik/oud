@@ -10,7 +10,7 @@ from oud.editor.editing.primitives.undo import undo
 from oud.editor.interaction.normal.actions import handle_normal
 from oud.editor.navigation import motions
 from oud.editor.services.status import status_line
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

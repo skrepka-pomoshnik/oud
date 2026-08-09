@@ -12,7 +12,7 @@ from oud.editor.editing.primitives.rhythm import (
     expected_beats,
     row_duration_sum,
 )
-from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 
 
 def _state(*, strings: int = 6, bars: int = 1) -> EditorState:

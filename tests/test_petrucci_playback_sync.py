@@ -3,11 +3,11 @@ from typing import cast
 
 from oud.editor.core.state import EditorState, PlaybackState
 from oud.editor.services.media.playback import advance_playback_cursor
-from oud.exports._midi_projection import _timed_vocal_events, build_playback_timeline
-from oud.exports._midi_serialization import _polyphonic_score_midi_note_events
-from petrucci.model import Bar, ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Piece
-from petrucci.piece_score_view import typeset_piece_score_view
-from petrucci.vocal_line import VocalEvent
+from oud.exports.midi.projection import _timed_vocal_events, build_playback_timeline
+from oud.exports.midi.serialization import _polyphonic_score_midi_note_events
+from petrucci.core.model import Bar, ImportedBarContent, ImportedScore, ImportedStaff, MelodyEvent, Piece
+from petrucci.adapters.piece_view import typeset_piece_score_view
+from petrucci.adapters.vocal import VocalEvent
 
 
 def _polyphonic_piece() -> Piece:

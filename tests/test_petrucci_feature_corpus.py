@@ -22,15 +22,15 @@ from petrucci import (
     notation_score_from_piece,
     typeset_piece,
 )
-from petrucci.tuning_utils import tuning_preset
-from scripts.fetch_ft3_corpus import load_manifest, manifest_paths
+from petrucci.core.music.tuning import tuning_preset
+from scripts.corpus.fetch import load_manifest, manifest_paths
 
-MANIFEST = Path("corpus/petrucci-feature-excerpts.json")
+MANIFEST = Path("tests/fixtures/ft3/manifests/petrucci-feature-excerpts.json")
 
 
 def _source_key(value: str | Path) -> str:
     rendered = Path(value).as_posix()
-    relative = rendered.partition("lutemusic/")[2]
+    relative = rendered.partition("tests/fixtures/ft3/corpus/")[2]
     return relative or rendered
 
 
@@ -159,8 +159,8 @@ def test_feature_manifest_is_a_source_honest_fixed_selection() -> None:
 
     assert raw["schema"] == 1
     assert raw["source_manifests"] == [
-        "corpus/ft3-note-input-100.json",
-        "corpus/ft3-random-75-v2.json",
+        "tests/fixtures/ft3/manifests/ft3-note-input-100.json",
+        "tests/fixtures/ft3/manifests/ft3-random-75-v2.json",
     ]
     assert sorted(features) == raw["available_features"]
     assert set(raw["known_gaps"]) == {"grace_notes", "tablature_style_provenance", "tuplets"}

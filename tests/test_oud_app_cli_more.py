@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from oud import app as oud_app
-from oud import cli_convert
-from petrucci.model import Bar, Piece
+from oud.presentation import app as oud_app
+from oud.presentation import cli_convert
+from petrucci.core.model import Bar, Piece
 
 
 def _write_tab(path: Path) -> None:

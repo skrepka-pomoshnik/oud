@@ -4,9 +4,8 @@ Run the release checks from the repository root:
 
 ```
 uv sync --locked
-uv run ruff check .
-uv run pytest tests -q
-uv run python scripts/corpus_smoke.py lutemusic
+./scripts/quality.sh
+uv run python scripts/checks/release_artifacts.py
 uv build
 ```
 
@@ -14,7 +13,7 @@ For a wider importer pass, use a temporary live sample. Downloaded files are
 removed when the command exits:
 
 ```
-uv run python scripts/corpus_smoke.py --fetch-lutemusic 250 \
+uv run python scripts/corpus/smoke.py --fetch-lutemusic 250 \
   --lutemusic-url https://browse.lutemusic.org/tabs/composers/
 ```
 
@@ -30,12 +29,14 @@ availability is not reserved until the first upload.
 curl -sS -o /dev/null -w '%{http_code}\n' https://pypi.org/pypi/oud/json
 ```
 
-The GitHub Actions matrix must be green on macOS before tagging. It runs
-Python 3.11 and 3.13, ruff, pytest, and the bundled-corpus smoke pass.
+The Ubuntu Python 3.11 quality job must be green before tagging. Run the focused
+`macos-curses` workflow manually when terminal input, resize handling, or curses
+presentation changes; it does not spend macOS runner minutes on unrelated
+commits.
 
 ## Publication decisions
 
 - The canonical repository, homepage, and issue tracker are
   `https://github.com/skrepka-pomoshnik/oud`.
-- `uv.lock`, `.github/workflows/ci.yml`, and `lutemusic/README.md` are tracked
+- `uv.lock`, `.github/workflows/ci.yml`, and `tests/fixtures/ft3/README.md` are tracked
   and present on `origin/main` from commit `390ebe8`.

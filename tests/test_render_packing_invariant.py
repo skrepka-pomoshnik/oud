@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 
 from oud.settings import DEFAULT_SETTINGS
-from petrucci.framebuffer import FrameBuffer
-from petrucci.model import Bar, Chord, Note, Piece
-from petrucci.render import render_piece
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.rendering.api import render_piece
 
 
 def _render(fill: str) -> str:

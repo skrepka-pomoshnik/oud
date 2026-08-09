@@ -1,6 +1,6 @@
 from oud.importers.ft3 import build_durations, load_ft3
-from petrucci.model import Bar, Chord, Note
-from petrucci.view_model import _bar_compact_width, _bar_display_width, _bars_fit
+from petrucci.core.model import Bar, Chord, Note
+from petrucci.terminal.view.model import _bar_compact_width, _bar_display_width, _bars_fit
 
 
 def test_bar_display_width_accounts_for_flags_and_dots() -> None:
@@ -110,7 +110,7 @@ def test_bars_fit_respects_chord_wrap_threshold() -> None:
 
 
 def test_compact_width_for_frog_galliard_bars_stays_tight() -> None:
-    piece = load_ft3("lutemusic/23a_frogg_galliard_2.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3")
     durations = build_durations(piece)
     bar7_width = _bar_compact_width(
         piece.bars[6],

@@ -9,16 +9,16 @@ from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write_ascii
 from oud.editor.services.status import status_line
-from oud.tui.commands import apply_command
-from oud.tui.input import handle_command
-from petrucci.framebuffer import FrameBuffer
-from petrucci.render_helpers import render_help
+from oud.presentation.tui.commands import apply_command
+from oud.presentation.tui.input import handle_command
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.rendering.primitives.helpers import render_help
 from tests.helpers_keyscript import press_keys
 
-PURE_FT3 = "lutemusic/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
-MIXED_FT3 = "lutemusic/can_she_excuse.ft3"
-DUET_FT3 = "lutemusic/willoughby_duet.ft3"
-VOCAL_ONLY_FT3 = "lutemusic/01_unquiet_thoughts/unquiet_thoughts_4-part.ft3"
+PURE_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
+MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
+DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
+VOCAL_ONLY_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_4-part.ft3"
 TAB_FILE = "examples/si_par_souffrir.tab"
 
 
@@ -183,7 +183,7 @@ def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: P
     line = status_line(state)
 
     assert "unquiet_thoughts_T.ft3*" in line
-    assert "FT3->edited.tab" in line
+    assert "FT3 EDIT:edited.tab" in line
     assert "bar:1" in line
     assert "str:1" in line
     assert len(line) <= 80

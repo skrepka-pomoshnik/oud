@@ -8,14 +8,14 @@ from oud.editor.core.document import configure_document
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
 from oud.editor.services.status import status_line
-from oud.tui.commands import apply_command, apply_set_command
-from oud.tui.controller import handle_key
-from oud.tui.input import handle_command as handle_command_input
-from oud.tui.input import handle_search as handle_search_input
-from oud.tui.input import history_next, history_prev, parse_search
-from oud.tui.loop import _read_input_batch, run_loop
-from petrucci.framebuffer import Frame
-from petrucci.model import Bar, ImportedScore, Piece
+from oud.presentation.tui.commands import apply_command, apply_set_command
+from oud.presentation.tui.controller import handle_key
+from oud.presentation.tui.input import handle_command as handle_command_input
+from oud.presentation.tui.input import handle_search as handle_search_input
+from oud.presentation.tui.input import history_next, history_prev, parse_search
+from oud.presentation.tui.loop import _read_input_batch, run_loop
+from petrucci.terminal.canvas.framebuffer import Frame
+from petrucci.core.model import Bar, ImportedScore, Piece
 
 
 def _state() -> EditorState:
@@ -52,7 +52,7 @@ def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     state.modified = True
     line = status_line(state)
     assert "example.ft3*" in line
-    assert "[FT3->TAB?]" in line
+    assert "[FT3 EDIT:choose :w path]" in line
     assert "bar:2" in line
     assert "beat:2/4" in line
     assert "str:3" in line
@@ -487,9 +487,9 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
     def _fake_render_piece(*args, **_kwargs):
         render_bar_offsets.append(args[2])
 
-    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
-    monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
+    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -537,9 +537,9 @@ def test_run_loop_follows_playback_advanced_during_full_render(monkeypatch) -> N
     def _fake_render_piece(*args, **_kwargs):
         render_bar_offsets.append(args[2])
 
-    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
-    monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
+    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -584,9 +584,9 @@ def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
         cache[(0, 0)] = [(2, 2, "a", 1)]
         cache[(0, 1)] = [(2, 3, "b", 1)]
 
-    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
-    monkeypatch.setattr("oud.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
+    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -620,9 +620,9 @@ def test_run_loop_passes_playback_position_to_imported_score_renderer(monkeypatc
     def _fake_render_piece(*args, **kwargs):
         rendered_positions.append((args[29], args[30], kwargs["playback_cache"]))
 
-    monkeypatch.setattr("oud.tui.loop.init_state", _fake_init_state)
-    monkeypatch.setattr("oud.tui.loop.update_playback_animation", lambda _state: False)
-    monkeypatch.setattr("oud.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
+    monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", lambda _state: False)
+    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
 
     assert (
         run_loop(

@@ -1,0 +1,617 @@
+{
+  "download_errors": [],
+  "files": [
+    {
+      "composer": "Whitfield",
+      "path": "random-75-v2/001/english_huntsuppe.ft3",
+      "sha256": "f5a866956e269c7cd7a3376d744dcfb7fb97af10f1e153ff0ce9990e14ff1649",
+      "size": 901,
+      "title": "english_huntsuppe.ft3",
+      "url": "https://browse.lutemusic.org/composers/Whitfield/english_huntsuppe.ft3"
+    },
+    {
+      "composer": "PhilipsP",
+      "path": "random-75-v2/002/chromatica_pavana.ft3",
+      "sha256": "2147deeae49101b9985266a05cd95d2eaef8f26111fd34a37714a71126f21fd5",
+      "size": 2433,
+      "title": "chromatica_pavana.ft3",
+      "url": "https://browse.lutemusic.org/composers/PhilipsP/chromatica_pavana.ft3"
+    },
+    {
+      "composer": "Tracetti",
+      "path": "random-75-v2/003/preamble.ft3",
+      "sha256": "c42944026f141cc8bc21cf06af672869585c6ee9d3fe9e111b7b76528e6473e2",
+      "size": 1825,
+      "title": "preamble.ft3",
+      "url": "https://browse.lutemusic.org/composers/Tracetti/preamble.ft3"
+    },
+    {
+      "composer": "Van_eyck",
+      "path": "random-75-v2/004/courant_duet_T.ft3",
+      "sha256": "db2c1ee3b593d7e1b54b74858d2366960a1764b0a4f39de869c8c01113a48462",
+      "size": 1209,
+      "title": "courant_duet_T.ft3",
+      "url": "https://browse.lutemusic.org/composers/Van_eyck/courant_duet_T.ft3"
+    },
+    {
+      "composer": "Costeley",
+      "path": "random-75-v2/005/10_a_terre_les_eaux.ft3",
+      "sha256": "a6c609e153b181a72c49316e232cc49b7be2d837b0de197e1b63b2a829922f15",
+      "size": 3790,
+      "title": "10_a_terre_les_eaux.ft3",
+      "url": "https://browse.lutemusic.org/composers/Costeley/10_a_terre_les_eaux.ft3"
+    },
+    {
+      "composer": "Askue",
+      "path": "random-75-v2/006/askue_jig.ft3",
+      "sha256": "b496f705065f787f733166ba8decc95599d8f2b8b36bdb7a2d852ec3cd17f999",
+      "size": 993,
+      "title": "askue_jig.ft3",
+      "url": "https://browse.lutemusic.org/composers/Askue/askue_jig.ft3"
+    },
+    {
+      "composer": "Pifaro",
+      "path": "random-75-v2/007/24_saltarello_laconitano.ft3",
+      "sha256": "3028d8a07af1d85d57e0f73dcd858aba2e73627dbe42639ef00b032fd3293d75",
+      "size": 1359,
+      "title": "24_saltarello_laconitano.ft3",
+      "url": "https://browse.lutemusic.org/composers/Pifaro/24_saltarello_laconitano.ft3"
+    },
+    {
+      "composer": "Kindersley",
+      "path": "random-75-v2/008/mrs_taylors_galliard_7C.ft3",
+      "sha256": "0cce9fef3561e3ffe308f05bdc3d41f159094cf35765f38ac07c0cc68a7c0182",
+      "size": 1734,
+      "title": "mrs_taylors_galliard_7C.ft3",
+      "url": "https://browse.lutemusic.org/composers/Kindersley/mrs_taylors_galliard_7C.ft3"
+    },
+    {
+      "composer": "Kellner",
+      "path": "random-75-v2/009/phantasia_FM.ft3",
+      "sha256": "ec75432722fe9186ae4ab4b7dc7f2a4ca02afd4677b05998e50e71ce14a6f70d",
+      "size": 1271,
+      "title": "phantasia_FM.ft3",
+      "url": "https://browse.lutemusic.org/composers/Kellner/phantasia_FM.ft3"
+    },
+    {
+      "composer": "Mesangeau",
+      "path": "random-75-v2/010/courante_1.ft3",
+      "sha256": "fb780da27db93660d9f3912c3aff7ee570ea025b22cab48f5cf76814ad923c13",
+      "size": 1484,
+      "title": "courante_1.ft3",
+      "url": "https://browse.lutemusic.org/composers/Mesangeau/courante_1.ft3"
+    },
+    {
+      "composer": "Gleitsmann",
+      "path": "random-75-v2/011/capriccio.ft3",
+      "sha256": "1b604dadbb1b8cc73fb2e2600149f1809673c045cc208b302f134ff62b2d2936",
+      "size": 3544,
+      "title": "capriccio.ft3",
+      "url": "https://browse.lutemusic.org/composers/Gleitsmann/capriccio.ft3"
+    },
+    {
+      "composer": "TudorH",
+      "path": "random-75-v2/012/15_consort_2_tudorH.ft3",
+      "sha256": "6e1ded6d8626a99105d57b204f408248251b7c920b941aa4728c70d6242b53ec",
+      "size": 1110,
+      "title": "15_consort_2_tudorH.ft3",
+      "url": "https://browse.lutemusic.org/composers/TudorH/15_consort_2_tudorH.ft3"
+    },
+    {
+      "composer": "Berchem",
+      "path": "random-75-v2/013/13_o_sio_potesi_donna.ft3",
+      "sha256": "97a0fa889be418cbe0b9a52b8fca092c1dcbea7f1f4d23d083d4b5474a5bfcc6",
+      "size": 5262,
+      "title": "13_o_sio_potesi_donna.ft3",
+      "url": "https://browse.lutemusic.org/composers/Berchem/13_o_sio_potesi_donna.ft3"
+    },
+    {
+      "composer": "Beck",
+      "path": "random-75-v2/014/000_beck_katherine_ogie.ft3",
+      "sha256": "5052fa07729175a4ee86381469ce9799a6ca1d590b4d1fe069e9fa004716e090",
+      "size": 1353,
+      "title": "000_beck_katherine_ogie.ft3",
+      "url": "https://browse.lutemusic.org/composers/Beck/000_beck_katherine_ogie.ft3"
+    },
+    {
+      "composer": "Brewster",
+      "path": "random-75-v2/015/brewster_pavan.ft3",
+      "sha256": "69906f77242d21dd1ec43b796afc44b38eaac1a768e0b0d66da2a171ef30ba5b",
+      "size": 1846,
+      "title": "brewster_pavan.ft3",
+      "url": "https://browse.lutemusic.org/composers/Brewster/brewster_pavan.ft3"
+    },
+    {
+      "composer": "Wilson",
+      "path": "random-75-v2/016/prelude_02_archlute.ft3",
+      "sha256": "613f31fead89246349244187b9ffee11672cc0ea87a36e8b58d555070e73be90",
+      "size": 1474,
+      "title": "prelude_02_archlute.ft3",
+      "url": "https://browse.lutemusic.org/composers/Wilson/prelude_02_archlute.ft3"
+    },
+    {
+      "composer": "dalla_Gostena",
+      "path": "random-75-v2/017/dalla_gostena_fantasy_25.ft3",
+      "sha256": "8c76d14234a1498c6f76bc99da228c4e59774a180e986ddfe080cf4d41e66bcb",
+      "size": 1674,
+      "title": "dalla_gostena_fantasy_25.ft3",
+      "url": "https://browse.lutemusic.org/composers/dalla_Gostena/dalla_gostena_fantasy_25.ft3"
+    },
+    {
+      "composer": "RJohnson",
+      "path": "random-75-v2/018/carman_s_whistle.ft3",
+      "sha256": "b84703f12626012e0eaa1916e2a45405235f32ce5036f122eb5830e985bf3ffd",
+      "size": 2977,
+      "title": "carman_s_whistle.ft3",
+      "url": "https://browse.lutemusic.org/composers/RJohnson/carman_s_whistle.ft3"
+    },
+    {
+      "composer": "Spinacino",
+      "path": "random-75-v2/019/recercar_de_tous_biens.ft3",
+      "sha256": "1f672f8ca698a4168604fa0b79e9ce3a9149505666d702d76a2cd42795fcdf29",
+      "size": 1425,
+      "title": "recercar_de_tous_biens.ft3",
+      "url": "https://browse.lutemusic.org/composers/Spinacino/recercar_de_tous_biens.ft3"
+    },
+    {
+      "composer": "Sandrin",
+      "path": "random-75-v2/020/douce_memoire_song_sandrin.ft3",
+      "sha256": "a5b6bfb5b33f4a9ffda1435b1ed0780b4ef1c00d47a929a41a8bb138dc5fd056",
+      "size": 3918,
+      "title": "douce_memoire_song_sandrin.ft3",
+      "url": "https://browse.lutemusic.org/composers/Sandrin/douce_memoire_song_sandrin.ft3"
+    },
+    {
+      "composer": "Roncalli",
+      "path": "random-75-v2/021/Roncalli_sarabande.ft3",
+      "sha256": "ff9b2dbf27262a9660d5788be833100e55fc56689ef95fe48249bc9a757df30c",
+      "size": 949,
+      "title": "Roncalli_sarabande.ft3",
+      "url": "https://browse.lutemusic.org/composers/Roncalli/Roncalli_sarabande.ft3"
+    },
+    {
+      "composer": "Schlick",
+      "path": "random-75-v2/022/29_weg_wart_dein_artt.ft3",
+      "sha256": "dcd3c4291ae14db974721ba94ed07fce9df4b7a3d408268a98f340b74774eba9",
+      "size": 1298,
+      "title": "29_weg_wart_dein_artt.ft3",
+      "url": "https://browse.lutemusic.org/composers/Schlick/29_weg_wart_dein_artt.ft3"
+    },
+    {
+      "composer": "Susato",
+      "path": "random-75-v2/023/entre_vous_filles_clement.ft3",
+      "sha256": "2e3a963083dff123a2eb07e510da2ef19f7c544c815c85141e277c7a24babc55",
+      "size": 1526,
+      "title": "entre_vous_filles_clement.ft3",
+      "url": "https://browse.lutemusic.org/composers/Susato/entre_vous_filles_clement.ft3"
+    },
+    {
+      "composer": "Simpson",
+      "path": "random-75-v2/024/divisions_PT.ft3",
+      "sha256": "cb94efcc751fca65b710d15683d5aa549fff9964b17e28aeed8acd999840ed7d",
+      "size": 1629,
+      "title": "divisions_PT.ft3",
+      "url": "https://browse.lutemusic.org/composers/Simpson/divisions_PT.ft3"
+    },
+    {
+      "composer": "Coleman",
+      "path": "random-75-v2/025/to_my_lady_wyfe.ft3",
+      "sha256": "0cb9f1e3dde5562a1a6bb73066c1fa9aee1e32bad0936f496f81a8438b59e893",
+      "size": 956,
+      "title": "to_my_lady_wyfe.ft3",
+      "url": "https://browse.lutemusic.org/composers/Coleman/to_my_lady_wyfe.ft3"
+    },
+    {
+      "composer": "Marais",
+      "path": "random-75-v2/026/rondeau_130_T.ft3",
+      "sha256": "866c6e1f72a5c816278f2d486a2faf29424cfd949aee03ea15e6ce11755f5db1",
+      "size": 1668,
+      "title": "rondeau_130_T.ft3",
+      "url": "https://browse.lutemusic.org/composers/Marais/rondeau_130_T.ft3"
+    },
+    {
+      "composer": "Popular",
+      "path": "random-75-v2/027/in_my_life_lennonJ.ft3",
+      "sha256": "382a74cfecb8b3790f485ca6f80e91755aaa9c549b59a818963e1f4b2c2a4cd9",
+      "size": 1136,
+      "title": "in_my_life_lennonJ.ft3",
+      "url": "https://browse.lutemusic.org/composers/Popular/in_my_life_lennonJ.ft3"
+    },
+    {
+      "composer": "Xmas",
+      "path": "random-75-v2/028/i_saw_three_ships.ft3",
+      "sha256": "7174c1ab022688170f014bb8bdbd85d7c9fbf2f772198717a0c4dad3daf8c31c",
+      "size": 812,
+      "title": "i_saw_three_ships.ft3",
+      "url": "https://browse.lutemusic.org/composers/Xmas/i_saw_three_ships.ft3"
+    },
+    {
+      "composer": "Janequin",
+      "path": "random-75-v2/029/ie_prens_en_gre.ft3",
+      "sha256": "5bafde7fdb7880a063cd83b3fc5db3e98487c29517480725411325ab609fcf12",
+      "size": 2098,
+      "title": "ie_prens_en_gre.ft3",
+      "url": "https://browse.lutemusic.org/composers/Janequin/ie_prens_en_gre.ft3"
+    },
+    {
+      "composer": "Huet",
+      "path": "random-75-v2/030/fantasy_1.ft3",
+      "sha256": "d862bf0ea2613e3eabb3cad3c740d8dfc1993b6feb8cbb93f1ae6991f573f6ae",
+      "size": 3262,
+      "title": "fantasy_1.ft3",
+      "url": "https://browse.lutemusic.org/composers/Huet/fantasy_1.ft3"
+    },
+    {
+      "composer": "Ghizeghem",
+      "path": "random-75-v2/031/de_tous_biens_plaine_ghizeghem.ft3",
+      "sha256": "608d6d407b89caba6e70b28302411ff963e8f13b96bd90f45c8048da74145fa8",
+      "size": 3131,
+      "title": "de_tous_biens_plaine_ghizeghem.ft3",
+      "url": "https://browse.lutemusic.org/composers/Ghizeghem/de_tous_biens_plaine_ghizeghem.ft3"
+    },
+    {
+      "composer": "Ortiz",
+      "path": "random-75-v2/032/o_felice_02.ft3",
+      "sha256": "2848852dfea5ae40a652ead29250c4a1b686f82bc2db9bee71f15ce1d5569510",
+      "size": 2773,
+      "title": "o_felice_02.ft3",
+      "url": "https://browse.lutemusic.org/composers/Ortiz/o_felice_02.ft3"
+    },
+    {
+      "composer": "Terzi",
+      "path": "random-75-v2/033/courante.ft3",
+      "sha256": "79c7b6d811b27b25732c32753f4da398ad80c451db44078d4bb73c62e4de23d7",
+      "size": 1328,
+      "title": "courante.ft3",
+      "url": "https://browse.lutemusic.org/composers/Terzi/courante.ft3"
+    },
+    {
+      "composer": "Josquin",
+      "path": "random-75-v2/034/de_tous_biens_plaine.ft3",
+      "sha256": "d95ddf004cc644eebeecc28643d9c4f55584e47e146380bfb572ff53d477ad16",
+      "size": 2197,
+      "title": "de_tous_biens_plaine.ft3",
+      "url": "https://browse.lutemusic.org/composers/Josquin/de_tous_biens_plaine.ft3"
+    },
+    {
+      "composer": "Paez",
+      "path": "random-75-v2/035/Seis_diferencias_de_bacas.ft3",
+      "sha256": "ba4c1b74b257605a3842366977f95964e473531ce0fab2ec927ca2eceeb5d526",
+      "size": 2318,
+      "title": "Seis_diferencias_de_bacas.ft3",
+      "url": "https://browse.lutemusic.org/composers/Paez/Seis_diferencias_de_bacas.ft3"
+    },
+    {
+      "composer": "Reys",
+      "path": "random-75-v2/036/branle_de_st_nicolas_8C.ft3",
+      "sha256": "3d6b1bbb429e6af9b44fcee989ad8b7780c128066dc581145a9b0bd511f4e7ad",
+      "size": 1887,
+      "title": "branle_de_st_nicolas_8C.ft3",
+      "url": "https://browse.lutemusic.org/composers/Reys/branle_de_st_nicolas_8C.ft3"
+    },
+    {
+      "composer": "LRossi",
+      "path": "random-75-v2/037/disperate_speranze_VT.ft3",
+      "sha256": "a0114a93821edbaf3c046fbbc9bbf421e2f462853929cfd5c35aa724ed74e554",
+      "size": 4009,
+      "title": "disperate_speranze_VT.ft3",
+      "url": "https://browse.lutemusic.org/composers/LRossi/disperate_speranze_VT.ft3"
+    },
+    {
+      "composer": "Cabezon",
+      "path": "random-75-v2/038/tiento1a.ft3",
+      "sha256": "b156f3b93f9e6f3c27f855604e08fb7b831aa1fed7c2d5052c822c383efd3d54",
+      "size": 1580,
+      "title": "tiento1a.ft3",
+      "url": "https://browse.lutemusic.org/composers/Cabezon/tiento1a.ft3"
+    },
+    {
+      "composer": "Vide",
+      "path": "random-75-v2/039/vit_encore_T.ft3",
+      "sha256": "cda661d286495ff04d7bd4d56b1fd0384fab18c628234e8a3c6d47f6ab34331e",
+      "size": 1008,
+      "title": "vit_encore_T.ft3",
+      "url": "https://browse.lutemusic.org/composers/Vide/vit_encore_T.ft3"
+    },
+    {
+      "composer": "Vallet",
+      "path": "random-75-v2/040/bourree.ft3",
+      "sha256": "08678477ee2b773cde893065d70cafd848c9c8f94b5e62f596e7dfb266da2f9a",
+      "size": 943,
+      "title": "bourree.ft3",
+      "url": "https://browse.lutemusic.org/composers/Vallet/bourree.ft3"
+    },
+    {
+      "composer": "Binchois",
+      "path": "random-75-v2/041/les_tres_doulx_jeux.ft3",
+      "sha256": "1ae4292371a84d7006eb458a6eceb37989e9dc408aeea744014281e29d266298",
+      "size": 1254,
+      "title": "les_tres_doulx_jeux.ft3",
+      "url": "https://browse.lutemusic.org/composers/Binchois/les_tres_doulx_jeux.ft3"
+    },
+    {
+      "composer": "Bulman",
+      "path": "random-75-v2/042/47v_pavane_bulman.ft3",
+      "sha256": "c3cef4bd3c12c00d23fe7f774f6b440afa648b1cfe6ffb0f587b813b7a60be5f",
+      "size": 2695,
+      "title": "47v_pavane_bulman.ft3",
+      "url": "https://browse.lutemusic.org/composers/Bulman/47v_pavane_bulman.ft3"
+    },
+    {
+      "composer": "Gorzanis",
+      "path": "random-75-v2/043/chi_passa_solo.ft3",
+      "sha256": "0a9a84cef598d5c1197c8f021a96a32c800025847e597f6fd903c250c0b031eb",
+      "size": 1109,
+      "title": "chi_passa_solo.ft3",
+      "url": "https://browse.lutemusic.org/composers/Gorzanis/chi_passa_solo.ft3"
+    },
+    {
+      "composer": "VGaultier",
+      "path": "random-75-v2/044/la_belle_homicide.ft3",
+      "sha256": "d991425e2a9771045223fee2080816fb3adbf4c0d0101d03ede59b1f4c448651",
+      "size": 1347,
+      "title": "la_belle_homicide.ft3",
+      "url": "https://browse.lutemusic.org/composers/VGaultier/la_belle_homicide.ft3"
+    },
+    {
+      "composer": "Rael",
+      "path": "random-75-v2/045/146_bituricensus_branle_gavotte_1.ft3",
+      "sha256": "185c39a085912361d76d92f48c655ff288d1ca72d963f378e58aeeb81550d68e",
+      "size": 1454,
+      "title": "146_bituricensus_branle_gavotte_1.ft3",
+      "url": "https://browse.lutemusic.org/composers/Rael/146_bituricensus_branle_gavotte_1.ft3"
+    },
+    {
+      "composer": "Passereau",
+      "path": "random-75-v2/046/il_est_bel_et_bon_solo.ft3",
+      "sha256": "707bc4194761b2d0d4832b6237bb404e8e43fa38a96e0e6f2027923460d077c9",
+      "size": 1871,
+      "title": "il_est_bel_et_bon_solo.ft3",
+      "url": "https://browse.lutemusic.org/composers/Passereau/il_est_bel_et_bon_solo.ft3"
+    },
+    {
+      "composer": "Gervaise",
+      "path": "random-75-v2/047/gervaise_danseries.ft3",
+      "sha256": "a8f6c986f7b598c7ce08575608d5d9530f47b3e7b11b4b3d838797949b4fe96c",
+      "size": 993,
+      "title": "gervaise_danseries.ft3",
+      "url": "https://browse.lutemusic.org/composers/Gervaise/gervaise_danseries.ft3"
+    },
+    {
+      "composer": "Sentler",
+      "path": "random-75-v2/048/fantasia.ft3",
+      "sha256": "8f325b0adbfef83546a0253fd9ad5e043dbe3da449de6dc21f9f5d4ab07aba45",
+      "size": 1739,
+      "title": "fantasia.ft3",
+      "url": "https://browse.lutemusic.org/composers/Sentler/fantasia.ft3"
+    },
+    {
+      "composer": "Mauduit",
+      "path": "random-75-v2/049/eau_vive_T.ft3",
+      "sha256": "bb0cb094552fcd07293f5353bf69a2ccd84c6cb3763db3360e7b4e7219fc5d29",
+      "size": 1844,
+      "title": "eau_vive_T.ft3",
+      "url": "https://browse.lutemusic.org/composers/Mauduit/eau_vive_T.ft3"
+    },
+    {
+      "composer": "De_l_Espine",
+      "path": "random-75-v2/050/Coranto_confess.ft3",
+      "sha256": "0bdf65db97eea9a20c12186b69edeec6f09081058b58f076b47d81f2c09b2e17",
+      "size": 1821,
+      "title": "Coranto_confess.ft3",
+      "url": "https://browse.lutemusic.org/composers/De_l_Espine/Coranto_confess.ft3"
+    },
+    {
+      "composer": "Mazzocchi",
+      "path": "random-75-v2/051/Folle_cor.ft3",
+      "sha256": "056c84f9ed73b10037afe662b72cc322454b4ebb41d39db4989c5b46b5ad2407",
+      "size": 2642,
+      "title": "Folle_cor.ft3",
+      "url": "https://browse.lutemusic.org/composers/Mazzocchi/Folle_cor.ft3"
+    },
+    {
+      "composer": "Lasso",
+      "path": "random-75-v2/052/la_nuict_froide_et_sombre_E.ft3",
+      "sha256": "7817fc18bd4998dcb171aedb525eb3736ceb54df254672e78c252f45556072c3",
+      "size": 1905,
+      "title": "la_nuict_froide_et_sombre_E.ft3",
+      "url": "https://browse.lutemusic.org/composers/Lasso/la_nuict_froide_et_sombre_E.ft3"
+    },
+    {
+      "composer": "Van_Wilder",
+      "path": "random-75-v2/053/arthurs_dump.ft3",
+      "sha256": "64dcc2a1f779cebc71c4b6da1e1ecc232b12ae85522b5bd7661ae094feebe307",
+      "size": 3191,
+      "title": "arthurs_dump.ft3",
+      "url": "https://browse.lutemusic.org/composers/Van_Wilder/arthurs_dump.ft3"
+    },
+    {
+      "composer": "Robinson",
+      "path": "random-75-v2/054/bonny_sweet_robin.ft3",
+      "sha256": "87b03fc2020f6fb5d45f554eb8e91b3fb20e554d166f69a12040e61454a80615",
+      "size": 1321,
+      "title": "bonny_sweet_robin.ft3",
+      "url": "https://browse.lutemusic.org/composers/Robinson/bonny_sweet_robin.ft3"
+    },
+    {
+      "composer": "Castello",
+      "path": "random-75-v2/055/sonata_01_F.ft3",
+      "sha256": "5b5116808531b99de9cf17300eb298949383e10136d2570416644d7c024c7530",
+      "size": 3108,
+      "title": "sonata_01_F.ft3",
+      "url": "https://browse.lutemusic.org/composers/Castello/sonata_01_F.ft3"
+    },
+    {
+      "composer": "Barbetta",
+      "path": "random-75-v2/056/moresca_prima_le_canarie.ft3",
+      "sha256": "5920f2491c88c1240f11c9e9bb034d98192cd02a4379b4b63eb4e7ff0d9c32e1",
+      "size": 1324,
+      "title": "moresca_prima_le_canarie.ft3",
+      "url": "https://browse.lutemusic.org/composers/Barbetta/moresca_prima_le_canarie.ft3"
+    },
+    {
+      "composer": "Willaert",
+      "path": "random-75-v2/057/recercar.ft3",
+      "sha256": "37bcda747b4b43cfc03aaec050bd164ffdb876d0bf505849945a1f65254f505a",
+      "size": 1964,
+      "title": "recercar.ft3",
+      "url": "https://browse.lutemusic.org/composers/Willaert/recercar.ft3"
+    },
+    {
+      "composer": "Allison",
+      "path": "random-75-v2/058/allison_lords_prayer.ft3",
+      "sha256": "5272e037ddadf67062c1a96f3bd4cbfa590a139846d30f06f5c21a5de9e60c9e",
+      "size": 1803,
+      "title": "allison_lords_prayer.ft3",
+      "url": "https://browse.lutemusic.org/composers/Allison/allison_lords_prayer.ft3"
+    },
+    {
+      "composer": "Chardavoine",
+      "path": "random-75-v2/059/une_jeune_fillette.ft3",
+      "sha256": "d1b1642e2c8faf4f9116510e79991630b22b6e84377500e27bdfebecca3d943f",
+      "size": 4568,
+      "title": "une_jeune_fillette.ft3",
+      "url": "https://browse.lutemusic.org/composers/Chardavoine/une_jeune_fillette.ft3"
+    },
+    {
+      "composer": "Lully",
+      "path": "random-75-v2/060/recit_de_la_beaute_double.ft3",
+      "sha256": "04aa7b732b053d6868e435738de864157b12ae931e6da299f2fd19651eba483c",
+      "size": 2591,
+      "title": "recit_de_la_beaute_double.ft3",
+      "url": "https://browse.lutemusic.org/composers/Lully/recit_de_la_beaute_double.ft3"
+    },
+    {
+      "composer": "Rameau",
+      "path": "random-75-v2/061/menuett.ft3",
+      "sha256": "f5865e5ee58c934d246f7ba51c4e6b2105b5d464cc5bfb0a09f53478f184f924",
+      "size": 1031,
+      "title": "menuett.ft3",
+      "url": "https://browse.lutemusic.org/composers/Rameau/menuett.ft3"
+    },
+    {
+      "composer": "Milano",
+      "path": "random-75-v2/062/milano_098_que_voulez_vous_dire_de_moi.ft3",
+      "sha256": "f449d347f4b77424325b9d31c8309c90379422650d063206fa1b0bbcbfcb69dd",
+      "size": 1790,
+      "title": "milano_098_que_voulez_vous_dire_de_moi.ft3",
+      "url": "https://browse.lutemusic.org/composers/Milano/milano_098_que_voulez_vous_dire_de_moi.ft3"
+    },
+    {
+      "composer": "Ballard",
+      "path": "random-75-v2/063/ballard_courante.ft3",
+      "sha256": "b4844732d71b9530758eb0a1858fbdf51bb05aadffabe590520140242cb45212",
+      "size": 1454,
+      "title": "ballard_courante.ft3",
+      "url": "https://browse.lutemusic.org/composers/Ballard/ballard_courante.ft3"
+    },
+    {
+      "composer": "Sanz",
+      "path": "random-75-v2/064/spanish_dance.ft3",
+      "sha256": "fdd2c36507b465aa9f633121957cc9f58781b3f609cc2635ef826901550c9b3e",
+      "size": 1558,
+      "title": "spanish_dance.ft3",
+      "url": "https://browse.lutemusic.org/composers/Sanz/spanish_dance.ft3"
+    },
+    {
+      "composer": "Gesualdo",
+      "path": "random-75-v2/065/gesualdo_gagliarda_4.ft3",
+      "sha256": "23142884b501ddda773ddddc265ed9cff7d603a9d30ac3b6cf86c062ccff28ae",
+      "size": 1780,
+      "title": "gesualdo_gagliarda_4.ft3",
+      "url": "https://browse.lutemusic.org/composers/Gesualdo/gesualdo_gagliarda_4.ft3"
+    },
+    {
+      "composer": "Visee",
+      "path": "random-75-v2/066/minuet_in_D.ft3",
+      "sha256": "b5f292824b40207b9932c00384652fff9abf83c095e736d2fa8d270414307815",
+      "size": 934,
+      "title": "minuet_in_D.ft3",
+      "url": "https://browse.lutemusic.org/composers/Visee/minuet_in_D.ft3"
+    },
+    {
+      "composer": "Ferrabosco",
+      "path": "random-75-v2/067/ferrabosco-galliard.ft3",
+      "sha256": "4d036244dd67bcada80e8e1f5fa5e80a5b4db2920ccd26aee50230347bce6c51",
+      "size": 1624,
+      "title": "ferrabosco-galliard.ft3",
+      "url": "https://browse.lutemusic.org/composers/Ferrabosco/ferrabosco-galliard.ft3"
+    },
+    {
+      "composer": "Frescobaldi",
+      "path": "random-75-v2/068/recercar_dopo_il_credo.ft3",
+      "sha256": "9913b41e08e5acaea68bdb867da56a1358846c997517e6cd1a14603963ed2920",
+      "size": 2276,
+      "title": "recercar_dopo_il_credo.ft3",
+      "url": "https://browse.lutemusic.org/composers/Frescobaldi/recercar_dopo_il_credo.ft3"
+    },
+    {
+      "composer": "Despond",
+      "path": "random-75-v2/069/filou.ft3",
+      "sha256": "c28d344528c4eec4a7f8167163348c4ef406174d80da9995666fb62f8ae7f84c",
+      "size": 2942,
+      "title": "filou.ft3",
+      "url": "https://browse.lutemusic.org/composers/Despond/filou.ft3"
+    },
+    {
+      "composer": "White",
+      "path": "random-75-v2/070/01_in_nomine.ft3",
+      "sha256": "5c2c0ba5e03fe3abe2474cce972dbe6523ea20c9b8a52b8099891b123d163e9a",
+      "size": 1638,
+      "title": "01_in_nomine.ft3",
+      "url": "https://browse.lutemusic.org/composers/White/01_in_nomine.ft3"
+    },
+    {
+      "composer": "Richard",
+      "path": "random-75-v2/071/dans_ce_beau_sejour_T.ft3",
+      "sha256": "f86838c815494fdb3251de6bb701e2503e924b8ee65018e94c931d64298e8d56",
+      "size": 1231,
+      "title": "dans_ce_beau_sejour_T.ft3",
+      "url": "https://browse.lutemusic.org/composers/Richard/dans_ce_beau_sejour_T.ft3"
+    },
+    {
+      "composer": "Mozart",
+      "path": "random-75-v2/072/mozart_variations.ft3",
+      "sha256": "2e3b6847795fd799e78880e73ac86c5172a83ec840cf7f31d80cd7973931c824",
+      "size": 4259,
+      "title": "mozart_variations.ft3",
+      "url": "https://browse.lutemusic.org/composers/Mozart/mozart_variations.ft3"
+    },
+    {
+      "composer": "Pilkington",
+      "path": "random-75-v2/073/george_pilkingtons_funerall.ft3",
+      "sha256": "098a9998ddf26848228c4b993e7bca37f1b3dcaa9df4d396b0c24c15e20a51c1",
+      "size": 1661,
+      "title": "george_pilkingtons_funerall.ft3",
+      "url": "https://browse.lutemusic.org/composers/Pilkington/george_pilkingtons_funerall.ft3"
+    },
+    {
+      "composer": "Mace",
+      "path": "random-75-v2/074/praeludium_02.ft3",
+      "sha256": "de23ba32aff4d26c71859d23f9b9b2f8d7bd4235254a847f377cc84e330da7b0",
+      "size": 787,
+      "title": "praeludium_02.ft3",
+      "url": "https://browse.lutemusic.org/composers/Mace/praeludium_02.ft3"
+    },
+    {
+      "composer": "Festa",
+      "path": "random-75-v2/075/o_passi_sparsi_solo_Gm.ft3",
+      "sha256": "9a60c1f0e8d318be7062d2165683f2f313de513101eb0c916319a70095cbc025",
+      "size": 1649,
+      "title": "o_passi_sparsi_solo_Gm.ft3",
+      "url": "https://browse.lutemusic.org/composers/Festa/o_passi_sparsi_solo_Gm.ft3"
+    }
+  ],
+  "listing_errors": [],
+  "root": "tests/fixtures/ft3/corpus",
+  "schema": 1,
+  "selection": {
+    "candidate_count": 397,
+    "existing_urls_excluded": 92,
+    "method": "one-time seeded composer-stratified sample; one direct FT3 from each previously unseen composer; never repeated by tests",
+    "seed": 20260717,
+    "selected": 75,
+    "unique_composers": 75
+  },
+  "source": "https://browse.lutemusic.org/composers/"
+}

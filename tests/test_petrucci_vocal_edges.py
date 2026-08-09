@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from petrucci.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
-from petrucci.render_vocal import (
+from petrucci.core.model import Bar, Chord, ImportedTextRow, LyricEvent, MelodyEvent, Note
+from petrucci.rendering.staff.vocal import (
     _bar_lyric_rows,
     _dedup_lyric_rows,
     _grid_lyric_events,
@@ -16,7 +16,7 @@ from petrucci.render_vocal import (
     melody_rows_for_bar,
     vocal_onset_cols_for_bar,
 )
-from petrucci.vocal_line import chord_top_pitch, infer_vocal_events, lyric_anchor_onsets, token_pitch_value
+from petrucci.adapters.vocal import chord_top_pitch, infer_vocal_events, lyric_anchor_onsets, token_pitch_value
 
 
 def test_vocal_token_and_chord_pitch_fallbacks_are_explicit() -> None:

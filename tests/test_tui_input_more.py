@@ -1,7 +1,8 @@
 import os
+import subprocess
 
 from oud.editor.core.state import EditorState
-from oud.tui.input import (
+from oud.presentation.tui.input import (
     complete_command,
     complete_command_text,
     handle_command,
@@ -10,7 +11,7 @@ from oud.tui.input import (
     history_prev,
     parse_search,
 )
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:
@@ -81,6 +82,43 @@ def test_complete_command_basic(tmp_path) -> None:
     assert complete_command(state) is True
 
 
+def test_path_completion_lists_every_candidate(tmp_path) -> None:
+    state = _state()
+    for index in range(12):
+        (tmp_path / f"piece-{index:02}.tab").write_text("x", encoding="utf-8")
+
+    text, message = complete_command_text(state, f"e {tmp_path}{os.sep}")
+
+    assert text == f"e {tmp_path}{os.sep}piece-"
+    assert message is None
+    text, message = complete_command_text(state, text)
+    assert text == f"e {tmp_path}{os.sep}piece-"
+    assert message is not None
+    assert all(f"piece-{index:02}.tab" in message for index in range(12))
+
+
+def test_fzf_path_completion_uses_system_filter(monkeypatch, tmp_path) -> None:
+    state = _state()
+    state.settings["completion"] = "fzf"
+    first = tmp_path / "first-piece.tab"
+    second = tmp_path / "second-piece.tab"
+    first.write_text("x", encoding="utf-8")
+    second.write_text("x", encoding="utf-8")
+    monkeypatch.setattr("oud.presentation.tui.input.completion.shutil.which", lambda _name: "/usr/bin/fzf")
+
+    def _run(command, **kwargs):
+        assert command == ["/usr/bin/fzf", "--filter", "scd"]
+        assert "first-piece.tab" in kwargs["input"]
+        return subprocess.CompletedProcess(command, 0, stdout="second-piece.tab\n", stderr="")
+
+    monkeypatch.setattr("oud.presentation.tui.input.completion.subprocess.run", _run)
+
+    text, message = complete_command_text(state, f"e {tmp_path}{os.sep}scd")
+
+    assert text == f"e {second}"
+    assert message is None
+
+
 def test_complete_set_value_uses_legit_options_only() -> None:
     state = _state()
     text, msg = complete_command_text(state, "set tabnotation=")
@@ -138,6 +176,10 @@ def test_complete_set_value_uses_legit_options_only() -> None:
 
     text, msg = complete_command_text(state, "set madeup=")
     assert text == "set madeup="
+    assert msg is None
+
+    text, msg = complete_command_text(state, "set completion=f")
+    assert text == "set completion=fzf"
     assert msg is None
 
 

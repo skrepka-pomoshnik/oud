@@ -6,19 +6,19 @@ from oud.editor.navigation.cursor_map import (
     system_display_indices_for_bar as _system_display_indices_for_bar,
 )
 from oud.editor.navigation.layout import bars_per_line, dynamic_system_starts, system_index, system_start_index
-from petrucci.duet_score import (
+from petrucci.adapters.duet import (
     duet_bar_mapping,
     duet_logical_bar_count,
     duet_raw_bar_index,
     is_duet_score_piece,
 )
-from petrucci.layout_map import LayoutBlockPolicy, block_height
-from petrucci.render_legacy import (
+from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height
+from petrucci.rendering.bar.legacy import (
     _piece_has_lyrics,
     _piece_has_melody_grid,
     _piece_lyric_row_count,
 )
-from petrucci.render_vocal import melody_row_count
+from petrucci.rendering.staff.vocal import melody_row_count
 
 
 def rows_per_screen(state: EditorState, height: int) -> int:

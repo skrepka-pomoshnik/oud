@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from oud.command_io import OutputExistsError, atomic_export, atomic_output_path, atomic_write_text
+from oud.presentation.command_io import OutputExistsError, atomic_export, atomic_output_path, atomic_write_text
 
 
 def test_atomic_write_refuses_overwrite_and_preserves_existing_data(tmp_path: Path) -> None:

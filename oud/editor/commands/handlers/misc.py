@@ -9,9 +9,9 @@ from pathlib import Path
 from oud.editor.core.coordinates import string_index
 from oud.editor.core.feedback.messages import MISSING_LESS
 from oud.editor.core.state import EditorState
-from petrucci.help_text import help_lines
-from petrucci.time_utils import parse_time_signature_value
-from petrucci.tuning_utils import tuning_preset
+from petrucci.terminal.help import help_lines
+from petrucci.core.music.time import parse_time_signature_value
+from petrucci.core.music.tuning import tuning_preset
 
 
 def row_first_note_col(state: EditorState) -> int:

@@ -7,7 +7,7 @@ from oud.editor.editing.primitives.ranges import (
     chord_range_at_col_count,
     deletable_bar_range_from_cursor,
 )
-from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 
 
 def test_bar_range_single_count_and_indices() -> None:

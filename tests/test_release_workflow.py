@@ -11,7 +11,7 @@ from tests.helpers_keyscript import press_keys
 
 def test_real_piece_edit_save_export_and_reopen(tmp_path: Path) -> None:
     config_path = str(tmp_path / "config.toml")
-    state = init_state("lutemusic/02_forlorne_hope_8C.ft3", config_path=config_path)
+    state = init_state("tests/fixtures/ft3/corpus/02_forlorne_hope_8C.ft3", config_path=config_path)
     original_bar_count = len(state.piece.bars)
 
     press_keys(state, ["i", "a", 27, "h", "R", "b", 27])

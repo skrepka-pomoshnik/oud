@@ -7,7 +7,7 @@ from oud.editor.commands.metadata import (
     cmd_title,
 )
 from oud.editor.core.state import EditorState
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

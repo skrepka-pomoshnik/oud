@@ -1,4 +1,4 @@
-from petrucci.layout_map import LayoutBlockPolicy, block_height, layout_block_rows
+from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height, layout_block_rows
 
 
 def test_layout_block_rows_show_extras_reserves_single_span_row() -> None:

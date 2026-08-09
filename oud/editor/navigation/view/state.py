@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from oud.editor.core.state import EditorState
-from petrucci.framebuffer import Frame
+from petrucci.terminal.canvas.framebuffer import Frame
 
 
 def view_resize(state: EditorState, *, height: int, width: int) -> bool:

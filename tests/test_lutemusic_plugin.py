@@ -3,8 +3,8 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
-from oud.plugins import lutemusic
-from oud.plugins.model import RemoteTab
+from oud.services.plugins import lutemusic
+from oud.services.plugins.model import RemoteTab
 
 
 def test_download_folder_ft3_preserves_subfolders_and_filters_non_ft3(monkeypatch, tmp_path: Path) -> None:

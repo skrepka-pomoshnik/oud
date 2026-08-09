@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from petrucci.model import Bar, Chord, Note, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 
 _TYPE_TO_DENOM = {
     "whole": 1,

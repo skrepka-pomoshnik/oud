@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from oud import app as oud_app
-from oud.cli_convert import ConvertOptions
-from petrucci.model import Bar, Piece
+from oud.presentation import app as oud_app
+from oud.presentation.cli_convert import ConvertOptions
+from petrucci.core.model import Bar, Piece
 
 
 def test_main_defaults_to_tui(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -31,8 +31,8 @@ def test_main_with_path_opens_tui(monkeypatch: pytest.MonkeyPatch) -> None:
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
-    assert oud_app.main(["examples/example.ft3"]) == 0
-    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH, False)]
+    assert oud_app.main(["tests/fixtures/ft3/corpus/examples/example.ft3"]) == 0
+    assert calls == [(oud_app._main, "tests/fixtures/ft3/corpus/examples/example.ft3", oud_app.CONFIG_PATH, False)]
 
 
 def test_main_with_config_then_path_opens_tui(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,8 +43,8 @@ def test_main_with_config_then_path_opens_tui(monkeypatch: pytest.MonkeyPatch) -
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
-    assert oud_app.main(["--config", "cfg.toml", "examples/example.ft3"]) == 0
-    assert calls == [(oud_app._main, "examples/example.ft3", "cfg.toml", False)]
+    assert oud_app.main(["--config", "cfg.toml", "tests/fixtures/ft3/corpus/examples/example.ft3"]) == 0
+    assert calls == [(oud_app._main, "tests/fixtures/ft3/corpus/examples/example.ft3", "cfg.toml", False)]
 
 
 def test_main_with_readonly_flag_opens_tui_in_viewer_mode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,8 +55,8 @@ def test_main_with_readonly_flag_opens_tui_in_viewer_mode(monkeypatch: pytest.Mo
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
-    assert oud_app.main(["--readonly", "examples/example.ft3"]) == 0
-    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH, True)]
+    assert oud_app.main(["--readonly", "tests/fixtures/ft3/corpus/examples/example.ft3"]) == 0
+    assert calls == [(oud_app._main, "tests/fixtures/ft3/corpus/examples/example.ft3", oud_app.CONFIG_PATH, True)]
 
 
 def test_main_tui_subcommand_accepts_readonly_flag(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,8 +67,8 @@ def test_main_tui_subcommand_accepts_readonly_flag(monkeypatch: pytest.MonkeyPat
         return 0
 
     monkeypatch.setattr(curses, "wrapper", fake_wrapper)
-    assert oud_app.main(["tui", "--readonly", "examples/example.ft3"]) == 0
-    assert calls == [(oud_app._main, "examples/example.ft3", oud_app.CONFIG_PATH, True)]
+    assert oud_app.main(["tui", "--readonly", "tests/fixtures/ft3/corpus/examples/example.ft3"]) == 0
+    assert calls == [(oud_app._main, "tests/fixtures/ft3/corpus/examples/example.ft3", oud_app.CONFIG_PATH, True)]
 
 
 def test_main_dispatches_convert(monkeypatch: pytest.MonkeyPatch) -> None:

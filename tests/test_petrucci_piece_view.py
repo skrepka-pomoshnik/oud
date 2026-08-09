@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from petrucci.model import (
+from petrucci.core.model import (
     Bar,
     Chord,
     ImportedBarContent,
@@ -13,8 +13,8 @@ from petrucci.model import (
     Note,
     Piece,
 )
-from petrucci.piece_score_view import typeset_piece_score_view
-from petrucci.typeset import TypesetOptions, typeset_piece
+from petrucci.adapters.piece_view import typeset_piece_score_view
+from petrucci.engraving.typeset import TypesetOptions, typeset_piece
 
 SETTINGS = {
     "showmelody": "on",

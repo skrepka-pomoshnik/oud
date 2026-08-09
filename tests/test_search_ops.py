@@ -10,7 +10,7 @@ from oud.editor.commands.query.search import (
     target_search_word_under_cursor,
 )
 from oud.editor.core.state import EditorState
-from petrucci.model import Bar, Piece
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

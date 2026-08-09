@@ -9,6 +9,15 @@ import pytest
 from oud.exports.midi import export_midi
 from oud.importers.ft3 import build_durations, load_ft3
 
+FT3_CORPUS = Path("tests/fixtures/ft3/corpus")
+MIDI_PARITY_CASES = (
+    ("chromatica_pavana", "random-75-v2/002/chromatica_pavana.ft3", 1278, 1278, 1277),
+    ("01_felice_fu_quel_anon", "01_felice_fu_quel_anon.ft3", 133, 133, 120),
+    ("menuett", "random-75-v2/061/menuett.ft3", 234, 226, 193),
+    ("can_she_excuse", "can_she_excuse.ft3", 524, 532, 444),
+    ("phrygian_fantasy", "random-50-v3/026/phrygian_fantasy.ft3", 380, 380, 380),
+)
+
 
 def _variable_length(data: bytes, position: int) -> tuple[int, int]:
     value = 0
@@ -76,39 +85,62 @@ def _midi_note_ons(path: Path) -> Counter[tuple[Fraction, int]]:
 
 
 @pytest.mark.parametrize(
-    ("stem", "reference_count", "generated_count", "minimum_exact_overlap"),
-    [
-        ("chromatica_pavana", 1278, 1278, 1277),
-        ("01_felice_fu_quel_anon", 133, 133, 120),
-        ("menuett", 234, 226, 193),
-        ("can_she_excuse", 524, 532, 444),
-        ("phrygian_fantasy", 380, 380, 380),
-    ],
+    ("stem", "source", "_reference_count", "generated_count", "_minimum_exact_overlap"),
+    MIDI_PARITY_CASES,
 )
-def test_ft3_export_tracks_companion_midi_evidence(
+def test_ft3_export_has_stable_note_count(
     tmp_path: Path,
     stem: str,
-    reference_count: int,
+    source: str,
+    _reference_count: int,
     generated_count: int,
-    minimum_exact_overlap: int,
+    _minimum_exact_overlap: int,
 ) -> None:
-    ft3_path = Path("lutemusic") / f"{stem}.ft3"
-    reference = _midi_note_ons(Path("lutemusic") / f"{stem}.mid")
+    ft3_path = FT3_CORPUS / source
     piece = load_ft3(str(ft3_path))
     generated_path = tmp_path / f"{stem}.mid"
     export_midi(str(generated_path), piece, {}, build_durations(piece), 32)
     generated = _midi_note_ons(generated_path)
 
-    assert sum(reference.values()) == reference_count
     assert sum(generated.values()) == generated_count
+
+
+@pytest.mark.parametrize(
+    ("stem", "source", "reference_count", "_generated_count", "minimum_exact_overlap"),
+    MIDI_PARITY_CASES,
+)
+def test_ft3_export_tracks_optional_companion_midi_evidence(
+    tmp_path: Path,
+    stem: str,
+    source: str,
+    reference_count: int,
+    _generated_count: int,
+    minimum_exact_overlap: int,
+) -> None:
+    reference_path = FT3_CORPUS / f"{stem}.mid"
+    if not reference_path.exists():
+        pytest.skip("optional third-party companion MIDI is not installed")
+    reference = _midi_note_ons(reference_path)
+    piece = load_ft3(str(FT3_CORPUS / source))
+    generated_path = tmp_path / f"{stem}.mid"
+    export_midi(str(generated_path), piece, {}, build_durations(piece), 32)
+    generated = _midi_note_ons(generated_path)
+
+    assert sum(reference.values()) == reference_count
     assert sum((reference & generated).values()) >= minimum_exact_overlap
 
 
-def test_empty_folle_companion_midi_is_not_accepted_as_parity_evidence(tmp_path: Path) -> None:
-    reference = _midi_note_ons(Path("lutemusic/Folle_cor.mid"))
-    piece = load_ft3("lutemusic/Folle_cor.ft3")
+def test_folle_export_has_stable_note_count(tmp_path: Path) -> None:
+    piece = load_ft3("tests/fixtures/ft3/corpus/random-75-v2/051/Folle_cor.ft3")
     generated_path = tmp_path / "Folle_cor.mid"
     export_midi(str(generated_path), piece, {}, build_durations(piece), 32)
 
-    assert not reference
     assert sum(_midi_note_ons(generated_path).values()) == 1030
+
+
+def test_empty_folle_companion_midi_is_not_accepted_as_parity_evidence() -> None:
+    reference_path = FT3_CORPUS / "Folle_cor.mid"
+    if not reference_path.exists():
+        pytest.skip("optional third-party companion MIDI is not installed")
+
+    assert not _midi_note_ons(reference_path)

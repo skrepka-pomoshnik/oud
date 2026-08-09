@@ -16,8 +16,40 @@ concurrency:
 
 jobs:
   quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - name: Restore external FT3 fixture cache
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/ft3/corpus
+          key: ft3-${{ hashFiles('tests/fixtures/ft3/manifests/*.json') }}
+      - name: Install
+        run: uv sync --locked
+      - name: Fetch fixed external FT3 corpora
+        run: >-
+          uv run python scripts/corpus/fetch.py
+          tests/fixtures/ft3/manifests/ft3-regression.json
+          tests/fixtures/ft3/manifests/ft3-random-75.json
+          tests/fixtures/ft3/manifests/ft3-random-75-v2.json
+          tests/fixtures/ft3/manifests/ft3-random-50-v3.json
+          tests/fixtures/ft3/manifests/ft3-random-63-v4.json
+          tests/fixtures/ft3/manifests/ft3-note-input-100.json
+      - name: Quality gate
+        run: ./scripts/quality.sh
+      - name: Release artifact boundary
+        if: github.event_name != 'pull_request'
+        run: uv run python scripts/checks/release_artifacts.py
+
+  macos-curses:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -26,14 +58,9 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --locked
-      - name: Fetch fixed external FT3 corpora
+      - name: Fetch resize fixture
         run: >-
-          uv run python scripts/fetch_ft3_corpus.py
-          corpus/ft3-regression.json
-          corpus/ft3-random-75.json
-          corpus/ft3-random-75-v2.json
-          corpus/ft3-random-50-v3.json
-          corpus/ft3-random-63-v4.json
-          corpus/ft3-note-input-100.json
-      - name: Quality gate
-        run: ./scripts/quality.sh
+          uv run python scripts/corpus/fetch.py
+          tests/fixtures/ft3/manifests/ft3-regression.json
+      - name: Real curses resize probe
+        run: uv run pytest tests/test_curses_resize_macos.py -q --no-cov

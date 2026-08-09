@@ -4,7 +4,7 @@ from oud.editor.core.coordinates import string_index
 from oud.editor.core.feedback.messages import NO_BARS
 from oud.editor.core.state import EditorState, UndoAction
 from oud.editor.editing.primitives.edits import record_action
-from petrucci.time_utils import parse_time_signature_value
+from petrucci.core.music.time import parse_time_signature_value
 
 
 def cmd_time(state: EditorState, value: str) -> None:

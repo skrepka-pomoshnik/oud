@@ -102,11 +102,11 @@ def test_public_petrucci_contract_has_no_result_policy_vocabulary() -> None:
 
 def test_generic_petrucci_modules_only_import_the_standard_library_and_petrucci() -> None:
     generic = (
-        Path("petrucci/display.py"),
-        Path("petrucci/layout.py"),
-        Path("petrucci/notation_layout.py"),
-        Path("petrucci/score.py"),
-        Path("petrucci/system_fitting.py"),
+        Path("petrucci/terminal/display.py"),
+        Path("petrucci/engraving/layout/engine.py"),
+        Path("petrucci/engraving/notation/layout.py"),
+        Path("petrucci/core/score.py"),
+        Path("petrucci/engraving/layout/fitting.py"),
     )
     forbidden: list[tuple[str, str]] = []
     for path in generic:

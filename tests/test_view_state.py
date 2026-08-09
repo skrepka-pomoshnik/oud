@@ -7,8 +7,8 @@ from oud.editor.navigation.view.state import (
     view_merge_dirty,
     view_resize,
 )
-from petrucci.framebuffer import Frame
-from petrucci.model import Bar, Piece
+from petrucci.terminal.canvas.framebuffer import Frame
+from petrucci.core.model import Bar, Piece
 
 
 def _state() -> EditorState:

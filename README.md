@@ -65,6 +65,25 @@ printf '%s\n' '-C' 'b' '0a-----' 'e' | oud convert - - --input-format tab --form
 Text formats can stream through `-`; MIDI, MXL, and PDF require a file. PDF
 conversion keeps the generated `.ly` source when LilyPond is missing or fails.
 
+### View a generated LilyPond PDF
+
+Generated files belong under the ignored `build/` tree:
+
+```bash
+mkdir -p build/lilypond
+uv run oud convert examples/si_par_souffrir.tab build/lilypond/si-par-souffrir.pdf -f
+xdg-open build/lilypond/si-par-souffrir.pdf  # Linux
+# open build/lilypond/si-par-souffrir.pdf   # macOS
+```
+
+For the Dowland benchmark:
+
+```bash
+uv run python scripts/corpus/fetch.py tests/fixtures/ft3/manifests/ft3-regression.json
+uv run oud convert tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse.ft3 \
+  build/lilypond/can-she-excuse.pdf -f
+```
+
 ## Controls
 
 Vim-like:
@@ -108,20 +127,26 @@ Casual:
 :set measures=every measuresstep=10
 :set barsperline=0   auto bars/row
 :set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart
+:set completion=fzf  use system fzf for fuzzy path ranking (default: prefix)
 :dark / :light  force dark/light color theme (:set theme=auto follows terminal)
 ```
+
+Command and search prompts own the complete bottom row. In commands that take
+a path, such as `:e examples/`, Tab completes a unique path or displays every
+matching file and directory. `completion=fzf` uses non-interactive system
+`fzf --filter`; if `fzf` is unavailable, Oud reports it and uses prefix matching.
 
 ## Architecture overview
 
 - `petrucci/` reusable top-level score model, tab/note input contracts, and character-cell typesetting
 - `oud/importers/` FT3/TAB/MusicXML parsing and import semantics
 - `oud/editor/` state, ops, undo/redo, commands
-- `oud/tui/` input, controller, viewport
-- `oud/ui/` curses adapter
+- `oud/presentation/tui/` input, controller, viewport
+- `oud/presentation/ui/` curses adapter
 - `oud/exports/` TAB, ASCII, LilyPond/PDF, MIDI, and MusicXML exporters
-- `oud/plugins/` self-contained plugins
+- `oud/services/plugins/` self-contained plugins
 
-Entry point: `oud` -> `oud.app:main`.
+Entry point: `oud` -> `oud.presentation.app:main`.
 
 ## Thanks
 
@@ -130,7 +155,7 @@ Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
 The external FT3 test manifests reference typesettings by Sarge Gerbode from
 [lutemusic.org](https://www.lutemusic.org), licensed
 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/); see
-`lutemusic/README.md`. Their payloads are ignored by Git and are not covered by
+`tests/fixtures/ft3/README.md`. Their payloads are ignored by Git and are not covered by
 this project's GPL-3.0 license.
 
 ## LICENSE

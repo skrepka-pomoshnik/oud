@@ -5,10 +5,10 @@ import pytest
 from oud.editor.core.state import EditorState
 from oud.importers.ft3 import load_ft3
 from oud.settings import DEFAULT_SETTINGS
-from oud.tui.commands import apply_command
-from petrucci.framebuffer import FrameBuffer
-from petrucci.model import Bar, Chord, Note, Piece
-from petrucci.render import render_piece
+from oud.presentation.tui.commands import apply_command
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.rendering.api import render_piece
 
 
 def _state() -> EditorState:
@@ -151,7 +151,7 @@ def test_playback_render_updates_for_different_columns() -> None:
 
 
 def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
-    piece = load_ft3("examples/02_forlorne_hope_8C.ft3")
+    piece = load_ft3("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     bar = piece.bars[9]
     state = EditorState(
         Piece(title="forlorne", bars=[bar], strings=piece.strings),
@@ -186,9 +186,9 @@ def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
 @pytest.mark.parametrize(
     ("path", "bar_index"),
     [
-        ("examples/26_lachrimae_galliard_in_G.ft3", 0),
-        ("examples/02_forlorne_hope_8C.ft3", 9),
-        ("lutemusic/23a_frogg_galliard_2.ft3", 28),
+        ("tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3", 0),
+        ("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3", 9),
+        ("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3", 28),
     ],
 )
 def test_playback_marker_is_monotonic_on_real_fixture_bars(

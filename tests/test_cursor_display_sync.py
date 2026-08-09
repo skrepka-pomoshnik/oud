@@ -12,10 +12,10 @@ from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key
 from oud.editor.navigation.viewport import ensure_cursor_visible
-from oud.tui.commands import apply_command
-from petrucci.framebuffer import FrameBuffer
-from petrucci.render import render_piece
-from petrucci.screen import A_REVERSE
+from oud.presentation.tui.commands import apply_command
+from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.rendering.api import render_piece
+from petrucci.terminal.canvas.screen import A_REVERSE
 from tests.helpers_keyscript import keyscript_state
 
 
@@ -102,12 +102,12 @@ def _opened(path: str) -> EditorState:
 
 
 def test_drawn_cursor_moves_on_every_l_press_in_chord_bars() -> None:
-    state = _opened("examples/02_forlorne_hope_8C.ft3")
+    state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     assert _count_stalls(state, "l", 40) == 0
 
 
 def test_drawn_cursor_moves_on_every_h_press_in_chord_bars() -> None:
-    state = _opened("examples/02_forlorne_hope_8C.ft3")
+    state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     for _ in range(40):
         _press(state, "l")
     assert _count_stalls(state, "h", 40) == 0
@@ -120,13 +120,13 @@ def test_drawn_cursor_moves_in_tab_grid_bars() -> None:
 
 
 def test_drawn_cursor_moves_in_vocal_piece_with_scrolling() -> None:
-    state = _opened("lutemusic/32_passacaglia.ft3")
+    state = _opened("tests/fixtures/ft3/corpus/32_passacaglia.ft3")
     assert _count_stalls(state, "l", 60) == 0
     assert _count_stalls(state, "h", 60) == 0
 
 
 def test_renderer_publishes_cursor_maps_for_rendered_bars() -> None:
-    state = _opened("examples/02_forlorne_hope_8C.ft3")
+    state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     assert state.display_cursor_maps
     for bar_index, mapping in state.display_cursor_maps.items():
         assert len(mapping) == state.bar_width, bar_index

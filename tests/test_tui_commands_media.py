@@ -7,8 +7,8 @@ import pytest
 
 from oud.editor.commands import dispatch as cmd_ops
 from oud.editor.core.state import EditorState
-from oud.tui import commands as cmd
-from petrucci.model import Bar, Piece
+from oud.presentation.tui import commands as cmd
+from petrucci.core.model import Bar, Piece
 
 
 def _state(bars: int = 2) -> EditorState:
@@ -176,7 +176,7 @@ def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    src = Path("lutemusic/czarna_krowa.ft3")
+    src = Path("tests/fixtures/ft3/corpus/czarna_krowa.ft3")
     if not src.exists():
         pytest.skip("local FT3 corpus file not available")
     state = _state()

@@ -1,4 +1,4 @@
-# BEGIN COMMON PYTHON WORKSPACE IGNORES
+# Python environments, caches, and build products
 __pycache__/
 *.py[cod]
 *.pyo
@@ -27,24 +27,11 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
-# END COMMON PYTHON WORKSPACE IGNORES
-
-.venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.coverage
-.mypy_cache/
-.ruff_cache/
-dist/
-build/
-*.egg-info/
 downloads/
-.DS_Store
-.vscode/
 .claude/settings.local.json
-*.swp
-*.swo
+/examples/
+/tests/fixtures/ft3/corpus/
+
 # Generated exports (committed examples are re-included below)
 *.mid
 *.ly
@@ -64,8 +51,6 @@ out.*
 quality.txt
 refs/
 /test.tab
-!examples/*.mid
-!examples/*.ly
 
 # External FT3 corpora are local-only. Keep manifests and attribution in Git,
 # never Gerbode or other third-party FT3 payloads/decoded dumps.

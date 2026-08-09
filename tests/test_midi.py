@@ -1,28 +1,28 @@
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     BASE_NOTE_VELOCITY,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     accent_velocity as _accent_velocity,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     meta_tempo as _meta_tempo,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     note_off as _note_off,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     note_on as _note_on,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     program_change as _program_change,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     vlq as _vlq,
 )
-from oud.exports._midi_bytes import (
+from oud.exports.midi.bytes import (
     write_track as _write_track,
 )
-from oud.exports._midi_projection import (
+from oud.exports.midi.projection import (
     _bar_chord_events,
     _chord_positions,
     _collect_manual_chords,
@@ -33,9 +33,9 @@ from oud.exports._midi_projection import (
     _resolved_tuning_for_piece,
     build_playback_timeline,
 )
-from oud.exports._midi_serialization import _single_score_midi_note_events
+from oud.exports.midi.serialization import _single_score_midi_note_events
 from oud.exports.midi import export_midi
-from petrucci.model import (
+from petrucci.core.model import (
     Bar,
     Chord,
     ImportedBarContent,
@@ -46,7 +46,7 @@ from petrucci.model import (
     Note,
     Piece,
 )
-from petrucci.render_utils import chord_positions as render_chord_positions
+from petrucci.rendering.primitives.utils import chord_positions as render_chord_positions
 
 
 def _track_data(path) -> bytes:

@@ -5,7 +5,7 @@ from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.edits import clear_cell_note, undo_group
 from oud.editor.editing.primitives.ranges import BarRange
-from petrucci.render_utils import bar_cells, bar_cells_from_chords
+from petrucci.rendering.primitives.utils import bar_cells, bar_cells_from_chords
 
 
 def enter_visual_mode(state: EditorState, *, linewise: bool = False) -> None:

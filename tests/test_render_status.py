@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from petrucci.model import Bar, Chord, Note, Piece
-from petrucci.render_status import (
+from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.rendering.system.status import (
     bar_meter_integrity_marker,
     build_status_lines,
     resolve_duration_text,
     status_attr_for_message,
 )
-from petrucci.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
+from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 
 
 def test_resolve_duration_text_manual_and_dotted() -> None:
@@ -53,7 +53,7 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text="8",
     )
-    assert line == "base  :w  ok"
+    assert line == ":w  ok"
     line = build_status_lines(
         mode="command",
         cmdline="e ex",
@@ -62,7 +62,7 @@ def test_build_status_lines_modes() -> None:
         status_line="base",
         dur_text=None,
     )
-    assert line.startswith("base  :e ex  Matches:")
+    assert line.startswith(":e ex  Matches:")
     line = build_status_lines(
         mode="normal",
         cmdline="",

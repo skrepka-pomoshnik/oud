@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from oud import plugins as plugin_package
 from oud.editor.commands.dispatch import cmd_open
 from oud.editor.commands.plugins.state import (
     plugin_apply_nav,
@@ -31,7 +30,8 @@ from oud.editor.core.input.menu import (
 )
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
-from oud.plugins.model import RemoteTab
+from oud.services import plugins as plugin_package
+from oud.services.plugins.model import RemoteTab
 
 
 @dataclass(frozen=True)
@@ -42,6 +42,7 @@ class PluginInfo:
 
 
 PLUGIN_HEADER = "# oud-plugin"
+PLUGIN_DOWNLOAD_ROOT = Path("downloads/lutemusic")
 
 
 @lru_cache(maxsize=1)
@@ -106,7 +107,7 @@ def _select_index_item(state: EditorState, kind: str) -> None:
     if state.plugin_name != "lutemusic":
         state.message = "Unknown plugin index"
         return
-    from oud.plugins import lutemusic  # noqa: PLC0415
+    from oud.services.plugins import lutemusic  # noqa: PLC0415
 
     url = lutemusic.LUTEMUSIC_URLS.get(kind)
     if not url:
@@ -128,7 +129,7 @@ def _select_index_item(state: EditorState, kind: str) -> None:
 
 
 def _open_random_lutemusic_ft3(state: EditorState) -> None:
-    from oud.plugins import lutemusic  # noqa: PLC0415
+    from oud.services.plugins import lutemusic  # noqa: PLC0415
 
     state.message = "Searching random FT3..."
     item = lutemusic.random_ft3()
@@ -182,7 +183,7 @@ def _open_lutemusic_dir_item(state: EditorState, item: RemoteTab) -> bool:
         state.message = "Plugin does not support folders"
         return True
     state.message = "Fetching lutemusic..."
-    from oud.plugins import lutemusic  # noqa: PLC0415
+    from oud.services.plugins import lutemusic  # noqa: PLC0415
 
     items = lutemusic.fetch_supported_tabs(item.url)
     if not items:
@@ -205,11 +206,11 @@ def download_plugin_item(state: EditorState) -> Path | None:
     if item.url.startswith("lutemusic:index:") or item.is_dir:
         state.message = "Select a list first"
         return None
-    dest_dir = Path("lutemusic")
+    dest_dir = PLUGIN_DOWNLOAD_ROOT
     if state.plugin_name != "lutemusic":
         state.message = "Plugin does not support downloads"
         return None
-    from oud.plugins import lutemusic  # noqa: PLC0415
+    from oud.services.plugins import lutemusic  # noqa: PLC0415
 
     try:
         path = lutemusic.download_tab(item, dest_dir)
@@ -237,9 +238,9 @@ def download_plugin_folder_recursive(state: EditorState) -> list[Path] | None:
         state.plugins.confirm = token
         state.message = "Press D again: download folder recursively (FT3 only)"
         return None
-    from oud.plugins import lutemusic  # noqa: PLC0415
+    from oud.services.plugins import lutemusic  # noqa: PLC0415
 
-    dest_dir = Path("lutemusic") / item.title
+    dest_dir = PLUGIN_DOWNLOAD_ROOT / item.title
     try:
         paths = lutemusic.download_folder_ft3(item, dest_dir)
     except OSError as exc:

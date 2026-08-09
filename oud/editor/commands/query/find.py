@@ -3,7 +3,7 @@ from __future__ import annotations
 from oud.editor.core.coordinates import string_index
 from oud.editor.core.state import EditorState
 from oud.editor.navigation.motions import CursorMotionTarget, apply_motion_target
-from petrucci.render_utils import bar_cells, bar_cells_from_chords
+from petrucci.rendering.primitives.utils import bar_cells, bar_cells_from_chords
 
 
 def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:

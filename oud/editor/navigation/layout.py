@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from oud.editor.core.state import EditorState
-from petrucci.spacing import (
+from petrucci.engraving.layout.spacing import (
     auto_bar_plan,
     collision_base_bar_widths,
     justified_extra_width,
     short_system_bar_floor,
 )
-from petrucci.view_model import _next_system_start
+from petrucci.terminal.view.model import _next_system_start
 
 _SYSTEM_LAYOUT_SETTING_KEYS = (
     "layout",
@@ -301,7 +301,7 @@ def auto_system_bar_plan_with_gaps(  # noqa: C901
         )
         # Match renderer's final width normalization so navigation and viewport
         # operate on the same system breaks the user actually sees.
-        from petrucci.system_plan import redistribute_extra_width  # noqa: PLC0415
+        from petrucci.engraving.layout.systems import redistribute_extra_width  # noqa: PLC0415
 
         min_widths = _renderer_min_bar_widths(state, bar_indices)
         readable_floor = short_system_bar_floor(
@@ -336,15 +336,15 @@ def auto_system_bar_plan_with_gaps(  # noqa: C901
 
 def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list[int]:
     """Per-bar minimum display widths, mirroring render_systems' computation."""
-    from petrucci.render_bar_state import resolved_bar_time_value  # noqa: PLC0415
-    from petrucci.render_spacing import required_auto_display_width_for_bar  # noqa: PLC0415
-    from petrucci.tab_policy import (  # noqa: PLC0415
+    from petrucci.rendering.bar.state import resolved_bar_time_value  # noqa: PLC0415
+    from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar  # noqa: PLC0415
+    from petrucci.input.tablature.policy import (  # noqa: PLC0415
         bar_has_multifret_tokens,
         multifret_event_gap,
         show_time_cue_for_bar,
         time_cue_side_pad,
     )
-    from petrucci.view_model import _parse_time_signature  # noqa: PLC0415
+    from petrucci.terminal.view.model import _parse_time_signature  # noqa: PLC0415
 
     bars = state.piece.bars
     barpad_text = state.settings.get("barpad", "1")

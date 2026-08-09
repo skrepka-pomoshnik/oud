@@ -4,9 +4,9 @@ import zipfile
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from petrucci.model import Bar, Piece
-from petrucci.tab_input import editor_event_columns, editor_fret_at
-from petrucci.time_utils import parse_time_signature_value
+from petrucci.core.model import Bar, Piece
+from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
+from petrucci.core.music.time import parse_time_signature_value
 
 MUSICXML_DOCTYPE = (
     '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" '

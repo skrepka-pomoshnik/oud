@@ -9,8 +9,8 @@ from oud.editor.services.io.loading import import_warning_summary, load_piece_da
 from oud.importers.ft3 import build_durations
 from oud.importers.tab import load_tab_data
 from oud.settings import DEFAULT_SETTINGS, load_settings
-from petrucci.model import Bar
-from petrucci.tuning_utils import tuning_count
+from petrucci.core.model import Bar
+from petrucci.core.music.tuning import tuning_count
 
 
 def init_state(  # noqa: C901, PLR0912

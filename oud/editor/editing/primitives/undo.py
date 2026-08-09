@@ -9,7 +9,7 @@ from typing import TypeVar, cast
 from oud.editor.core.state import BarSnapshot, EditorState, UndoAction
 from oud.editor.editing.primitives.bars import clear_bar_contents, delete_bar, insert_bar, restore_bar_snapshot
 from oud.settings import save_settings
-from petrucci.model import Piece
+from petrucci.core.model import Piece
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
