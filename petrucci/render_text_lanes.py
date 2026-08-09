@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Protocol
 
 from petrucci.key_signature import key_signature_count
@@ -53,7 +54,25 @@ def visible_lyric_rows(lines: list[str] | None, max_rows: int = 2) -> list[str]:
     return out
 
 
-def text_bar_cells(text: str | None, width: int) -> list[str]:  # noqa: C901
+def _place_proportional_token(
+    cells: list[str],
+    *,
+    source_position: int,
+    source_width: int,
+    token: str,
+    last_end: int,
+) -> int:
+    width = len(cells)
+    destination = min(width - 1, (source_position * width) // source_width)
+    if destination <= last_end:
+        destination = min(width - 1, last_end + 1)
+    token_text = token[: width - destination]
+    for offset, char in enumerate(token_text):
+        cells[destination + offset] = char
+    return destination + len(token_text) - 1
+
+
+def text_bar_cells(text: str | None, width: int) -> list[str]:
     if width <= 0:
         return []
     out = [" "] * width
@@ -67,19 +86,13 @@ def text_bar_cells(text: str | None, width: int) -> list[str]:  # noqa: C901
     last_end = -1
     for src_pos, tok in tokens:
         # Preserve relative token positions within the bar instead of collapsing all spaces.
-        dest = min(width - 1, (src_pos * width) // src_width)
-        if dest <= last_end:
-            dest = min(width - 1, last_end + 1)
-        if dest >= width:
-            break
-        avail = width - dest
-        if avail <= 0:
-            break
-        tok_text = tok[:avail]
-        for i, ch in enumerate(tok_text):
-            if dest + i < width:
-                out[dest + i] = ch
-        last_end = dest + len(tok_text) - 1
+        last_end = _place_proportional_token(
+            out,
+            source_position=src_pos,
+            source_width=src_width,
+            token=tok,
+            last_end=last_end,
+        )
     return out
 
 
@@ -733,7 +746,35 @@ def _draw_editorial_brackets(rows: list[list[str]], *, row: int, col: int, floor
         rows[row][right] = "]"
 
 
-def lyric_event_cells(  # noqa: C901
+def _place_lyric_event(
+    cells: list[str],
+    event: LyricEvent,
+    *,
+    onset_cols: list[int],
+    floor: int,
+    last_end: int,
+) -> tuple[int, int] | None:
+    target = _event_target_col(onset_cols, event.onset_index)
+    if target is None:
+        return None
+    start = max(floor, min(len(cells) - 1, target))
+    if start <= last_end + 1:
+        start = last_end + 2
+    if start >= len(cells):
+        return None
+    if event.extender and not event.text:
+        cells[start] = "_"
+        return start, start
+    text = event.text or ""
+    if not text:
+        return None
+    end = min(len(cells) - 1, start + len(text) - 1)
+    for offset, char in enumerate(text[: end - start + 1]):
+        cells[start + offset] = char
+    return start, end
+
+
+def lyric_event_cells(
     events: list[LyricEvent] | None,
     *,
     onset_cols: list[int],
@@ -746,50 +787,42 @@ def lyric_event_cells(  # noqa: C901
     floor = max(0, left_pad)
     last_end = floor - 1
     placed_spans: list[tuple[LyricEvent, int, int]] = []
-    for ev in events:
-        target = _event_target_col(onset_cols, ev.onset_index)
-        if target is None:
+    for event in events:
+        placed = _place_lyric_event(cells, event, onset_cols=onset_cols, floor=floor, last_end=last_end)
+        if placed is None:
             continue
-        start = max(floor, min(len(cells) - 1, target))
-        if start <= last_end + 1:
-            start = last_end + 2
-        if start >= len(cells):
-            continue
-        if ev.extender and not ev.text:
-            cells[start] = "_"
-            placed_spans.append((ev, start, start))
-            last_end = start
-            continue
-        text = ev.text or ""
-        if not text:
-            continue
-        end = min(len(cells) - 1, start + len(text) - 1)
-        if end < start:
-            continue
-        for idx, ch in enumerate(text[: end - start + 1]):
-            cells[start + idx] = ch
-        placed_spans.append((ev, start, end))
+        start, end = placed
+        placed_spans.append((event, start, end))
         last_end = end
     _place_lyric_link_cues(cells, placed_spans)
     return cells
 
 
-def _place_lyric_link_cues(  # noqa: C901
+def _place_syllable_dash(cells: list[str], end: int, next_start: int) -> None:
+    gap_mid = end + max(1, (next_start - end) // 2)
+    for column in range(max(end + 1, gap_mid - 1), min(next_start, gap_mid + 2)):
+        if 0 <= column < len(cells) and cells[column] == " ":
+            cells[column] = "-"
+
+
+def _place_lyric_extender(cells: list[str], end: int, next_start: int) -> None:
+    for column in range(end + 1, next_start):
+        if 0 <= column < len(cells) and cells[column] == " ":
+            cells[column] = "_"
+
+
+def _place_lyric_link(cells: list[str], event: LyricEvent, end: int, next_start: int) -> None:
+    if event.syllabic in {"begin", "middle"}:
+        _place_syllable_dash(cells, end, next_start)
+    elif event.extender:
+        _place_lyric_extender(cells, end, next_start)
+
+
+def _place_lyric_link_cues(
     cells: list[str],
     placed_spans: list[tuple[LyricEvent, int, int]],
 ) -> None:
-    for idx, (ev, _start, end) in enumerate(placed_spans):
-        if idx + 1 >= len(placed_spans):
-            continue
-        _next_ev, next_start, _next_end = placed_spans[idx + 1]
+    for (event, _start, end), (_next_event, next_start, _next_end) in pairwise(placed_spans):
         if next_start <= end + 1:
             continue
-        if ev.syllabic in {"begin", "middle"}:
-            gap_mid = end + max(1, (next_start - end) // 2)
-            for col in range(max(end + 1, gap_mid - 1), min(next_start, gap_mid + 2)):
-                if 0 <= col < len(cells) and cells[col] == " ":
-                    cells[col] = "-"
-        elif ev.extender:
-            for col in range(end + 1, next_start):
-                if 0 <= col < len(cells) and cells[col] == " ":
-                    cells[col] = "_"
+        _place_lyric_link(cells, event, end, next_start)

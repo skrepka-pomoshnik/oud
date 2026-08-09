@@ -187,26 +187,35 @@ def _editorial_entries(piece: Piece) -> list[tuple[int, str]]:
     return sorted(entries)
 
 
-def notes_lines(piece: Piece) -> list[str]:  # noqa: C901
-    lines = ["NOTES", ""]
-    for note in piece.notes:
-        text = (note or "").strip()
-        if text:
-            lines.append(text)
-    if piece.footnote:
-        lines.extend(["", f"Footnote: {piece.footnote}"])
-    if piece.source:
-        lines.append(f"Source: {piece.source}")
-    if piece.editor:
-        lines.append(f"Editor: {piece.editor}")
-    if piece.comment:
-        lines.append(f"Comment: {piece.comment}")
+def _piece_note_lines(piece: Piece) -> list[str]:
+    return [text for note in piece.notes if (text := (note or "").strip())]
+
+
+def _footnote_lines(piece: Piece) -> list[str]:
+    return ["", f"Footnote: {piece.footnote}"] if piece.footnote else []
+
+
+def _source_note_lines(piece: Piece) -> list[str]:
+    fields = (("Source", piece.source), ("Editor", piece.editor), ("Comment", piece.comment))
+    return [f"{label}: {value}" for label, value in fields if value]
+
+
+def _editorial_note_lines(piece: Piece) -> list[str]:
     editorial = _editorial_entries(piece)
-    if editorial:
-        lines.append("")
-        lines.append("Bar Comments")
-        for bar_no, text in editorial:
-            lines.append(f"[{bar_no}] {text}")
+    if not editorial:
+        return []
+    return ["", "Bar Comments", *[f"[{bar_no}] {text}" for bar_no, text in editorial]]
+
+
+def notes_lines(piece: Piece) -> list[str]:
+    lines = [
+        "NOTES",
+        "",
+        *_piece_note_lines(piece),
+        *_footnote_lines(piece),
+        *_source_note_lines(piece),
+        *_editorial_note_lines(piece),
+    ]
     if lines == ["NOTES", ""]:
         lines.append("No notes")
     lines.extend(["", "q/esc to close"])

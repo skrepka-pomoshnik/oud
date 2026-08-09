@@ -38,7 +38,7 @@ test modules are split by behavior, with every test module below the ceiling.
 
 ## Complexity
 
-The enforced ceiling is 7. The baseline currently contains 119 over-limit
+The enforced ceiling is 7. The baseline currently contains 114 over-limit
 functions, including suppressed findings. The former normal-mode and Petrucci
 render dispatchers now delegate to focused command, movement, system, rhythm,
 staff, cue, and undo-action modules without over-limit coordinator functions.

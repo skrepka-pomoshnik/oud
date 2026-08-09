@@ -187,7 +187,23 @@ def _beamified_chord_flag_positions(
     return filtered
 
 
-def _bar_number_for_index(  # noqa: C901
+def _bar_number_value(piece: Piece, bar_index: int, countdots: str) -> int:
+    if countdots != "on":
+        return bar_index + 1
+    repeats = sum(piece.bars[index].repeat == "." for index in range(bar_index + 1))
+    return bar_index + 1 + repeats
+
+
+def _periodic_bar_number(number: int, bar_index: int, step: int) -> str | None:
+    interval = max(1, step)
+    return f"[{number}]" if bar_index > 0 and number % interval == 0 else None
+
+
+def _multiple_bar_number(number: int, interval: int) -> str | None:
+    return f"[{number}]" if number % interval == 0 else None
+
+
+def _bar_number_for_index(
     piece: Piece,
     bar_index: int,
     measures: str,
@@ -196,22 +212,13 @@ def _bar_number_for_index(  # noqa: C901
     *,
     system_start: bool = False,
 ) -> str | None:
-    extra = 0
-    if countdots == "on":
-        for idx in range(bar_index + 1):
-            if piece.bars[idx].repeat == ".":
-                extra += 1
-    number = bar_index + 1 + extra
+    number = _bar_number_value(piece, bar_index, countdots)
     if measures == "system":
         return str(number) if system_start else None
     if measures == "every":
-        if step <= 0:
-            step = 1
-        if bar_index > 0 and number % step == 0:
-            return f"[{number}]"
-        return None
+        return _periodic_bar_number(number, bar_index, step)
     if measures == "five":
-        return f"[{number}]" if number % 5 == 0 else None
+        return _multiple_bar_number(number, 5)
     if measures == "start":
         return f"[{number}]" if bar_index == 0 else None
     return None

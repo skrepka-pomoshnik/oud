@@ -429,10 +429,6 @@
       {
         "name": "bass_strings_used",
         "complexity": 9
-      },
-      {
-        "name": "notes_lines",
-        "complexity": 10
       }
     ],
     "petrucci/render_marks.py": [],
@@ -472,18 +468,6 @@
       {
         "name": "_event_accidental_map",
         "complexity": 9
-      },
-      {
-        "name": "_place_lyric_link_cues",
-        "complexity": 10
-      },
-      {
-        "name": "lyric_event_cells",
-        "complexity": 10
-      },
-      {
-        "name": "text_bar_cells",
-        "complexity": 10
       }
     ],
     "petrucci/render_utils.py": [
@@ -522,10 +506,6 @@
       {
         "name": "_bar_imported_ft3_ornaments",
         "complexity": 9
-      },
-      {
-        "name": "_bar_number_for_index",
-        "complexity": 10
       }
     ],
     "petrucci/view_width.py": [
