@@ -66,6 +66,7 @@ def _system_layout(context: SystemRenderContext, bar_start: int) -> SystemLayout
     display_indices = system_display_indices_for_bars(
         context.piece.bars[bar_start : plan.bar_end],
         total_strings=context.total_strings,
+        edited_strings={string for bar, string, _column in context.overrides if bar_start <= bar < plan.bar_end},
     )
     display_strings = len(display_indices)
     visual_indices = visual_row_indices(display_indices, reverse=context.reverse_strings)

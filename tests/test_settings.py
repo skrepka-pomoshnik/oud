@@ -1,3 +1,4 @@
+from oud.editor.settings_ops import set_value_options
 from oud.settings import load_settings, save_settings
 
 
@@ -75,3 +76,14 @@ def test_playback_scroll_defaults_on(tmp_path) -> None:
     loaded = load_settings(str(tmp_path / "missing.toml"))
 
     assert loaded["playbackscroll"] == "on"
+
+
+def test_lyrics_default_to_one_stanza_with_explicit_display_options(tmp_path) -> None:
+    loaded = load_settings(str(tmp_path / "missing.toml"))
+
+    assert loaded["showlyrics"] == "on"
+    assert loaded["lyricmode"] == "first"
+    assert loaded["lyricverse"] == "1"
+    assert loaded["scoreview"] == "score"
+    assert set_value_options("lyricmode") == ("all", "current", "first")
+    assert set_value_options("scoreview") == ("score", "staff")

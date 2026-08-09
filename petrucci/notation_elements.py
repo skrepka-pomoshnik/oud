@@ -135,16 +135,6 @@ def _event_cue_elements(
     rows: StaffRows,
 ) -> tuple[LayoutElement, ...]:
     elements: list[LayoutElement] = []
-    if event.tuplet is not None:
-        if not rows.tuplet_rows:
-            _layout_fail(f"event {event.id!r} requires an unallocated tuplet row")
-        elements.append(
-            LayoutElement(
-                ElementKey(event.id, ElementRole.TUPLET),
-                Rect(x, rows.tuplet_rows[0], 3),
-                f"{event.tuplet.actual}:{event.tuplet.normal}",
-            ),
-        )
     if event.grace:
         if rows.grace_row is None:
             _layout_fail(f"event {event.id!r} requires an unallocated grace row")
@@ -443,6 +433,8 @@ def _beam_elements(
     *,
     lanes: dict[str, tuple[bool, int]],
     rows: StaffRows,
+    left: int,
+    right: int,
 ) -> tuple[LayoutElement, ...]:
     stems = {element.key.source_id: element for element in elements if element.key.role is ElementRole.STEM}
     beams: list[LayoutElement] = []
@@ -458,7 +450,9 @@ def _beam_elements(
         if len(group_stems) >= 2:
             beams.extend(_complete_beam_elements(group, group_stems, up=up, beam_y=beam_y))
         elif group[0].beam is not BeamKind.NONE:
-            beams.extend(_partial_beam_elements(group[0], group_stems[0], up=up, beam_y=beam_y))
+            beams.extend(
+                _partial_beam_elements(group[0], group_stems[0], up=up, beam_y=beam_y, left=left, right=right),
+            )
     return tuple(beams)
 
 
@@ -482,28 +476,42 @@ def _beam_stem_extensions(
     return tuple(extensions)
 
 
-def _beam_groups(events: tuple[NotationEvent, ...]) -> tuple[tuple[NotationEvent, ...], ...]:  # noqa: C901
-    groups: list[tuple[NotationEvent, ...]] = []
+def _events_by_voice(events: tuple[NotationEvent, ...]) -> tuple[tuple[NotationEvent, ...], ...]:
     voices = sorted({event.voice for event in events})
-    for voice in voices:
-        active: list[NotationEvent] = []
-        ordered = sorted((event for event in events if event.voice == voice), key=lambda event: (event.onset, event.id))
-        for event in ordered:
-            if event.beam is BeamKind.START:
-                if active:
-                    groups.append(tuple(active))
-                active = [event]
-            elif event.beam is BeamKind.CONTINUE and active:
-                active.append(event)
-            elif event.beam is BeamKind.END and active:
-                active.append(event)
-                groups.append(tuple(active))
-                active = []
-            elif event.beam in {BeamKind.PARTIAL_FORWARD, BeamKind.PARTIAL_BACKWARD}:
-                groups.append((event,))
-        if active:
-            groups.append(tuple(active))
+    return tuple(
+        tuple(sorted((event for event in events if event.voice == voice), key=lambda event: (event.onset, event.id)))
+        for voice in voices
+    )
+
+
+def _beam_groups(events: tuple[NotationEvent, ...]) -> tuple[tuple[NotationEvent, ...], ...]:
+    groups: list[tuple[NotationEvent, ...]] = []
+    for voice_events in _events_by_voice(events):
+        groups.extend(_voice_beam_groups(voice_events))
     return tuple(groups)
+
+
+def _voice_beam_groups(events: tuple[NotationEvent, ...]) -> tuple[tuple[NotationEvent, ...], ...]:
+    groups: list[tuple[NotationEvent, ...]] = []
+    active: list[NotationEvent] = []
+    for event in events:
+        if event.beam is BeamKind.START:
+            _flush_beam_group(groups, active)
+            active = [event]
+        elif event.beam is BeamKind.CONTINUE and active:
+            active.append(event)
+        elif event.beam is BeamKind.END and active:
+            groups.append((*active, event))
+            active = []
+        elif event.beam in {BeamKind.PARTIAL_FORWARD, BeamKind.PARTIAL_BACKWARD}:
+            groups.append((event,))
+    _flush_beam_group(groups, active)
+    return tuple(groups)
+
+
+def _flush_beam_group(groups: list[tuple[NotationEvent, ...]], active: list[NotationEvent]) -> None:
+    if active:
+        groups.append(tuple(active))
 
 
 def _complete_beam_elements(
@@ -533,17 +541,77 @@ def _partial_beam_elements(
     *,
     up: bool,
     beam_y: int,
+    left: int,
+    right: int,
 ) -> tuple[LayoutElement, ...]:
     forward = event.beam in {BeamKind.START, BeamKind.CONTINUE, BeamKind.PARTIAL_FORWARD}
-    start_x = stem.rect.x if forward else max(0, stem.rect.x - 2)
+    start_x = stem.rect.x if forward else max(left, stem.rect.x - 2)
+    end_x = min(right, stem.rect.x + 2) if forward else stem.rect.x
     return tuple(
         LayoutElement(
             ElementKey(event.id, ElementRole.BEAM, index),
-            Rect(start_x, beam_y + (index if up else -index), 3),
+            Rect(start_x, beam_y + (index if up else -index), max(1, end_x - start_x + 1)),
             "partial",
         )
         for index in range(_flag_count_for_event(event))
     )
+
+
+def _tuplet_elements(
+    events: tuple[NotationEvent, ...],
+    event_xs: dict[str, int],
+    *,
+    rows: StaffRows,
+    right: int,
+) -> tuple[LayoutElement, ...]:
+    groups = _tuplet_groups(events)
+    if not groups:
+        return ()
+    if not rows.tuplet_rows:
+        _layout_fail("tuplet events require an unallocated tuplet row")
+    elements: list[LayoutElement] = []
+    for group in groups:
+        first = group[0]
+        ratio = first.tuplet
+        if ratio is None or first.id not in event_xs:
+            continue
+        left = event_xs[first.id]
+        last_x = event_xs.get(group[-1].id, left)
+        natural_right = max(left + 2, last_x)
+        elements.append(
+            LayoutElement(
+                ElementKey(first.id, ElementRole.TUPLET),
+                Rect(left, rows.tuplet_rows[0], max(1, min(right, natural_right) - left + 1)),
+                f"{ratio.actual}:{ratio.normal}",
+            ),
+        )
+    return tuple(elements)
+
+
+def _tuplet_groups(events: tuple[NotationEvent, ...]) -> tuple[tuple[NotationEvent, ...], ...]:
+    groups: list[tuple[NotationEvent, ...]] = []
+    for voice_events in _events_by_voice(events):
+        groups.extend(_voice_tuplet_groups(voice_events))
+    return tuple(groups)
+
+
+def _voice_tuplet_groups(events: tuple[NotationEvent, ...]) -> tuple[tuple[NotationEvent, ...], ...]:
+    groups: list[tuple[NotationEvent, ...]] = []
+    active: list[NotationEvent] = []
+    for event in events:
+        if event.tuplet is None:
+            if active:
+                groups.append(tuple(active))
+                active = []
+        elif active and event.tuplet == active[-1].tuplet:
+            active.append(event)
+        else:
+            if active:
+                groups.append(tuple(active))
+            active = [event]
+    if active:
+        groups.append(tuple(active))
+    return tuple(groups)
 
 
 def _flag_count_for_event(event: NotationEvent) -> int:

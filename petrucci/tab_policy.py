@@ -165,10 +165,15 @@ def visual_row_indices(indices: list[int], *, reverse: bool) -> list[int]:
     return list(reversed(indices)) if reverse else list(indices)
 
 
-def system_display_indices_for_bars(bars: list[Bar], *, total_strings: int) -> list[int]:
+def system_display_indices_for_bars(
+    bars: list[Bar],
+    *,
+    total_strings: int,
+    edited_strings: set[int] | None = None,
+) -> list[int]:
     base_strings = min(6, total_strings)
     indices = list(range(base_strings))
-    used_bass: set[int] = set()
+    used_bass = {idx for idx in edited_strings or set() if base_strings <= idx < total_strings}
     for bar in bars:
         for note in bar.notes:
             idx = note.string - 1
@@ -209,7 +214,7 @@ def string_label(
     return f"{label_value:>{width}}"
 
 
-def time_sig_inline_rows(  # noqa: C901, PLR0911, PLR0912
+def time_sig_inline_rows(
     raw_time_value: str,
     sig_label: str,
     *,
@@ -217,55 +222,79 @@ def time_sig_inline_rows(  # noqa: C901, PLR0911, PLR0912
 ) -> list[str]:
     raw = (raw_time_value or "").strip()
     mode = style_mode or "symbol"
+    raw_rows = _raw_time_sig_rows(raw, mode)
+    if raw_rows is not None:
+        return raw_rows
+    return _label_time_sig_rows((sig_label or "").strip(), mode)
+
+
+def _raw_time_sig_rows(raw: str, mode: str) -> list[str] | None:
+    preset = _preset_time_sig_rows(raw, mode, raw=True)
+    if preset is not None:
+        return preset
+    return _slash_time_sig_rows(raw, fraction=mode == "fraction")
+
+
+def _preset_time_sig_rows(value: str, mode: str, *, raw: bool) -> list[str] | None:
     if mode == "numeric":
-        if raw in {"C", "c", "4/4"}:
-            return [" 4"]
-        if raw in {"C|", "c|", "2/2"}:
-            return [" 2"]
-        if raw in {"O", "o", "3/4"}:
-            return [" 3"]
+        numeric = {
+            "C": " 4",
+            "c": " 4",
+            "4/4": " 4",
+            "C|": " 2",
+            "c|": " 2",
+            "2/2": " 2",
+            "O": " 3",
+            "o": " 3",
+            "3/4": " 3",
+        }
+        if not raw:
+            numeric = {"C": " 4", "C|": " 2", "O": " 3"}
+        row = numeric.get(value)
+        return [row] if row is not None else None
     if mode == "fraction":
-        if raw in {"C", "c"}:
-            return [" 4", " /", " 4"]
-        if raw in {"C|", "c|", "2/2"}:
-            return [" 2", " /", " 2"]
-        if raw in {"O", "o"}:
-            return [" 3", " /", " 4"]
-    if "/" in raw:
-        left_raw, right_raw = raw.split("/", 1)
-        left_raw = left_raw.strip()
-        right_raw = right_raw.strip()
-        if mode == "fraction" and left_raw and right_raw:
-            return [f"{left_raw[:2]:>2}", " /", f"{right_raw[:2]:>2}"]
-        if left_raw:
-            return [left_raw[:2].rjust(2)]
-    text = (sig_label or "").strip()
+        fractions = {
+            "C": [" 4", " /", " 4"],
+            "c": [" 4", " /", " 4"],
+            "C|": [" 2", " /", " 2"],
+            "c|": [" 2", " /", " 2"],
+            "2/2": [" 2", " /", " 2"],
+            "O": [" 3", " /", " 4"],
+            "o": [" 3", " /", " 4"],
+        }
+        if not raw:
+            fractions = {key: rows for key, rows in fractions.items() if key in {"C", "C|", "O"}}
+        return fractions.get(value)
+    return None
+
+
+def _slash_time_sig_rows(value: str, *, fraction: bool) -> list[str] | None:
+    if "/" not in value:
+        return None
+    left, right = (part.strip() for part in value.split("/", 1))
+    if fraction and left and right:
+        return [f"{left[:2]:>2}", " /", f"{right[:2]:>2}"]
+    return [left[:2].rjust(2)] if left else None
+
+
+def _label_time_sig_rows(text: str, mode: str) -> list[str]:
     if not text:
         return []
-    if mode == "numeric":
-        if text == "C":
-            return [" 4"]
-        if text == "C|":
-            return [" 2"]
-        if text == "O":
-            return [" 3"]
-    if mode == "fraction":
-        if text == "C":
-            return [" 4", " /", " 4"]
-        if text == "C|":
-            return [" 2", " /", " 2"]
-        if text == "O":
-            return [" 3", " /", " 4"]
+    preset = _preset_time_sig_rows(text, mode, raw=False)
+    if preset is not None:
+        return preset
+    return _symbolic_time_sig_rows(text)
+
+
+def _symbolic_time_sig_rows(text: str) -> list[str]:
     if text in {"C", "O"}:
         # Common/cut time cue centered in staff without stem clutter.
         return [" ", text[:1], " "]
     if text == "C|":
         return [" ", "C|", " "]
-    if "/" in text:
-        left, right = text.split("/", 1)
-        top = f"{left[:2]:>2}"
-        bot = f"{right[:2]:>2}"
-        return [top, " /", bot]
+    fraction = _slash_time_sig_rows(text, fraction=True)
+    if fraction is not None:
+        return fraction
     return [f"{text[:2]:>2}", "  ", "  "]
 
 

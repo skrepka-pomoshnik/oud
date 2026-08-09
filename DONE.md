@@ -1,8 +1,53 @@
 # DONE
 
+- 2026-08-09: Retired the five highest Petrucci complexity findings, introduced typed bar-view assembly, and published an executable supported-behavior matrix with explicit FT3/Fronimo limits. Validation: mandatory Ruff, format, Ty, and pytest gate.
 Technical change log. Keep short, append newest on top.
 
 ## 2026-08-09
+- Expanded the fixed FT3 compatibility corpus from 263 to 300 disjoint,
+  checksum-verified public scores with metadata and clean semantic audits.
+  Split the five highest-complexity Petrucci render, spacing, tuning, and mark
+  coordinators, lowering the C901 baseline from 134 to 129; the full uv quality
+  gate passes.
+- Added a checksum-verified Lully score with one canonical tie to curated
+  Petrucci terminal, TAB round-trip, LilyPond, MIDI, semantic, and published-PDF
+  acceptance. Split leading-row allocation from vocal layout placement,
+  lowering the C901 baseline to 134; the full uv quality gate passes.
+- Curated source-supported Petrucci excerpts for La Couperin trio, O felice,
+  and Almain 11 with fixed terminal, TAB round-trip, LilyPond, MIDI, semantic,
+  and published-score expectations. Recorded missing style provenance, ties,
+  tuplets, and grace notes as explicit corpus work, bumped the version to
+  0.4.0a1, and split system-fit validation to lower the C901 baseline to 135;
+  the full uv quality gate passes.
+- Added deterministic French and Italian transaction pipelines covering
+  canonical editor state, terminal rows, TAB save/reopen, LilyPond, and MIDI.
+  Split vocal fallback inference, semantic-canvas cluster painting, and terminal
+  valued-symbol selection, lowering the C901 baseline to 136; the full uv
+  quality gate passes.
+- Added French and Italian transaction/keyscript acceptance fixtures for extra
+  bass courses, repeated chords, course movement, attachment retention, and
+  mixed note/chord/rest undo. Editor transactions are now intrinsically atomic.
+  Split TAB metadata, chord, and segment parsing into focused state owners,
+  retiring all three importer findings plus the settings-option dispatcher and
+  lowering the C901 baseline to 139;
+  the full uv quality gate passes.
+- Added explicit full-score and focused-staff terminal modes. Full-score mode
+  keeps all mapped notation and tablature staffs in one layout while staff
+  focus vertically reaches tall scores without moving the logical cursor;
+  focused mode renders one selected voice or tablature. Added upstream-inspired
+  beamlet, grace, grouped-tuplet, broken-span, volta, and repeat-barline
+  regressions, bounded partial beams away from barlines, and grouped one tuplet
+  bracket per run. Split three complexity findings; the baseline is now 143.
+- Made multi-stanza FT3 songs compact by selecting lyrics before horizontal and
+  vertical layout. Terminal display now defaults to the first stanza, supports
+  `first`, selected `current`, `all`, and full hiding, and reports the selection
+  in `:info`. Corrected flat pitch parsing so Felice's third-tactus `bb` sounds
+  as B-flat instead of B-natural; focused regressions cover the real score.
+- Closed seven small Petrucci slices: atomic Italian two-digit replacement and
+  deletion, invalid-boundary tests, note/rest replacement tests, one Oud Italian
+  insert path using `TabEditTransaction`, focused time-signature row helpers, and
+  `MelodyEvent.source_id` propagation through canonical notation and terminal
+  semantic cells. The function-level debt baseline is now 146.
 - Added public one-cell terminal notehead overrides without replacing the active
   pretty/safe glyph inventory; added a source-independent typed tablature
   transaction API for fret, course, rational onset, duration, note/chord/rest,

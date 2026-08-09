@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from typing import Protocol
 
 from petrucci.key_signature import key_signature_count
 from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent
@@ -413,7 +415,112 @@ def _draw_vocal_ornament(rows: list[list[str]], *, row: int, col: int, ornament:
             return
 
 
-def melody_staff_rows(  # noqa: C901
+@dataclass(frozen=True)
+class _FallbackVocalEvent:
+    onset_index: int
+    pitch: int
+    note_type: int = 4
+    dotted: bool = False
+    is_rest: bool = False
+    editorial_brackets: bool = False
+    ornament: str | None = None
+    beam: str | None = None
+
+
+class _StaffEvent(Protocol):
+    @property
+    def onset_index(self) -> int: ...
+
+    @property
+    def pitch(self) -> int | None: ...
+
+    @property
+    def note_type(self) -> int: ...
+
+    @property
+    def dotted(self) -> bool: ...
+
+
+def _fallback_vocal_events(
+    events: list[MelodyEvent] | None,
+    bar_chords: list[Chord] | None,
+    tuning_pitches: list[int] | None,
+) -> list[_StaffEvent]:
+    onset_pitch = _event_pitch_map(events)
+    _merge_chord_pitch_map(onset_pitch, bar_chords, tuning_pitches)
+    _fill_unpitched_event_rows(onset_pitch, events)
+    fallback_events: list[_StaffEvent] = []
+    for index, pitch in sorted(onset_pitch.items()):
+        fallback_events.append(_FallbackVocalEvent(onset_index=index, pitch=pitch))
+    return fallback_events
+
+
+def _inferred_staff_events(bar: Bar | None, tuning_pitches: list[int] | None) -> list[_StaffEvent]:
+    inferred_events: list[_StaffEvent] = []
+    if bar is not None:
+        inferred_events.extend(infer_vocal_events(bar, tuning_pitches=tuning_pitches))
+    return inferred_events
+
+
+def _staff_onset_columns(
+    events: list[_StaffEvent],
+    onset_cols: list[int],
+    *,
+    width: int,
+    left_pad: int,
+) -> tuple[list[int], int]:
+    effective_left_pad = max(0, min(width - 1, left_pad))
+    required_onsets = max((event.onset_index for event in events), default=-1) + 1
+    if len(onset_cols) >= required_onsets:
+        return onset_cols, effective_left_pad
+    return (
+        _resampled_onset_cols(
+            onset_cols=onset_cols,
+            event_count=required_onsets,
+            width=width,
+            left_pad=effective_left_pad,
+        ),
+        effective_left_pad,
+    )
+
+
+def _draw_staff_event(
+    rows: list[list[str]],
+    event: _StaffEvent,
+    *,
+    onset_cols: list[int],
+    onset_accidental: dict[int, str],
+    width: int,
+    floor: int,
+    melody_view: str | None,
+) -> tuple[str, int, int] | None:
+    onset_index = event.onset_index
+    if onset_index < 0 or onset_index >= len(onset_cols):
+        return None
+    column = max(floor, min(width - 1, onset_cols[onset_index]))
+    if getattr(event, "is_rest", False):
+        rows[min(len(rows) - 1, _TOP_LINE_ROW + 2)][column] = "r"
+        return None
+    pitch = getattr(event, "pitch", None)
+    if pitch is None:
+        return None
+    note_type = event.note_type
+    raw_row, row = _pitch_rows(pitch, melody_view)
+    _draw_vocal_stem(rows, row=row, col=column, note_type=note_type, dotted=event.dotted)
+    _draw_vocal_ledger(rows, raw_row=raw_row, row=row, col=column)
+    accidental = onset_accidental.get(onset_index, "")
+    if accidental:
+        edge = column - 1 if getattr(event, "editorial_brackets", False) else column
+        _draw_vocal_accidental(rows, row=row, col=edge, accidental=accidental, floor=floor)
+    rows[row][column] = _melody_notehead_glyph(note_type)
+    if getattr(event, "editorial_brackets", False):
+        _draw_editorial_brackets(rows, row=row, col=column, floor=floor)
+    _draw_vocal_ornament(rows, row=row, col=column, ornament=getattr(event, "ornament", None))
+    beam = getattr(event, "beam", None)
+    return (beam, row, column) if beam else None
+
+
+def melody_staff_rows(
     events: list[MelodyEvent] | None,
     *,
     onset_cols: list[int],
@@ -424,74 +531,36 @@ def melody_staff_rows(  # noqa: C901
     tuning_pitches: list[int] | None = None,
     melody_view: str | None = None,
 ) -> list[list[str]]:
-    _ = melody_view
     rows = [[" "] * max(0, width) for _ in range(_MELODY_STAFF_ROWS)]
     for staff_row in range(_TOP_LINE_ROW, _BOTTOM_LINE_ROW + 1, 2):
         rows[staff_row] = ["-"] * max(0, width)
     if width <= 0 or not onset_cols:
         return rows
-    vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_pitches) if bar is not None else []
+    vocal_events = _inferred_staff_events(bar, tuning_pitches)
     if not vocal_events:
-        onset_pitch = _event_pitch_map(events)
-        _merge_chord_pitch_map(onset_pitch, bar_chords, tuning_pitches)
-        _fill_unpitched_event_rows(onset_pitch, events)
-        vocal_events = [
-            type(
-                "_FallbackVocalEvent",
-                (),
-                {
-                    "onset_index": onset_idx,
-                    "pitch": pitch,
-                    "note_type": 4,
-                    "dotted": False,
-                },
-            )()
-            for onset_idx, pitch in sorted(onset_pitch.items())
-        ]
+        vocal_events = list(_fallback_vocal_events(events, bar_chords, tuning_pitches))
     if not vocal_events:
         return rows
-    effective_left_pad = max(0, min(width - 1, left_pad))
-    required_onsets = max((event.onset_index for event in vocal_events), default=-1) + 1
-    if len(onset_cols) < required_onsets:
-        onset_cols = _resampled_onset_cols(
-            onset_cols=onset_cols,
-            event_count=required_onsets,
-            width=width,
-            left_pad=effective_left_pad,
-        )
+    onset_cols, effective_left_pad = _staff_onset_columns(
+        vocal_events,
+        onset_cols,
+        width=width,
+        left_pad=left_pad,
+    )
     onset_accidental = _event_accidental_map_for_bar(events, bar=bar)
-    floor = effective_left_pad
     beam_points: list[tuple[str, int, int]] = []
     for event in vocal_events:
-        onset_idx = event.onset_index
-        if onset_idx < 0 or onset_idx >= len(onset_cols):
-            continue
-        col = max(floor, min(width - 1, onset_cols[onset_idx]))
-        if getattr(event, "is_rest", False):
-            rest_row = min(len(rows) - 1, _TOP_LINE_ROW + 2)
-            rows[rest_row][col] = "r"
-            continue
-        if event.pitch is None:
-            continue
-        raw_row, row = _pitch_rows(event.pitch, melody_view)
-        _draw_vocal_stem(
+        beam_point = _draw_staff_event(
             rows,
-            row=row,
-            col=col,
-            note_type=event.note_type,
-            dotted=event.dotted,
+            event,
+            onset_cols=onset_cols,
+            onset_accidental=onset_accidental,
+            width=width,
+            floor=effective_left_pad,
+            melody_view=melody_view,
         )
-        _draw_vocal_ledger(rows, raw_row=raw_row, row=row, col=col)
-        accidental = onset_accidental.get(onset_idx, "")
-        if accidental:
-            accidental_edge = col - 1 if getattr(event, "editorial_brackets", False) else col
-            _draw_vocal_accidental(rows, row=row, col=accidental_edge, accidental=accidental, floor=floor)
-        rows[row][col] = _melody_notehead_glyph(event.note_type)
-        if getattr(event, "editorial_brackets", False):
-            _draw_editorial_brackets(rows, row=row, col=col, floor=floor)
-        _draw_vocal_ornament(rows, row=row, col=col, ornament=getattr(event, "ornament", None))
-        if beam := getattr(event, "beam", None):
-            beam_points.append((beam, row, col))
+        if beam_point is not None:
+            beam_points.append(beam_point)
     _draw_vocal_beams(rows, beam_points)
     return rows
 

@@ -296,10 +296,39 @@ def test_vocal_renderer_displays_all_lyric_rows_without_two_row_cap() -> None:
     )
     kwargs["settings"]["showmelody"] = "on"
     kwargs["settings"]["showlyrics"] = "on"
+    kwargs["settings"]["lyricmode"] = "all"
     text = "\n".join(_render_lines(kwargs))
     assert "Row1" in text
     assert "Row2" in text
     assert "Row3" in text
+
+
+def test_vocal_renderer_selects_first_or_current_lyric_stanza() -> None:
+    kwargs = _args("normal")
+    kwargs["piece"] = Piece(
+        title="SelectedLyrics",
+        bars=[
+            Bar(
+                melody_events=[MelodyEvent("c", 0)],
+                lyric_event_rows=[
+                    [LyricEvent("First", 0, verse=0)],
+                    [LyricEvent("Second", 0, verse=1)],
+                    [LyricEvent("Third", 0, verse=2)],
+                ],
+                chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(3, 1, 0)])],
+            ),
+        ],
+        strings=6,
+    )
+    kwargs["settings"].update(showmelody="on", showlyrics="on", lyricmode="first")
+    first_text = "\n".join(_render_lines(kwargs))
+    assert "First" in first_text
+    assert "Second" not in first_text
+
+    kwargs["settings"].update(lyricmode="current", lyricverse="2")
+    current_text = "\n".join(_render_lines(kwargs))
+    assert "Second" in current_text
+    assert "First" not in current_text
 
 
 def test_vocal_renderer_orders_lyric_rows_by_verse_index() -> None:

@@ -8,6 +8,7 @@ from fractions import Fraction
 
 from petrucci.framebuffer import Frame
 from petrucci.layout import ElementRole, LayoutMetrics, NotationLayoutPolicy, ScoreLayout, layout_score
+from petrucci.lyric_display import piece_for_lyric_display
 from petrucci.model import ImportedStaff, MelodyEvent, Piece
 from petrucci.piece_adapter import notation_score_from_piece
 from petrucci.render_utils import bar_cells_from_chords, chord_positions, note_type_to_denom
@@ -93,7 +94,9 @@ def typeset_piece_score_view(
 ) -> PieceScoreView | None:
     """Render a Piece notation-focused view, or return ``None`` for tablature."""
 
-    staff_indices = _canonical_staff_indices(piece, focused_imported_staff_index)
+    piece = piece_for_lyric_display(piece, settings)
+    score_view = settings.get("scoreview", "auto")
+    staff_indices = _canonical_staff_indices(piece, focused_imported_staff_index, score_view=score_view)
     if settings.get("showmelody", "on") != "on" or staff_indices == ():
         return None
     score = notation_score_from_piece(
@@ -101,7 +104,7 @@ def typeset_piece_score_view(
         staff_indices=None if staff_indices is None else staff_indices,
         include_lyrics=settings.get("showlyrics", "on") == "on",
     )
-    mixed_default = _has_tablature(piece) and focused_imported_staff_index is None
+    mixed_default = _mixed_score_view(piece, focused_imported_staff_index, score_view=score_view)
     if mixed_default:
         score = _with_tablature_staff(score)
     policy = NotationLayoutPolicy(
@@ -119,7 +122,11 @@ def typeset_piece_score_view(
     )
     layout = layout_score(score, viewport=base_options.viewport, metrics=base_options.metrics, policy=policy)
     active_position = playback or cursor
-    focused_staff_id = _focused_staff_id(piece, focused_imported_staff_index)
+    focused_staff_id = _focused_staff_id(
+        piece,
+        focused_imported_staff_index,
+        tab_is_focus=mixed_default and focused_imported_staff_index is None,
+    )
     active_event = _source_event(
         piece,
         score,
@@ -381,7 +388,12 @@ def _without_partial_staffs(
     )
 
 
-def _canonical_staff_indices(piece: Piece, focused_index: int | None) -> tuple[int, ...] | None:
+def _canonical_staff_indices(
+    piece: Piece,
+    focused_index: int | None,
+    *,
+    score_view: str,
+) -> tuple[int, ...] | None:
     imported = piece.imported_score
     has_tablature = _has_tablature(piece)
     if imported is None:
@@ -389,13 +401,23 @@ def _canonical_staff_indices(piece: Piece, focused_index: int | None) -> tuple[i
     note_indices = tuple(index for index, staff in enumerate(imported.staffs) if staff.kind == "note")
     if not note_indices:
         return ()
-    if not has_tablature:
+    if score_view == "score" or (score_view == "auto" and not has_tablature):
         return note_indices
+    if score_view == "staff" and has_tablature and focused_index is None:
+        return ()
     if focused_index is not None and 0 <= focused_index < len(imported.staffs):
         selected = imported.staffs[focused_index]
         note_index = _note_index_for_focus(imported.staffs, focused_index, selected)
         return (note_index,) if note_index is not None else ()
-    return note_indices
+    return (note_indices[0],) if score_view == "staff" else note_indices
+
+
+def _mixed_score_view(piece: Piece, focused_index: int | None, *, score_view: str) -> bool:
+    if not _has_tablature(piece):
+        return False
+    if score_view == "score":
+        return True
+    return score_view == "auto" and focused_index is None
 
 
 def _note_index_for_focus(staffs: list[ImportedStaff], index: int, selected: ImportedStaff) -> int | None:
@@ -417,7 +439,9 @@ def _note_index_for_focus(staffs: list[ImportedStaff], index: int, selected: Imp
     return note_indices[0] if len(note_indices) == 1 else None
 
 
-def _focused_staff_id(piece: Piece, focused_index: int | None) -> str | None:
+def _focused_staff_id(piece: Piece, focused_index: int | None, *, tab_is_focus: bool = False) -> str | None:
+    if tab_is_focus:
+        return "piece:tab"
     imported = piece.imported_score
     if imported is None or focused_index is None or not 0 <= focused_index < len(imported.staffs):
         return None
@@ -465,7 +489,11 @@ def _source_onset_index(
     imported = piece.imported_score
     if imported is None:
         return source_position
-    preferred = int(preferred_staff_id.rsplit(":", 1)[-1]) if preferred_staff_id is not None else None
+    preferred = (
+        int(preferred_staff_id.rsplit(":", 1)[-1])
+        if preferred_staff_id is not None and preferred_staff_id.startswith("piece:staff:")
+        else None
+    )
     staffs = [(index, staff) for index, staff in enumerate(imported.staffs) if staff.kind == "note"]
     staffs.sort(key=lambda item: item[0] != preferred)
     for _index, staff in staffs:

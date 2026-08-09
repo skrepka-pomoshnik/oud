@@ -72,34 +72,55 @@ def _lyric_line_elements(
     return tuple(elements)
 
 
-def _lyric_connector_elements(  # noqa: C901
+def _lyric_connector_elements(
     lyrics: dict[str, tuple[LyricSyllable, ...]],
     *,
     event_xs: dict[str, int],
     rows: StaffRows,
 ) -> tuple[LayoutElement, ...]:
+    by_verse = _visible_lyrics_by_verse(lyrics, event_xs=event_xs)
+    return tuple(
+        element for verse, values in by_verse.items() for element in _verse_hyphen_elements(verse, values, rows=rows)
+    )
+
+
+def _visible_lyrics_by_verse(
+    lyrics: dict[str, tuple[LyricSyllable, ...]],
+    *,
+    event_xs: dict[str, int],
+) -> dict[int, list[tuple[int, LyricSyllable]]]:
     by_verse: dict[int, list[tuple[int, LyricSyllable]]] = {}
     for event_id, event_lyrics in lyrics.items():
         if event_id not in event_xs:
             continue
         for lyric in event_lyrics:
             by_verse.setdefault(lyric.verse, []).append((event_xs[event_id], lyric))
+    return by_verse
+
+
+def _verse_hyphen_elements(
+    verse: int,
+    values: list[tuple[int, LyricSyllable]],
+    *,
+    rows: StaffRows,
+) -> tuple[LayoutElement, ...]:
+    if verse >= len(rows.lyric_rows):
+        return ()
     elements: list[LayoutElement] = []
-    for verse, values in by_verse.items():
-        ordered = sorted(values, key=lambda item: (item[0], item[1].id))
-        for (x, lyric), (next_x, _next_lyric) in pairwise(ordered):
-            if lyric.syllabic not in {Syllabic.BEGIN, Syllabic.MIDDLE}:
-                continue
-            right = x + display_width(lyric.text)
-            if next_x - right < 2 or verse >= len(rows.lyric_rows):
-                continue
-            hyphen_x = right + ((next_x - right) // 2)
-            elements.append(
-                LayoutElement(
-                    ElementKey(lyric.id, ElementRole.LYRIC_HYPHEN),
-                    Rect(hyphen_x, rows.lyric_rows[verse]),
-                ),
-            )
+    ordered = sorted(values, key=lambda item: (item[0], item[1].id))
+    for (x, lyric), (next_x, _next_lyric) in pairwise(ordered):
+        if lyric.syllabic not in {Syllabic.BEGIN, Syllabic.MIDDLE}:
+            continue
+        right = x + display_width(lyric.text)
+        if next_x - right < 2:
+            continue
+        hyphen_x = right + ((next_x - right) // 2)
+        elements.append(
+            LayoutElement(
+                ElementKey(lyric.id, ElementRole.LYRIC_HYPHEN),
+                Rect(hyphen_x, rows.lyric_rows[verse]),
+            ),
+        )
     return tuple(elements)
 
 

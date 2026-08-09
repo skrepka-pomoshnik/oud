@@ -123,10 +123,6 @@
       {
         "name": "apply_set_command",
         "complexity": 13
-      },
-      {
-        "name": "set_value_options",
-        "complexity": 12
       }
     ],
     "oud/editor/tab_assignment.py": [
@@ -164,12 +160,6 @@
       },
       {
         "name": "verify_render_bar_issues",
-        "complexity": 9
-      }
-    ],
-    "oud/editor/view_focus.py": [
-      {
-        "name": "visible_view_staffs",
         "complexity": 9
       }
     ],
@@ -367,20 +357,6 @@
         "complexity": 10
       }
     ],
-    "oud/importers/tab.py": [
-      {
-        "name": "_parse_bar_segment_lines",
-        "complexity": 14
-      },
-      {
-        "name": "_parse_chord_line",
-        "complexity": 13
-      },
-      {
-        "name": "parse_tab_lines_data",
-        "complexity": 30
-      }
-    ],
     "oud/playback/timeline.py": [
       {
         "name": "cursors_at_time",
@@ -437,24 +413,6 @@
         "complexity": 9
       }
     ],
-    "petrucci/layout_map.py": [
-      {
-        "name": "layout_block_rows",
-        "complexity": 8
-      }
-    ],
-    "petrucci/notation_annotations.py": [
-      {
-        "name": "_lyric_connector_elements",
-        "complexity": 8
-      }
-    ],
-    "petrucci/notation_elements.py": [
-      {
-        "name": "_beam_groups",
-        "complexity": 9
-      }
-    ],
     "petrucci/piece_adapter.py": [
       {
         "name": "_bar_events",
@@ -463,16 +421,6 @@
       {
         "name": "_bar_lyrics",
         "complexity": 9
-      }
-    ],
-    "petrucci/render.py": [
-      {
-        "name": "_render_duet_score_view",
-        "complexity": 23
-      },
-      {
-        "name": "render_piece",
-        "complexity": 23
       }
     ],
     "petrucci/render_geometry.py": [
@@ -493,16 +441,8 @@
     ],
     "petrucci/render_marks.py": [
       {
-        "name": "_imported_ft3_mark_target_rows",
-        "complexity": 16
-      },
-      {
         "name": "_merge_span_rows_with_cue_priority",
         "complexity": 11
-      },
-      {
-        "name": "_overlay_inline_local_marks_on_display_row",
-        "complexity": 13
       },
       {
         "name": "_place_parenthesize_tie_cues",
@@ -555,10 +495,6 @@
         "complexity": 10
       },
       {
-        "name": "melody_staff_rows",
-        "complexity": 13
-      },
-      {
         "name": "text_bar_cells",
         "complexity": 10
       }
@@ -585,35 +521,9 @@
         "complexity": 9
       }
     ],
-    "petrucci/spacing.py": [
-      {
-        "name": "auto_bar_plan",
-        "complexity": 17
-      }
-    ],
-    "petrucci/system_fitting.py": [
-      {
-        "name": "fit_measured_boxes",
-        "complexity": 8
-      }
-    ],
-    "petrucci/tab_policy.py": [
-      {
-        "name": "time_sig_inline_rows",
-        "complexity": 24
-      }
-    ],
     "petrucci/terminal.py": [
       {
         "name": "_paint_element",
-        "complexity": 8
-      },
-      {
-        "name": "_valued_notation_symbol",
-        "complexity": 9
-      },
-      {
-        "name": "write",
         "complexity": 8
       }
     ],
@@ -635,16 +545,8 @@
         "complexity": 10
       },
       {
-        "name": "_beamified_chord_flag_positions",
-        "complexity": 14
-      },
-      {
         "name": "_place_parenthesize_tie_cues",
         "complexity": 11
-      },
-      {
-        "name": "build_bar_view",
-        "complexity": 13
       }
     ],
     "petrucci/view_width.py": [
@@ -659,20 +561,6 @@
       {
         "name": "_infer_time_signature",
         "complexity": 9
-      },
-      {
-        "name": "_scale_row",
-        "complexity": 13
-      },
-      {
-        "name": "_tuning_labels",
-        "complexity": 18
-      }
-    ],
-    "petrucci/vocal_line.py": [
-      {
-        "name": "infer_vocal_events",
-        "complexity": 8
       }
     ],
     "scripts/corpus_smoke.py": [

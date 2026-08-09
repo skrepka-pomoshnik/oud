@@ -1,5 +1,36 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class _LeadingRows:
+    offset: int
+    meta: int | None
+    tactus: int | None
+    slur: int | None
+    tie: int | None
+    hold: int | None
+    gliss: int | None
+    tuplet: int | None
+
+
+def _alloc_leading_rows(
+    include_meta: bool,
+    show_tactus: bool,
+    show_extras: bool,
+    show_tuplets: bool,
+) -> _LeadingRows:
+    offset = int(include_meta)
+    meta = 0 if include_meta else None
+    tactus = offset if show_tactus else None
+    offset += int(show_tactus)
+    cue = offset if show_extras or show_tuplets else None
+    offset += int(cue is not None)
+    span = cue if show_extras else None
+    tuplet = cue if show_tuplets else None
+    return _LeadingRows(offset, meta, tactus, span, span, span, span, tuplet)
+
 
 def _resolved_lyric_rows(show_lyrics: bool, lyric_rows_count: int) -> int:
     return lyric_rows_count if lyric_rows_count > 0 else (1 if show_lyrics else 0)
@@ -69,7 +100,7 @@ def layout_rows(height: int, strings: int) -> dict[str, int | None]:
     }
 
 
-def layout_block_rows(  # noqa: C901, PLR0917 - legacy API pending a typed layout-policy record
+def layout_block_rows(  # noqa: PLR0917 - legacy API pending a typed layout-policy record
     strings: int,
     include_meta: bool,
     show_dur: bool,
@@ -84,25 +115,9 @@ def layout_block_rows(  # noqa: C901, PLR0917 - legacy API pending a typed layou
     vocal_pos: str = "bottom",
 ) -> dict[str, int | None]:
     _ = strings
-    offset = 0
-    meta = 0 if include_meta else None
-    if include_meta:
-        offset += 1
-    tactus = offset if show_tactus else None
-    if show_tactus:
-        offset += 1
-    ann = orn = slur = tie = hold = gliss = tuplet = None
-    if show_extras or show_tuplets:
-        # Local marks (annotations/ornaments/fingerings) are rendered inline; reserve
-        # only one shared cue row for spans/tuplet cues.
-        if show_extras:
-            slur = offset
-            tie = offset
-            hold = offset
-            gliss = offset
-        if show_tuplets:
-            tuplet = offset
-        offset += 1
+    leading = _alloc_leading_rows(include_meta, show_tactus, show_extras, show_tuplets)
+    offset = leading.offset
+    ann = orn = None
     actual_lyric_rows = _resolved_lyric_rows(show_lyrics, lyric_rows_count)
     actual_melody_rows = max(1, melody_rows_count) if show_melody else 0
     melody = None
@@ -129,15 +144,15 @@ def layout_block_rows(  # noqa: C901, PLR0917 - legacy API pending a typed layou
         )
     lyric = lyric_rows[0] if lyric_rows else None
     return {
-        "meta": meta,
+        "meta": leading.meta,
         "ann": ann,
         "orn": orn,
-        "tactus": tactus,
-        "slur": slur,
-        "tie": tie,
-        "hold": hold,
-        "gliss": gliss,
-        "tuplet": tuplet,
+        "tactus": leading.tactus,
+        "slur": leading.slur,
+        "tie": leading.tie,
+        "hold": leading.hold,
+        "gliss": leading.gliss,
+        "tuplet": leading.tuplet,
         "flag": flag,
         "flag2": flag2,
         "dur": dur,

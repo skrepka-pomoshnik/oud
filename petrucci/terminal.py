@@ -200,7 +200,7 @@ class _SemanticCanvas:
         self.ids: list[list[str | None]] = [[None for _ in range(width)] for _ in range(height)]
         self.priorities = [[-1 for _ in range(width)] for _ in range(height)]
 
-    def write(  # noqa: C901
+    def write(
         self,
         y: int,
         x: int,
@@ -214,22 +214,45 @@ class _SemanticCanvas:
         if y < 0 or y >= self.height or cursor >= self.width:
             return
         for cluster in split_display_clusters(text):
-            if cursor + cluster.width <= 0:
-                cursor += cluster.width
-                continue
-            if cursor < 0 or cursor + cluster.width > self.width:
+            next_cursor = self._write_cluster(
+                y,
+                cursor,
+                cluster.text,
+                cluster.width,
+                role=role,
+                source_id=source_id,
+                priority=priority,
+            )
+            if next_cursor is None:
                 break
-            if any(self.priorities[y][cell_x] > priority for cell_x in range(cursor, cursor + cluster.width)):
-                cursor += cluster.width
-                continue
-            self.chars[y][cursor] = cluster.text
-            for continuation_x in range(cursor + 1, cursor + cluster.width):
-                self.chars[y][continuation_x] = ""
-            for cell_x in range(cursor, cursor + cluster.width):
-                self.roles[y][cell_x] = role
-                self.ids[y][cell_x] = source_id
-                self.priorities[y][cell_x] = priority
-            cursor += cluster.width
+            cursor = next_cursor
+
+    def _write_cluster(
+        self,
+        y: int,
+        cursor: int,
+        text: str,
+        width: int,
+        *,
+        role: ElementRole,
+        source_id: str,
+        priority: int,
+    ) -> int | None:
+        next_cursor = cursor + width
+        if next_cursor <= 0:
+            return next_cursor
+        if cursor < 0 or next_cursor > self.width:
+            return None
+        if any(self.priorities[y][cell_x] > priority for cell_x in range(cursor, next_cursor)):
+            return next_cursor
+        self.chars[y][cursor] = text
+        for continuation_x in range(cursor + 1, next_cursor):
+            self.chars[y][continuation_x] = ""
+        for cell_x in range(cursor, next_cursor):
+            self.roles[y][cell_x] = role
+            self.ids[y][cell_x] = source_id
+            self.priorities[y][cell_x] = priority
+        return next_cursor
 
     def snapshot(self) -> SemanticFrame:
         lines = ["".join(row) for row in self.chars]
@@ -421,27 +444,35 @@ def _ending_text(element: LayoutElement, glyphs: _GlyphInventory) -> str:
     return prefix + (glyphs.ending_fill * max(0, element.rect.width - display_width(prefix)))
 
 
-def _valued_notation_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str:  # noqa: C901
+def _valued_notation_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str:
+    staff_symbol = _valued_staff_symbol(element, glyphs)
+    return staff_symbol if staff_symbol is not None else _valued_mark_symbol(element, glyphs)
+
+
+def _valued_staff_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str | None:
     role = element.key.role
     if role is ElementRole.CLEF:
-        text = _clef_text(element.value, glyphs)
-    elif role is ElementRole.FLAG:
-        text = glyphs.flag_up if element.value == "up" else glyphs.flag_down
-    elif role is ElementRole.KEY_SIGNATURE:
-        text = _key_signature_text(element.value, glyphs)
-    elif role is ElementRole.NOTEHEAD:
-        text = glyphs.open_notehead if element.value in {"1", "2"} else glyphs.filled_notehead
-    elif role is ElementRole.REST:
-        text = _rest_text(element.value, glyphs)
-    elif role is ElementRole.ORNAMENT:
-        text = _ornament_text(element.value, glyphs)
-    elif role is ElementRole.ACCIDENTAL:
-        text = _accidental_text(element.value, glyphs)
-    elif role is ElementRole.DOT:
-        text = glyphs.dot * max(1, int(element.value or "1"))
-    else:
-        text = element.value
-    return text
+        return _clef_text(element.value, glyphs)
+    if role is ElementRole.FLAG:
+        return glyphs.flag_up if element.value == "up" else glyphs.flag_down
+    if role is ElementRole.KEY_SIGNATURE:
+        return _key_signature_text(element.value, glyphs)
+    if role is ElementRole.NOTEHEAD:
+        return glyphs.open_notehead if element.value in {"1", "2"} else glyphs.filled_notehead
+    return None
+
+
+def _valued_mark_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str:
+    role = element.key.role
+    if role is ElementRole.REST:
+        return _rest_text(element.value, glyphs)
+    if role is ElementRole.ORNAMENT:
+        return _ornament_text(element.value, glyphs)
+    if role is ElementRole.ACCIDENTAL:
+        return _accidental_text(element.value, glyphs)
+    if role is ElementRole.DOT:
+        return glyphs.dot * max(1, int(element.value or "1"))
+    return element.value
 
 
 def _clef_text(value: str, glyphs: _GlyphInventory) -> str:

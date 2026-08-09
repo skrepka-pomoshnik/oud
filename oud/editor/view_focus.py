@@ -9,7 +9,7 @@ from petrucci.duet_score import (
     duet_staff_labels,
     is_duet_score_piece,
 )
-from petrucci.model import Piece
+from petrucci.model import ImportedStaff, Piece
 
 if TYPE_CHECKING:
     from oud.editor.state import EditorState
@@ -32,7 +32,7 @@ def _has_tablature(piece: Piece) -> bool:
     return any(bar.chords or bar.notes for bar in piece.bars)
 
 
-def visible_view_staffs(piece: Piece) -> tuple[ViewStaff, ...]:  # noqa: C901
+def visible_view_staffs(piece: Piece) -> tuple[ViewStaff, ...]:
     if is_duet_score_piece(piece):
         return tuple(
             ViewStaff(key=f"duet-{index}", label=label, source_index=index)
@@ -43,19 +43,29 @@ def visible_view_staffs(piece: Piece) -> tuple[ViewStaff, ...]:  # noqa: C901
     if _has_tablature(piece) or piece.imported_score is None:
         staffs.append(ViewStaff(key="tab", label="Tab"))
     if piece.imported_score is not None:
-        note_count = sum(staff.kind == "note" for staff in piece.imported_score.staffs)
-        lyric_count = sum(staff.kind == "lyrics" for staff in piece.imported_score.staffs)
-        for index, imported in enumerate(piece.imported_score.staffs):
-            label = imported.label or _IMPORTED_LABELS.get(imported.kind)
-            if imported.kind == "note" and note_count == 1:
-                label = "Melody"
-            elif imported.kind == "lyrics" and lyric_count == 1:
-                label = "Lyrics"
-            elif imported.kind == "lyrics" and imported.label:
-                label = f"{imported.label} lyrics"
-            if label is not None:
-                staffs.append(ViewStaff(key=f"{imported.kind}-{index}", label=label, source_index=index))
+        staffs.extend(_imported_view_staffs(piece.imported_score.staffs))
     return tuple(staffs) or (ViewStaff(key="score", label="Score"),)
+
+
+def _imported_view_staffs(imported_staffs: list[ImportedStaff]) -> tuple[ViewStaff, ...]:
+    note_count = sum(staff.kind == "note" for staff in imported_staffs)
+    lyric_count = sum(staff.kind == "lyrics" for staff in imported_staffs)
+    staffs: list[ViewStaff] = []
+    for index, imported in enumerate(imported_staffs):
+        label = _imported_staff_label(imported, note_count=note_count, lyric_count=lyric_count)
+        if label is not None:
+            staffs.append(ViewStaff(key=f"{imported.kind}-{index}", label=label, source_index=index))
+    return tuple(staffs)
+
+
+def _imported_staff_label(imported: ImportedStaff, *, note_count: int, lyric_count: int) -> str | None:
+    if imported.kind == "note" and note_count == 1:
+        return "Melody"
+    if imported.kind == "lyrics" and lyric_count == 1:
+        return "Lyrics"
+    if imported.kind == "lyrics" and imported.label:
+        return f"{imported.label} lyrics"
+    return imported.label or _IMPORTED_LABELS.get(imported.kind)
 
 
 def current_view_staff(state: EditorState) -> ViewStaff:

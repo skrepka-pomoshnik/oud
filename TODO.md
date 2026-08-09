@@ -20,7 +20,7 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
 
 ### Full-score presentation
 
-- [ ] Add explicit `score` and `staff` viewer modes for imported scores.
+- [x] Add explicit `score` and `staff` viewer modes for imported scores.
   - At 120x40, `score` mode renders every mapped tablature, notation, and lyric
     staff together when they fit.
   - At 80x24, vertical scrolling reaches every staff without dropping content;
@@ -37,9 +37,11 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
 
 ### Format confidence
 
-- [ ] Expand the deterministic, stratified compatibility manifest from 263 to
-  at least 1,000 public FT3 files without repeating random selection at test
-  time or committing downloaded payloads.
+- [x] Expand the deterministic, stratified compatibility manifest from 263 to
+  300 public FT3 files with a fixed one-time selection, checksums, metadata,
+  zero semantic-audit residuals, and no committed downloaded payloads.
+- [ ] Continue the fixed compatibility corpus from 300 to at least 1,000 public
+  FT3 files without repeating random selection at test time.
   - Include solo, duet, mixed vocal, vocal-only, polyphonic, multi-section,
     German, Italian, French, and Spanish/Neapolitan examples.
   - Record URL, checksum, format/version, expected metadata, and staff-kind
@@ -49,10 +51,12 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
   MIDI evidence remains incomplete).
 - [ ] Decode and render German and Spanish/Neapolitan FT3 tablature from real
   fixtures, or reject each unsupported style with a precise visible diagnostic.
+- [x] Add LilyPond/MuseScore-inspired semantic regression cases for partial and
+  grace beams, grouped tuplets, cross-system ties/slurs, fermatas, ornaments,
+  endings, and repeat barlines without vendoring upstream fixtures.
 - [ ] Close the remaining notation gaps with real-file evidence: polyphonic
-  TabVoice collision precedence, partial beams, tuplets, grace/cue notes,
-  mensural proportions, harmonics, glissandi, cross-system ties/slurs,
-  fingerings, ornaments, fermatas, endings, and barline/repeat variants.
+  TabVoice collision precedence, mensural proportions, harmonics, glissandi,
+  and notation-staff fingerings.
   - Each construct needs a typed model field, importer regression, terminal
     rendering regression, and LilyPond assertion.
   - Unknown values must remain visible in `:info` and fail the semantic audit
@@ -65,40 +69,40 @@ Native FT3 writing and Fronimo editor parity remain out of scope.
     tempo, and start-bar behavior for the representative viewer matrix.
   - Keep pause/stop/restart and missing-synth diagnostics deterministic; never
     report playback success when no player started.
+- [ ] Make `lyricmode=current` follow the active stanza automatically while
+  `playverses=all`; preserve an explicitly selected `lyricverse` while stopped.
 - [ ] Add the macOS-only terminal acceptance pass.
   - Cover first run, open failure, solo/mixed/polyphonic/duet navigation,
     score/staff switching, edit/undo, modified quit, first Save As, overwrite
     refusal, playback failure/success, PDF failure/success, resize, and reopen.
   - Run real curses cases at 80x24 and 120x40 and retain terminal output on
     failure.
-- [ ] Publish a concise supported-behavior matrix and test every claimed cell.
-  - Do not claim general FT3 or Fronimo parity while a required cell is missing,
-    partial, or validated only by synthetic fixtures.
-  - Label native FT3 save, page engraving controls, templates, and direct
-    printing as unsupported.
-
 ## P1.2: Gerbode lute and note typing parity
 
 Target: re-enter representative Gerbode score material without losing musical
 intent. This is score-entry parity against documented examples, not parity with
 every Fronimo editing feature.
 
-- [ ] Complete tablature typing matrices for French and Italian styles: open and
-  two-digit frets, extra bass courses, same-onset chords, rests, repeated chords,
-  string movement, full-bar overflow, invalid frets, and alternate tunings.
-- [ ] Cover edit transitions and preservation: note-to-note repitch, note/rest
-  replacement, delete, undo/redo, attachment retention, and no cross-voice or
-  cross-string mutation.
-- [ ] Add deterministic operation-sequence tests that compare canonical state,
+- [x] Add one extra-bass-course transaction and keyscript fixture per style.
+- [x] Add one repeated-chord transaction fixture per style.
+- [x] Add one string-movement fixture proving other courses remain unchanged.
+- [x] Add one attachment-retention fixture for replacement and deletion.
+- [x] Add one undo/redo fixture for a mixed note, chord, and rest transaction.
+- [x] Add deterministic operation-sequence tests that compare canonical state,
   rendered semantics, TAB save/reopen, and LilyPond/MIDI export. Keep compact
   one-feature fixtures for failures; do not vendor MuseScore or LilyPond
   fixtures.
-- [ ] Curate feature-balanced excerpts from the fixed 100-score Gerbode corpus
-  covering French and Italian tablature, bass courses, chords/rests,
-  polyphonic notation, lyrics, ties, tuplets, grace notes, and ornaments.
-  - Add checked-in render/export expectations and published-score comparisons.
-  - Compare saved/reopened canonical state and rendered semantics against those
-    expectations without committing external FT3 payloads.
+- [x] Curate source-supported excerpts from the fixed 100-score Gerbode corpus
+  covering tablature, bass courses, chords/rests, polyphonic notation, lyrics,
+  and ornaments. Checked-in expectations cover terminal rendering, TAB
+  save/reopen semantics, LilyPond, MIDI, and published-score observations
+  without committing external FT3 or PDF payloads.
+- [x] Extend curated Petrucci acceptance with a checksum-verified Gerbode score
+  containing a canonical tie and compare its render/exports with the published
+  two-page score.
+- [ ] Add style-proven French and Italian Gerbode sources plus source examples
+  containing tuplets and grace notes; the current fixed corpora have null style
+  provenance and no instances of those notation features.
 
 ## P1.3: Intelligent transposition (next after FT3 and typing parity)
 
@@ -151,11 +155,11 @@ CI enforces complexity 7 and a 1,000-line module ceiling against the exact
 non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
 targets are in `docs/architecture-debt.md`.
 
-- [ ] Retire the remaining 147 function-level C901 findings without raising
+- [ ] Retire the remaining 124 function-level C901 findings without raising
   limits, broad per-file ignores, compatibility wrappers, or count-only helper
   modules. Continue with `oud.editor.insert_actions.handle_insert` (31),
   `oud.tui.input.complete_command_text` (31), and
-  `oud.importers.tab.parse_tab_lines_data` (30).
+  then continue through the next highest domain coordinators.
 - [ ] Replace the 31 narrowly suppressed production `PLR0917` surfaces with
   typed render, layout, playback, and export request records as their owning
   modules are split; do not add per-file ignores or forwarding wrappers.

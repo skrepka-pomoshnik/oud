@@ -13,7 +13,7 @@ from petrucci.duet_score import (
     is_duet_score_piece,
 )
 from petrucci.layout_map import block_height as _block_height
-from petrucci.render import (
+from petrucci.render_legacy import (
     _piece_has_lyrics,
     _piece_has_melody_grid,
     _piece_lyric_row_count,

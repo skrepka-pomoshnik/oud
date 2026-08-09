@@ -51,6 +51,70 @@ class _BarSegmentParseResult:
     spans: list[tuple[int, int]]
 
 
+@dataclass(slots=True, frozen=True)
+class _ChordLineParts:
+    flag: str
+    fret_text: str
+    dotted: bool
+    grid: str | None
+
+
+@dataclass(slots=True)
+class _BarAccumulator:
+    strings: int
+    default_time: str | None = None
+    last_note_type: int | None = None
+    bars: list[Bar] = field(default_factory=list)
+    spans: list[tuple[int, int]] = field(default_factory=list)
+    current_bar: Bar = field(init=False)
+    span_start: int | None = None
+    span_end: int | None = None
+
+    def __post_init__(self) -> None:
+        self.current_bar = Bar(time_sig=self.default_time)
+
+    def set_default_time(self, value: str | None) -> None:
+        self.default_time = value
+        if self.current_bar.time_sig is None and value:
+            self.current_bar.time_sig = value
+
+    def set_time_signature(self, value: str | None, line_no: int) -> None:
+        self.current_bar.time_sig = value
+        self._include_line(line_no)
+
+    def add_chord(self, line: str, line_no: int) -> bool:
+        chord, self.last_note_type = _parse_chord_line(line, self.strings, self.last_note_type)
+        if chord is None or not chord.notes:
+            return False
+        self.current_bar.chords.append(chord)
+        self.current_bar.notes.extend(chord.notes)
+        self._include_line(line_no)
+        return True
+
+    def break_bar(self, *, reset_note_type: bool = False) -> None:
+        self._finalize_current_bar()
+        self.current_bar = Bar(time_sig=self.default_time)
+        self.span_start = None
+        self.span_end = None
+        if reset_note_type:
+            self.last_note_type = None
+
+    def finish(self) -> None:
+        self._finalize_current_bar()
+
+    def _include_line(self, line_no: int) -> None:
+        if self.span_start is None:
+            self.span_start = line_no
+        self.span_end = line_no
+
+    def _finalize_current_bar(self) -> None:
+        if not self.current_bar.chords and not self.current_bar.notes:
+            return
+        self.bars.append(self.current_bar)
+        if self.span_start is not None and self.span_end is not None:
+            self.spans.append((self.span_start, self.span_end))
+
+
 def _is_fret_char(ch: str) -> bool:
     return ch in "abcdefghiklmnopqrst" or ch.isdigit() or ch in {"x", "r", "E"}
 
@@ -106,51 +170,48 @@ def _normalize_chord_line(line: str) -> str:
     return f"0{line[1:]}"
 
 
-def _parse_chord_line(  # noqa: C901
+def _chord_line_parts(line: str) -> _ChordLineParts | None:
+    text = _normalize_chord_line(line)
+    grid = "start" if text.startswith("#") else None
+    payload = text.removeprefix("#")
+    if not payload or payload[0].isspace():
+        return None
+    flag = payload[0]
+    payload = payload[1:].removeprefix("!")
+    dotted = payload.startswith(".")
+    payload = payload.removeprefix(".")
+    if payload.startswith("#"):
+        grid = "start"
+        payload = payload[1:]
+    return _ChordLineParts(flag, payload.rstrip("\n"), dotted, grid)
+
+
+def _fret_notes(text: str, strings: int) -> list[Note]:
+    padded = text.ljust(strings)
+    prefer_alt_c = not any(ch in padded for ch in "qst")
+    notes: list[Note] = []
+    for idx, ch in enumerate(padded[:strings]):
+        if not _is_fret_char(ch):
+            continue
+        fret = _fret_from_char(ch, prefer_alt_c)
+        if fret is not None:
+            notes.append(Note(string=idx + 1, fret=fret, raw_pos=0))
+    return notes
+
+
+def _parse_chord_line(
     line: str,
     strings: int,
     last_note_type: int | None,
 ) -> tuple[Chord | None, int | None]:
-    text = _normalize_chord_line(line)
-    if not text:
+    parts = _chord_line_parts(line)
+    if parts is None:
         return None, last_note_type
-    idx = 0
-    grid = None
-    if text.startswith("#"):
-        grid = "start"
-        idx += 1
-        if idx >= len(text):
-            return None, last_note_type
-    flag = text[idx]
-    if flag.isspace():
-        return None, last_note_type
-    dotted = False
-    rest = text[idx + 1 :]
-    if rest.startswith("!"):
-        rest = rest[1:]
-    if rest.startswith("."):
-        dotted = True
-        rest = rest[1:]
-    if rest.startswith("#"):
-        grid = "start"
-        rest = rest[1:]
-    note_type = _note_type_for_flag(flag, last_note_type)
+    note_type = _note_type_for_flag(parts.flag, last_note_type)
     if note_type is None:
         return None, last_note_type
-
-    text = rest.rstrip("\n")
-    if len(text) < strings:
-        text = text.ljust(strings)
-    prefer_alt_c = not any(ch in text for ch in "qst")
-
-    chord = Chord(note_type=note_type, dotted=dotted, grid=grid)
-    for idx, ch in enumerate(text[:strings]):
-        if _is_fret_char(ch):
-            fret = _fret_from_char(ch, prefer_alt_c)
-            if fret is None:
-                continue
-            note = Note(string=idx + 1, fret=fret, raw_pos=0)
-            chord.notes.append(note)
+    chord = Chord(note_type=note_type, dotted=parts.dotted, grid=parts.grid)
+    chord.notes.extend(_fret_notes(parts.fret_text, strings))
     return chord, note_type
 
 
@@ -168,20 +229,6 @@ def _apply_title_block(piece: Piece, text: str) -> None:
         piece.title = text
     elif not piece.author:
         piece.author = text
-
-
-def _finalize_current_bar(
-    piece: Piece,
-    current_bar: Bar,
-    *,
-    span_start: int | None,
-    span_end: int | None,
-    bar_line_spans: list[tuple[int, int]],
-) -> None:
-    if current_bar.chords or current_bar.notes:
-        piece.bars.append(current_bar)
-        if span_start is not None and span_end is not None:
-            bar_line_spans.append((span_start, span_end))
 
 
 def _bar_range_for_line_span(
@@ -281,7 +328,65 @@ def _last_note_type_from_bar(bar: Bar) -> int | None:
     return bar.chords[-1].note_type
 
 
-def _parse_bar_segment_lines(  # noqa: C901
+def _segment_line_kind(line: str) -> str:
+    stripped = line.strip()
+    return next(
+        (
+            kind
+            for kind, matches in (
+                ("blank", not line),
+                ("invalid", line.startswith(("{", "#", "$"))),
+                ("ignore", line.startswith(("-", "%"))),
+                ("bar", line.startswith("b")),
+                ("time", line.startswith("S")),
+                ("end", stripped == "e"),
+            )
+            if matches
+        ),
+        "chord",
+    )
+
+
+def _segment_ignore(_accumulator: _BarAccumulator, _line: str, _line_no: int) -> bool:
+    return True
+
+
+def _segment_invalid(_accumulator: _BarAccumulator, _line: str, _line_no: int) -> bool:
+    return False
+
+
+def _segment_bar(accumulator: _BarAccumulator, _line: str, _line_no: int) -> bool:
+    accumulator.break_bar()
+    return True
+
+
+def _segment_time(accumulator: _BarAccumulator, line: str, line_no: int) -> bool:
+    accumulator.set_time_signature(_parse_time_signature(line.strip()), line_no)
+    return True
+
+
+def _segment_end(accumulator: _BarAccumulator, _line: str, _line_no: int) -> bool:
+    accumulator.break_bar(reset_note_type=True)
+    return True
+
+
+def _segment_chord(accumulator: _BarAccumulator, line: str, line_no: int) -> bool:
+    accumulator.add_chord(line, line_no)
+    return True
+
+
+_SEGMENT_HANDLERS = {
+    "blank": _segment_ignore,
+    "invalid": _segment_invalid,
+    "ignore": _segment_ignore,
+    "bar": _segment_bar,
+    "time": _segment_time,
+    "end": _segment_end,
+    "chord": _segment_chord,
+}
+
+
+def _parse_bar_segment_lines(
     lines: list[str],
     *,
     start_line_no: int,
@@ -289,184 +394,148 @@ def _parse_bar_segment_lines(  # noqa: C901
     default_time: str | None,
     last_note_type: int | None,
 ) -> _BarSegmentParseResult | None:
-    bars: list[Bar] = []
-    spans: list[tuple[int, int]] = []
-    current_bar = Bar(time_sig=default_time)
-    current_span_start: int | None = None
-    current_span_end: int | None = None
-    local_last_note_type = last_note_type
-
-    def _finalize() -> None:
-        if current_bar.chords or current_bar.notes:
-            bars.append(current_bar)
-            if current_span_start is not None and current_span_end is not None:
-                spans.append((current_span_start, current_span_end))
-
+    accumulator = _BarAccumulator(strings, default_time=default_time, last_note_type=last_note_type)
     for offset, raw in enumerate(lines):
         line_no = start_line_no + offset
         line = raw.rstrip("\n").rstrip("\r")
-        if not line:
-            continue
-        if line.startswith(("{", "#", "$")):
-            # Segment reparse intentionally avoids metadata/header semantics.
+        handler = _SEGMENT_HANDLERS[_segment_line_kind(line)]
+        if not handler(accumulator, line, line_no):
             return None
-        if line.startswith(("-", "%")):
-            continue
-        if line.startswith("b"):
-            _finalize()
-            current_bar = Bar(time_sig=default_time)
-            current_span_start = None
-            current_span_end = None
-            continue
-        if line.startswith("S"):
-            current_bar.time_sig = _parse_time_signature(line.strip())
-            if current_span_start is None:
-                current_span_start = line_no
-            current_span_end = line_no
-            continue
-        if line.strip() == "e":
-            _finalize()
-            current_bar = Bar(time_sig=default_time)
-            current_span_start = None
-            current_span_end = None
-            local_last_note_type = None
-            continue
-        chord, local_last_note_type = _parse_chord_line(line, strings, local_last_note_type)
-        if chord and chord.notes:
-            current_bar.chords.append(chord)
-            current_bar.notes.extend(chord.notes)
-            if current_span_start is None:
-                current_span_start = line_no
-            current_span_end = line_no
-    _finalize()
-    return _BarSegmentParseResult(bars=bars, spans=spans)
+    accumulator.finish()
+    return _BarSegmentParseResult(bars=accumulator.bars, spans=accumulator.spans)
+
+
+class _TabLinesParser:
+    def __init__(self, strings: int) -> None:
+        self.accumulator = _BarAccumulator(strings)
+        self.piece = Piece(title=None, author=None, composer=None, bars=self.accumulator.bars, strings=strings)
+        self.saw_letters = False
+        self.saw_digits = False
+        self.saw_end_marker = False
+
+    def consume(self, line_no: int, raw: str) -> None:
+        line = raw.rstrip("\n").rstrip("\r")
+        handlers = (
+            self._consume_blank,
+            self._consume_title,
+            self._consume_hash_header,
+            self._consume_dollar_header,
+            self._consume_tuning,
+            self._consume_ignored,
+            self._consume_bar,
+            self._consume_time_signature,
+            self._consume_end,
+        )
+        for handler in handlers:
+            if handler(line_no, line):
+                return
+        self._consume_chord(line_no, line)
+
+    def finish(self, source_lines: list[str]) -> TabData | None:
+        self.accumulator.finish()
+        if self.saw_letters:
+            self.piece.style = "french"
+        elif self.saw_digits:
+            self.piece.style = "italian"
+        has_identity = any((self.piece.title, self.piece.author, self.piece.composer))
+        if not self.piece.bars and not has_identity:
+            return None
+        if not self.piece.bars:
+            self.piece.import_warnings.append(TAB_EMPTY_WARNING)
+        elif not self.saw_end_marker:
+            self.piece.import_warnings.append(TAB_INCOMPLETE_WARNING.format(bars=len(self.piece.bars)))
+        return TabData(
+            piece=self.piece,
+            overrides={},
+            durations={},
+            dotted=set(),
+            bar_width=0,
+            bar_line_spans=self.accumulator.spans,
+            source_lines=list(source_lines),
+        )
+
+    @staticmethod
+    def _consume_blank(_line_no: int, line: str) -> bool:
+        return not line
+
+    def _consume_title(self, _line_no: int, line: str) -> bool:
+        if not line.startswith("{") or not line.endswith("}"):
+            return False
+        _apply_title_block(self.piece, line.strip("{}").strip())
+        return True
+
+    def _consume_hash_header(self, _line_no: int, line: str) -> bool:
+        if not line.startswith("#") or not _looks_like_hash_header(line):
+            return False
+        self._apply_hash_header(line[1:].strip())
+        return True
+
+    def _apply_hash_header(self, header: str) -> None:
+        lower = header.lower()
+        if lower.startswith("tuning:"):
+            self.piece.tuning = header.split(":", 1)[1].strip()
+        elif lower.startswith(("time:", "timesig:", "meter:")):
+            self.accumulator.set_default_time(_parse_time_signature(header.split(":", 1)[1].strip()))
+        elif lower.startswith("subtitle:"):
+            self.piece.subtitle = header.split(":", 1)[1].strip()
+        elif lower.startswith("footnote:"):
+            self.piece.footnote = header.split(":", 1)[1].strip()
+
+    def _consume_dollar_header(self, _line_no: int, line: str) -> bool:
+        if not line.startswith("$"):
+            return False
+        header = line[1:].strip()
+        if header.lower().startswith(("time=", "timesig=", "meter=")):
+            self.accumulator.set_default_time(_parse_time_signature(header.split("=", 1)[1].strip()))
+        return True
+
+    def _consume_tuning(self, _line_no: int, line: str) -> bool:
+        if not line.startswith("-tuning "):
+            return False
+        self.piece.tuning = line.split(" ", 1)[1].strip()
+        return True
+
+    @staticmethod
+    def _consume_ignored(_line_no: int, line: str) -> bool:
+        return line.startswith(("-", "%"))
+
+    def _consume_bar(self, _line_no: int, line: str) -> bool:
+        if not line.startswith("b"):
+            return False
+        self.accumulator.break_bar()
+        return True
+
+    def _consume_time_signature(self, line_no: int, line: str) -> bool:
+        if not line.startswith("S"):
+            return False
+        self.accumulator.set_time_signature(_parse_time_signature(line.strip()), line_no)
+        return True
+
+    def _consume_end(self, _line_no: int, line: str) -> bool:
+        if line.strip() != "e":
+            return False
+        self.saw_end_marker = True
+        self.accumulator.break_bar(reset_note_type=True)
+        return True
+
+    def _consume_chord(self, line_no: int, line: str) -> None:
+        if not self.accumulator.add_chord(line, line_no):
+            return
+        payload = line[1:]
+        self.saw_letters |= any("a" <= ch <= "p" for ch in payload)
+        self.saw_digits |= any(ch.isdigit() or ch == "x" for ch in payload)
 
 
 def parse_tab_text_data(text: str, strings: int = 6) -> TabData | None:
     return parse_tab_lines_data(text.splitlines(), strings=strings)
 
 
-def parse_tab_lines_data(lines: list[str], strings: int = 6) -> TabData | None:  # noqa: PLR0912, C901
+def parse_tab_lines_data(lines: list[str], strings: int = 6) -> TabData | None:
     # Format cues inspired by luteconv tab parsing.
-    piece = Piece(title=None, author=None, composer=None, bars=[], strings=strings)
-    current_bar = Bar()
-    last_note_type: int | None = None
-    saw_letters = False
-    saw_digits = False
-    default_time: str | None = None
-    bar_line_spans: list[tuple[int, int]] = []
-    current_bar_span_start: int | None = None
-    current_bar_span_end: int | None = None
-    saw_end_marker = False
+    parser = _TabLinesParser(strings)
     for line_no, raw in enumerate(lines):
-        line = raw.rstrip("\n").rstrip("\r")
-        if not line:
-            continue
-        if line.startswith("{") and line.endswith("}"):
-            title_text = line.strip("{}").strip()
-            _apply_title_block(piece, title_text)
-            continue
-        if line.startswith("#") and _looks_like_hash_header(line):
-            header = line[1:].strip()
-            if header.lower().startswith("tuning:"):
-                piece.tuning = header.split(":", 1)[1].strip()
-            elif header.lower().startswith(("time:", "timesig:", "meter:")):
-                value = header.split(":", 1)[1].strip()
-                parsed = _parse_time_signature(value)
-                default_time = parsed
-                if current_bar.time_sig is None and parsed:
-                    current_bar.time_sig = parsed
-            elif header.lower().startswith("subtitle:"):
-                piece.subtitle = header.split(":", 1)[1].strip()
-            elif header.lower().startswith("footnote:"):
-                piece.footnote = header.split(":", 1)[1].strip()
-            continue
-        if line.startswith("$"):
-            header = line[1:].strip()
-            if header.lower().startswith(("time=", "timesig=", "meter=")):
-                value = header.split("=", 1)[1].strip()
-                parsed = _parse_time_signature(value)
-                default_time = parsed
-                if current_bar.time_sig is None and parsed:
-                    current_bar.time_sig = parsed
-            continue
-        if line.startswith("-tuning "):
-            piece.tuning = line.split(" ", 1)[1].strip()
-            continue
-        if line.startswith("-"):
-            continue
-        if line.startswith("%"):
-            continue
-        if line.startswith("b"):
-            _finalize_current_bar(
-                piece,
-                current_bar,
-                span_start=current_bar_span_start,
-                span_end=current_bar_span_end,
-                bar_line_spans=bar_line_spans,
-            )
-            current_bar = Bar(time_sig=default_time)
-            current_bar_span_start = None
-            current_bar_span_end = None
-            continue
-        if line.startswith("S"):
-            current_bar.time_sig = _parse_time_signature(line.strip())
-            if current_bar_span_start is None:
-                current_bar_span_start = line_no
-            current_bar_span_end = line_no
-            continue
-        if line.strip() == "e":
-            saw_end_marker = True
-            _finalize_current_bar(
-                piece,
-                current_bar,
-                span_start=current_bar_span_start,
-                span_end=current_bar_span_end,
-                bar_line_spans=bar_line_spans,
-            )
-            current_bar = Bar(time_sig=default_time)
-            current_bar_span_start = None
-            current_bar_span_end = None
-            last_note_type = None
-            continue
-        chord, last_note_type = _parse_chord_line(line, strings, last_note_type)
-        if chord and chord.notes:
-            current_bar.chords.append(chord)
-            current_bar.notes.extend(chord.notes)
-            if current_bar_span_start is None:
-                current_bar_span_start = line_no
-            current_bar_span_end = line_no
-            for ch in line[1:]:
-                if "a" <= ch <= "p":
-                    saw_letters = True
-                elif ch.isdigit() or ch == "x":
-                    saw_digits = True
-    _finalize_current_bar(
-        piece,
-        current_bar,
-        span_start=current_bar_span_start,
-        span_end=current_bar_span_end,
-        bar_line_spans=bar_line_spans,
-    )
-    if saw_letters:
-        piece.style = "french"
-    elif saw_digits:
-        piece.style = "italian"
-    if not piece.bars and not piece.title and not piece.author and not piece.composer:
-        return None
-    if not piece.bars:
-        piece.import_warnings.append(TAB_EMPTY_WARNING)
-    elif not saw_end_marker:
-        piece.import_warnings.append(TAB_INCOMPLETE_WARNING.format(bars=len(piece.bars)))
-    return TabData(
-        piece=piece,
-        overrides={},
-        durations={},
-        dotted=set(),
-        bar_width=0,
-        bar_line_spans=bar_line_spans,
-        source_lines=list(lines),
-    )
+        parser.consume(line_no, raw)
+    return parser.finish(lines)
 
 
 def load_tab_data(path: str, strings: int = 6) -> TabData | None:

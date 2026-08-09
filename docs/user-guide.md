@@ -195,7 +195,8 @@ Durations are tracked per onset column and rendered according to current flag st
 
 - Layout: `spacing`, `spacingmode`, `spacingfill`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
 - Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
-- Rendering presets/cues: `tabnotation`, `timesigstyle`
+- Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
+- Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
@@ -205,6 +206,11 @@ Notes:
 - `barsperline=0` means auto.
 - `barpad` controls left/right inner padding inside bars.
 - `measures=system` labels the first bar of each displayed system; `every` uses `measuresstep`.
+- `showlyrics=off` hides lyrics. `lyricmode=first` is the compact default; `current` displays the
+  1-based stanza selected by `lyricverse`, while `all` displays every stanza.
+- `scoreview=score` keeps every mapped notation and tablature staff in one layout; `j`/`k` moves the
+  vertical focus through a tall score without moving the logical score cursor. `scoreview=staff`
+  renders only the focused staff for compact reading.
 
 ## 7.1 Tonality and Accidentals
 

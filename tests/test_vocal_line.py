@@ -1,5 +1,11 @@
 from petrucci.model import Bar, Chord, LyricEvent, MelodyEvent, Note
-from petrucci.vocal_line import infer_vocal_events
+from petrucci.vocal_line import infer_vocal_events, token_pitch_value
+
+
+def test_token_pitch_value_distinguishes_b_from_b_flat() -> None:
+    assert token_pitch_value("b") == 71
+    assert token_pitch_value("bb") == 70
+    assert token_pitch_value("ab") == 68
 
 
 def test_infer_vocal_events_without_explicit_melody_uses_all_chord_onsets() -> None:

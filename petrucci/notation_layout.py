@@ -37,6 +37,7 @@ from petrucci.notation_elements import (
     _layout_fail,
     _lyric_elements,
     _stem_up,
+    _tuplet_elements,
     _unplaced_event_markers,
 )
 from petrucci.notation_horizontal import _horizontal_plan, _measure_geometry, _natural_onset_gap
@@ -595,7 +596,17 @@ def _layout_measure(
     )
     elements.extend(positioned.elements)
     if policy.show_stems:
-        elements.extend(_beam_elements(measure.events, elements, lanes=beam_lanes, rows=rows))
+        elements.extend(
+            _beam_elements(
+                measure.events,
+                elements,
+                lanes=beam_lanes,
+                rows=rows,
+                left=event_left,
+                right=content_right,
+            ),
+        )
+    elements.extend(_tuplet_elements(measure.events, positioned.event_xs, rows=rows, right=content_right))
     if policy.show_lyrics:
         elements.extend(_lyric_line_elements(lyric_lines, x=event_left, right=content_right, rows=rows))
         elements.extend(_lyric_connector_elements(lyrics, event_xs=positioned.event_xs, rows=rows))

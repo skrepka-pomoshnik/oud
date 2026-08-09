@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -17,11 +18,15 @@ RANDOM_MANIFEST = Path("corpus/ft3-random-75.json")
 EXPANDED_RANDOM_MANIFEST = Path("corpus/ft3-random-75-v2.json")
 RANDOM_50_V3_MANIFEST = Path("corpus/ft3-random-50-v3.json")
 RANDOM_63_V4_MANIFEST = Path("corpus/ft3-random-63-v4.json")
+RANDOM_37_V5_MANIFEST = Path("corpus/ft3-random-37-v5.json")
+NOTE_INPUT_MANIFEST = Path("corpus/ft3-note-input-100.json")
+REGRESSION_MANIFEST = Path("corpus/ft3-regression.json")
 FIXED_RANDOM_MANIFESTS = (
     RANDOM_MANIFEST,
     EXPANDED_RANDOM_MANIFEST,
     RANDOM_50_V3_MANIFEST,
     RANDOM_63_V4_MANIFEST,
+    RANDOM_37_V5_MANIFEST,
 )
 
 
@@ -114,6 +119,56 @@ def test_random_63_v4_manifest_is_a_new_fixed_composer_stratified_selection() ->
     assert len({entry["composer"] for entry in raw["files"]}) == 63
     assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
     assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
+
+
+def test_random_37_v5_manifest_expands_compatibility_corpus_to_300() -> None:
+    raw = json.loads(RANDOM_37_V5_MANIFEST.read_text(encoding="utf-8"))
+    expanded = load_manifest(RANDOM_37_V5_MANIFEST)
+    previous_paths = (REGRESSION_MANIFEST, *FIXED_RANDOM_MANIFESTS[:-1], NOTE_INPUT_MANIFEST)
+    previous = [entry for path in previous_paths for entry in load_manifest(path).files]
+
+    assert raw["selection"]["selected"] == 37
+    assert raw["selection"]["seed"] == 20260809
+    assert raw["selection"]["unique_composers"] == 20
+    assert raw["selection"]["composer_index_size"] == 195
+    assert raw["selection"]["candidate_count"] == 79
+    assert "one-time" in raw["selection"]["method"]
+    assert "never repeated" in raw["selection"]["method"]
+    assert len(expanded.files) == 37
+    assert sum(len(load_manifest(path).files) for path in FIXED_RANDOM_MANIFESTS) == 300
+    assert {entry.url for entry in expanded.files}.isdisjoint(entry.url for entry in previous)
+    assert {entry.sha256 for entry in expanded.files}.isdisjoint(entry.sha256 for entry in previous)
+    assert all(
+        {"format", "bars", "strings", "style", "tab_chords", "staff_kinds", "notation_events", "lyrics"} <= entry.keys()
+        for entry in raw["files"]
+    )
+
+
+def test_random_37_v5_metadata_matches_verified_payloads(fixed_pieces: dict[Path, Piece]) -> None:
+    raw = json.loads(RANDOM_37_V5_MANIFEST.read_text(encoding="utf-8"))
+    manifest = load_manifest(RANDOM_37_V5_MANIFEST)
+    for expected, path in zip(raw["files"], manifest_paths(manifest), strict=True):
+        piece = fixed_pieces[path]
+        staff_kinds = (
+            Counter(staff.kind for staff in piece.imported_score.staffs) if piece.imported_score else Counter()
+        )
+        try:
+            score = notation_score_from_piece(piece)
+        except PieceAdapterError:
+            score = None
+        notation_events = (
+            sum(len(measure.events) for staff in score.staffs for measure in staff.measures) if score else 0
+        )
+        lyrics = sum(len(staff.lyrics) for staff in score.staffs) if score else 0
+
+        assert expected["format"] == "ft3"
+        assert expected["bars"] == len(piece.bars)
+        assert expected["strings"] == piece.strings
+        assert expected["style"] == piece.style
+        assert expected["tab_chords"] == sum(len(bar.chords) for bar in piece.bars)
+        assert expected["staff_kinds"] == dict(sorted(staff_kinds.items()))
+        assert expected["notation_events"] == notation_events
+        assert expected["lyrics"] == lyrics
 
 
 def test_ft3_payload_suffixes_are_ignored() -> None:
@@ -264,7 +319,7 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
         except PieceAdapterError as exc:
             rejected[_relative(path)] = str(exc)
 
-    assert len(notation) == 30
+    assert len(notation) == 31
     assert rejected == {
         "lutemusic/random-50-v3/041/sonata_CM_01_moderato.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"

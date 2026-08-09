@@ -754,7 +754,7 @@ def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(m
     def _fake_render_systems(*_args, **kwargs):
         captured["show_extras"] = kwargs["show_extras"]
 
-    monkeypatch.setattr("petrucci.render.render_systems", _fake_render_systems)
+    monkeypatch.setattr("petrucci.render_legacy.render_systems", _fake_render_systems)
     kwargs = _args("normal")
     kwargs["settings"]["showextras"] = "on"
     kwargs["settings"]["showspans"] = "off"

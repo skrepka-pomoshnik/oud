@@ -308,7 +308,7 @@ def _bar_events(  # noqa: C901
         onset = Fraction(0)
         for onset_index, source_events in sorted(voice_events.items()):
             sources = tuple(sorted(source_events, key=lambda event: (event.text, event.src_pos)))
-            event_id = f"{prefix}:event:{onset_index}:{voice}"
+            event_id = _source_event_id(sources, fallback=f"{prefix}:event:{onset_index}:{voice}")
             duration = _group_duration(sources, event_id=event_id)
             event = _notation_event(
                 sources,
@@ -335,6 +335,13 @@ def _bar_events(  # noqa: C901
         slur_starts=frozenset(slur_starts),
         slur_ends=frozenset(slur_ends),
     )
+
+
+def _source_event_id(sources: tuple[MelodyEvent, ...], *, fallback: str) -> str:
+    source_ids = {source.source_id for source in sources if source.source_id is not None}
+    if len(source_ids) > 1:
+        _fail(f"event group {fallback!r} has conflicting source identities")
+    return source_ids.pop() if source_ids else fallback
 
 
 def _notation_event(

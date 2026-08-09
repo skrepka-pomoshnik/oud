@@ -1,0 +1,26 @@
+# Engraving regression provenance
+
+Petrucci keeps small typed fixtures that reproduce transferable engraving
+invariants. It does not copy or vendor LilyPond or MuseScore fixture files.
+
+## Upstream cases mirrored locally
+
+- Partial and grace beamlets: LilyPond `auto-beam-partial.ly`,
+  `auto-beam-partial-grace.ly`, and `beam-beamlet-break.ly`; MuseScore
+  `src/engraving/tests/beam_data`.
+- Grouped tuplets with beams: LilyPond's tuplet and auto-beam regression family;
+  MuseScore `compat114_data/tuplets*.mscx` and `compat206_data/tuplets*.mscx`.
+- Broken ties and slurs: LilyPond's broken tie/slur regression family;
+  MuseScore `partialtie_data`, especially `repeat_barlines.mscx`.
+- Endings with repeat barlines: LilyPond `bar-line-allow-volta-hook.ly` and the
+  built-in repeat-barline matrix; MuseScore `barline_data`.
+
+The corresponding Petrucci tests assert semantic roles, bounded geometry,
+continuation segments, collision freedom, and stable source ownership. They do
+not assert LilyPond or MuseScore pixels because the terminal proof renderer has
+a different output contract.
+
+Upstream references:
+
+- <https://github.com/lilypond/lilypond/tree/master/input/regression>
+- <https://github.com/musescore/MuseScore/tree/main/src/engraving/tests>

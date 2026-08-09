@@ -92,6 +92,7 @@ class MelodyEvent:
     slur_start: bool = False
     slur_end: bool = False
     grace: bool = False
+    source_id: str | None = None
 
 
 @dataclass(frozen=True)

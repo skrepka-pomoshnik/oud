@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
+from fractions import Fraction
 
 from oud.editor.controller_utils import cursor_key, string_index
 from oud.editor.edit_ops import (
     apply_duration,
     apply_override,
+    apply_tab_transaction,
     clear_cell_note,
     record_action,
     undo_group,
@@ -40,6 +42,7 @@ from petrucci.render_utils import (
     format_fret,
     note_type_to_denom,
 )
+from petrucci.tab_mutation import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
 
 
 def _column_has_event(state: EditorState, bar_index: int, col: int) -> bool:
@@ -267,14 +270,19 @@ def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
             _flatten_chords_to_grid(state, state.cursor_bar)
         bar = state.cursor_bar
         string = string_index(state, state.cursor_string)
-        text = str(fret)
-        for offset, ch in enumerate(text[:2]):
-            col = state.cursor_col + offset
-            if col >= state.bar_width:
-                break
-            apply_override(state, (bar, string, col), ch)
-        if not cell_has_duration(state, bar, string, state.cursor_col):
-            apply_duration(state, cursor_key(state), state.current_duration)
+        apply_tab_transaction(
+            state,
+            TabEditTransaction(
+                (
+                    TabEdit(
+                        TabPosition(bar, Fraction(state.cursor_col, state.bar_width), string + 1),
+                        TabEditIntent.CHORD,
+                        fret=fret,
+                        duration=state.current_duration,
+                    ),
+                ),
+            ),
+        )
     return True
 
 

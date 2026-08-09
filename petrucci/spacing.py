@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from petrucci.model import Bar
 from petrucci.view_model import (
     _bar_compact_width,
@@ -72,7 +74,152 @@ def _total_width(widths: list[int], gaps: list[int]) -> int:
     return sum(widths) + sum(gaps)
 
 
-def auto_bar_plan(  # noqa: C901, PLR0912
+@dataclass(frozen=True)
+class _AutoBarRequest:
+    bars: list[Bar]
+    bar_start: int
+    usable_width: int
+    bar_width: int
+    overrides: dict[tuple[int, int, int], str]
+    durations: dict[tuple[int, int, int], int]
+    default_duration: int
+    dotted: set[tuple[int, int]]
+    bar_gap: int
+    spacing_fill: str
+    stave_breaks: set[int]
+    bars_per_line_limit: int
+    max_chords: int
+    chord_wrap_limit: int
+
+
+def _selected_bar_indices(request: _AutoBarRequest) -> tuple[list[int], int, int]:
+    if request.bar_start < 0 or request.bar_start >= len(request.bars):
+        return [], 0, 0
+    compact = compact_fill_enabled(request.spacing_fill)
+    width_limited = _bars_fit(
+        request.bars,
+        request.bar_start,
+        request.bar_gap,
+        request.usable_width,
+        request.bar_width,
+        request.overrides,
+        request.durations,
+        request.default_duration,
+        request.dotted,
+        max_chords=request.max_chords,
+        compact=compact,
+        chord_wrap_limit=request.chord_wrap_limit,
+    )
+    per_line = width_limited
+    if request.bars_per_line_limit > 0:
+        per_line = min(per_line, request.bars_per_line_limit)
+    end = _next_system_start(
+        request.bars,
+        request.bar_start,
+        max(1, per_line),
+        request.stave_breaks,
+    )
+    end = min(len(request.bars), end)
+    return list(range(request.bar_start, end)), end, width_limited
+
+
+def _measured_widths(request: _AutoBarRequest, indices: list[int]) -> list[int]:
+    width_fn = _bar_compact_width if compact_fill_enabled(request.spacing_fill) else _bar_display_width
+    return [
+        width_fn(
+            request.bars[index],
+            index,
+            request.bar_width,
+            request.overrides,
+            request.durations,
+            request.default_duration,
+            request.dotted,
+        )
+        for index in indices
+    ]
+
+
+def _trim_to_width(
+    indices: list[int],
+    widths: list[int],
+    usable_width: int,
+    bar_gap: int,
+) -> tuple[list[int], list[int], list[int]]:
+    gaps = [bar_gap for _ in range(max(0, len(widths) - 1))]
+    while widths and _total_width(widths, gaps) > usable_width:
+        widths.pop()
+        indices = indices[: len(widths)]
+        gaps = [bar_gap for _ in range(max(0, len(widths) - 1))]
+    return indices, widths, gaps
+
+
+def _stretch_widths(widths: list[int], extra: int) -> None:
+    left = 0
+    right = len(widths) - 1
+    while extra > 0 and left <= right:
+        widths[left] += 1
+        extra -= 1
+        if extra <= 0:
+            break
+        if right != left:
+            widths[right] += 1
+            extra -= 1
+        left += 1
+        right -= 1
+        if left > right:
+            left = 0
+            right = len(widths) - 1
+
+
+def _smart_widths(widths: list[int], extra: int) -> None:
+    index = 0
+    while extra > 0:
+        widths[index] += 1
+        extra -= 1
+        index = (index + 1) % len(widths)
+
+
+def _edge_gaps(gaps: list[int], extra: int) -> None:
+    if len(gaps) == 1:
+        gaps[0] += extra
+        return
+    while extra > 0:
+        gaps[0] += 1
+        extra -= 1
+        if extra > 0:
+            gaps[-1] += 1
+            extra -= 1
+
+
+def _distribute_extra(spacing_fill: str, widths: list[int], gaps: list[int], extra: int) -> None:
+    if spacing_fill == "stretch":
+        _stretch_widths(widths, extra)
+    elif spacing_fill == "smart":
+        _smart_widths(widths, extra)
+    elif spacing_fill == "edge":
+        _edge_gaps(gaps, extra)
+
+
+def _should_justify(
+    request: _AutoBarRequest,
+    widths: list[int],
+    bar_end: int,
+    width_limited: int,
+) -> bool:
+    ended_at_break = bar_end in request.stave_breaks or (
+        bar_end > request.bar_start and request.bars[bar_end - 1].system_break
+    )
+    width_limited_end = min(len(request.bars), request.bar_start + width_limited)
+    return (
+        len(widths) > 1
+        and bar_end < len(request.bars)
+        and bar_end == width_limited_end
+        and not ended_at_break
+        and request.chord_wrap_limit <= 0
+    )
+
+
+def auto_bar_plan(
     *,
     bars: list[Bar],
     bar_start: int,
@@ -89,97 +236,26 @@ def auto_bar_plan(  # noqa: C901, PLR0912
     max_chords: int = 0,
     chord_wrap_limit: int = 0,
 ) -> tuple[list[int], list[int], list[int]]:
-    if bar_start < 0 or bar_start >= len(bars):
-        return [], [], []
-    compact_fill = compact_fill_enabled(spacing_fill)
-    width_limited_bars = _bars_fit(
+    request = _AutoBarRequest(
         bars,
         bar_start,
-        bar_gap,
         usable_width,
         bar_width,
         overrides,
         durations,
         default_duration,
         dotted,
-        max_chords=max_chords,
-        compact=compact_fill,
-        chord_wrap_limit=chord_wrap_limit,
+        bar_gap,
+        spacing_fill,
+        stave_breaks,
+        bars_per_line_limit,
+        max_chords,
+        chord_wrap_limit,
     )
-    bars_per_line = width_limited_bars
-    if bars_per_line_limit > 0:
-        bars_per_line = min(bars_per_line, bars_per_line_limit)
-    bars_per_line = max(1, bars_per_line)
-    bar_end = _next_system_start(bars, bar_start, bars_per_line, stave_breaks)
-    bar_end = min(len(bars), bar_end)
-    bar_indices = list(range(bar_start, bar_end))
-    widths: list[int] = []
-    for abs_bar in bar_indices:
-        width_fn = _bar_compact_width if compact_fill else _bar_display_width
-        widths.append(
-            width_fn(
-                bars[abs_bar],
-                abs_bar,
-                bar_width,
-                overrides,
-                durations,
-                default_duration,
-                dotted,
-            ),
-        )
-    gaps = [bar_gap for _ in range(max(0, len(widths) - 1))]
-    while widths and _total_width(widths, gaps) > usable_width:
-        widths.pop()
-        bar_indices = bar_indices[: len(widths)]
-        gaps = [bar_gap for _ in range(max(0, len(widths) - 1))]
+    indices, bar_end, width_limited = _selected_bar_indices(request)
+    widths = _measured_widths(request, indices)
+    indices, widths, gaps = _trim_to_width(indices, widths, usable_width, bar_gap)
     extra = max(0, usable_width - _total_width(widths, gaps))
-    ended_at_break = bar_end in stave_breaks or (bar_end > bar_start and bars[bar_end - 1].system_break)
-    width_limited_end = min(len(bars), bar_start + width_limited_bars)
-    should_justify = (
-        len(widths) > 1
-        and bar_end < len(bars)
-        and bar_end == width_limited_end
-        and not ended_at_break
-        and chord_wrap_limit <= 0
-    )
-    if not widths or extra <= 0 or not should_justify:
-        return bar_indices, widths, gaps
-    if spacing_fill == "stretch":
-        # Edge-stretch: keep inter-bar gaps compact and spend extra space
-        # inside bars with a left/right emphasis to preserve readable systems.
-        left = 0
-        right = len(widths) - 1
-        while extra > 0 and left <= right:
-            widths[left] += 1
-            extra -= 1
-            if extra <= 0:
-                break
-            if right != left:
-                widths[right] += 1
-                extra -= 1
-            left += 1
-            right -= 1
-            if left > right:
-                left = 0
-                right = len(widths) - 1
-        return bar_indices, widths, gaps
-    if spacing_fill == "smart":
-        idx = 0
-        while extra > 0:
-            widths[idx] += 1
-            extra -= 1
-            idx = (idx + 1) % len(widths)
-        return bar_indices, widths, gaps
-    if spacing_fill == "edge":
-        if len(gaps) == 1:
-            gaps[0] += extra
-        else:
-            while extra > 0:
-                gaps[0] += 1
-                extra -= 1
-                if extra <= 0:
-                    break
-                gaps[-1] += 1
-                extra -= 1
-        return bar_indices, widths, gaps
-    return bar_indices, widths, gaps
+    if widths and extra > 0 and _should_justify(request, widths, bar_end, width_limited):
+        _distribute_extra(spacing_fill, widths, gaps, extra)
+    return indices, widths, gaps

@@ -237,12 +237,13 @@ def set_tab_duration(document: EditableTablature, key: CellKey, duration: int) -
 
 def clear_tab_cell(document: EditableTablature, key: CellKey) -> TabMutation:
     _validate_cell_key(document, key)
-    chord = _clear_chord_note(document, key)
-    cell = _clear_cell_value(document, key)
-    rhythm = _clear_rhythm(document, key[0], key[2])
-    dot = _clear_dot(document, key[0], key[2])
+    onset_key = _tab_onset_key(document, key)
+    chord = _clear_chord_note(document, onset_key)
+    cells = _clear_encoded_cells(document, onset_key)
+    rhythm = _clear_rhythm(document, onset_key[0], onset_key[2])
+    dot = _clear_dot(document, onset_key[0], onset_key[2])
     return TabMutation(
-        cells=(cell,) if cell else (),
+        cells=cells,
         rhythms=(rhythm,) if rhythm else (),
         dots=(dot,) if dot else (),
         chords=(chord,) if chord else (),
@@ -251,15 +252,16 @@ def clear_tab_cell(document: EditableTablature, key: CellKey) -> TabMutation:
 
 def clear_tab_note(document: EditableTablature, key: CellKey) -> TabMutation:
     _validate_cell_key(document, key)
-    chord = _clear_chord_note(document, key)
-    cell = _clear_cell_value(document, key)
+    onset_key = _tab_onset_key(document, key)
+    chord = _clear_chord_note(document, onset_key)
+    cells = _clear_encoded_cells(document, onset_key)
     rhythm = None
     dot = None
-    if not _column_has_notes(document, key[0], key[2]):
-        rhythm = _clear_rhythm(document, key[0], key[2])
-        dot = _clear_dot(document, key[0], key[2])
+    if not _column_has_notes(document, onset_key[0], onset_key[2]):
+        rhythm = _clear_rhythm(document, onset_key[0], onset_key[2])
+        dot = _clear_dot(document, onset_key[0], onset_key[2])
     return TabMutation(
-        cells=(cell,) if cell else (),
+        cells=cells,
         rhythms=(rhythm,) if rhythm else (),
         dots=(dot,) if dot else (),
         chords=(chord,) if chord else (),
@@ -311,23 +313,34 @@ def _apply_tab_edit(document: EditableTablature, operation: TabEdit) -> tuple[Ta
 
 
 def _enter_fret(document: EditableTablature, operation: TabEdit, column: int) -> tuple[TabMutation, ...]:
-    course = operation.position.course
-    fret = operation.fret
-    if course is None or fret is None:
-        _reject("invalid-operation", "fret entry requires a course and fret")
-    if course > document.strings:
-        _reject("invalid-position", "course exceeds the document course count")
+    course, fret = _required_fret_input(document, operation)
     changes: list[TabMutation] = []
     if operation.intent is TabEditIntent.NOTE:
         changes.extend(_clear_column(document, operation.position.bar_index, column))
+    else:
+        replaced = clear_tab_note(document, (operation.position.bar_index, course - 1, column))
+        if replaced.changed:
+            changes.append(replaced)
     symbols = _fret_symbols(document.style, fret)
     if column + len(symbols) > document.bar_width:
         _reject("bar-overflow", "fret representation extends beyond the bar")
     for offset, symbol in enumerate(symbols):
         key = (operation.position.bar_index, course - 1, column + offset)
         changes.append(set_tab_cell(document, key, symbol))
-    changes.append(set_tab_duration(document, (operation.position.bar_index, course - 1, column), operation.duration))
+    if not _rhythm_snapshot(document, operation.position.bar_index, column):
+        key = (operation.position.bar_index, course - 1, column)
+        changes.append(set_tab_duration(document, key, operation.duration))
     return tuple(changes)
+
+
+def _required_fret_input(document: EditableTablature, operation: TabEdit) -> tuple[int, int]:
+    course = operation.position.course
+    fret = operation.fret
+    if course is None or fret is None:
+        _reject("invalid-operation", "fret entry requires a course and fret")
+    if course > document.strings:
+        _reject("invalid-position", "course exceeds the document course count")
+    return course, fret
 
 
 def _delete_at_position(document: EditableTablature, position: TabPosition, column: int) -> tuple[TabMutation, ...]:
@@ -357,7 +370,7 @@ def _column_for_onset(document: EditableTablature, position: TabPosition) -> int
 
 def _fret_symbols(style: str, fret: int) -> str:
     if style == "italian":
-        return "x" if fret == 10 else str(fret)
+        return str(fret)
     letters = "abcdefghiklmnopqrst"
     if fret >= len(letters):
         _reject("invalid-fret", "fret cannot be represented in French tablature")
@@ -380,10 +393,35 @@ def _rhythm_snapshot(document: EditableTablature, bar_index: int, column: int) -
     )
 
 
-def _clear_cell_value(document: EditableTablature, key: CellKey) -> TabCellDelta | None:
-    if key not in document.cells:
-        return None
-    return TabCellDelta(key, document.cells.pop(key), None)
+def _tab_onset_key(document: EditableTablature, key: CellKey) -> CellKey:
+    bar_index, string_index, column = key
+    if document.style != "italian" or column <= 0 or key in document.durations:
+        return key
+    previous = (bar_index, string_index, column - 1)
+    current_text = document.cells.get(key, "")
+    previous_text = document.cells.get(previous, "")
+    if current_text.isdigit() and previous_text.isdigit() and previous in document.durations:
+        return previous
+    return key
+
+
+def _clear_encoded_cells(document: EditableTablature, key: CellKey) -> tuple[TabCellDelta, ...]:
+    keys = [key]
+    bar_index, string_index, column = key
+    next_key = (bar_index, string_index, column + 1)
+    text = document.cells.get(key, "")
+    continuation = document.cells.get(next_key, "")
+    if (
+        document.style == "italian"
+        and text.isdigit()
+        and continuation.isdigit()
+        and key in document.durations
+        and next_key not in document.durations
+    ):
+        keys.append(next_key)
+    return tuple(
+        TabCellDelta(cell_key, document.cells.pop(cell_key), None) for cell_key in keys if cell_key in document.cells
+    )
 
 
 def _clear_rhythm(document: EditableTablature, bar_index: int, column: int) -> TabRhythmDelta | None:

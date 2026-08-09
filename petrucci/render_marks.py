@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unicodedata
 
+from petrucci.model import Bar, Chord, Note
 from petrucci.render_helpers import safe_addstr
 from petrucci.screen import Screen
 from petrucci.view_model import (
@@ -149,7 +150,41 @@ def _combining_only_mark(text: str) -> bool:
     return bool(text) and all(unicodedata.combining(ch) for ch in text)
 
 
-def _overlay_inline_local_marks_on_display_row(  # noqa: C901, PLR0912
+def _mapped_mark_column(grid_map: dict[int, int] | list[int], column: int) -> int:
+    if isinstance(grid_map, dict):
+        return grid_map.get(column, column)
+    return grid_map[column] if 0 <= column < len(grid_map) else column
+
+
+def _mark_for_source_row(
+    mark: str,
+    column: int,
+    target_rows: list[int] | None,
+    source_row_index: int | None,
+) -> str:
+    if mark == " " or target_rows is None or source_row_index is None:
+        return mark
+    if column >= len(target_rows) or target_rows[column] != source_row_index:
+        return " "
+    return mark
+
+
+def _place_inline_mark(display_row_cells: list[str], column: int, mark: str) -> None:
+    if mark == " ":
+        return
+    if _combining_only_mark(mark):
+        display_row_cells[column] += mark
+        return
+    right = column + 1
+    if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
+        display_row_cells[right] = mark
+
+
+def _inline_fingering_mark(annotation: str, *, style: str) -> str:
+    return " " if annotation == " " else _inline_fingering_glyph(annotation, style=style)
+
+
+def _overlay_inline_local_marks_on_display_row(
     *,
     display_row_cells: list[str],
     source_row_cells: list[str],
@@ -166,44 +201,13 @@ def _overlay_inline_local_marks_on_display_row(  # noqa: C901, PLR0912
     for col in range(min(width, len(ann_cells), len(orn_cells))):
         if source_row_cells[col] == "-":
             continue
-        if isinstance(grid_map, dict):
-            mapped = grid_map.get(col, col)
-        else:
-            mapped = grid_map[col] if 0 <= col < len(grid_map) else col
-        disp_col = draw_pad + mapped
+        disp_col = draw_pad + _mapped_mark_column(grid_map, col)
         if not (0 <= disp_col < len(display_row_cells)):
             continue
-        orn = orn_cells[col]
-        if (
-            orn != " "
-            and orn_target_rows is not None
-            and source_row_index is not None
-            and (col >= len(orn_target_rows) or orn_target_rows[col] != source_row_index)
-        ):
-            orn = " "
-        if orn != " ":
-            if _combining_only_mark(orn):
-                display_row_cells[disp_col] = display_row_cells[disp_col] + orn
-            else:
-                right = disp_col + 1
-                if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
-                    display_row_cells[right] = orn
-        ann = ann_cells[col]
-        if (
-            ann != " "
-            and ann_target_rows is not None
-            and source_row_index is not None
-            and (col >= len(ann_target_rows) or ann_target_rows[col] != source_row_index)
-        ):
-            ann = " "
-        if ann != " ":
-            mark = _inline_fingering_glyph(ann, style=style)
-            if _combining_only_mark(mark):
-                display_row_cells[disp_col] = display_row_cells[disp_col] + mark
-            else:
-                right = disp_col + 1
-                if right < len(display_row_cells) and display_row_cells[right] in ("-", " "):
-                    display_row_cells[right] = mark
+        ornament = _mark_for_source_row(orn_cells[col], col, orn_target_rows, source_row_index)
+        _place_inline_mark(display_row_cells, disp_col, ornament)
+        annotation = _mark_for_source_row(ann_cells[col], col, ann_target_rows, source_row_index)
+        _place_inline_mark(display_row_cells, disp_col, _inline_fingering_mark(annotation, style=style))
 
 
 def _merge_span_rows_with_cue_priority(  # noqa: C901
@@ -280,9 +284,36 @@ def _target_note_rows_by_col(cells: list[list[str]]) -> list[int]:
     return targets
 
 
-def _imported_ft3_mark_target_rows(  # noqa: C901, PLR0912
+def _fingering_target(chord: Chord, total_strings: int, fingering_mode: str) -> int:
+    for note in chord.notes:
+        if 1 <= note.string <= total_strings and _ft3_display_fingering_for_note(
+            note,
+            fingering_mode=fingering_mode,
+        ):
+            return note.string - 1
+    return -1
+
+
+def _selected_ornament(note: Note, ornament_mode: str) -> str | None:
+    return {
+        "left": note.left_ornament,
+        "right": note.right_ornament,
+        "both": note.left_ornament or note.right_ornament,
+    }.get(ornament_mode)
+
+
+def _ornament_target(chord: Chord, total_strings: int, ornament_mode: str) -> int:
+    for note in chord.notes:
+        if not 1 <= note.string <= total_strings:
+            continue
+        if note.arpeggio or _ft3_ornament_glyph(_selected_ornament(note, ornament_mode)):
+            return note.string - 1
+    return -1
+
+
+def _imported_ft3_mark_target_rows(
     *,
-    bar,
+    bar: Bar,
     total_strings: int,
     grid_width: int,
     default_duration: int,
@@ -294,34 +325,12 @@ def _imported_ft3_mark_target_rows(  # noqa: C901, PLR0912
     if not getattr(bar, "chords", None):
         return ann_targets, orn_targets
     positions = chord_positions(bar, grid_width, default_duration)
-    for idx, chord in enumerate(bar.chords):
-        if idx >= len(positions):
-            break
-        col = positions[idx][0]
+    for chord, position in zip(bar.chords, positions, strict=False):
+        col = position[0]
         if not (0 <= col < grid_width):
             continue
         if ann_targets[col] < 0:
-            for note in chord.notes:
-                if not (1 <= note.string <= total_strings):
-                    continue
-                if _ft3_display_fingering_for_note(note, fingering_mode=fingering_mode):
-                    ann_targets[col] = note.string - 1
-                    break
+            ann_targets[col] = _fingering_target(chord, total_strings, fingering_mode)
         if orn_targets[col] < 0:
-            for note in chord.notes:
-                if not (1 <= note.string <= total_strings):
-                    continue
-                left = note.left_ornament
-                right = note.right_ornament
-                if ornament_mode == "left":
-                    picked = left
-                elif ornament_mode == "right":
-                    picked = right
-                elif ornament_mode == "both":
-                    picked = left or right
-                else:
-                    picked = None
-                if note.arpeggio or _ft3_ornament_glyph(picked):
-                    orn_targets[col] = note.string - 1
-                    break
+            orn_targets[col] = _ornament_target(chord, total_strings, ornament_mode)
     return ann_targets, orn_targets

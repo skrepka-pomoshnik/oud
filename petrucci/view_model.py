@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from petrucci.model import Bar, Note, Piece
 from petrucci.render_utils import (
     bar_cells,
@@ -109,7 +111,47 @@ def _fallback_redundant_positions(
     return positions
 
 
-def _beamified_chord_flag_positions(  # noqa: C901, PLR0912
+@dataclass
+class _BeamFlagState:
+    global_denom: int
+    global_dot: bool = False
+    in_group: bool = False
+    group_denom: int | None = None
+    group_dot: bool | None = None
+
+
+def _beam_flag_visible(
+    marker: str | None,
+    index: int,
+    denom: int,
+    dot: bool,
+    *,
+    hide_redundant: bool,
+    state: _BeamFlagState,
+) -> bool:
+    if marker == "start":
+        state.in_group = True
+        state.group_denom = None
+        state.group_dot = None
+        return True
+    if marker in {"mid", "end"} and state.in_group:
+        visible = not hide_redundant or denom != state.group_denom or dot != state.group_dot
+        if marker == "end":
+            state.in_group = False
+        return visible
+    state.in_group = False
+    return index == 0 or not hide_redundant or denom != state.global_denom or dot != state.global_dot
+
+
+def _update_beam_flag_state(state: _BeamFlagState, marker: str | None, denom: int, dot: bool) -> None:
+    state.global_denom = denom
+    state.global_dot = dot
+    if marker in {"start", "mid", "end"}:
+        state.group_denom = denom
+        state.group_dot = dot
+
+
+def _beamified_chord_flag_positions(
     bar: Bar,
     positions: list[tuple[int, int, bool]],
     *,
@@ -133,41 +175,14 @@ def _beamified_chord_flag_positions(  # noqa: C901, PLR0912
         )
 
     filtered: list[tuple[int, int, bool]] = []
-    prev_global_denom = default_duration
-    prev_global_dot = False
-    in_group = False
-    prev_group_denom: int | None = None
-    prev_group_dot: bool | None = None
+    state = _BeamFlagState(global_denom=default_duration)
 
     for idx, (chord, pos) in enumerate(zip(chords, positions, strict=False)):
         col, denom, dot = pos
         marker = chord.grid
-        show = False
-        if idx == 0 and not hide_redundant:
-            show = True
-        if marker == "start":
-            in_group = True
-            prev_group_denom = None
-            prev_group_dot = None
-            show = True
-        elif marker in {"mid", "end"} and in_group:
-            if not hide_redundant or denom != prev_group_denom or dot != prev_group_dot:
-                show = True
-            if marker == "end":
-                in_group = False
-        else:
-            if in_group:
-                in_group = False
-            if idx == 0 or not hide_redundant or denom != prev_global_denom or dot != prev_global_dot:
-                show = True
-
-        if show:
+        if _beam_flag_visible(marker, idx, denom, dot, hide_redundant=hide_redundant, state=state):
             filtered.append((col, denom, dot))
-        prev_global_denom = denom
-        prev_global_dot = dot
-        if marker in {"start", "mid", "end"}:
-            prev_group_denom = denom
-            prev_group_dot = dot
+        _update_beam_flag_state(state, marker, denom, dot)
     return filtered
 
 
@@ -515,7 +530,191 @@ def _bar_flags(
     return row
 
 
-def build_bar_view(  # noqa: C901, PLR0917 - public compatibility; replace options with a typed view request
+@dataclass(frozen=True)
+class _BarViewRequest:
+    bar: Bar
+    overrides: dict[tuple[int, int, int], str]
+    durations: dict[tuple[int, int, int], int]
+    ornaments: dict[tuple[int, int], str]
+    annotations: dict[tuple[int, int], str]
+    slurs: list[tuple[int, int, int]]
+    ties: list[tuple[int, int, int]]
+    holds: list[tuple[int, int, int]]
+    glisses: list[tuple[int, int, int]]
+    bar_index: int
+    strings: int
+    bar_width: int
+    default_duration: int
+    style: str
+    french_c: str
+    slurcuestyle: str
+    tiecuestyle: str
+    tienoteheads: str
+    holdcuestyle: str
+    glisscuestyle: str
+    showft3extras: str
+    ft3fingering: str
+    ft3ornaments: str
+    showfingerings: str | None
+    showornaments: str | None
+
+
+def _apply_bar_overrides(cells: list[list[str]], request: _BarViewRequest) -> None:
+    for (bar_index, string, column), char in request.overrides.items():
+        if bar_index != request.bar_index:
+            continue
+        if string >= request.strings or column >= request.bar_width:
+            continue
+        cells[string][column] = char
+
+
+def _hide_tied_noteheads(cells: list[list[str]], request: _BarViewRequest) -> None:
+    hidden_columns = tie_notehead_hidden_cols(request.ties, bar_index=request.bar_index, mode=request.tienoteheads)
+    for column in hidden_columns:
+        if not 0 <= column < request.bar_width:
+            continue
+        for row in cells:
+            if row[column] != "-":
+                row[column] = "-"
+
+
+def _bar_view_cells(request: _BarViewRequest) -> list[list[str]]:
+    cells = (
+        bar_cells_from_chords(
+            request.bar,
+            request.strings,
+            request.bar_width,
+            request.default_duration,
+            request.style,
+            french_c=request.french_c,
+        )
+        if request.bar.chords
+        else bar_cells(
+            request.bar,
+            request.strings,
+            request.bar_width,
+            request.style,
+            french_c=request.french_c,
+        )
+    )
+    _apply_bar_overrides(cells, request)
+    _hide_tied_noteheads(cells, request)
+    return cells
+
+
+def _bar_view_rhythm(request: _BarViewRequest) -> tuple[list[str], list[str]]:
+    flag_cells = _bar_flags(
+        request.durations,
+        request.bar_index,
+        request.strings,
+        request.bar_width,
+        request.default_duration,
+    )
+    duration_cells = _bar_durations(
+        request.durations,
+        request.bar_index,
+        request.strings,
+        request.bar_width,
+        request.default_duration,
+    )
+    if not any(bar_index == request.bar_index for bar_index, _string, _column in request.durations):
+        columns = {
+            column
+            for bar_index, _string, column in request.overrides
+            if bar_index == request.bar_index and column < request.bar_width
+        }
+        for column in columns:
+            duration_cells[column] = duration_display(request.default_duration)
+    return flag_cells, duration_cells
+
+
+def _bar_view_marks(request: _BarViewRequest) -> tuple[list[str], list[str]]:
+    show_fingerings = (request.showfingerings or request.showft3extras) == "on"
+    show_ornaments = (request.showornaments or request.showft3extras) == "on"
+    imported_annotations = (
+        _bar_imported_ft3_annotations(
+            request.bar,
+            bar_width=request.bar_width,
+            default_duration=request.default_duration,
+            fingering_mode=request.ft3fingering,
+        )
+        if show_fingerings
+        else [" " for _ in range(request.bar_width)]
+    )
+    imported_ornaments = (
+        _bar_imported_ft3_ornaments(
+            request.bar,
+            bar_width=request.bar_width,
+            default_duration=request.default_duration,
+            ornament_mode=request.ft3ornaments,
+        )
+        if show_ornaments
+        else [" " for _ in range(request.bar_width)]
+    )
+    annotation_cells = _merge_mark_rows(
+        imported_annotations,
+        _bar_annotations(request.annotations, request.bar_index, request.bar_width),
+    )
+    local_ornaments = (
+        _bar_ornaments(request.ornaments, request.bar_index, request.bar_width)
+        if show_ornaments
+        else [" " for _ in range(request.bar_width)]
+    )
+    return annotation_cells, _merge_mark_rows(imported_ornaments, local_ornaments)
+
+
+def _bar_view_span_row(
+    spans: list[tuple[int, int, int]],
+    chars: tuple[str, str, str] | None,
+    request: _BarViewRequest,
+) -> list[str]:
+    if chars is None:
+        return [" " for _ in range(request.bar_width)]
+    return _bar_span_row(spans, request.bar_index, request.bar_width, *chars)
+
+
+def _bar_view_spans(request: _BarViewRequest) -> tuple[list[str], list[str], list[str], list[str]]:
+    return (
+        _bar_view_span_row(request.slurs, slur_span_chars(request.slurcuestyle), request),
+        _bar_view_span_row(request.ties, tie_span_chars(request.tiecuestyle), request),
+        _bar_view_span_row(request.holds, hold_span_chars(request.holdcuestyle), request),
+        _bar_view_span_row(request.glisses, gliss_span_chars(request.glisscuestyle), request),
+    )
+
+
+def _build_bar_view(request: _BarViewRequest) -> dict[str, list[str]]:
+    cells = _bar_view_cells(request)
+    flag_cells, duration_cells = _bar_view_rhythm(request)
+    annotation_cells, ornament_cells = _bar_view_marks(request)
+    slur_cells, tie_cells, hold_cells, gliss_cells = _bar_view_spans(request)
+    parenthesized_columns = tie_notehead_parenthesize_cols(
+        request.ties,
+        bar_index=request.bar_index,
+        mode=request.tienoteheads,
+    )
+    _place_parenthesize_tie_cues(
+        ann_cells=annotation_cells,
+        orn_cells=ornament_cells,
+        tie_cells=tie_cells,
+        slur_cells=slur_cells,
+        hold_cells=hold_cells,
+        gliss_cells=gliss_cells,
+        paren_tie_cols=parenthesized_columns,
+    )
+    return {
+        "ann": ["".join(annotation_cells)],
+        "orn": ["".join(ornament_cells)],
+        "slur": ["".join(slur_cells)],
+        "tie": ["".join(tie_cells)],
+        "hold": ["".join(hold_cells)],
+        "gliss": ["".join(gliss_cells)],
+        "flag": ["".join(flag_cells)],
+        "dur": ["".join(duration_cells)],
+        "rows": ["".join(cells[string]) for string in range(request.strings)],
+    }
+
+
+def build_bar_view(  # noqa: PLR0917 - public compatibility; options are captured in a typed view request
     bar: Bar,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -543,121 +742,32 @@ def build_bar_view(  # noqa: C901, PLR0917 - public compatibility; replace optio
     showfingerings: str | None = None,
     showornaments: str | None = None,
 ) -> dict[str, list[str]]:
-    if glisses is None:
-        glisses = []
-    bar_cells_data = (
-        bar_cells_from_chords(
-            bar,
-            strings,
-            bar_width,
-            default_duration,
-            style,
-            french_c=french_c,
-        )
-        if bar.chords
-        else bar_cells(
-            bar,
-            strings,
-            bar_width,
-            style,
-            french_c=french_c,
-        )
-    )
-    for (b, s, col), ch in overrides.items():
-        if b != bar_index:
-            continue
-        if s >= strings or col >= bar_width:
-            continue
-        bar_cells_data[s][col] = ch
-    hidden_tie_cols = tie_notehead_hidden_cols(ties, bar_index=bar_index, mode=tienoteheads)
-    paren_tie_cols = tie_notehead_parenthesize_cols(ties, bar_index=bar_index, mode=tienoteheads)
-    for hide_col in hidden_tie_cols:
-        if not (0 <= hide_col < bar_width):
-            continue
-        for row_cells in bar_cells_data:
-            if row_cells[hide_col] != "-":
-                row_cells[hide_col] = "-"
-    flag_cells = _bar_flags(
-        durations,
-        bar_index,
-        strings,
-        bar_width,
-        default_duration,
-    )
-    dur_cells = _bar_durations(
-        durations,
-        bar_index,
-        strings,
-        bar_width,
-        default_duration,
-    )
-    if not any(b == bar_index for (b, _s, _c) in durations):
-        override_cols = {col for (b, _s, col) in overrides if b == bar_index and col < bar_width}
-        for col in override_cols:
-            dur_cells[col] = duration_display(default_duration)
-    imported_ann = [" " for _ in range(bar_width)]
-    imported_orn = [" " for _ in range(bar_width)]
-    show_fingerings = (showfingerings or showft3extras) == "on"
-    show_ornaments_value = (showornaments or showft3extras) == "on"
-    if show_fingerings:
-        imported_ann = _bar_imported_ft3_annotations(
-            bar,
+    return _build_bar_view(
+        _BarViewRequest(
+            bar=bar,
+            overrides=overrides,
+            durations=durations,
+            ornaments=ornaments,
+            annotations=annotations,
+            slurs=slurs,
+            ties=ties,
+            holds=holds,
+            glisses=glisses or [],
+            bar_index=bar_index,
+            strings=strings,
             bar_width=bar_width,
             default_duration=default_duration,
-            fingering_mode=ft3fingering,
+            style=style,
+            french_c=french_c,
+            slurcuestyle=slurcuestyle,
+            tiecuestyle=tiecuestyle,
+            tienoteheads=tienoteheads,
+            holdcuestyle=holdcuestyle,
+            glisscuestyle=glisscuestyle,
+            showft3extras=showft3extras,
+            ft3fingering=ft3fingering,
+            ft3ornaments=ft3ornaments,
+            showfingerings=showfingerings,
+            showornaments=showornaments,
         )
-    if show_ornaments_value:
-        imported_orn = _bar_imported_ft3_ornaments(
-            bar,
-            bar_width=bar_width,
-            default_duration=default_duration,
-            ornament_mode=ft3ornaments,
-        )
-    ann_cells = _merge_mark_rows(imported_ann, _bar_annotations(annotations, bar_index, bar_width))
-    local_orn_cells = (
-        _bar_ornaments(ornaments, bar_index, bar_width) if show_ornaments_value else [" " for _ in range(bar_width)]
     )
-    orn_cells = _merge_mark_rows(imported_orn, local_orn_cells)
-    slur_chars = slur_span_chars(slurcuestyle)
-    slur_cells = (
-        [" " for _ in range(bar_width)]
-        if slur_chars is None
-        else _bar_span_row(slurs, bar_index, bar_width, *slur_chars)
-    )
-    tie_chars = tie_span_chars(tiecuestyle)
-    tie_cells = (
-        [" " for _ in range(bar_width)] if tie_chars is None else _bar_span_row(ties, bar_index, bar_width, *tie_chars)
-    )
-    hold_chars = hold_span_chars(holdcuestyle)
-    hold_cells = (
-        [" " for _ in range(bar_width)]
-        if hold_chars is None
-        else _bar_span_row(holds, bar_index, bar_width, *hold_chars)
-    )
-    gliss_chars = gliss_span_chars(glisscuestyle)
-    gliss_cells = (
-        [" " for _ in range(bar_width)]
-        if gliss_chars is None
-        else _bar_span_row(glisses, bar_index, bar_width, *gliss_chars)
-    )
-    _place_parenthesize_tie_cues(
-        ann_cells=ann_cells,
-        orn_cells=orn_cells,
-        tie_cells=tie_cells,
-        slur_cells=slur_cells,
-        hold_cells=hold_cells,
-        gliss_cells=gliss_cells,
-        paren_tie_cols=paren_tie_cols,
-    )
-    rows = ["".join(bar_cells_data[s_idx]) for s_idx in range(strings)]
-    return {
-        "ann": ["".join(ann_cells)],
-        "orn": ["".join(orn_cells)],
-        "slur": ["".join(slur_cells)],
-        "tie": ["".join(tie_cells)],
-        "hold": ["".join(hold_cells)],
-        "gliss": ["".join(gliss_cells)],
-        "flag": ["".join(flag_cells)],
-        "dur": ["".join(dur_cells)],
-        "rows": rows,
-    }

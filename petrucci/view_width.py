@@ -90,7 +90,56 @@ def _infer_time_signature(bar: Bar, default_duration: int = 4) -> str | None:  #
     return None
 
 
-def _tuning_labels(  # noqa: C901, PLR0912
+def _parse_pitch_labels(text: str, *, show_octaves: bool, limit: int | None = None) -> list[str]:
+    labels: list[str] = []
+    index = 0
+    while index < len(text):
+        note = text[index]
+        if not note.isalpha():
+            index += 1
+            continue
+        index += 1
+        accidental = ""
+        if index < len(text) and text[index] in "+-#b":
+            accidental = text[index]
+            index += 1
+        digits = ""
+        while index < len(text) and text[index].isdigit():
+            digits += text[index]
+            index += 1
+        suffix = digits if show_octaves else ""
+        labels.append(f"{note}{accidental}{suffix}")
+        if limit is not None and len(labels) >= limit:
+            break
+    return labels
+
+
+def _bass_tuning_labels(bass: list[str] | None, *, show_octaves: bool) -> list[str]:
+    labels: list[str] = []
+    for token in bass or []:
+        parsed = _parse_pitch_labels(token, show_octaves=show_octaves, limit=1)
+        if parsed:
+            labels.append(parsed[0])
+    return labels
+
+
+def _pad_tuning_labels(
+    labels: list[str],
+    strings: int,
+    bass: list[str] | None,
+    *,
+    show_octaves: bool,
+) -> list[str]:
+    missing = strings - len(labels)
+    bass_labels = _bass_tuning_labels(bass, show_octaves=show_octaves)
+    if bass_labels:
+        labels = bass_labels[:missing] + labels
+    if len(labels) < strings:
+        labels = [""] * (strings - len(labels)) + labels
+    return labels
+
+
+def _tuning_labels(
     tuning: str,
     strings: int,
     *,
@@ -99,55 +148,9 @@ def _tuning_labels(  # noqa: C901, PLR0912
 ) -> list[str]:
     if not tuning:
         return [str(strings - idx) for idx in range(strings)]
-    labels: list[str] = []
-    idx = 0
-    while idx < len(tuning) and len(labels) < strings:
-        ch = tuning[idx]
-        if ch.isalpha():
-            note = ch
-            idx += 1
-            accidental = ""
-            if idx < len(tuning) and tuning[idx] in "+-#b":
-                accidental = tuning[idx]
-                idx += 1
-            digits = ""
-            while idx < len(tuning) and tuning[idx].isdigit():
-                digits += tuning[idx]
-                idx += 1
-            label = f"{note}{accidental}"
-            if show_octaves and digits:
-                label += digits
-            label = label.strip()
-            labels.append(label if label else note)
-        else:
-            idx += 1
+    labels = _parse_pitch_labels(tuning, show_octaves=show_octaves, limit=strings)
     if len(labels) < strings:
-        missing = strings - len(labels)
-        bass_labels: list[str] = []
-        if bass:
-            for token in bass:
-                note = ""
-                accidental = ""
-                digits = ""
-                for ch in token:
-                    if not note and ch.isalpha():
-                        note = ch
-                    elif note and not accidental and ch in "+-#b":
-                        accidental = ch
-                    elif note and ch.isdigit():
-                        digits += ch
-                if not note:
-                    continue
-                label = f"{note}{accidental}"
-                if show_octaves and digits:
-                    label += digits
-                bass_labels.append(label)
-        if bass_labels:
-            labels = bass_labels[:missing] + labels
-            if len(labels) < strings:
-                labels = [""] * (strings - len(labels)) + labels
-        else:
-            labels = [""] * missing + labels
+        labels = _pad_tuning_labels(labels, strings, bass, show_octaves=show_octaves)
     labels = labels[:strings]
     labels.reverse()
     return labels
@@ -185,43 +188,46 @@ def _scale_col(col: int, src_width: int, dest_width: int) -> int:
     return min(dest_width - 1, (col * (dest_width - 1)) // (src_width - 1))
 
 
-def _scale_row(row: list[str], dest_width: int, fill_char: str) -> list[str]:  # noqa: C901
+def _nearest_free_column(scaled: list[str], target: int, fill_char: str) -> int | None:
+    if scaled[target] == fill_char:
+        return target
+    for offset in range(1, len(scaled)):
+        right = target + offset
+        if right < len(scaled) and scaled[right] == fill_char:
+            return right
+        left = target - offset
+        if left >= 0 and scaled[left] == fill_char:
+            return left
+    return None
+
+
+def _scaled_row_positions(row: list[str], dest_width: int, fill_char: str) -> list[tuple[int, str]]:
+    src_width = len(row)
+    return [(_scale_col(src_col, src_width, dest_width), char) for src_col, char in enumerate(row) if char != fill_char]
+
+
+def _bounded_scaled_target(dest_column: int, last_position: int, dest_width: int) -> int:
+    return min(max(dest_column, last_position + 1), dest_width - 1)
+
+
+def _scale_row(row: list[str], dest_width: int, fill_char: str) -> list[str]:
     if dest_width <= 0:
         return []
     scaled = [fill_char for _ in range(dest_width)]
     src_width = len(row)
     if src_width <= 0:
         return scaled
-    positions: list[tuple[int, str]] = []
-    for src_col, ch in enumerate(row):
-        if ch == fill_char:
-            continue
-        positions.append((_scale_col(src_col, src_width, dest_width), ch))
+    positions = _scaled_row_positions(row, dest_width, fill_char)
     if not positions:
         return scaled
-    min_gap = 1
-    last_pos = -min_gap
+    last_pos = -1
     for dest_col, ch in positions:
-        target = max(dest_col, last_pos + min_gap)
-        if target >= dest_width:
-            target = dest_width - 1
-        if scaled[target] != fill_char:
-            moved = False
-            for offset in range(1, dest_width):
-                right = target + offset
-                left = target - offset
-                if right < dest_width and scaled[right] == fill_char:
-                    target = right
-                    moved = True
-                    break
-                if left >= 0 and scaled[left] == fill_char:
-                    target = left
-                    moved = True
-                    break
-            if not moved:
-                continue
-        scaled[target] = ch
-        last_pos = target
+        target = _bounded_scaled_target(dest_col, last_pos, dest_width)
+        free_column = _nearest_free_column(scaled, target, fill_char)
+        if free_column is None:
+            continue
+        scaled[free_column] = ch
+        last_pos = free_column
     return scaled
 
 

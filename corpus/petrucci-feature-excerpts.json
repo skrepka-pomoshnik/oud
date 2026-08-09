@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "source_manifests": [
+    "corpus/ft3-note-input-100.json",
+    "corpus/ft3-random-75-v2.json"
+  ],
+  "selection": "Four fixed-corpus scores selected for complementary source-supported Petrucci features.",
+  "available_features": [
+    "bass_courses",
+    "chords",
+    "lyrics",
+    "ornaments",
+    "polyphonic_notation",
+    "rests",
+    "tablature",
+    "ties"
+  ],
+  "known_gaps": {
+    "grace_notes": "No grace-note event occurs in the fixed 100-score corpus.",
+    "tablature_style_provenance": "Every selected fixed-corpus source records a null style, so French or Italian source style cannot be claimed.",
+    "tuplets": "No tuplet event occurs in the fixed 100-score corpus."
+  },
+  "excerpts": [
+    {
+      "id": "la-couperin-trio",
+      "source_manifest": "corpus/ft3-note-input-100.json",
+      "path": "note-input-100/044/la_couperin_trio.ft3",
+      "source_url": "https://browse.lutemusic.org/composers/Forqueray/la_couperin_trio.ft3",
+      "source_sha256": "b0b7c4765273c8c2607cdc61e96a90639d3f5d2c3e3c54baaffeaec7e7b73345",
+      "render_bar": 1,
+      "features": [
+        "bass_courses",
+        "chords",
+        "lyrics",
+        "ornaments",
+        "polyphonic_notation",
+        "rests",
+        "tablature"
+      ],
+      "published_score": {
+        "url": "https://browse.lutemusic.org/composers/Forqueray/pdf/la_couperin_trio.pdf",
+        "pages": 3,
+        "comparison": "The opening page prints two bass-clef notation parts above twelve-course lute tablature, with rests, chord stacks, low courses, and plus ornaments."
+      },
+      "semantics": {
+        "bars": 77,
+        "strings": 12,
+        "tab_events": 171,
+        "tab_chord_events": 123,
+        "max_course": 12,
+        "notation_staffs": 2,
+        "notation_events": 717,
+        "notation_rests": 52,
+        "lyrics": 78,
+        "ties": 0,
+        "tuplets": 0,
+        "grace_notes": 0
+      },
+      "expectations": {
+        "render_sha256": "faafc8b46002a5ce0e9a45489a4c4367d155ff827ed429892c81ea0dfe8d3771",
+        "tab_sha256": "7acf32dd4a48b94ebc228ecd2ca529f5405ad282eb7b7772721f5e90f806bc6e",
+        "tab_projection_sha256": "435c4d4e31bd6fbd4bb2d8c04fda7961ef37de524077ea2a33305a730c29dcf1",
+        "lilypond_sha256": "ac0b155ade53b5eaa295a5355943f5d8349f615667e691ffb952f3edd0b1a990",
+        "midi_sha256": "6deb94d3d113d4c0fcbe907c421acd48d162d3cd95245a0807153cc1108e9395"
+      }
+    },
+    {
+      "id": "o-felice-01",
+      "source_manifest": "corpus/ft3-note-input-100.json",
+      "path": "note-input-100/024/o_felice_01.ft3",
+      "source_url": "https://browse.lutemusic.org/composers/Ortiz/o_felice_01.ft3",
+      "source_sha256": "cf61786e494890d9cc0e0bdf4e5af5ab0ef76614a70d4030f8443108d052323f",
+      "render_bar": 1,
+      "features": [
+        "bass_courses",
+        "chords",
+        "lyrics",
+        "rests",
+        "tablature"
+      ],
+      "published_score": {
+        "url": "https://browse.lutemusic.org/composers/Ortiz/pdf/o_felice_01.pdf",
+        "pages": 3,
+        "comparison": "The opening page prints one bass-clef melodic part above lute tablature, beginning with rests and continuing with aligned attacks."
+      },
+      "semantics": {
+        "bars": 40,
+        "strings": 8,
+        "tab_events": 171,
+        "tab_chord_events": 125,
+        "max_course": 8,
+        "notation_staffs": 1,
+        "notation_events": 328,
+        "notation_rests": 5,
+        "lyrics": 6,
+        "ties": 0,
+        "tuplets": 0,
+        "grace_notes": 0
+      },
+      "expectations": {
+        "render_sha256": "4e4197bd8efa7f35b9bb9d9cedd0280372d81e79bbca7f2b35787e274db07b90",
+        "tab_sha256": "ea249aa32dfa7c4766cd39cd9df5baeac757af0806c9ce5afbd446a438778b96",
+        "tab_projection_sha256": "3c8bc61a58dcc175802d798857a4ef4d7f6c3e7fbb3562e0d7b105f7f59ad291",
+        "lilypond_sha256": "8f4e627c58901c3e6afb1712e19238126e0af62abd867dc4ae17aa7d88f265f3",
+        "midi_sha256": "d2f569b6f2d894e107a13a3b3e05434e0b6703663837f25d3757f79101194f45"
+      }
+    },
+    {
+      "id": "almain-11",
+      "source_manifest": "corpus/ft3-note-input-100.json",
+      "path": "note-input-100/002/almain_11.ft3",
+      "source_url": "https://browse.lutemusic.org/composers/RJohnson/almain_11.ft3",
+      "source_sha256": "2324ed71e60d0bc331669cbc7482c78b2e71e3ecf56ee7ae73b06ebf5ac44ce3",
+      "render_bar": 1,
+      "features": [
+        "bass_courses",
+        "chords",
+        "ornaments",
+        "tablature"
+      ],
+      "published_score": {
+        "url": "https://browse.lutemusic.org/composers/RJohnson/pdf/almain_11.pdf",
+        "pages": 1,
+        "comparison": "The single page prints tablature-only chord stacks with diapason bass courses and x/line ornaments."
+      },
+      "semantics": {
+        "bars": 17,
+        "strings": 10,
+        "tab_events": 101,
+        "tab_chord_events": 26,
+        "max_course": 10,
+        "notation_staffs": 0,
+        "notation_events": 0,
+        "notation_rests": 0,
+        "lyrics": 0,
+        "ties": 0,
+        "tuplets": 0,
+        "grace_notes": 0
+      },
+      "expectations": {
+        "render_sha256": "72b78bcadd2350005e4083d56c9734286e8ddb8ce83bd28b157727c7be7a3c27",
+        "tab_sha256": "3691b5ae1244d5c9a1a9638b0a4f47b12635107f76a1482f35a94e22f9ab4fd7",
+        "tab_projection_sha256": "0ccc3b613fe14e2085929a43953ae404358af4efd63c18f4977404272d6d0a77",
+        "lilypond_sha256": "2e63e1919254db43a9a17247785d35a303b758301e2fc8d7523f49fe502c87f7",
+        "midi_sha256": "bbc10a30f63a197e75dd9448e8ca957ecc261ec051ac7946684e726e82c79277"
+      }
+    },
+    {
+      "id": "recit-de-la-beaute-double",
+      "source_manifest": "corpus/ft3-random-75-v2.json",
+      "path": "random-75-v2/060/recit_de_la_beaute_double.ft3",
+      "source_url": "https://browse.lutemusic.org/composers/Lully/recit_de_la_beaute_double.ft3",
+      "source_sha256": "04aa7b732b053d6868e435738de864157b12ae931e6da299f2fd19651eba483c",
+      "render_bar": 1,
+      "features": [
+        "bass_courses",
+        "chords",
+        "lyrics",
+        "ornaments",
+        "rests",
+        "tablature",
+        "ties"
+      ],
+      "published_score": {
+        "url": "https://browse.lutemusic.org/composers/Lully/pdf/recit_de_la_beaute_double.pdf",
+        "pages": 2,
+        "comparison": "The opening page prints one vocal staff with lyrics, ornaments, and curved spans above eight-course French-letter tablature; canonical source semantics identify one span as a tie."
+      },
+      "semantics": {
+        "bars": 26,
+        "strings": 8,
+        "tab_events": 92,
+        "tab_chord_events": 46,
+        "max_course": 8,
+        "notation_staffs": 1,
+        "notation_events": 148,
+        "notation_rests": 8,
+        "lyrics": 29,
+        "ties": 1,
+        "tuplets": 0,
+        "grace_notes": 0
+      },
+      "expectations": {
+        "render_sha256": "74554d81ffb6b13ee388e737c8f3cf2fad5fc43340a1a59e8cf6f7aa05e80aa7",
+        "tab_sha256": "ac569c72fa5dcf32301996e530ff996652044f09095e018dc74bdb7adcfd66bd",
+        "tab_projection_sha256": "d9ff0d9180f587121579549e306a7e7a870ab741130041a3dbda2f0c282e159f",
+        "lilypond_sha256": "872bcc564f2bc9dc619d59b37e79e12d23239851932165f1d69d25e3be4fb061",
+        "midi_sha256": "080e88f3f66fc9469ba3364ea271801aaaf5742c5e2e8d306293c9dbd00f603a"
+      }
+    }
+  ]
+}

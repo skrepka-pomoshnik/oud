@@ -345,7 +345,7 @@ Each fixed corpus directory must report zero unresolved files, for example:
 Scanned 75 file(s): 0 with unresolved values or records.
 ```
 
-Together the four random manifests cover 263 fixed external files. Tests
+Together the five random manifests cover 300 fixed external files. Tests
 verify their paths, URLs, SHA-256 digests, and zero-unresolved result.
 
 “Unresolved” means an unconsumed note-extra bit, unknown vocal flag, unknown

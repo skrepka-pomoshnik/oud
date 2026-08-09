@@ -28,13 +28,14 @@ def token_pitch_value(token: str) -> int | None:
     raw = token.strip().lower()
     if not raw:
         return None
-    letter = next((ch for ch in raw if ch in _DIATONIC_BASE), None)
-    if letter is None:
+    letter_index = next((index for index, char in enumerate(raw) if char in _DIATONIC_BASE), None)
+    if letter_index is None:
         return None
+    letter = raw[letter_index]
     pitch = 60 + _DIATONIC_BASE[letter]
-    pitch += raw.count("#")
-    if "b" in raw and letter != "b":
-        pitch -= 1
+    accidentals = raw[letter_index + 1 :]
+    pitch += accidentals.count("#")
+    pitch -= accidentals.count("b")
     pitch += 12 * raw.count("'")
     pitch -= 12 * raw.count(",")
     return pitch
@@ -51,29 +52,32 @@ def chord_top_pitch(chord: Chord, tuning_pitches: list[int] | None) -> int | Non
     return max(pitches) if pitches else None
 
 
-def infer_vocal_events(  # noqa: C901
+def infer_vocal_events(
     bar: Bar,
     *,
     tuning_pitches: list[int] | None,
 ) -> list[VocalEvent]:
-    anchor_events = _anchor_melody_events(bar)
-    if anchor_events:
-        out: list[VocalEvent] = []
-        for onset_index, chord_index, text in anchor_events:
-            event = _explicit_vocal_event(
-                onset_index=onset_index,
-                chord_index=chord_index,
-                source=text,
-                chords=bar.chords,
-                tuning_pitches=tuning_pitches,
-            )
-            if event is not None:
-                out.append(event)
-        if out:
-            return out
-    if not bar.chords:
-        return []
-    out = []
+    explicit = _explicit_vocal_events(bar, tuning_pitches)
+    return explicit or _inferred_chord_vocal_events(bar, tuning_pitches)
+
+
+def _explicit_vocal_events(bar: Bar, tuning_pitches: list[int] | None) -> list[VocalEvent]:
+    out: list[VocalEvent] = []
+    for onset_index, chord_index, text in _anchor_melody_events(bar):
+        event = _explicit_vocal_event(
+            onset_index=onset_index,
+            chord_index=chord_index,
+            source=text,
+            chords=bar.chords,
+            tuning_pitches=tuning_pitches,
+        )
+        if event is not None:
+            out.append(event)
+    return out
+
+
+def _inferred_chord_vocal_events(bar: Bar, tuning_pitches: list[int] | None) -> list[VocalEvent]:
+    out: list[VocalEvent] = []
     for onset_index, chord in enumerate(bar.chords):
         pitch = chord_top_pitch(chord, tuning_pitches)
         if pitch is None:

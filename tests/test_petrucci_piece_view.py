@@ -296,3 +296,65 @@ def test_short_view_scrolls_to_focused_voice_without_partial_neighbor() -> None:
     assert view is not None
     assert view.result.cells_for("piece:staff:2:bar:0:event:0:0")
     assert not view.result.cells_for("piece:staff:0:bar:0:event:0:0")
+
+
+def test_explicit_score_view_keeps_all_mixed_staffs_and_focus_scrolls_tall_layout() -> None:
+    piece = _imported_piece(tablature=True, two_voices=True)
+    settings = {**SETTINGS, "scoreview": "score"}
+    full = typeset_piece_score_view(
+        piece,
+        width=120,
+        height=40,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=None,
+        settings=settings,
+        focused_imported_staff_index=0,
+    )
+    lower = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=12,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=None,
+        settings=settings,
+        focused_imported_staff_index=2,
+    )
+
+    assert full is not None and lower is not None
+    expected_staffs = ["piece:staff:0", "piece:staff:2", "piece:tab"]
+    assert [rows.staff_id for rows in full.result.layout.systems[0].staff_rows] == expected_staffs
+    assert "soprano" in full.result.text and "bass" in full.result.text and "lute" in full.result.text
+    assert [rows.staff_id for rows in lower.result.layout.systems[0].staff_rows] == expected_staffs
+    assert lower.result.cells_for("piece:staff:2:bar:0:event:0:0")
+
+
+def test_explicit_staff_view_selects_one_voice_or_falls_back_to_tab() -> None:
+    piece = _imported_piece(tablature=True, two_voices=True)
+    settings = {**SETTINGS, "scoreview": "staff"}
+    bass = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=24,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=None,
+        settings=settings,
+        focused_imported_staff_index=2,
+    )
+    tab = typeset_piece_score_view(
+        piece,
+        width=80,
+        height=24,
+        bar_offset=0,
+        cursor=(0, 0),
+        playback=None,
+        settings=settings,
+        focused_imported_staff_index=None,
+    )
+
+    assert bass is not None
+    assert [rows.staff_id for rows in bass.result.layout.systems[0].staff_rows] == ["piece:staff:2"]
+    assert "bass" in bass.result.text and "soprano" not in bass.result.text and "lute" not in bass.result.text
+    assert tab is None

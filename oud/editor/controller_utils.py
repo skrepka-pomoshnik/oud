@@ -38,6 +38,8 @@ def _bass_strings_used(state: EditorState) -> set[int]:  # noqa: C901
 
 def visible_string_indices(state: EditorState) -> list[int]:
     total = state.piece.strings
+    if state.mode in {"insert", "replace"}:
+        return list(range(total))
     base = min(6, total)
     indices = list(range(base))
     bass = sorted(idx for idx in _bass_strings_used(state) if base <= idx < total)

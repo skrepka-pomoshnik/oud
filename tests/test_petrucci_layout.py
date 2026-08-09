@@ -15,6 +15,7 @@ from petrucci.layout import (
 )
 from petrucci.score import (
     AccidentalDisplay,
+    BarlineKind,
     BeamKind,
     Clef,
     EventKind,
@@ -716,4 +717,102 @@ def test_dense_chord_dots_nested_spans_and_reserved_cues_do_not_overlap() -> Non
     assert rows.tuplet_rows and rows.grace_row is not None and rows.ornament_row is not None
     assert len(rows.lyric_rows) == 2
     assert all(not (head.x == dot.x and head.y == dot.y) for head in heads for dot in dots)
+    assert layout_collisions(layout) == ()
+
+
+def test_upstream_partial_beamlets_and_grace_stay_inside_repeat_measure() -> None:
+    """Mirror LilyPond partial-grace and MuseScore beam-boundary cases."""
+
+    first = NotationEvent(
+        "partial-forward",
+        Fraction(0),
+        Fraction(1, 16),
+        EventKind.NOTE,
+        (pitch_from_midi(72),),
+        beam=BeamKind.PARTIAL_FORWARD,
+        grace=True,
+    )
+    last = NotationEvent(
+        "partial-backward",
+        Fraction(15, 16),
+        Fraction(1, 16),
+        EventKind.NOTE,
+        (pitch_from_midi(60),),
+        beam=BeamKind.PARTIAL_BACKWARD,
+    )
+    measure = NotationMeasure("partial-measure", 1, (first, last), barline=BarlineKind.REPEAT_END)
+    score = NotationScore("partial-score", (NotationStaff("partial-staff", (measure,)),))
+
+    layout = layout_score(score, viewport=LayoutViewport(width=28, height=24))
+    barline = next(element for element in layout.elements_for(measure.id) if element.key.role is ElementRole.BARLINE)
+    beams = [element for element in layout.elements if element.key.role is ElementRole.BEAM]
+
+    assert len(beams) == 4
+    assert all(element.rect.right < barline.rect.x for element in beams)
+    assert any(element.key.role is ElementRole.GRACE for element in layout.elements_for(first.id))
+
+
+def test_upstream_tuplet_group_gets_one_bracket_without_losing_beam() -> None:
+    """Mirror LilyPond tuplet/beam and MuseScore tuplet compatibility cases."""
+
+    events = tuple(
+        NotationEvent(
+            f"triplet-{index}",
+            Fraction(index, 12),
+            Fraction(1, 12),
+            EventKind.NOTE,
+            (pitch_from_midi(60 + index),),
+            beam=(BeamKind.START, BeamKind.CONTINUE, BeamKind.END)[index],
+            tuplet=TupletRatio(3, 2),
+        )
+        for index in range(3)
+    )
+    score = NotationScore(
+        "grouped-triplet-score",
+        (NotationStaff("grouped-triplet-staff", (NotationMeasure("grouped-triplet-measure", 1, events),)),),
+    )
+
+    layout = layout_score(score)
+    tuplets = [element for element in layout.elements if element.key.role is ElementRole.TUPLET]
+    beams = [element for element in layout.elements if element.key.role is ElementRole.BEAM]
+    first_onset = layout.onset_for(events[0].id)
+    last_onset = layout.onset_for(events[-1].id)
+
+    assert first_onset is not None and last_onset is not None
+    assert len(tuplets) == 1
+    assert tuplets[0].key.source_id == events[0].id
+    assert tuplets[0].rect.x <= first_onset.x
+    assert tuplets[0].rect.right >= last_onset.x
+    assert len(beams) == 1
+
+
+def test_upstream_broken_spans_coexist_with_volta_and_repeat_barlines() -> None:
+    """Mirror LilyPond broken-span/volta and MuseScore partial-tie repeat cases."""
+
+    first = _event("broken-first", 0, 60)
+    second = _event("broken-second", 0, 60)
+    measures = (
+        NotationMeasure(
+            "broken-m1",
+            1,
+            (first,),
+            barline=BarlineKind.REPEAT_END,
+            ending_numbers=(1,),
+            forced_break_after=True,
+        ),
+        NotationMeasure("broken-m2", 2, (second,), barline=BarlineKind.REPEAT_START),
+    )
+    spans = (
+        NotationSpan("broken-tie", SpanKind.TIE, first.id, second.id),
+        NotationSpan("broken-slur", SpanKind.SLUR, first.id, second.id),
+    )
+    score = NotationScore("broken-score", (NotationStaff("broken-staff", measures, spans=spans),))
+
+    layout = layout_score(score, viewport=LayoutViewport(width=40, height=30))
+
+    assert len(layout.elements_for("broken-tie")) == 2
+    assert len(layout.elements_for("broken-slur")) == 2
+    assert all(element.continuation for element in layout.elements_for("broken-tie"))
+    roles = {element.key.role for element in layout.elements_for("broken-m1")}
+    assert {ElementRole.ENDING, ElementRole.BARLINE}.issubset(roles)
     assert layout_collisions(layout) == ()

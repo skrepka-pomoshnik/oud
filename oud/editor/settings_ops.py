@@ -82,6 +82,7 @@ _INT_KEYS = {
     "newbars",
     "minimumfret",
     "maxstretch",
+    "lyricverse",
 }
 
 _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
@@ -142,6 +143,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         {"auto", "both", "1", "2"},
         "Duetscoreview must be auto/both/1/2",
     ),
+    "scoreview": (
+        {"score", "staff"},
+        "Scoreview must be score/staff",
+    ),
     "tiecuestyle": (
         {"bracket", "paren", "hide"},
         "Tiecuestyle must be bracket/paren/hide",
@@ -169,6 +174,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "playverses": (
         {"once", "all"},
         "Playverses must be once/all",
+    ),
+    "lyricmode": (
+        {"first", "current", "all"},
+        "Lyricmode must be first/current/all",
     ),
     "ft3fingering": (
         {"off", "left", "right", "both"},
@@ -384,19 +393,9 @@ def is_bool_set_token(token: str) -> bool:
     return token.endswith("!") and token[:-1] in _BOOL_KEYS
 
 
-def set_value_options(key: str) -> tuple[str, ...]:  # noqa: PLR0911, C901
-    if key in _DEPRECATED_SET_ALIASES:
-        key = _DEPRECATED_SET_ALIASES[key]
-    if key == "__ft3extras_bundle__":
-        return ("on", "off")
-    if key in _BOOL_KEYS:
-        return ("on", "off")
-    if key in _ENUM_VALUES:
-        allowed, _error = _ENUM_VALUES[key]
-        return tuple(sorted(allowed))
-    if key == "tuning":
-        # Common presets + aliases accepted by tuning_preset(); free-form tuning still allowed.
-        presets = (
+_TUNING_VALUE_OPTIONS = tuple(
+    sorted(
+        {
             "renaissance",
             "renaissance6",
             "ren6",
@@ -415,21 +414,34 @@ def set_value_options(key: str) -> tuple[str, ...]:  # noqa: PLR0911, C901
             "baroque-dminor",
             "baroque-sharp",
             "baroque-flat",
-        )
-        return tuple(sorted(set(presets)))
-    if key in {"time", "timesig"}:
-        return ("C", "O", "2/2", "3/4", "4/4", "6/8", "auto")
-    if key == "measuresstep":
-        return ("1", "5", "10")
-    if key == "minimumfret":
-        return ("0", "1", "2", "3", "5", "7")
-    if key == "maxstretch":
-        return ("0", "2", "3", "4", "5", "7")
-    if key in {"strings", "staff"}:
-        return tuple(str(v) for v in range(4, 14))
+        },
+    ),
+)
+
+_SET_VALUE_OPTIONS = {
+    "__ft3extras_bundle__": ("on", "off"),
+    "tuning": _TUNING_VALUE_OPTIONS,
+    "time": ("C", "O", "2/2", "3/4", "4/4", "6/8", "auto"),
+    "timesig": ("C", "O", "2/2", "3/4", "4/4", "6/8", "auto"),
+    "measuresstep": ("1", "5", "10"),
+    "lyricverse": tuple(str(value) for value in range(1, 17)),
+    "minimumfret": ("0", "1", "2", "3", "5", "7"),
+    "maxstretch": ("0", "2", "3", "4", "5", "7"),
+    "strings": tuple(str(value) for value in range(4, 14)),
+    "staff": tuple(str(value) for value in range(4, 14)),
+}
+
+
+def set_value_options(key: str) -> tuple[str, ...]:
+    key = _DEPRECATED_SET_ALIASES.get(key, key)
+    if key in _BOOL_KEYS:
+        return ("on", "off")
+    if key in _ENUM_VALUES:
+        allowed, _error = _ENUM_VALUES[key]
+        return tuple(sorted(allowed))
     if key == "set":
         return set_preset_names()
-    return ()
+    return _SET_VALUE_OPTIONS.get(key, ())
 
 
 _HANDLERS: dict[str, SetHandler] = {

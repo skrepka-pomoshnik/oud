@@ -6,7 +6,10 @@ from contextlib import contextmanager
 from oud.editor.state import EditorState, UndoAction, UndoGroupFrame
 from petrucci.tab_mutation import (
     EditableTablature,
+    TabEditTransaction,
     TabMutation,
+    TabMutationResult,
+    apply_tab_mutation,
     clear_tab_cell,
     clear_tab_note,
     set_tab_cell,
@@ -107,6 +110,14 @@ def apply_override(state: EditorState, key: tuple[int, int, int], ch: str) -> No
 
 def apply_duration(state: EditorState, key: tuple[int, int, int], dur: int) -> None:
     _record_tab_mutation(state, set_tab_duration(_editable_tablature(state), key, dur))
+
+
+def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -> TabMutationResult:
+    with undo_group(state, label="tab-transaction"):
+        result = apply_tab_mutation(_editable_tablature(state), transaction)
+        for mutation in result.changes:
+            _record_tab_mutation(state, mutation)
+    return result
 
 
 def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:

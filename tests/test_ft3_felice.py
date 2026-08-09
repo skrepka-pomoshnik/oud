@@ -1,4 +1,6 @@
 from oud.importers.ft3 import load_ft3
+from petrucci.lyric_display import piece_for_lyric_display
+from petrucci.vocal_line import infer_vocal_events
 
 FELICE = "lutemusic/01_felice_fu_quel_anon.ft3"
 
@@ -26,3 +28,26 @@ def test_felice_high_letter_frets_are_not_dropped() -> None:
 
     for bar_index in (12, 13, 14, 15):
         assert piece.bars[bar_index].chords, bar_index + 1
+
+
+def test_felice_compact_lyric_display_selects_one_stanza_before_layout() -> None:
+    piece = load_ft3(FELICE)
+    first = piece_for_lyric_display(piece, {"showlyrics": "on", "lyricmode": "first"})
+    current = piece_for_lyric_display(
+        piece,
+        {"showlyrics": "on", "lyricmode": "current", "lyricverse": "2"},
+    )
+    assert first.imported_score is not None
+    assert current.imported_score is not None
+    first_lyrics = next(staff for staff in first.imported_score.staffs if staff.kind == "lyrics")
+    current_lyrics = next(staff for staff in current.imported_score.staffs if staff.kind == "lyrics")
+    assert [event.text for event in first_lyrics.bars[1].lyric_event_rows[0]] == ["fu", "quel", "di"]
+    assert [event.text for event in current_lyrics.bars[1].lyric_event_rows[0]] == ["gli_oc", "chi", "miei"]
+    assert all(len(bar.lyric_event_rows) <= 1 for bar in first_lyrics.bars)
+
+
+def test_felice_third_tactus_keeps_f_minor_flat_pitches() -> None:
+    piece = load_ft3(FELICE)
+    events = infer_vocal_events(piece.bars[2], tuning_pitches=[])
+    assert [event.text for event in events] == ["bb", "ab", "g"]
+    assert [event.pitch for event in events] == [70, 68, 67]

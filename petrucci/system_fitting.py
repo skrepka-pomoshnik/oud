@@ -39,14 +39,12 @@ class BoxSystem:
     filled: bool
 
 
-def fit_measured_boxes(  # noqa: C901
+def _validate_fit_request(
     boxes: tuple[MeasuredBox, ...],
-    *,
     available_width: int,
-    gap: int = 0,
-    justify: bool = True,
-    max_stretch_per_box: int = 6,
-) -> tuple[BoxSystem, ...]:
+    gap: int,
+    max_stretch_per_box: int,
+) -> None:
     """Pack natural boxes into systems, then apply bounded justification."""
 
     if available_width <= 0:
@@ -56,6 +54,17 @@ def fit_measured_boxes(  # noqa: C901
     if max_stretch_per_box < 0:
         _invalid("maximum stretch must be non-negative")
     _validate_unique_ids(boxes)
+
+
+def fit_measured_boxes(
+    boxes: tuple[MeasuredBox, ...],
+    *,
+    available_width: int,
+    gap: int = 0,
+    justify: bool = True,
+    max_stretch_per_box: int = 6,
+) -> tuple[BoxSystem, ...]:
+    _validate_fit_request(boxes, available_width, gap, max_stretch_per_box)
 
     systems: list[BoxSystem] = []
     current: list[MeasuredBox] = []

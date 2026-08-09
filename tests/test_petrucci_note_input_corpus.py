@@ -43,6 +43,7 @@ PREVIOUS_MANIFESTS = (
     Path("corpus/ft3-random-75-v2.json"),
     Path("corpus/ft3-random-50-v3.json"),
     Path("corpus/ft3-random-63-v4.json"),
+    Path("corpus/ft3-random-37-v5.json"),
 )
 NOTE_TYPE_DENOMINATORS = {2: 1, 3: 2, 4: 4, 5: 8, 6: 16, 7: 32, 8: 64}
 
