@@ -97,6 +97,21 @@ def test_path_completion_lists_every_candidate(tmp_path) -> None:
     assert all(f"piece-{index:02}.tab" in message for index in range(12))
 
 
+def test_path_completion_lists_directory_children_without_repeating_prefix(tmp_path) -> None:
+    state = _state()
+    directory = tmp_path / "examples"
+    directory.mkdir()
+    (directory / "alpha.tab").write_text("x", encoding="utf-8")
+    (directory / "zeta.ft3").write_text("x", encoding="utf-8")
+
+    text, message = complete_command_text(state, f"e {directory}{os.sep}")
+
+    assert text == f"e {directory}{os.sep}"
+    assert message is not None
+    assert "alpha.tab" in message
+    assert "zeta.ft3" in message
+
+
 def test_fzf_path_completion_uses_system_filter(monkeypatch, tmp_path) -> None:
     state = _state()
     state.settings["completion"] = "fzf"
@@ -214,8 +229,10 @@ def test_handle_command_paths() -> None:
         calls.append(cmdline)
 
     state.mode = "command"
+    state.message = "Matches: old.tab"
     handle_command(state, 27, _apply)
     assert state.mode == "normal"
+    assert state.message == ""
     assert state.insert_prefix == ""
     assert state.replace_once is False
     state.mode = "command"

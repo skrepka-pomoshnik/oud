@@ -64,6 +64,7 @@ def handle_command(state: EditorState, key: int, apply_command) -> bool:
     if result.cancel:
         set_mode(state, "normal")
         state.cmdline = ""
+        state.message = ""
         command_history_reset_nav(state)
         return True
     if result.submit:

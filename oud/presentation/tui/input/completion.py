@@ -148,7 +148,9 @@ def _complete_path(state: EditorState, cmd: str, rest: str, cmdline: str) -> Com
     if state.settings.get("completion", "prefix") != "fzf":
         common = os.path.commonprefix([str(entry) for entry in entries])
         if common and common != str(expanded):
-            return f"{cmd} {common}", diagnostic
+            completed = f"{cmd} {common}"
+            if completed != cmdline:
+                return completed, diagnostic
     return cmdline, _completion_message(entries, diagnostic)
 
 
