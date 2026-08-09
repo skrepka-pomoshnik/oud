@@ -5,7 +5,7 @@ Priority order:
 1. Publication-grade FT3 viewer support.
 2. Gerbode-based lute tablature and standard-note typing parity.
 3. Intelligent, score-aware transposition.
-4. Publication-quality PDF generation through LilyPond.
+4. Linked Petrucci proof quality and LilyPond publication export.
 5. Architecture debt and secondary release work.
 
 ## P0: Publication blockers
@@ -135,7 +135,18 @@ algorithm that preserves sounding pitch and produces playable tablature.
   bass courses, alternate tunings, impossible ranges, deterministic output,
   save/reopen pitch invariants, and LilyPond/MIDI agreement.
 
-## P1.4: Publication-quality PDF via LilyPond (next after transposition)
+## P1.4: Linked Petrucci and LilyPond engraving (next after transposition)
+
+- [ ] Expand `corpus/engraving-quality-matrix.json` until every supported
+  notation feature has one source-independent microcase and at least one real
+  FT3 case.
+- [ ] Drive Petrucci proof assertions and LilyPond export assertions from the
+  same matrix instead of maintaining backend-specific fixture inventories.
+- [ ] Translate the remaining applicable LilyPond 2.24.4 and MuseScore 4.6.0
+  regressions into small legal fixtures that record provenance and the borrowed
+  invariant rather than upstream output bytes.
+- [ ] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
+  internal representation.
 
 - [ ] Add explicit LilyPond executable/version selection and retain structured,
   actionable compiler diagnostics.

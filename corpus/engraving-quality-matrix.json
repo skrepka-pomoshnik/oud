@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "scope": "Shared semantic and optical acceptance inventory for Petrucci proof rendering and LilyPond publication export.",
+  "profiles": ["petrucci", "classic"],
+  "cases": [
+    {
+      "id": "tab-registration-and-rhythm",
+      "features": ["tablature", "rhythm-flags", "barlines", "partial-beams"],
+      "petrucci_contract": ["one onset column per chord", "rhythm marks register with chord onsets"],
+      "lilypond_contract": ["TabStaff", "tabFullNotation", "stable thin/thick line hierarchy"],
+      "upstream": [
+        {
+          "project": "LilyPond",
+          "version": "2.24.4",
+          "fixture": "input/regression/auto-beam-partial.ly",
+          "borrowed_invariant": "partial measures do not shift or invent beam groups"
+        },
+        {
+          "project": "LilyPond",
+          "version": "2.24.4",
+          "fixture": "input/regression/beam-beamlet-break.ly",
+          "borrowed_invariant": "beamlet direction and breaks remain deterministic"
+        }
+      ]
+    },
+    {
+      "id": "voice-lute-lyrics",
+      "features": ["polyphony", "tablature", "lyrics", "staff-group"],
+      "petrucci_contract": ["voice and lute remain vertically registered", "lyrics reserve only required rows"],
+      "lilypond_contract": ["StaffGroup", "Lyrics", "voice and tablature share bar geometry"],
+      "upstream": [
+        {
+          "project": "MuseScore",
+          "version": "4.6.0",
+          "fixture": "src/engraving/tests/data/lyrics",
+          "borrowed_invariant": "syllables follow voice events without changing rhythmic alignment"
+        }
+      ]
+    },
+    {
+      "id": "polyphonic-collisions",
+      "features": ["seconds", "unisons", "dots", "accidentals", "opposed-stems"],
+      "petrucci_contract": ["colliding heads remain distinguishable", "dots and accidentals retain deterministic lanes"],
+      "lilypond_contract": ["independent voices", "no collision warnings"],
+      "upstream": [
+        {
+          "project": "MuseScore",
+          "version": "4.6.0",
+          "fixture": "src/engraving/tests/data/note",
+          "borrowed_invariant": "seconds, unisons, dots, and accidentals do not overlap"
+        }
+      ]
+    },
+    {
+      "id": "broken-spans",
+      "features": ["ties", "slurs", "system-breaks"],
+      "petrucci_contract": ["continuation cues survive viewport and system boundaries"],
+      "lilypond_contract": ["ties and slurs survive explicit line breaks", "no orphan span fragments"],
+      "upstream": [
+        {
+          "project": "LilyPond",
+          "version": "2.24.4",
+          "fixture": "input/regression/tie-broken.ly",
+          "borrowed_invariant": "broken ties retain both visible endpoints"
+        }
+      ]
+    },
+    {
+      "id": "repeat-and-volta-registration",
+      "features": ["repeats", "voltas", "barline-hooks"],
+      "petrucci_contract": ["repeat signs consume explicit columns", "volta labels do not collide with music"],
+      "lilypond_contract": ["repeat barlines and volta hooks compile without warnings"],
+      "upstream": [
+        {
+          "project": "LilyPond",
+          "version": "2.24.4",
+          "fixture": "input/regression/bar-line-allow-volta-hook.ly",
+          "borrowed_invariant": "volta hooks terminate on eligible barlines"
+        }
+      ]
+    }
+  ]
+}

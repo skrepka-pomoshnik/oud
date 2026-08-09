@@ -1,5 +1,7 @@
 # DONE
 
+- 2026-08-09: Established an export-only linked engraving program: a shared Petrucci/LilyPond quality matrix records translated LilyPond 2.24.4 and MuseScore 4.6.0 invariants; `lyprofile=petrucci` applies the default publication hierarchy with `classic` as a diagnostic fallback; and generated output has an executable compiler/warning regression. Validation: Ruff, Ruff format, Ty, and 1,533 tests pass with one platform skip and 95.07% Petrucci coverage.
+
 - 2026-08-09: Replaced the flat `oud.editor` namespace with six directional domain packages: core, navigation, editing, services, commands, and interaction. Canonical imports and architecture-debt paths now use the hierarchy, obsolete flat modules were removed rather than wrapped, and a structural regression enforces at most seven direct entities per package. Validation: Ruff, Ruff format, Ty, and 1,530 tests pass with one platform skip and 95.07% Petrucci coverage.
 
 - 2026-08-09: Added public `NotationLayoutPolicy.justify_last_system` control for final and one-system notation layouts. Final justification fills the available measure width, remains opt-in, and does not stretch nonfinal forced-break systems. Replaced positional box-fitting options with a typed request and added generic fitting plus public layout regressions. Validation: Ruff, Ruff format, Ty, and 1,530 tests pass with one platform skip and 95.07% Petrucci coverage.

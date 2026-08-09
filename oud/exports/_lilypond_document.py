@@ -14,6 +14,7 @@ from oud.exports._lilypond_common import (
     _piece_has_melody,
     _piece_has_tab_content,
 )
+from oud.exports._lilypond_style import paper_block, score_overrides, tab_staff_overrides
 from oud.exports._lilypond_tab import (
     _build_tab_body,
     _tab_staff_with_block,
@@ -167,6 +168,7 @@ def lilypond_text(
     style = settings.get("style") or "french"
     if style == "french":
         layout.append("    tablatureFormat = #fret-letter-tablature-format")
+    layout.extend(score_overrides(settings))
     layout += [r"  }", r"  \context {", r"    \TabStaff"]
     # Hide the default "TAB" clef label/glyph in exported tab staves.
     layout.append(r"    \override Clef.stencil = ##f")
@@ -177,6 +179,7 @@ def lilypond_text(
             labels = ["a", "b", "r", "d", "e", "f", "g", "h", "i", "k", "l"]
         labels_text = " ".join(f'"{label}"' for label in labels)
         layout.append(f"    fretLabels = #'({labels_text})")
+    layout.extend(tab_staff_overrides(settings))
     layout += [r"  }", r"}"]
     blocks = _build_main_blocks(
         piece=piece,
@@ -192,7 +195,7 @@ def lilypond_text(
         [
             *header,
             "",
-            r"\paper { indent = 0\mm }",
+            *paper_block(settings),
             "",
             *blocks,
             "",

@@ -59,6 +59,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "staffthick": "1",
     "fontstyle": "modern",
     "lynoteheads": "classic",
+    "lyprofile": "petrucci",
     "charstyle": "standard",
     "fretlabelmode": "auto",
     "scoreview": "score",

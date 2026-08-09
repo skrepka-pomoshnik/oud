@@ -1,5 +1,17 @@
 # Engraving regression provenance
 
+`corpus/engraving-quality-matrix.json` is the shared acceptance inventory for
+Petrucci's terminal proof renderer and the LilyPond publication exporter. Each
+case records one semantic feature family, the proof-rendering contract, the
+publication-export contract, and the exact upstream regression family whose
+quality invariant was translated. Oud does not copy upstream fixtures or claim
+pixel identity; it adopts their small, executable failure cases.
+
+LilyPond export uses the `petrucci` profile by default. This profile applies a
+restrained movable-type hierarchy to paper margins, staff rules, barlines,
+tablature noteheads, stems, and beams. `:set lyprofile=classic` selects the
+minimal unstyled LilyPond layout for comparison and diagnosis.
+
 Petrucci keeps small typed fixtures that reproduce transferable engraving
 invariants. It does not copy or vendor LilyPond or MuseScore fixture files.
 
