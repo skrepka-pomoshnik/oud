@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from petrucci.cue_placement import place_parenthesize_tie_cues as _place_parenthesize_tie_cues
 from petrucci.render_helpers import apply_overrides
 from petrucci.render_marks import (
     _imported_ft3_mark_target_rows,
     _merge_mark_rows,
-    _place_parenthesize_tie_cues,
     _repeat_dot_display_rows,
     _split_tuplet_cues_from_annotations,
     _target_note_rows_by_col,

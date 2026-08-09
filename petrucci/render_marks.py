@@ -55,42 +55,6 @@ def _overlay_sparse_mark_chars(
         safe_addstr(stdscr, y, bar_x + draw_pad + dst_col, ch)
 
 
-def _place_parenthesize_tie_cues(  # noqa: C901
-    *,
-    ann_cells: list[str],
-    orn_cells: list[str],
-    tie_cells: list[str],
-    slur_cells: list[str] | None,
-    hold_cells: list[str] | None,
-    gliss_cells: list[str] | None,
-    paren_tie_cols: set[int],
-    allow_ann_row: bool = True,
-) -> None:
-    def _place_open(end_col: int) -> None:
-        if allow_ann_row and 0 <= end_col < len(ann_cells) and ann_cells[end_col] == " ":
-            ann_cells[end_col] = "("
-            return
-        for row in (tie_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
-            left = end_col - 1
-            while 0 <= left < len(row):
-                if row[left] == " ":
-                    row[left] = "("
-                    return
-                left -= 1
-
-    def _place_close(end_col: int) -> None:
-        for row in (tie_cells, orn_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
-            if 0 <= end_col < len(row) and row[end_col] == " ":
-                row[end_col] = ")"
-                return
-
-    for end_col in paren_tie_cols:
-        if not (0 <= end_col < len(tie_cells)):
-            continue
-        _place_open(end_col)
-        _place_close(end_col)
-
-
 def _merge_nonspace_rows(*rows: list[str]) -> list[str]:
     if not rows:
         return []
@@ -210,7 +174,42 @@ def _overlay_inline_local_marks_on_display_row(
         _place_inline_mark(display_row_cells, disp_col, _inline_fingering_mark(annotation, style=style))
 
 
-def _merge_span_rows_with_cue_priority(  # noqa: C901
+def _span_char(row: list[str] | None, index: int) -> str | None:
+    if row is None or index >= len(row) or row[index] == " ":
+        return None
+    return row[index]
+
+
+def _priority_span_char(
+    index: int,
+    *,
+    slur_row: list[str] | None,
+    hold_row: list[str] | None,
+    gliss_row: list[str] | None,
+    tie_row: list[str] | None,
+    tuplet_row: list[str] | None,
+) -> str:
+    structural = tuple(
+        char
+        for char in (
+            _span_char(slur_row, index),
+            _span_char(hold_row, index),
+            _span_char(tie_row, index),
+            _span_char(tuplet_row, index),
+        )
+        if char is not None
+    )
+    if ")" in structural:
+        return ")"
+    if "(" in structural:
+        return "("
+    for row in (tuplet_row, tie_row, gliss_row, hold_row, slur_row):
+        if char := _span_char(row, index):
+            return char
+    return " "
+
+
+def _merge_span_rows_with_cue_priority(
     *,
     slur_row: list[str] | None,
     hold_row: list[str] | None,
@@ -225,33 +224,14 @@ def _merge_span_rows_with_cue_priority(  # noqa: C901
     width = len(base_rows[0])
     out = [" " for _ in range(width)]
     for idx in range(width):
-        chars = [
-            row[idx]
-            for row in (slur_row, hold_row, tie_row, tuplet_row)
-            if row is not None and idx < len(row) and row[idx] != " "
-        ]
-        if not chars:
-            continue
-        if ")" in chars:
-            out[idx] = ")"
-            continue
-        if "(" in chars:
-            out[idx] = "("
-            continue
-        if tuplet_row is not None and idx < len(tuplet_row) and tuplet_row[idx] != " ":
-            out[idx] = tuplet_row[idx]
-            continue
-        if tie_row is not None and idx < len(tie_row) and tie_row[idx] != " ":
-            out[idx] = tie_row[idx]
-            continue
-        if gliss_row is not None and idx < len(gliss_row) and gliss_row[idx] != " ":
-            out[idx] = gliss_row[idx]
-            continue
-        if hold_row is not None and idx < len(hold_row) and hold_row[idx] != " ":
-            out[idx] = hold_row[idx]
-            continue
-        if slur_row is not None and idx < len(slur_row) and slur_row[idx] != " ":
-            out[idx] = slur_row[idx]
+        out[idx] = _priority_span_char(
+            idx,
+            slur_row=slur_row,
+            hold_row=hold_row,
+            gliss_row=gliss_row,
+            tie_row=tie_row,
+            tuplet_row=tuplet_row,
+        )
     return out
 
 

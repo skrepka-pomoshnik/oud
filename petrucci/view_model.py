@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from petrucci.cue_placement import place_parenthesize_tie_cues as _place_parenthesize_tie_cues
 from petrucci.model import Bar, Note, Piece
 from petrucci.render_utils import (
     bar_cells,
@@ -375,42 +376,6 @@ def _merge_mark_rows(base: list[str], user: list[str]) -> list[str]:
         if ch != " ":
             out[idx] = ch
     return out
-
-
-def _place_parenthesize_tie_cues(  # noqa: C901
-    *,
-    ann_cells: list[str],
-    orn_cells: list[str],
-    tie_cells: list[str],
-    slur_cells: list[str] | None,
-    hold_cells: list[str] | None,
-    gliss_cells: list[str] | None,
-    paren_tie_cols: set[int],
-    allow_ann_row: bool = True,
-) -> None:
-    def _place_open(end_col: int) -> None:
-        if allow_ann_row and 0 <= end_col < len(ann_cells) and ann_cells[end_col] == " ":
-            ann_cells[end_col] = "("
-            return
-        for row in (tie_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
-            left = end_col - 1
-            while 0 <= left < len(row):
-                if row[left] == " ":
-                    row[left] = "("
-                    return
-                left -= 1
-
-    def _place_close(end_col: int) -> None:
-        for row in (tie_cells, orn_cells, slur_cells or [], hold_cells or [], gliss_cells or []):
-            if 0 <= end_col < len(row) and row[end_col] == " ":
-                row[end_col] = ")"
-                return
-
-    for end_col in paren_tie_cols:
-        if not (0 <= end_col < len(tie_cells)):
-            continue
-        _place_open(end_col)
-        _place_close(end_col)
 
 
 def _bar_imported_ft3_annotations(  # noqa: C901

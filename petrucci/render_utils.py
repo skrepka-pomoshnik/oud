@@ -203,7 +203,58 @@ def flag_count(denom: int) -> int:
     return count
 
 
-def flag_row_style(  # noqa: C901
+def _place_flag_stem(row: list[str], column: int, stem: str, stem_width: int) -> None:
+    row[column] = stem
+    for extra in range(1, max(1, stem_width)):
+        position = column + extra
+        if position < len(row) and row[position] == " ":
+            row[position] = stem
+
+
+def _flag_start(
+    column: int,
+    stem_width: int,
+    *,
+    dotted: bool,
+    dotplacement: str,
+    dot_positions: list[int],
+) -> int:
+    start = column + max(1, stem_width)
+    if dotted and dotplacement == "afterstem":
+        dot_positions.append(start)
+        return start + 1
+    return start
+
+
+def _place_flags(row: list[str], start: int, count: int, flag: str) -> None:
+    for offset in range(count):
+        position = start + offset
+        if position < len(row):
+            row[position] = flag
+
+
+def _queue_trailing_dot(
+    dot_positions: list[int],
+    *,
+    start: int,
+    flag_total: int,
+    dotted: bool,
+    dotplacement: str,
+    bar_width: int,
+) -> None:
+    position = start + flag_total
+    if dotted and dotplacement != "afterstem" and position < bar_width:
+        dot_positions.append(position)
+
+
+def _place_pending_dot(row: list[str], position: int, dot: str) -> None:
+    while position < len(row) and row[position] != " ":
+        position += 1
+    if position < len(row):
+        row[position] = dot
+
+
+def flag_row_style(
     positions: list[tuple[int, int, bool]],
     bar_width: int,
     *,
@@ -216,30 +267,26 @@ def flag_row_style(  # noqa: C901
     row = [" " for _ in range(bar_width)]
     dot_positions: list[int] = []
     for col, denom, dotted in positions:
-        row[col] = stem
-        for extra in range(1, max(1, stem_width)):
-            pos = col + extra
-            if pos < bar_width and row[pos] == " ":
-                row[pos] = stem
+        _place_flag_stem(row, col, stem, stem_width)
         slash_count = flag_count(denom)
-        flag_start = col + max(1, stem_width)
-        if dotted and dotplacement == "afterstem":
-            dot_positions.append(flag_start)
-            flag_start += 1
-        for i in range(slash_count):
-            pos = flag_start + i
-            if pos < bar_width:
-                row[pos] = flag
-        if dotted and dotplacement != "afterstem":
-            pos = flag_start + slash_count
-            if pos < bar_width:
-                dot_positions.append(pos)
-    for pos in dot_positions:
-        idx = pos
-        while idx < bar_width and row[idx] != " ":
-            idx += 1
-        if idx < bar_width:
-            row[idx] = dot
+        flag_start = _flag_start(
+            col,
+            stem_width,
+            dotted=dotted,
+            dotplacement=dotplacement,
+            dot_positions=dot_positions,
+        )
+        _place_flags(row, flag_start, slash_count, flag)
+        _queue_trailing_dot(
+            dot_positions,
+            start=flag_start,
+            flag_total=slash_count,
+            dotted=dotted,
+            dotplacement=dotplacement,
+            bar_width=bar_width,
+        )
+    for position in dot_positions:
+        _place_pending_dot(row, position, dot)
     return row
 
 

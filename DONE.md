@@ -1,5 +1,6 @@
 # DONE
 
+- 2026-08-09: Retired the next five highest Petrucci complexity findings, consolidated duplicated tie-cue placement, and split framebuffer, rhythm-flag, and span-priority operations below the enforced ceiling. Validation: mandatory Ruff, format, Ty, and pytest gate.
 - 2026-08-09: Retired the five highest Petrucci complexity findings, introduced typed bar-view assembly, and published an executable supported-behavior matrix with explicit FT3/Fronimo limits. Validation: mandatory Ruff, format, Ty, and pytest gate.
 Technical change log. Keep short, append newest on top.
 

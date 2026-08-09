@@ -172,36 +172,57 @@ def iter_attr_runs(text: str, attrs: tuple[int, ...]) -> list[tuple[str, int]]:
     return runs
 
 
-def draw_frame_rows(screen: Screen, frame: Frame, rows: set[int]) -> None:  # noqa: C901
+def _normalized_attrs(attrs: tuple[int, ...], width: int) -> tuple[int, ...]:
+    if len(attrs) > width:
+        return attrs[:width]
+    if len(attrs) < width:
+        return attrs + (0,) * (width - len(attrs))
+    return attrs
+
+
+def _draw_attr_run(
+    screen: Screen,
+    *,
+    row: int,
+    x: int,
+    text: str,
+    attr: int,
+    width: int,
+) -> int | None:
+    chunk_columns = len(_split_display_clusters(text))
+    if x + chunk_columns > width:
+        output = _clip_display_cols(text, max(0, width - x))
+        if not output:
+            return None
+        chunk_columns = len(_split_display_clusters(output))
+    else:
+        output = text
+    try:
+        screen.addstr(row, x, output, attr)
+    except CursesError:
+        return None
+    return chunk_columns
+
+
+def _draw_frame_row(screen: Screen, frame: Frame, row: int, width: int) -> None:
+    if width <= 0:
+        return
+    attrs = _normalized_attrs(frame.attrs[row], width)
+    x = 0
+    for chunk_text, attr in iter_attr_runs(frame.lines[row], attrs):
+        if x >= width:
+            return
+        if not chunk_text:
+            continue
+        consumed = _draw_attr_run(screen, row=row, x=x, text=chunk_text, attr=attr, width=width)
+        if consumed is None:
+            return
+        x += consumed
+
+
+def draw_frame_rows(screen: Screen, frame: Frame, rows: set[int]) -> None:
     height, width = screen.getmaxyx()
     for row in sorted(rows):
         if row < 0 or row >= height:
             continue
-        text = frame.lines[row]
-        attrs = frame.attrs[row]
-        if width <= 0:
-            continue
-        if len(attrs) > width:
-            attrs = attrs[:width]
-        elif len(attrs) < width:
-            attrs = attrs + (0,) * (width - len(attrs))
-        x = 0
-        for chunk_text, attr in iter_attr_runs(text, attrs):
-            if x >= width:
-                break
-            if not chunk_text:
-                continue
-            chunk_cols = len(_split_display_clusters(chunk_text))
-            if x + chunk_cols > width:
-                clipped = _clip_display_cols(chunk_text, max(0, width - x))
-                if not clipped:
-                    break
-                chunk_out = clipped
-                chunk_cols = len(_split_display_clusters(chunk_out))
-            else:
-                chunk_out = chunk_text
-            try:
-                screen.addstr(row, x, chunk_out, attr)
-            except CursesError:
-                break
-            x += chunk_cols
+        _draw_frame_row(screen, frame, row, width)

@@ -405,10 +405,6 @@
     ],
     "petrucci/framebuffer.py": [
       {
-        "name": "draw_frame_rows",
-        "complexity": 12
-      },
-      {
         "name": "overlay_dirty_rows",
         "complexity": 9
       }
@@ -439,16 +435,7 @@
         "complexity": 10
       }
     ],
-    "petrucci/render_marks.py": [
-      {
-        "name": "_merge_span_rows_with_cue_priority",
-        "complexity": 11
-      },
-      {
-        "name": "_place_parenthesize_tie_cues",
-        "complexity": 11
-      }
-    ],
+    "petrucci/render_marks.py": [],
     "petrucci/render_playback.py": [
       {
         "name": "_playback_marker_ops",
@@ -509,10 +496,6 @@
         "complexity": 8
       },
       {
-        "name": "flag_row_style",
-        "complexity": 12
-      },
-      {
         "name": "smart_group_map",
         "complexity": 9
       },
@@ -543,10 +526,6 @@
       {
         "name": "_bar_number_for_index",
         "complexity": 10
-      },
-      {
-        "name": "_place_parenthesize_tie_cues",
-        "complexity": 11
       }
     ],
     "petrucci/view_width.py": [

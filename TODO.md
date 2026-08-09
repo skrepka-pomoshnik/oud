@@ -155,7 +155,7 @@ CI enforces complexity 7 and a 1,000-line module ceiling against the exact
 non-growth baseline in `architecture-debt.json`; rationale, counts, and ownership
 targets are in `docs/architecture-debt.md`.
 
-- [ ] Retire the remaining 124 function-level C901 findings without raising
+- [ ] Retire the remaining 119 function-level C901 findings without raising
   limits, broad per-file ignores, compatibility wrappers, or count-only helper
   modules. Continue with `oud.editor.insert_actions.handle_insert` (31),
   `oud.tui.input.complete_command_text` (31), and
