@@ -19,7 +19,7 @@ PURE_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3
 MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
 DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
 VOCAL_ONLY_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_4-part.ft3"
-TAB_FILE = "examples/si_par_souffrir.tab"
+TAB_FILE = "tests/fixtures/tab/minimal_score.tab"
 
 
 def _submit_command_path(state, path: Path, config_path: str) -> None:
@@ -106,7 +106,7 @@ def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -
 
 
 @pytest.mark.parametrize("command", ["wq", "x"])
-def test_write_quit_uses_sibling_default_and_exits_after_write(
+def test_write_quit_prefills_sibling_destination_before_write(
     tmp_path: Path,
     command: str,
 ) -> None:
@@ -117,8 +117,11 @@ def test_write_quit_uses_sibling_default_and_exits_after_write(
     state = init_state(str(source), config_path=config)
     state.modified = True
 
+    apply_command(state, command, config)
+    assert state.mode == "command"
+    assert state.cmdline == f"{command} {target}"
     with pytest.raises(SystemExit):
-        apply_command(state, command, config)
+        apply_command(state, state.cmdline, config)
     assert target.exists()
     assert state.modified is False
 

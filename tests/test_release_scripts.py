@@ -13,7 +13,7 @@ def test_readme_screenshot_main_renders_real_score(tmp_path: Path, capsys) -> No
     status = render_readme_screenshot.main(
         [
             "--source",
-            "examples/si_par_souffrir.tab",
+            "examples/triste.tab",
             "--output",
             str(output),
             "--width",
@@ -27,7 +27,7 @@ def test_readme_screenshot_main_renders_real_score(tmp_path: Path, capsys) -> No
     assert status == 0
     assert capsys.readouterr().out == f"Wrote {output}\n"
     assert content.startswith("<svg")
-    assert "oud - si_par_souffrir.tab" in content
+    assert "oud - triste.tab" in content
     assert 'role="img"' in content
     assert 'class="status"' in content
 

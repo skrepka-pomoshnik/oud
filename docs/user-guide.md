@@ -20,14 +20,14 @@ Run from project root:
 
 ```bash
 python3 -m oud.presentation.app
-python3 -m oud.presentation.app examples/si_par_souffrir.tab
+python3 -m oud.presentation.app examples/triste.tab
 ```
 
 From a checkout:
 
 ```bash
 uv run oud
-uv run oud examples/si_par_souffrir.tab
+uv run oud examples/triste.tab
 ```
 
 Non-interactive commands use stdout for primary output and stderr for

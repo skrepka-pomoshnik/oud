@@ -474,6 +474,12 @@ class _TabLinesParser:
         lower = header.lower()
         if lower.startswith("tuning:"):
             self.piece.tuning = header.split(":", 1)[1].strip()
+        elif lower.startswith("tempo:"):
+            value = header.split(":", 1)[1].strip()
+            if value.isdigit() and int(value) > 0:
+                self.piece.tempo = int(value)
+            else:
+                self.piece.import_warnings.append(f"Invalid TAB tempo: {value or 'empty'}")
         elif lower.startswith(("time:", "timesig:", "meter:")):
             self.accumulator.set_default_time(_parse_time_signature(header.split(":", 1)[1].strip()))
         elif lower.startswith("subtitle:"):

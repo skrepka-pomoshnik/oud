@@ -114,7 +114,7 @@ def test_drawn_cursor_moves_on_every_h_press_in_chord_bars() -> None:
 
 
 def test_drawn_cursor_moves_in_tab_grid_bars() -> None:
-    state = _opened("examples/Sarabande_de_gautier.tab")
+    state = _opened("examples/triste.tab")
     assert _count_stalls(state, "l", 40) == 0
     assert _count_stalls(state, "h", 40) == 0
 

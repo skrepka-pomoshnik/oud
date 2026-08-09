@@ -34,8 +34,8 @@ def _confirm_new_target(state: EditorState, path: str) -> bool:
 
 def request_save_as(state: EditorState, command: str = "w") -> None:
     set_mode(state, "command")
-    state.cmdline = f"{command} "
-    state.message = "Enter a .tab destination"
+    state.cmdline = f"{command} {default_write_path(state)}"
+    state.message = "Confirm or edit the .tab destination"
 
 
 def cmd_write(state: EditorState, path: str) -> bool:
@@ -75,12 +75,12 @@ def cmd_write(state: EditorState, path: str) -> bool:
 
 
 def cmd_write_default(state: EditorState, args: str, *, prompt_command: str = "w") -> bool:
-    _ = prompt_command
     path = args.strip()
     if not path and state.write_path:
         path = state.write_path
     if not path:
-        path = default_write_path(state)
+        request_save_as(state, prompt_command)
+        return False
     return cmd_write(state, path)
 
 

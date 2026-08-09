@@ -7,6 +7,7 @@ import pytest
 
 from oud.editor.commands import dispatch as cmd_ops
 from oud.editor.core.state import EditorState
+from oud.editor.services.media.jobs import drain_background_messages
 from oud.presentation.tui import commands as cmd
 from petrucci.core.model import Bar, Piece
 
@@ -50,6 +51,7 @@ def _wait_pdf(state: EditorState) -> None:
     assert job is not None
     job.join(timeout=1)
     assert not job.is_alive()
+    drain_background_messages(state)
 
 
 def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901

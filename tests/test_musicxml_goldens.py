@@ -56,8 +56,8 @@ def _export_piece_subset_to_musicxml_text(src_path: str, bars: int, tmp_path: Pa
 
 
 def test_musicxml_export_matches_local_tab_golden(tmp_path: Path) -> None:
-    actual = _export_piece_subset_to_musicxml_text("examples/si_par_souffrir.tab", bars=2, tmp_path=tmp_path)
-    expected = (FIXTURES / "si_par_souffrir_2bars.musicxml.norm").read_text(encoding="utf-8")
+    actual = _export_piece_subset_to_musicxml_text("tests/fixtures/tab/minimal_score.tab", bars=2, tmp_path=tmp_path)
+    expected = (FIXTURES / "minimal_score_2bars.musicxml.norm").read_text(encoding="utf-8")
     assert actual == expected
 
 

@@ -30,7 +30,7 @@ def test_tab_roundtrip_matrix_on_real_fixtures_refs_luteconv_style(tmp_path: Pat
     paths = [
         Path("tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3"),
         Path("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3"),
-        Path("examples/si_par_souffrir.tab"),
+        Path("tests/fixtures/tab/minimal_score.tab"),
         Path("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3"),
     ]
     for src in paths:

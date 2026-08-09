@@ -6,7 +6,7 @@ from pathlib import Path
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.ranges import BarRange
 from oud.editor.editing.visual import visual_bar_range
-from oud.editor.services.media.jobs import start_pdf_job
+from oud.editor.services.media.jobs import pdf_job_running, start_pdf_job
 
 SaveFn = Callable[[str, dict[str, str]], None]
 ExportMidiFn = Callable[..., str]
@@ -204,11 +204,17 @@ def print_pdf(
     export_lilypond_fn: ExportLyFn,
     print_lilypond_pdf_fn: Callable[..., str],
 ) -> None:
+    if pdf_job_running(state):
+        state.message = "PDF build already running"
+        return
     target = args.strip()
-    base = str(Path(target).with_suffix("")) if target else "out"
-    if not target and state.path:
-        base = str(Path(state.path).with_suffix(""))
+    if target:
+        base = str(Path(target).with_suffix(""))
+    else:
+        stem = Path(state.path).stem if state.path else "score"
+        base = str(Path("build") / "lilypond" / stem)
     ly_path = base + ".ly"
+    Path(ly_path).parent.mkdir(parents=True, exist_ok=True)
     # PDF output should be readable by default: force full tab notation so
     # stems/flags are visible in LilyPond output, but do not persist this in
     # editor settings/config.

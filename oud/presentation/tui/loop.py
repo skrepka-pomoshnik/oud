@@ -7,6 +7,7 @@ from oud.editor.navigation.view.focus import current_view_staff
 from oud.editor.navigation.view.state import view_commit_frame, view_merge_dirty, view_resize
 from oud.editor.navigation.viewport import ensure_cursor_visible
 from oud.editor.services.bootstrap import init_state
+from oud.editor.services.media.jobs import drain_background_messages
 from oud.editor.services.media.playback import update_playback_animation
 from oud.editor.services.status import status_line
 from oud.exports.export_tab import export_ascii
@@ -92,6 +93,7 @@ def run_loop(  # noqa: C901
             if not running:
                 break
 
+        background_changed = drain_background_messages(state)
         message_changed = decay_transient_message(state)
         height, width = stdscr.getmaxyx()
         state.screen_height = height
@@ -100,12 +102,17 @@ def run_loop(  # noqa: C901
         playback_changed = update_playback_animation(state)
         resized = view_resize(state, height=height, width=width)
         playback_only = (
-            playback_changed and not needs_render and not message_changed and not resized and not state.dirty_rows
+            playback_changed
+            and not needs_render
+            and not background_changed
+            and not message_changed
+            and not resized
+            and not state.dirty_rows
         )
         can_overlay_playback = (
             playback_only and state.last_base_frame is not None and state.playback_overlay_cache is not None
         )
-        if needs_render or message_changed or playback_changed or resized or state.dirty_rows:
+        if needs_render or background_changed or message_changed or playback_changed or resized or state.dirty_rows:
             prev_bar_offset = state.bar_offset
             ensure_cursor_visible(state, width, height)
             viewport_changed = state.bar_offset != prev_bar_offset

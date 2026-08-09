@@ -28,7 +28,7 @@ Current import/export focus:
 
 FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target and never changes the source. FT3 scores containing non-TAB or duet layers open read-only so visible material cannot disappear on save.
 
-## Docs
+## DOCUMENTATION
 
 - [User and developer guide](docs/user-guide.md)
 - [FT3 format notes](docs/ft3-format.md)
@@ -44,12 +44,12 @@ Requires Python 3.11+. This installs the `oud` command. No runtime
 dependencies beyond the standard library; MIDI playback optionally uses
 `fluidsynth` or `timidity` if installed.
 
-## Run
+## EXAMPLES
 
 ```
-oud examples/si_par_souffrir.tab
+oud examples/triste.tab
 # or straight from a checkout:
-uv run oud examples/si_par_souffrir.tab
+uv run oud examples/triste.tab
 ```
 
 Non-interactive conversion infers the format from the output suffix and refuses
@@ -65,15 +65,15 @@ printf '%s\n' '-C' 'b' '0a-----' 'e' | oud convert - - --input-format tab --form
 Text formats can stream through `-`; MIDI, MXL, and PDF require a file. PDF
 conversion keeps the generated `.ly` source when LilyPond is missing or fails.
 
-### View a generated LilyPond PDF
+### VIEW A GENERATED LILYPOND PDF
 
 Generated files belong under the ignored `build/` tree:
 
 ```bash
 mkdir -p build/lilypond
-uv run oud convert examples/si_par_souffrir.tab build/lilypond/si-par-souffrir.pdf -f
-xdg-open build/lilypond/si-par-souffrir.pdf  # Linux
-# open build/lilypond/si-par-souffrir.pdf   # macOS
+uv run oud convert examples/triste.tab build/lilypond/triste.pdf -f
+xdg-open build/lilypond/triste.pdf  # Linux
+# open build/lilypond/triste.pdf   # macOS
 ```
 
 For the Dowland benchmark:
@@ -84,7 +84,7 @@ uv run oud convert tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse.ft
   build/lilypond/can-she-excuse.pdf -f
 ```
 
-## Controls
+## CONTROLS
 
 Vim-like:
 
@@ -105,12 +105,13 @@ Casual:
 - `Home/End` move to the bar edges; `PgUp/PgDn` scroll
 - `Insert` add bar, `Delete` delete bar
 - `Ctrl-Z/Ctrl-Y` undo/redo
+- `Ctrl-C` exit immediately and quietly
 - `F1` help
 
-## Commands
+## COMMANDS
 
 ```
-:w [path]       write .tab (first write prompts for Save As)
+:w [path]       write .tab (first write opens a prefilled Save As command)
 :wa [path]      export ascii without marking the score saved
 :e <path>       open
 :help           open help in less
@@ -119,7 +120,7 @@ Casual:
 :play loop [n]  loop current bar or active visual range n times (default 2)
 :set playbackscroll=off  disable score following during playback (default on)
 :lilypond [path] export lilypond
-:pdf            export lilypond + compile pdf
+:pdf [path]     export LilyPond and compile PDF under build/lilypond by default
 :midicmd [path] show midi command
 :source [path]  view file with less
 :set maxbars=.. limit bars per system
@@ -136,7 +137,7 @@ a path, such as `:e examples/`, Tab completes a unique path or displays every
 matching file and directory. `completion=fzf` uses non-interactive system
 `fzf --filter`; if `fzf` is unavailable, Oud reports it and uses prefix matching.
 
-## Architecture overview
+## ARCHITECTURE
 
 - `petrucci/` reusable top-level score model, tab/note input contracts, and character-cell typesetting
 - `oud/importers/` FT3/TAB/MusicXML parsing and import semantics
@@ -148,9 +149,13 @@ matching file and directory. `completion=fzf` uses non-interactive system
 
 Entry point: `oud` -> `oud.presentation.app:main`.
 
-## Thanks
+## CREDITS
 
-Format cues for `.tab` parsing are inspired by luteconv (GPLv3).
+- [LilyPond](https://lilypond.org/) is the PDF engraving backend; its regression suite informs publication tests.
+- [MuseScore](https://musescore.org/) provides MusicXML interoperability and engraving-test references.
+- [luteconv](https://github.com/LukeEmmet/luteconv) provides GPLv3 `.tab` parsing and conversion precedents.
+- [FluidSynth](https://www.fluidsynth.org/) and [TiMidity++](https://sourceforge.net/projects/timidity/) are optional MIDI players.
+- [fzf](https://github.com/junegunn/fzf) optionally ranks command-line path completions.
 
 The external FT3 test manifests reference typesettings by Sarge Gerbode from
 [lutemusic.org](https://www.lutemusic.org), licensed

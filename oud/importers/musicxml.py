@@ -1,10 +1,27 @@
 from __future__ import annotations
 
 import zipfile
+from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from petrucci.core.model import Bar, Chord, Note, Piece
+
+
+@dataclass(frozen=True)
+class _TimedTabNote:
+    onset: int
+    duration: int
+    string: int
+    fret: int
+
+
+_RHYTHMS = tuple(
+    (Fraction(4, denominator) * (Fraction(3, 2) if dotted else 1), note_type, dotted)
+    for note_type, denominator in enumerate((1, 2, 4, 8, 16, 32, 64, 128, 256), start=2)
+    for dotted in (False, True)
+)
 
 _TYPE_TO_DENOM = {
     "whole": 1,
@@ -101,35 +118,114 @@ def _measure_repeat(measure: ET.Element) -> str | None:
     return None
 
 
-def _parse_measure(measure: ET.Element) -> Bar:
+def _duration_units(node: ET.Element) -> int:
+    duration = _text(_child(node, "duration"))
+    try:
+        return max(0, int(duration))
+    except ValueError:
+        return 0
+
+
+def _measure_divisions(measure: ET.Element, inherited: int) -> int:
+    attributes = _child(measure, "attributes")
+    divisions = _text(_child(attributes, "divisions")) if attributes is not None else ""
+    try:
+        return max(1, int(divisions))
+    except ValueError:
+        return inherited
+
+
+def _staff_lines(measure: ET.Element, inherited: int) -> int:
+    attributes = _child(measure, "attributes")
+    staff = _child(attributes, "staff-details") if attributes is not None else None
+    lines = _text(_child(staff, "staff-lines")) if staff is not None else ""
+    try:
+        return max(1, int(lines))
+    except ValueError:
+        return inherited
+
+
+def _rhythm_for_duration(duration: int, divisions: int) -> tuple[int, bool]:
+    value = Fraction(max(1, duration), max(1, divisions))
+    _, note_type, dotted = min(
+        _RHYTHMS,
+        key=lambda candidate: (abs(candidate[0] - value), candidate[2], candidate[1]),
+    )
+    return note_type, dotted
+
+
+def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], int]:
+    cursor = 0
+    previous_onset = 0
+    measure_end = 0
+    notes: list[_TimedTabNote] = []
+    for node in measure:
+        tag = _local(node.tag)
+        if tag == "backup":
+            cursor = max(0, cursor - _duration_units(node))
+            continue
+        if tag == "forward":
+            cursor += _duration_units(node)
+            measure_end = max(measure_end, cursor)
+            continue
+        if tag != "note":
+            continue
+        duration = _duration_units(node)
+        is_chord = _child(node, "chord") is not None
+        onset = previous_onset if is_chord else cursor
+        if not is_chord:
+            previous_onset = onset
+            cursor += duration
+        measure_end = max(measure_end, onset + duration, cursor)
+        technical = _technical(node)
+        if technical is None or _child(node, "rest") is not None:
+            continue
+        notes.append(_TimedTabNote(onset, duration, technical[0], technical[1]))
+    return notes, measure_end
+
+
+def _group_timed_notes(notes: list[_TimedTabNote], measure_end: int, divisions: int) -> list[Chord]:
+    grouped: dict[int, dict[tuple[int, int], _TimedTabNote]] = {}
+    for note in notes:
+        grouped.setdefault(note.onset, {})[(note.string, note.fret)] = note
+    onsets = sorted(grouped)
+    events: list[Chord] = []
+    for index, onset in enumerate(onsets):
+        timed = sorted(grouped[onset].values(), key=lambda note: (note.string, note.fret))
+        event_end = onsets[index + 1] if index + 1 < len(onsets) else measure_end
+        duration = event_end - onset
+        if duration <= 0:
+            duration = max((note.duration for note in timed), default=divisions)
+        note_type, dotted = _rhythm_for_duration(duration, divisions)
+        events.append(
+            Chord(
+                note_type=note_type,
+                dotted=dotted,
+                grid=None,
+                notes=[Note(note.string, note.fret, 0) for note in timed],
+            )
+        )
+    return events
+
+
+def _parse_measure(measure: ET.Element, divisions: int) -> tuple[Bar, int]:
     bar = Bar()
     bar.time_sig = _measure_time(measure)
     bar.repeat = _measure_repeat(measure)
-    events: list[Chord] = []
-    pending: Chord | None = None
-    for note_node in _children(measure, "note"):
-        is_chord_tone = _child(note_node, "chord") is not None
-        note_type, dotted = _note_type(note_node)
-        tech = _technical(note_node)
-        is_rest = _child(note_node, "rest") is not None
-        if is_chord_tone and pending is not None:
-            if tech is not None:
-                pending.notes.append(Note(tech[0], tech[1], 0))
-            continue
-        if pending is not None:
-            events.append(pending)
-            pending = None
-        chord = Chord(note_type=note_type, dotted=dotted, grid=None, notes=[])
-        if not is_rest and tech is not None:
-            chord.notes.append(Note(tech[0], tech[1], 0))
-        pending = chord
-    if pending is not None:
-        events.append(pending)
-    bar.chords = events
-    return bar
+    notes, measure_end = _timed_notes(measure)
+    bar.chords = _group_timed_notes(notes, measure_end, divisions)
+    return bar, max((note.string for note in notes), default=0)
 
 
-def _parse_piece(root: ET.Element) -> Piece:  # noqa: C901
+def _technical_count(part: ET.Element) -> int:
+    return sum(
+        _technical(note) is not None
+        for measure in _children(part, "measure")
+        for note in _children(measure, "note")
+    )
+
+
+def _parse_piece(root: ET.Element) -> Piece:
     work = _child(root, "work")
     work_title = _child(work, "work-title") if work is not None else None
     title = _text(work_title) or "Untitled"
@@ -141,20 +237,16 @@ def _parse_piece(root: ET.Element) -> Piece:  # noqa: C901
             if ctype == "composer":
                 composer = _text(creator) or None
                 break
-    part = _child(root, "part")
+    part = max(_children(root, "part"), key=_technical_count, default=None)
     bars: list[Bar] = []
     strings = 6
+    divisions = 1
     if part is not None:
         for measure in _children(part, "measure"):
-            bars.append(_parse_measure(measure))
-            if strings == 6:
-                attrs = _child(measure, "attributes")
-                if attrs is not None:
-                    staff = _child(attrs, "staff-details")
-                    if staff is not None:
-                        lines = _text(_child(staff, "staff-lines"))
-                        if lines.isdigit():
-                            strings = max(1, int(lines))
+            divisions = _measure_divisions(measure, divisions)
+            bar, max_string = _parse_measure(measure, divisions)
+            bars.append(bar)
+            strings = max(_staff_lines(measure, strings), max_string)
     return Piece(title=title, composer=composer, bars=bars, strings=strings)
 
 

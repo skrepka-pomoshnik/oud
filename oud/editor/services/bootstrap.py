@@ -44,6 +44,8 @@ def init_state(  # noqa: C901, PLR0912
     is_tab = bool(path and path.lower().endswith(".tab"))
     if piece.style:
         state.settings["style"] = piece.style
+    if piece.tempo is not None:
+        state.settings["tempo"] = str(piece.tempo)
     if piece.tuning:
         tuned_strings = tuning_count(piece.tuning)
         if tuned_strings:

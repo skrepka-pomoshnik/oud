@@ -265,7 +265,10 @@ def main(argv: list[str] | None = None) -> int:
         read_only = bool(
             getattr(parsed, "readonly_global", False) or getattr(parsed, "readonly_tui", False),
         )
-        return curses.wrapper(_main, parsed.path, parsed.config, read_only)
+        try:
+            return curses.wrapper(_main, parsed.path, parsed.config, read_only)
+        except KeyboardInterrupt:
+            return EXIT_INTERRUPTED
     if parsed.command == "ascii":
         try:
             bars = parsed.bars

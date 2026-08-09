@@ -29,7 +29,9 @@ Thumbs.db
 *.swo
 downloads/
 .claude/settings.local.json
-/examples/
+/examples/*
+!/examples/README.md
+!/examples/triste.tab
 /tests/fixtures/ft3/corpus/
 
 # Generated exports (committed examples are re-included below)

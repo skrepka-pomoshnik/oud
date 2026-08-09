@@ -168,6 +168,9 @@ def _header_lines(context: _TabExportContext) -> list[str]:
     tuning = context.piece.tuning or context.settings.get("tuning")
     if tuning:
         lines.append(f"-tuning {tuning}")
+    tempo = context.piece.tempo or context.settings.get("tempo")
+    if tempo:
+        lines.append(f"# tempo: {tempo}")
     title = context.piece.title or ""
     composer = context.piece.composer or ""
     if title and composer:

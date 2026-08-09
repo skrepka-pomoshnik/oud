@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from queue import SimpleQueue
 from threading import Thread
 from typing import TYPE_CHECKING, TypedDict
 
@@ -87,6 +88,7 @@ class EditorState:
         self.system_layout_cache_starts: tuple[int, ...] = ()
         self.midi_proc: subprocess.Popen[bytes] | None = None
         self.pdf_job: Thread | None = None
+        self.background_messages: SimpleQueue[tuple[str, str]] = SimpleQueue()
         self.playback = PlaybackState()
         self.count_prefix = ""
         self.pending_key = ""

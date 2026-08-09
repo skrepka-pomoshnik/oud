@@ -175,5 +175,6 @@ class Piece:
     tuning: str | None = None
     tuning_source: str | None = None
     style: str | None = None
+    tempo: int | None = None
     bars: list[Bar] = field(default_factory=list)
     strings: int = 6

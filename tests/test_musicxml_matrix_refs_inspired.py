@@ -64,11 +64,10 @@ def _assert_musicxml_roundtrip_subset(src_path: str, tmp_path: Path) -> None:
     assert _musicxml_supported_signature(mxl_piece) == src_sig
 
 
-def test_musicxml_matrix_real_examples_refs_luteconv_style(tmp_path: Path) -> None:
+def test_musicxml_matrix_tracked_fixtures_refs_luteconv_style(tmp_path: Path) -> None:
     paths = [
-        "examples/si_par_souffrir.tab",
-        "examples/2_intrada_anon.tab",
-        "examples/Sarabande_de_gautier.tab",
+        "tests/fixtures/tab/minimal_score.tab",
+        "examples/triste.tab",
         "tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3",
         "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",
     ]
