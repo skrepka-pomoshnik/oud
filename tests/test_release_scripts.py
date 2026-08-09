@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts import render_readme_screenshot, render_snapshots
+from scripts.rendering import readme_screenshot as render_readme_screenshot
+from scripts.rendering import snapshots as render_snapshots
 from tests import render_snapshot_utils
 
 

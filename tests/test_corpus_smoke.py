@@ -7,7 +7,7 @@ import pytest
 
 from oud.services.plugins.model import RemoteTab
 from petrucci.core.model import Bar, Piece
-from scripts import corpus_smoke
+from scripts.corpus import smoke as corpus_smoke
 
 
 class BrokenRecordError(ValueError):

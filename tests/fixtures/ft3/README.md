@@ -12,8 +12,9 @@ viewer integration tests.
 Fetch the fixed corpora from a checkout with:
 
 ```bash
-uv run python scripts/fetch_ft3_corpus.py \
-  corpus/ft3-regression.json corpus/ft3-random-75.json
+uv run python -m scripts.corpus.fetch \
+  tests/fixtures/ft3/manifests/ft3-regression.json \
+  tests/fixtures/ft3/manifests/ft3-random-75.json
 ```
 
 This verifies every payload against its checked-in SHA-256. Selection is not

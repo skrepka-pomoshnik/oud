@@ -11,9 +11,10 @@ from oud.importers.ft3 import build_durations, load_ft3
 
 FT3_CORPUS = Path("tests/fixtures/ft3/corpus")
 MIDI_PARITY_CASES = (
+    ("capriccio", "random-75-v2/011/capriccio.ft3", 1169, 1169, 1100),
     ("chromatica_pavana", "random-75-v2/002/chromatica_pavana.ft3", 1278, 1278, 1277),
     ("01_felice_fu_quel_anon", "01_felice_fu_quel_anon.ft3", 133, 133, 120),
-    ("menuett", "random-75-v2/061/menuett.ft3", 234, 226, 193),
+    ("menuett", "random-75-v2/061/menuett.ft3", 234, 234, 193),
     ("can_she_excuse", "can_she_excuse.ft3", 524, 532, 444),
     ("phrygian_fantasy", "random-50-v3/026/phrygian_fantasy.ft3", 380, 380, 380),
 )

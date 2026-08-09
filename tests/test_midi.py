@@ -186,6 +186,10 @@ def test_default_six_course_tuning_uses_the_six_course_range() -> None:
     assert _default_tuning(6) == [67, 62, 57, 53, 48, 43]
 
 
+def test_default_eleven_course_tuning_keeps_ft3_diapasons_low_to_high() -> None:
+    assert _default_tuning(11) == [67, 62, 57, 53, 48, 43, 31, 33, 35, 36, 38]
+
+
 def test_export_midi_skips_explicit_vocal_rest_events(tmp_path) -> None:
     bar = Bar(
         chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])],
@@ -271,6 +275,11 @@ def test_resolved_tuning_prepends_default_bass_strings_when_missing() -> None:
     piece = Piece(title="T", bars=[Bar()], strings=7)
     tuning = _resolved_tuning_for_piece(piece, {"tuning": "g2c3f3a3d4g4", "bassstrings": ""})
     assert tuning.startswith("d2")
+
+
+def test_resolved_tuning_uses_piece_metadata_without_a_setting_override() -> None:
+    piece = Piece(title="T", bars=[Bar()], strings=6, tuning="e2a2d3g3b3e4")
+    assert _resolved_tuning_for_piece(piece, {}) == "e2a2d3g3b3e4"
 
 
 def test_duration_ticks_dotted() -> None:

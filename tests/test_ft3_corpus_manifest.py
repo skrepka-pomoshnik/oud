@@ -10,9 +10,9 @@ import pytest
 from oud.importers.ft3 import load_ft3
 from petrucci import PieceAdapterError, notation_score_from_piece
 from petrucci.core.model import Piece
-from scripts import fetch_ft3_corpus
 from scripts.corpus.fetch import fetch_manifest, load_manifest, manifest_paths
 from scripts.corpus.audit import audit_piece
+from scripts.corpus import fetch as fetch_ft3_corpus
 
 RANDOM_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-75.json")
 EXPANDED_RANDOM_MANIFEST = Path("tests/fixtures/ft3/manifests/ft3-random-75-v2.json")
@@ -76,7 +76,8 @@ def test_random_75_manifest_is_a_fixed_one_time_selection() -> None:
     assert len({entry.path for entry in manifest.files}) == 75
     assert len({entry.url for entry in manifest.files}) == 75
     assert len({entry.sha256 for entry in manifest.files}) == 75
-    assert all(path.is_relative_to((Path.cwd() / "lutemusic").resolve()) for path in manifest_paths(manifest))
+    corpus_root = (Path.cwd() / "tests/fixtures/ft3/corpus").resolve()
+    assert all(path.is_relative_to(corpus_root) for path in manifest_paths(manifest))
 
 
 def test_expanded_random_75_manifest_is_new_composer_stratified_selection() -> None:

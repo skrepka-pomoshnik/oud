@@ -22,7 +22,12 @@ from oud.services.playback.timeline import PlaybackCursor, build_timeline_from_e
 from petrucci.adapters.duet import duet_logical_bar_count, duet_raw_bar_index, is_duet_score_piece
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
-from petrucci.core.music.tuning import default_bass_strings, parse_bass_strings, tuning_count
+from petrucci.core.music.tuning import (
+    default_bass_strings,
+    default_tuning_pitches,
+    parse_bass_strings,
+    tuning_count,
+)
 from petrucci.adapters.vocal import VocalEvent, infer_vocal_events
 
 
@@ -139,23 +144,11 @@ def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
 
 
 def _default_tuning(strings: int) -> list[int]:
-    defaults = [
-        "g4",
-        "d4",
-        "a3",
-        "f3",
-        "c3",
-        "g2",
-        "f2",
-        "e2",
-        "d2",
-        "c2",
-    ]
-    return _parse_tuning("".join(reversed(defaults[:strings])))
+    return default_tuning_pitches(strings)
 
 
 def _resolved_tuning_for_piece(piece: Piece, settings: dict[str, str]) -> str:
-    tuning = (settings.get("tuning", "") or "").strip()
+    tuning = (settings.get("tuning", "") or piece.tuning or "").strip()
     if not tuning:
         return tuning
     missing = max(0, piece.strings - tuning_count(tuning))

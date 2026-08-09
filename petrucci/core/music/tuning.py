@@ -111,3 +111,15 @@ def default_bass_strings(missing: int) -> list[str]:
     if missing <= 0:
         return []
     return series[:missing]
+
+
+def default_tuning_pitches(strings: int) -> list[int]:
+    """Return high-to-low courses, preserving FT3's low-to-high diapason rows."""
+
+    if strings <= 0:
+        return []
+    primary = parse_tuning_pitches(tuning_preset("renaissance6") or "")
+    if strings <= len(primary):
+        return primary[:strings]
+    bass = parse_tuning_pitches("".join(default_bass_strings(strings - len(primary))))
+    return primary + bass
