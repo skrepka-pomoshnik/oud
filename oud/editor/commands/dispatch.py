@@ -189,10 +189,11 @@ def cmd_musicxml(state: EditorState, args: str, config_path: str) -> None:
     )
 
 
-def cmd_pdf(state: EditorState, _args: str, config_path: str) -> None:
+def cmd_pdf(state: EditorState, args: str, config_path: str) -> None:
     _ = (_args, config_path)
     _print_pdf(
         state,
+        args,
         export_lilypond_fn=export_lilypond,
         print_lilypond_pdf_fn=print_lilypond_pdf,
     )
@@ -283,6 +284,7 @@ def cmd_write_ascii_default(state: EditorState, args: str) -> None:
 def print_pdf(state: EditorState) -> None:
     _print_pdf(
         state,
+        "",
         export_lilypond_fn=export_lilypond,
         print_lilypond_pdf_fn=print_lilypond_pdf,
     )

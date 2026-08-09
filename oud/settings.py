@@ -18,6 +18,7 @@ def _resolve_config_path(path: str) -> Path:
 
 
 DEFAULT_SETTINGS: dict[str, str] = {
+    "bottompanel": "on",
     "style": "french",
     "measures": "system",
     "measuresstep": "10",

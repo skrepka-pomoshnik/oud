@@ -4,7 +4,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from oud.editor.core.document import set_write_target
+from oud.editor.core.document import default_write_path, set_write_target
 from oud.editor.core.feedback.messages import MISSING_LESS, NO_SOURCE_PATH, MessageLevel
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
@@ -35,7 +35,7 @@ def _confirm_new_target(state: EditorState, path: str) -> bool:
 def request_save_as(state: EditorState, command: str = "w") -> None:
     set_mode(state, "command")
     state.cmdline = f"{command} "
-    state.message = "Save As .tab; source unchanged"
+    state.message = "Enter a .tab destination"
 
 
 def cmd_write(state: EditorState, path: str) -> bool:
@@ -75,12 +75,12 @@ def cmd_write(state: EditorState, path: str) -> bool:
 
 
 def cmd_write_default(state: EditorState, args: str, *, prompt_command: str = "w") -> bool:
+    _ = prompt_command
     path = args.strip()
     if not path and state.write_path:
         path = state.write_path
     if not path:
-        request_save_as(state, prompt_command)
-        return False
+        path = default_write_path(state)
     return cmd_write(state, path)
 
 

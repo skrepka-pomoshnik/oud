@@ -17,6 +17,15 @@ def _compact_name(name: str, width: int) -> str:
 
 
 def status_line(state: EditorState) -> str:
+    if state.settings.get("bottompanel", "on") == "off" and state.mode not in {
+        "command",
+        "search",
+        "help",
+        "info",
+        "notes",
+        "plugin",
+    }:
+        return ""
     name = _compact_name(display_path(state), state.screen_width)
     modified = "*" if state.modified else ""
     identity = f"{name}{modified} [{document_status_label(state)}]"

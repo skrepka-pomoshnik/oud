@@ -52,6 +52,7 @@ _BOOL_KEYS = {
     "showextras",
     "showft3extras",
     "showtactus",
+    "bottompanel",
     "italianmultifret",
     "viewinvert",
     "showtuning",

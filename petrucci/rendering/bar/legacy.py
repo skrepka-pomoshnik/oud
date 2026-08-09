@@ -60,6 +60,7 @@ class LegacyRenderRequest:
     playback_markers: list[Pair] | None
     cursor_display_maps: dict[int, list[int]] | None
     status_attr: int
+    show_status: bool
 
 
 @dataclass(frozen=True)
@@ -300,13 +301,14 @@ class _LegacyRenderer:
         if not rendered_duet:
             self._render_systems(width, display, limits, header_row)
         status_text = self._render_status(display)
-        safe_addstr(
-            self.screen,
-            request.height - 1,
-            0,
-            clean_text(status_text),
-            request.status_attr,
-        )
+        if request.show_status:
+            safe_addstr(
+                self.screen,
+                request.height - 1,
+                0,
+                clean_text(status_text),
+                request.status_attr,
+            )
         if request.mode == "help":
             self.screen.erase()
             render_help(self.screen, status_text, request.status_attr, request.help_offset)

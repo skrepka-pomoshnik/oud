@@ -39,17 +39,19 @@ def _render_ascii_preview(
     status_line: str,
     mode: str,
     status_attr: int,
+    show_status: bool,
 ) -> None:
     height, _width = stdscr.getmaxyx()
-    for idx, line in enumerate(ascii_lines[: max(0, height - 1)]):
+    for idx, line in enumerate(ascii_lines[: max(0, height - int(show_status))]):
         _safe_addstr(stdscr, idx, 0, _clean_text(line))
-    _safe_addstr(
-        stdscr,
-        height - 1,
-        0,
-        _clean_text(f"{status_line}  {mode}  ascii preview"),
-        status_attr,
-    )
+    if show_status:
+        _safe_addstr(
+            stdscr,
+            height - 1,
+            0,
+            _clean_text(f"{status_line}  {mode}  ascii preview"),
+            status_attr,
+        )
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,7 @@ class _AuxiliaryRequest:
     message: str
     ascii_lines: list[str] | None
     settings: dict[str, str]
+    show_status: bool
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,7 @@ class _CanonicalRequest:
     cmdline: str
     searchline: str
     message: str
+    show_status: bool
 
 
 def _render_auxiliary(
@@ -99,6 +103,7 @@ def _render_auxiliary(
             screen,
             request.status_line,
             request.status_attr,
+            request.show_status,
             request.help_offset,
             piece,
             {**request.settings, "terminal": f"{width}x{height}"},
@@ -137,10 +142,11 @@ def _render_canonical(
 ) -> bool:
     if request.mode == "help":
         return False
+    content_height = max(1, request.height - int(request.show_status))
     canonical = typeset_piece_score_view(
         piece,
         width=request.width,
-        height=max(1, request.height - 1),
+        height=content_height,
         bar_offset=request.bar_offset,
         cursor=(request.cursor_bar, request.cursor_col),
         playback=(request.playback_bar, request.playback_col)
@@ -151,7 +157,7 @@ def _render_canonical(
     )
     if canonical is None:
         return False
-    draw_frame_rows(screen, canonical.result.frame, set(range(max(0, request.height - 1))))
+    draw_frame_rows(screen, canonical.result.frame, set(range(content_height)))
     if request.cursor_maps is not None:
         request.cursor_maps.clear()
         request.cursor_maps.update(canonical.cursor_display_maps)
@@ -163,7 +169,8 @@ def _render_canonical(
         status_line=request.status_line,
         dur_text=None,
     )
-    _safe_addstr(screen, request.height - 1, 0, _clean_text(text), request.status_attr)
+    if request.show_status:
+        _safe_addstr(screen, request.height - 1, 0, _clean_text(text), request.status_attr)
     screen.refresh()
     return True
 
@@ -213,6 +220,14 @@ def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side
     stdscr.erase()
     height, width = stdscr.getmaxyx()
     status_attr = status_attr_for_message(message_level) if message else A_REVERSE
+    show_status = settings.get("bottompanel", "on") != "off" or mode in {
+        "command",
+        "search",
+        "help",
+        "info",
+        "notes",
+        "plugin",
+    }
     auxiliary = _AuxiliaryRequest(
         mode,
         status_line,
@@ -225,6 +240,7 @@ def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side
         message,
         ascii_lines,
         settings,
+        show_status,
     )
     if _render_auxiliary(stdscr, piece, width, height, auxiliary):
         return
@@ -245,6 +261,7 @@ def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side
         cmdline,
         searchline,
         message,
+        show_status,
     )
     if _render_canonical(stdscr, piece, canonical):
         return
@@ -253,7 +270,7 @@ def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side
         LegacyRenderRequest(
             piece,
             width,
-            height,
+            height + int(not show_status),
             bar_offset,
             cursor_bar,
             cursor_string,
@@ -283,5 +300,6 @@ def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side
             playback_markers,
             cursor_display_maps,
             status_attr,
+            show_status,
         ),
     )

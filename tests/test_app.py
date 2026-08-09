@@ -52,7 +52,7 @@ def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     state.modified = True
     line = status_line(state)
     assert "example.ft3*" in line
-    assert "[FT3 EDIT:choose :w path]" in line
+    assert "[FT3 EDIT:example.tab]" in line
     assert "bar:2" in line
     assert "beat:2/4" in line
     assert "str:3" in line
@@ -84,6 +84,16 @@ def test_set_command_updates_style_and_strings(tmp_path) -> None:
     apply_set_command(state, "style=italian strings=7", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "italian"
     assert state.settings["strings"] == "7"
+
+
+def test_hide_command_toggles_bottom_panel(tmp_path) -> None:
+    state = _state()
+    config = str(tmp_path / "cfg.toml")
+    apply_command(state, "hide", config)
+    assert state.settings["bottompanel"] == "off"
+    assert status_line(state) == ""
+    apply_command(state, "hide", config)
+    assert state.settings["bottompanel"] == "on"
 
 
 def test_set_command_supports_vim_style_boolean_tokens(tmp_path) -> None:

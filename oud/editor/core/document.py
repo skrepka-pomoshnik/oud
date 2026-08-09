@@ -67,7 +67,7 @@ def configure_document(
         state.persistent_notice = ""
         state.persistent_notice_level = MessageLevel.INFO
     elif state.document_mode is DocumentMode.IMPORTED_PROJECTION:
-        state.persistent_notice = "source unchanged"
+        state.persistent_notice = ""
         state.persistent_notice_level = MessageLevel.INFO
     elif path is None:
         state.persistent_notice = ""
@@ -98,11 +98,19 @@ def document_status_label(state: EditorState) -> str:
     if state.read_only:
         return f"{fmt} VIEW" if fmt != "NEW" else "VIEW"
     if state.document_mode is DocumentMode.IMPORTED_PROJECTION:
-        target = Path(state.write_path).name if state.write_path else "choose :w path"
+        target = Path(state.write_path or default_write_path(state)).name
         return f"{fmt} EDIT:{target}"
     if state.write_path:
         return "TAB"
-    return "NEW:choose :w path"
+    return f"NEW:{Path(default_write_path(state)).name}"
+
+
+def default_write_path(state: EditorState) -> str:
+    """Return a safe suggested TAB target without claiming it is established."""
+
+    if state.path:
+        return str(Path(state.path).with_suffix(".tab"))
+    return "untitled.tab"
 
 
 def display_path(state: EditorState) -> str:

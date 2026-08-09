@@ -157,6 +157,12 @@ def cmd_light(state: EditorState, _args: str, config_path: str) -> None:
     apply_set_command(state, "theme=light", config_path)
 
 
+def cmd_hide(state: EditorState, _args: str, config_path: str) -> None:
+    hidden = state.settings.get("bottompanel", "on") == "off"
+    apply_set_command(state, f"bottompanel={'on' if hidden else 'off'}", config_path)
+    state.message = f"Bottom panel {'shown' if hidden else 'hidden'}"
+
+
 def cmd_orn(state: EditorState, args: str) -> None:
     _set_ornament(state, args.strip())
 
@@ -453,6 +459,7 @@ def _command_specs() -> tuple[CommandSpec, ...]:
         CommandSpec("set", _with_config(cmd_set)),
         CommandSpec("dark", _with_config(cmd_dark)),
         CommandSpec("light", _with_config(cmd_light)),
+        CommandSpec("hide", _with_config(cmd_hide)),
         CommandSpec("convert", _with_config(cmd_convert)),
         CommandSpec("time", _no_config(cmd_time)),
         CommandSpec("verify", _no_config(cmd_verify)),

@@ -45,6 +45,13 @@ def _state(bars: int = 2) -> EditorState:
     return state
 
 
+def _wait_pdf(state: EditorState) -> None:
+    job = state.pdf_job
+    assert job is not None
+    job.join(timeout=1)
+    assert not job.is_alive()
+
+
 def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -93,6 +100,7 @@ def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901
     assert state.message == "Mxl ok"
     state.path = str(tmp_path / "score.ft3")
     cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
+    _wait_pdf(state)
     assert state.message == "Pdf ok"
     assert pdf_called["path"].endswith("score.ly")
     cmd.cmd_play(state, "2 120", str(tmp_path / "cfg.toml"))
@@ -196,6 +204,7 @@ def test_cmd_pdf_real_ft3_path_uses_neighbor_ly_output_if_available(
     monkeypatch.setattr(cmd_ops, "save_settings", lambda *_args, **_kwargs: None)
 
     cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
+    _wait_pdf(state)
     assert called["ly"].endswith("czarna_krowa.ly")
     assert called["pdf"].endswith("czarna_krowa.ly")
     assert state.message.endswith("czarna_krowa.pdf")
@@ -225,6 +234,7 @@ def test_cmd_pdf_forces_full_tabnotation_only_for_pdf_export(
     monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
 
     cmd.cmd_pdf(state, "", str(tmp_path / "cfg.toml"))
+    _wait_pdf(state)
     assert state.message == "Pdf ok"
     exported_settings_obj = captured["settings"]
     exported_settings = cast("dict[str, str]", exported_settings_obj)

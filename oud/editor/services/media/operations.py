@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from oud.editor.core.state import EditorState
+from oud.editor.services.media.jobs import start_pdf_job
 from oud.editor.editing.primitives.ranges import BarRange
 from oud.editor.editing.visual import visual_bar_range
 
@@ -107,23 +108,6 @@ def cmd_musicxml(
     save_fn(config_path, state.settings)
 
 
-def cmd_pdf(
-    state: EditorState,
-    _args: str,
-    config_path: str,
-    *,
-    cmd_lilypond_fn: Callable[[EditorState, str, str], None],
-    print_lilypond_pdf_fn: Callable[..., str],
-) -> None:
-    cmd_lilypond_fn(state, "", config_path)
-    source = state.path or "out"
-    ly_path = str(Path(source).with_suffix(".ly"))
-    state.message = print_lilypond_pdf_fn(
-        ly_path,
-        binary=state.settings.get("lilypond", "lilypond-2.26"),
-    )
-
-
 def cmd_play(
     state: EditorState,
     args: str,
@@ -215,12 +199,14 @@ def cmd_midicmd_default(
 
 def print_pdf(
     state: EditorState,
+    args: str = "",
     *,
     export_lilypond_fn: ExportLyFn,
     print_lilypond_pdf_fn: Callable[..., str],
 ) -> None:
-    base = "out"
-    if state.path:
+    target = args.strip()
+    base = str(Path(target).with_suffix("")) if target else "out"
+    if not target and state.path:
         base = str(Path(state.path).with_suffix(""))
     ly_path = base + ".ly"
     # PDF output should be readable by default: force full tab notation so
@@ -241,8 +227,12 @@ def print_pdf(
         ties=state.ties,
         holds=state.holds,
     )
-    state.message = print_lilypond_pdf_fn(
-        ly_path,
-        base,
-        binary=pdf_settings.get("lilypond", "lilypond-2.26"),
+    start_pdf_job(
+        state,
+        base + ".pdf",
+        lambda: print_lilypond_pdf_fn(
+            ly_path,
+            base,
+            binary=pdf_settings.get("lilypond", "lilypond-2.26"),
+        ),
     )

@@ -38,7 +38,7 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert projection.document_mode is DocumentMode.IMPORTED_PROJECTION
     assert projection.read_only is False
     assert projection.write_path is None
-    assert "source unchanged" in projection.visible_message
+    assert projection.visible_message == ""
 
     mixed = init_state(MIXED_FT3, config_path=config)
     assert mixed.document_mode is DocumentMode.IMPORTED_READ_ONLY
@@ -61,24 +61,20 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert tab.write_path == TAB_FILE
 
 
-def test_first_ft3_write_prompts_and_cancel_preserves_modified_state(tmp_path: Path) -> None:
+def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
-    state = init_state(PURE_FT3, config_path=config)
+    source = tmp_path / "source.ft3"
+    source.write_bytes(Path(PURE_FT3).read_bytes())
+    state = init_state(str(source), config_path=config)
     state.modified = True
 
     apply_command(state, "w", config)
 
-    assert state.mode == "command"
-    assert state.cmdline == "w "
-    assert "Save As" in state.message
-    assert state.path == PURE_FT3
-    assert state.write_path is None
-
-    handle_command(state, 27, lambda current, command: apply_command(current, command, config))
     assert state.mode == "normal"
-    assert state.modified is True
-    assert state.path == PURE_FT3
-    assert state.write_path is None
+    assert state.modified is False
+    assert state.path == str(source)
+    assert state.write_path == str(source.with_suffix(".tab"))
+    assert source.with_suffix(".tab").exists()
 
 
 def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -> None:
@@ -88,8 +84,7 @@ def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -
     source = state.path
     state.modified = True
 
-    apply_command(state, "w", config)
-    _submit_command_path(state, target, config)
+    apply_command(state, f"w {target}", config)
 
     assert target.exists()
     assert state.path == source
