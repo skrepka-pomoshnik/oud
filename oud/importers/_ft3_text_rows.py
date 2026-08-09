@@ -210,7 +210,7 @@ def _clean_lyric_token(token: str) -> str:
     if set(cleaned) <= {"_"}:
         return cleaned
     cleaned = re.sub(r"^[><:%#;,\d]+", "", cleaned)
-    cleaned = re.sub(r"[^\w'_\-]+$", "", cleaned)
+    cleaned = re.sub(r"[^\w'_\-.,;:!?]+$", "", cleaned)
     return cleaned.strip()
 
 
@@ -233,13 +233,14 @@ def _trim_leading_single_letter_positioned_noise(
 def _keep_lyric_token(token: str) -> bool:
     if not token:
         return False
-    if token in {"'", '"', "`", "(", ")", "[", "]", "{", "}", "|", "\\", "/", "=", "+", "*"}:
+    probe = token.rstrip(".,;:!?")
+    if probe in {"'", '"', "`", "(", ")", "[", "]", "{", "}", "|", "\\", "/", "=", "+", "*"}:
         return False
-    alpha_count = sum(ch.isalpha() for ch in token)
+    alpha_count = sum(ch.isalpha() for ch in probe)
     if alpha_count == 0:
         return False
-    lowered = token.lower()
-    return not (len(token) == 1 and lowered not in {"i", "a", "o"})
+    lowered = probe.lower()
+    return not (len(probe) == 1 and lowered not in {"i", "a", "o"})
 
 
 def _line_tokens_with_positions(line: str) -> list[tuple[int, str]]:
@@ -302,8 +303,9 @@ def _tokenize_control_row(row: bytes) -> list[tuple[int, str]]:  # noqa: C901
 def _likely_non_lyric_token(token: str) -> bool:
     if not token:
         return True
-    lower = token.lower()
-    if token.isupper() and 1 < len(token) <= 3:
+    probe = token.rstrip(".,;:!?")
+    lower = probe.lower()
+    if probe.isupper() and 1 < len(probe) <= 3:
         return True
     if all(ch.isdigit() or ch == "." for ch in lower):
         return True
@@ -311,7 +313,7 @@ def _likely_non_lyric_token(token: str) -> bool:
         return True
     if lower in {"times", "new", "roman", "timesnewroman"}:
         return True
-    return bool(any(ch in '@?><=|[]{}!";:' for ch in token))
+    return bool(any(ch in '@?><=|[]{}!";:' for ch in probe))
 
 
 def _lyric_tokens_from_control_row(row: bytes) -> list[str]:  # noqa: C901
@@ -487,22 +489,29 @@ def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEve
     return events
 
 
+def _append_structured_lyric_tokens(
+    primary: list[str],
+    secondary: list[str],
+    tokens_by_row: list[list[str]],
+    row_index: int,
+) -> None:
+    row_tokens = tokens_by_row[row_index]
+    if len(row_tokens) >= 2:
+        secondary.append(row_tokens[0])
+        primary.append(row_tokens[-1])
+        return
+    token = row_tokens[0]
+    previous_length = len(tokens_by_row[row_index - 1]) if row_index > 0 else 0
+    target = primary if row_index == 0 or previous_length <= 1 else secondary
+    target.append(token)
+
+
 def _structured_lyric_rows(tokens_by_row: list[list[str]]) -> list[list[str]]:
     primary: list[str] = []
     secondary: list[str] = []
-    for row_idx, row_tokens in enumerate(tokens_by_row):
-        if not row_tokens:
-            continue
-        if len(row_tokens) >= 2:
-            secondary.append(row_tokens[0])
-            primary.append(row_tokens[-1])
-            continue
-        token = row_tokens[0]
-        prev_len = len(tokens_by_row[row_idx - 1]) if row_idx > 0 else 0
-        if row_idx == 0 or prev_len <= 1:
-            primary.append(token)
-        else:
-            secondary.append(token)
+    for row_index, row_tokens in enumerate(tokens_by_row):
+        if row_tokens:
+            _append_structured_lyric_tokens(primary, secondary, tokens_by_row, row_index)
     rows: list[list[str]] = []
     if primary:
         rows.append(primary)

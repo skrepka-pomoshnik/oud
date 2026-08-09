@@ -523,7 +523,7 @@ def test_can_she_excuse_ft3_drops_noise_token_from_second_verse_bar_38() -> None
     piece = load_ft3("lutemusic/can_she_excuse.ft3")
     bar = piece.bars[37]
     lyric_rows = [[ev.text for ev in row] for row in bar.lyric_event_rows]
-    assert lyric_rows == [["come", "her", "will", "Thy"], ["it", "was", "I", "Who"]]
+    assert lyric_rows == [["come", "her", "will,", "Thy"], ["it", "was", "I", "Who"]]
     assert all("WN" not in text for row in lyric_rows for text in row)
     assert piece.import_warnings == []
     assert any(bar.lyrics for bar in piece.bars)

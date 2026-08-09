@@ -14,6 +14,7 @@ from oud.exports._lilypond_common import (
     _piece_has_melody,
     _piece_has_tab_content,
 )
+from oud.exports._lilypond_registration import build_lilypond_registration
 from oud.exports._lilypond_style import paper_block, score_overrides, tab_staff_overrides
 from oud.exports._lilypond_tab import (
     _build_tab_body,
@@ -46,6 +47,7 @@ def _build_main_blocks(  # noqa: C901
     ties: list[tuple[int, int, int]] | None,
     holds: list[tuple[int, int, int]] | None,
 ) -> list[str]:
+    registration = build_lilypond_registration(piece, settings)
     if is_duet_score_piece(piece):
         mode = settings.get("duetscoreview", "auto")
         staff_indices = [0, 1] if mode in {"auto", "both"} else [0 if mode == "1" else 1]
@@ -67,6 +69,7 @@ def _build_main_blocks(  # noqa: C901
                 slurs=sub_slurs,
                 ties=sub_ties,
                 holds=sub_holds,
+                registration=registration,
             )
             blocks.extend(_tab_staff_with_block(labels[staff_index], sub_body, settings, sub_piece))
         blocks.append(r">>")
@@ -84,6 +87,7 @@ def _build_main_blocks(  # noqa: C901
         slurs=slurs,
         ties=ties,
         holds=holds,
+        registration=registration,
     )
     has_imported_notation = bool(imported_note_staffs) or imported_barline_staff is not None
     has_imported_lyrics = bool(imported_lyric_staffs) and _piece_has_imported_lyrics(piece)
@@ -105,6 +109,7 @@ def _build_main_blocks(  # noqa: C901
                 note_staff,
                 lyric_staff,
                 imported_barline_staff,
+                registration=registration,
             )
             vocal_stack.extend(
                 _vocal_blocks(
@@ -122,10 +127,11 @@ def _build_main_blocks(  # noqa: C901
             None,
             imported_lyric_staffs[0] if imported_lyric_staffs else None,
             imported_barline_staff,
+            registration=registration,
         )
         vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
     else:
-        melody_body, lyric_bodies = _build_vocal_bodies(piece, settings)
+        melody_body, lyric_bodies = _build_vocal_bodies(piece, settings, registration)
         vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
 
     if not has_tab:
@@ -136,7 +142,7 @@ def _build_main_blocks(  # noqa: C901
 
     tab_block = _tab_staff_with_block(None, tab_body, settings, piece)
     blocks = [r"\new StaffGroup <<"]
-    vocal_pos = settings.get("vocalpos", "bottom")
+    vocal_pos = settings.get("vocalpos", "top")
     if vocal_pos == "bottom":
         blocks.extend(tab_block)
         blocks.extend(vocal_stack)

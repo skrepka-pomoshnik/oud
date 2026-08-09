@@ -151,8 +151,6 @@ algorithm that preserves sounding pitch and produces playable tablature.
   shared engraving-matrix microcase; 2.26 is authoritative and 2.24 differences
   must be documented as compatibility limitations.
 
-- [ ] Add explicit LilyPond executable/version selection and retain structured,
-  actionable compiler diagnostics.
 - [ ] Add stable engraving profiles for solo lute, lute with voice, vocal-only,
   polyphonic mixed score, duet, and multi-section works.
   - Control paper size, margins, staff size, system spacing, bars/system,
@@ -165,6 +163,8 @@ algorithm that preserves sounding pitch and produces playable tablature.
   long multi-page, and dense scores.
   - Check page count, system count, staff order, clipping, collisions, orphaned
     headings, lyric alignment, and readable scale.
+  - Extend the implemented Bossinensis twelve-stanza benchmark with bounded
+    raster-difference thresholds and further public Gerbode mixed scores.
   - Record intentional differences from Gerbode/Fronimo output instead of
     claiming pixel identity.
 

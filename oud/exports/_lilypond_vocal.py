@@ -19,15 +19,16 @@ from oud.exports._lilypond_common import (
     _repeat_mark_token,
     _with_imported_bar_structure,
 )
+from oud.exports._lilypond_registration import LilyPondRegistration
 from petrucci.model import Bar, ImportedBarContent, ImportedStaff, MelodyEvent, Piece
 from petrucci.render_utils import note_type_to_denom
 from petrucci.vocal_line import infer_vocal_events
 
 
-def _lyric_tokens_for_row(row, event_count: int) -> list[str]:
+def _lyric_tokens_for_row(row, sung_onsets: tuple[int, ...]) -> list[str]:
     by_onset = {ev.onset_index: ev for ev in row}
     tokens: list[str] = []
-    for onset in range(event_count):
+    for onset in sung_onsets:
         ev = by_onset.get(onset)
         if ev is None:
             tokens.append("_")
@@ -48,6 +49,7 @@ def _lyric_tokens_for_row(row, event_count: int) -> list[str]:
 def _build_vocal_bodies(  # noqa: C901
     piece: Piece,
     settings: dict[str, str],
+    registration: LilyPondRegistration,
 ) -> tuple[list[str], list[list[str]]]:
     melody_body: list[str] = []
     lyric_bodies: list[list[str]] = []
@@ -56,7 +58,8 @@ def _build_vocal_bodies(  # noqa: C901
     tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
     tuning_lookup = list(reversed(_normalize_tuning_length(tuning_pitches, piece.strings)))
 
-    for bar in piece.bars:
+    for bar_index, bar in enumerate(piece.bars):
+        _append_editorial_marks(melody_body, registration, bar_index)
         current_time_sig = _append_bar_time_change(melody_body, bar, current_time_sig)
         vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_lookup)
         for event in vocal_events:
@@ -68,17 +71,19 @@ def _build_vocal_bodies(  # noqa: C901
         if not vocal_events:
             melody_body.append("  r4")
         _append_barline(melody_body, bar)
+        if command := registration.command_after(bar_index):
+            melody_body.append(f"  {command}")
 
         rows = getattr(bar, "lyric_event_rows", None) or []
-        event_count = len(vocal_events)
+        sung_onsets = tuple(event.onset_index for event in vocal_events if not event.is_rest)
         if rows:
             while len(lyric_bodies) < len(rows):
                 lyric_bodies.append([])
             for idx, row in enumerate(rows):
-                lyric_bodies[idx].extend(_lyric_tokens_for_row(row, event_count))
+                lyric_bodies[idx].extend(_lyric_tokens_for_row(row, sung_onsets))
         elif lyric_bodies:
             for row in lyric_bodies:
-                row.extend(["_"] * event_count)
+                row.extend(["_"] * len(sung_onsets))
     return melody_body, lyric_bodies
 
 
@@ -137,7 +142,7 @@ def _append_imported_melody_bar(
     melody_body: list[str],
     note_bar: ImportedBarContent,
     current_time_sig: str | None,
-) -> tuple[str | None, int]:
+) -> tuple[str | None, tuple[int, ...]]:
     bar_like = Bar(
         time_sig=note_bar.time_sig,
         barline=note_bar.barline,
@@ -155,9 +160,12 @@ def _append_imported_melody_bar(
         numerator, denominator = note_bar.proportion
         melody_body.append(f"  \\scaleDurations {denominator}/{numerator} {{")
     event_count = 0
+    sung_onsets: list[int] = []
     beam_open = False
     for event_index, event in enumerate(note_bar.melody_events):
         is_rest = getattr(event, "is_rest", False)
+        if not is_rest:
+            sung_onsets.append(event.onset_index)
         lily = "r" if is_rest else _lily_note_from_event_text(event.text)
         note_type = event.note_type or 4
         duration = _duration_token(note_type_to_denom(note_type) or 4, event.dotted)
@@ -184,9 +192,18 @@ def _append_imported_melody_bar(
     if note_bar.proportion is not None:
         melody_body.append("  }")
     _append_barline(melody_body, bar_like)
-    if note_bar.system_break:
-        melody_body.append(r"  \break")
-    return current_time_sig, event_count
+    return current_time_sig, tuple(sung_onsets)
+
+
+def _append_editorial_marks(
+    body: list[str],
+    registration: LilyPondRegistration,
+    source_bar_index: int,
+) -> None:
+    body.extend(
+        f'  \\mark \\markup {{ \\italic "{_escape_lilypond(text)}" }}'
+        for text in registration.editorial_before[source_bar_index]
+    )
 
 
 def _pad_lyric_bodies(lyric_bodies: list[list[str]], event_count: int) -> None:
@@ -198,15 +215,15 @@ def _extend_event_lyric_rows(
     lyric_bodies: list[list[str]],
     rows: list[list],
     *,
-    event_count: int,
+    sung_onsets: tuple[int, ...],
     prior_event_count: int,
 ) -> None:
     while len(lyric_bodies) < len(rows):
         lyric_bodies.append(["_"] * prior_event_count)
     for row_idx, row in enumerate(rows):
-        lyric_bodies[row_idx].extend(_lyric_tokens_for_row(row, max(1, event_count)))
+        lyric_bodies[row_idx].extend(_lyric_tokens_for_row(row, sung_onsets))
     if len(lyric_bodies) > len(rows):
-        _pad_lyric_bodies(lyric_bodies[len(rows) :], event_count)
+        _pad_lyric_bodies(lyric_bodies[len(rows) :], len(sung_onsets))
 
 
 def _extend_raw_lyric_lines(
@@ -228,19 +245,19 @@ def _extend_imported_lyric_bodies(
     lyric_bodies: list[list[str]],
     lyric_bar: ImportedBarContent | None,
     *,
-    event_count: int,
+    sung_onsets: tuple[int, ...],
     prior_event_count: int,
 ) -> None:
     if lyric_bar is None:
         if lyric_bodies:
-            _pad_lyric_bodies(lyric_bodies, event_count)
+            _pad_lyric_bodies(lyric_bodies, len(sung_onsets))
         return
     rows = lyric_bar.lyric_event_rows or []
     if rows:
         _extend_event_lyric_rows(
             lyric_bodies,
             rows,
-            event_count=event_count,
+            sung_onsets=sung_onsets,
             prior_event_count=prior_event_count,
         )
         return
@@ -249,12 +266,12 @@ def _extend_imported_lyric_bodies(
         _extend_raw_lyric_lines(
             lyric_bodies,
             raw_lines,
-            event_count=event_count,
+            event_count=len(sung_onsets),
             prior_event_count=prior_event_count,
         )
         return
     if lyric_bodies:
-        _pad_lyric_bodies(lyric_bodies, event_count)
+        _pad_lyric_bodies(lyric_bodies, len(sung_onsets))
 
 
 def _build_imported_vocal_bodies(
@@ -263,6 +280,8 @@ def _build_imported_vocal_bodies(
     note_staff: ImportedStaff | None,
     lyric_staff: ImportedStaff | None,
     barline_staff: ImportedStaff | None,
+    *,
+    registration: LilyPondRegistration,
 ) -> tuple[list[str], list[list[str]]]:
     melody_body: list[str] = []
     lyric_bodies: list[list[str]] = []
@@ -281,6 +300,7 @@ def _build_imported_vocal_bodies(
     )
     prior_event_count = 0
     for source_bar_index in source_bar_indices:
+        _append_editorial_marks(melody_body, registration, source_bar_index)
         note_bar = note_bars.get(source_bar_index) or ImportedBarContent(
             source_bar_index=source_bar_index,
         )
@@ -289,18 +309,20 @@ def _build_imported_vocal_bodies(
             barline_bars.get(source_bar_index),
             _piece_bar_as_imported(piece, source_bar_index),
         )
-        current_time_sig, event_count = _append_imported_melody_bar(
+        current_time_sig, sung_onsets = _append_imported_melody_bar(
             melody_body,
             note_bar,
             current_time_sig,
         )
+        if command := registration.command_after(source_bar_index):
+            melody_body.append(f"  {command}")
         _extend_imported_lyric_bodies(
             lyric_bodies,
             lyric_bars.get(source_bar_index),
-            event_count=event_count,
+            sung_onsets=sung_onsets,
             prior_event_count=prior_event_count,
         )
-        prior_event_count += max(1, event_count)
+        prior_event_count += len(sung_onsets)
     return melody_body, lyric_bodies
 
 

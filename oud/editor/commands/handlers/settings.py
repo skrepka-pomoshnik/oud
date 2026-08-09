@@ -83,6 +83,8 @@ _INT_KEYS = {
     "minimumfret",
     "maxstretch",
     "lyricverse",
+    "lybarsperline",
+    "lysystemsperpage",
 }
 
 _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
@@ -202,6 +204,10 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "lyprofile": (
         {"classic", "petrucci"},
         "Lyprofile must be classic/petrucci",
+    ),
+    "lytabrhythm": (
+        {"minimal", "full"},
+        "Lytabrhythm must be minimal/full",
     ),
     "lilypondversion": (
         {"2.24", "2.26"},

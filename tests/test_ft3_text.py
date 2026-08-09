@@ -108,7 +108,7 @@ def test_refine_ft3_raw_text_record_reconstructs_three_verses() -> None:
         b"if",
     )
     record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
-    assert record.lyrics == ["Now O", "Dear when", "Dear if"]
+    assert record.lyrics == ["Now, O", "Dear, when", "Dear, if"]
     assert [len(row) for row in record.lyric_event_rows] == [2, 2, 2]
 
 

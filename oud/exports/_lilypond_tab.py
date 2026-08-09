@@ -20,6 +20,7 @@ from oud.exports._lilypond_common import (
     _span_maps,
     _split_tuning,
 )
+from oud.exports._lilypond_registration import LilyPondRegistration
 from petrucci.model import Piece
 from petrucci.render_utils import chord_positions, note_type_to_denom
 
@@ -34,6 +35,7 @@ def _build_tab_body(  # noqa: C901, PLR0912
     slurs: list[tuple[int, int, int]] | None,
     ties: list[tuple[int, int, int]] | None,
     holds: list[tuple[int, int, int]] | None,
+    registration: LilyPondRegistration,
 ) -> list[str]:
     body: list[str] = []
     current_time_sig = _append_global_prefix(body, piece, settings)
@@ -127,8 +129,8 @@ def _build_tab_body(  # noqa: C901, PLR0912
                 else:
                     body.append(f"  <{' '.join(pitches)}>{dur}{suffix}")
         _append_barline(body, bar)
-        if bar.system_break:
-            body.append(r"  \break")
+        if command := registration.command_after(b_idx):
+            body.append(f"  {command}")
     return body
 
 
@@ -156,8 +158,10 @@ def _tab_staff_with_block(  # noqa: C901
         tab_body_prefix.append(
             f"  \\set TabStaff.additionalBassStrings = \\stringTuning <{bass_text}>",
         )
-    if settings.get("tabnotation", "minimal") == "full":
+    if settings.get("lytabrhythm", settings.get("tabnotation", "minimal")) == "full":
         tab_body_prefix.append(r"  \tabFullNotation")
+        tab_body_prefix.append(r"  \stemUp")
+    if settings.get("tabnotation", "minimal") == "full":
         tab_body_prefix.append(r"  \set fingeringOrientations = #'(left)")
         tab_body_prefix.append(r"  \set strokeFingerOrientations = #'(right)")
     notehead_override = _ly_notehead_style_override(settings)

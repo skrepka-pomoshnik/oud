@@ -4,6 +4,7 @@ import pytest
 
 from oud.exports.lilypond import export_lilypond
 from oud.importers.ft3 import build_durations, load_ft3
+from oud.settings import DEFAULT_SETTINGS
 from petrucci.model import (
     Bar,
     Chord,
@@ -317,7 +318,7 @@ def test_export_lilypond_aligns_sparse_imported_lyrics_by_source_bar(tmp_path) -
     assert "  c4" not in text
     assert text.count("  b4") == 1
     assert text.count("  a4") == 1
-    assert '_ _ _ "late"' in text
+    assert '_ _ "late"' in text
 
 
 def test_export_lilypond_emits_barline_only_imported_score(tmp_path) -> None:
@@ -580,3 +581,30 @@ def test_export_lilypond_real_ft3_smoke_matrix_if_available(tmp_path, src_name: 
     assert "\\new TabStaff" in text
     assert "stringTunings" in text
     assert "\\bar " in text
+
+
+def test_export_lilypond_registers_dense_felice_score_like_gerbode(tmp_path) -> None:
+    piece = load_ft3("lutemusic/01_felice_fu_quel_anon.ft3")
+    path = tmp_path / "felice.ly"
+    settings = dict(DEFAULT_SETTINGS)
+
+    export_lilypond(
+        str(path),
+        piece,
+        overrides={},
+        durations=build_durations(piece),
+        bar_width=12,
+        settings=settings,
+    )
+
+    text = path.read_text(encoding="utf-8")
+    assert text.index('\\new Staff = "melodyStaff"') < text.index("\\new TabStaff")
+    assert "\\tabFullNotation" in text
+    assert "\\stemUp" in text
+    assert text.count("\\new Lyrics") == 12
+    assert text.count("\n  \\break\n") == 4
+    assert text.count("\n  \\pageBreak\n") == 2
+    assert '\\italic "Intro: Ricercars 1,9,12,14,15,16,18,20"' in text
+    assert '\\italic "Coda at end only."' in text
+    assert '"ha" -- "vran" "suo_in" --' in text
+    assert '"ten" -- "to_i" "dol" -- "ci" "pen" -- "sier" "mie" -- "i."' in text

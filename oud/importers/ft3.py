@@ -11,6 +11,7 @@ from oud.importers._ft3_duration import (
     _normalize_vocal_event_accidentals,
     build_durations,
 )
+from oud.importers._ft3_lyric_scope import apply_ft3_lyric_scopes
 from oud.importers._ft3_metadata import (
     _apply_annotations,
     _apply_preamble_notes,
@@ -303,6 +304,7 @@ def _finalize_piece(piece: Piece, metadata: _DocumentMetadata, state: _BodyState
         staff_labels=state.imported_staff_labels,
         text_record_cache=state.text_record_cache,
     )
+    apply_ft3_lyric_scopes(piece)
     if piece.imported_score is not None and any(staff.kind == "unknown" for staff in piece.imported_score.staffs):
         piece.import_warnings.append(
             "FT3 contains non-tab score data that is not decoded yet; imported as unknown staves.",

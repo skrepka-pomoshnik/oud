@@ -197,7 +197,7 @@ Durations are tracked per onset column and rendered according to current flag st
 - Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
-- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`
+- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
@@ -205,6 +205,9 @@ Durations are tracked per onset column and rendered according to current flag st
 
 Notes:
 - `barsperline=0` means auto.
+- `lybarsperline=0` and `lysystemsperpage=0` use the publication planner. Dense
+  multi-stanza scores default to four bars per system and two systems per page;
+  positive values force explicit LilyPond limits.
 - `barpad` controls left/right inner padding inside bars.
 - `measures=system` labels the first bar of each displayed system; `every` uses `measuresstep`.
 - `showlyrics=off` hides lyrics. `lyricmode=first` is the compact default; `current` displays the

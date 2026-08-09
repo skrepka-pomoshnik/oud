@@ -23,6 +23,7 @@ def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:
     assert matrix["publication_engines"]["baseline"] == "2.26"
     assert matrix["publication_engines"]["compatibility"] == "2.24"
     assert len(matrix["cases"]) >= 5
+    assert "gerbode-multiverse-registration" in {case["id"] for case in matrix["cases"]}
     for case in matrix["cases"]:
         assert case["features"]
         assert case["petrucci_contract"]
@@ -134,3 +135,4 @@ def test_supported_lilypond_engines_compile_without_warnings(
 def test_lilypond_226_is_the_configured_baseline() -> None:
     assert DEFAULT_SETTINGS["lilypond"] == "lilypond-2.26"
     assert DEFAULT_SETTINGS["lilypondversion"] == "2.26"
+    assert DEFAULT_SETTINGS["lytabrhythm"] == "full"

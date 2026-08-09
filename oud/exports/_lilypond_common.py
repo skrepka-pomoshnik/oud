@@ -739,9 +739,10 @@ def _raw_lyric_tokens(line: str, event_count: int) -> list[str]:
     words = [word for word in text.split() if word]
     if not words:
         return ["_"] * event_count
-    tokens = [f'"{_escape_lilypond(word)}"' for word in words[:event_count]]
-    if len(tokens) < event_count:
-        tokens.extend(["_"] * (event_count - len(tokens)))
+    target_count = max(event_count, len(words))
+    tokens = [f'"{_escape_lilypond(word)}"' for word in words]
+    if len(tokens) < target_count:
+        tokens.extend(["_"] * (target_count - len(tokens)))
     return tokens
 
 

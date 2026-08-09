@@ -822,7 +822,7 @@ def _decoded_note_content(
 def _decoded_lyric_content(decoded: FT3TextRecord, chunk: bytes) -> tuple[list[str], list[list[LyricEvent]]]:
     matrix = _positioned_lyric_matrix(chunk, decoded.melody_events)
     if matrix is not None:
-        return matrix
+        return _restore_matrix_source_prefix(matrix, decoded)
     lyrics = [line for line in decoded.lyrics if _is_meaningful_lyric_line(line)]
     rows = [
         list(row)
@@ -830,6 +830,31 @@ def _decoded_lyric_content(decoded: FT3TextRecord, chunk: bytes) -> tuple[list[s
         if any(event.extender for event in row) or _is_meaningful_lyric_line(" ".join(event.text for event in row))
     ]
     return lyrics, rows
+
+
+def _decoded_lyric_text_rows(decoded: FT3TextRecord) -> list[ImportedTextRow]:
+    meaningful = [row for row in decoded.structured_rows if _is_meaningful_lyric_line(row.text or " ".join(row.tokens))]
+    lyric_rows = [row for row in meaningful if row.kind == "lyrics"]
+    return lyric_rows or [row for row in meaningful if row.kind == "vocal"]
+
+
+def _restore_matrix_source_prefix(
+    matrix: tuple[list[str], list[list[LyricEvent]]],
+    decoded: FT3TextRecord,
+) -> tuple[list[str], list[list[LyricEvent]]]:
+    lyrics, rows = matrix
+    if len(rows) >= 8 or not rows or not rows[0] or not decoded.lyric_event_rows or not decoded.lyric_event_rows[0]:
+        return matrix
+    matrix_text = rows[0][0].text
+    source_text = decoded.lyric_event_rows[0][0].text
+    if len(source_text) != len(matrix_text) + 1 or source_text[1:] != matrix_text:
+        return matrix
+    repaired_rows = [list(row) for row in rows]
+    repaired_rows[0][0] = replace(repaired_rows[0][0], text=source_text)
+    repaired_lyrics = list(lyrics)
+    _first, separator, remainder = repaired_lyrics[0].partition(" ")
+    repaired_lyrics[0] = source_text + separator + remainder
+    return repaired_lyrics, repaired_rows
 
 
 def _positioned_lyric_matrix(
@@ -840,14 +865,28 @@ def _positioned_lyric_matrix(
     cells = _matrix_cells(chunk)
     if not onsets or not cells:
         return None
-    columns = _matrix_columns(cells, len(onsets))
-    if columns is None:
+    resolved = _resolved_lyric_columns(cells, onsets)
+    if resolved is None:
         return None
-    rows = _transpose_lyric_columns(columns, onsets, melody_events)
+    lyric_onsets, columns = resolved
+    rows = _transpose_lyric_columns(columns, lyric_onsets, melody_events)
     if not rows:
         return None
     lyrics = [" ".join(_matrix_source_text(cell) for cell in row) for row in zip(*columns, strict=True)]
     return lyrics, rows
+
+
+def _resolved_lyric_columns(
+    cells: list[bytes],
+    onsets: list[int],
+) -> tuple[list[int], list[list[bytes]]] | None:
+    for column_count in range(len(onsets), 0, -1):
+        columns = _matrix_columns(cells, column_count)
+        if columns is None:
+            continue
+        if column_count == len(onsets) or len(columns[0]) >= 8:
+            return onsets[:column_count], columns
+    return None
 
 
 def _matrix_cells(chunk: bytes) -> list[bytes]:
@@ -1004,11 +1043,7 @@ def _append_raw_imported_bar(  # noqa: C901
                 base,
                 lyrics=lyrics,
                 lyric_event_rows=lyric_event_rows,
-                text_rows=[
-                    row
-                    for row in decoded.structured_rows
-                    if row.kind == "lyrics" and _is_meaningful_lyric_line(row.text or " ".join(row.tokens))
-                ],
+                text_rows=_decoded_lyric_text_rows(decoded),
             ),
         )
     if comment_content := _decoded_comment_content(decoded):

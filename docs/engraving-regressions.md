@@ -25,6 +25,15 @@ lilypondversion = "2.26"
 For compatibility testing, point `lilypond` at the older executable and set
 `lilypondversion = "2.24"`. Oud never silently falls back to another binary.
 
+Mixed scores place the vocal staff above its lyrics and tablature by default.
+`lybarsperline=0` and `lysystemsperpage=0` retain automatic publication
+planning; scores with eight or more simultaneous lyric stanzas use a bounded
+four-bar, two-system-per-page plan so LilyPond does not compress the text into
+unreadable systems. Positive values override those automatic limits. Imported
+editorial cues remain registered with their source bars. Publication tablature
+prints rhythm stems and flags by default; `lytabrhythm=minimal` suppresses them
+without changing the terminal `tabnotation` policy.
+
 Petrucci keeps small typed fixtures that reproduce transferable engraving
 invariants. It does not copy or vendor LilyPond or MuseScore fixture files.
 
@@ -39,6 +48,10 @@ invariants. It does not copy or vendor LilyPond or MuseScore fixture files.
   MuseScore `partialtie_data`, especially `repeat_barlines.mscx`.
 - Endings with repeat barlines: LilyPond `bar-line-allow-volta-hook.ly` and the
   built-in repeat-barline matrix; MuseScore `barline_data`.
+- Dense multi-stanza registration: Bossinensis's *Felice fu quel dì* from the
+  public Gerbode FT3/PDF pair; the executable contract checks complete coda
+  syllables, final-stanza scope, four systems, two pages, staff order, and
+  source-bar editorial cues rather than pixel identity.
 
 The corresponding Petrucci tests assert semantic roles, bounded geometry,
 continuation segments, collision freedom, and stable source ownership. They do

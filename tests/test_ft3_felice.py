@@ -18,9 +18,40 @@ def test_felice_positioned_lyrics_transpose_into_twelve_verses() -> None:
         ["pon", "to"],
     ]
     assert [event.text for event in lyrics.bars[1].lyric_event_rows[1]] == ["gli_oc", "chi", "miei"]
+    assert len(lyrics.bars[4].lyric_event_rows) == 12
+    assert [[event.text for event in row] for row in lyrics.bars[4].lyric_event_rows[:2]] == [
+        ["ch'io", "mi", "tro"],
+        ["per", "cui", "nel"],
+    ]
     comments = next(staff for staff in piece.imported_score.staffs if staff.kind == "comment")
-    assert len(comments.bars) == 1
-    assert comments.bars[0].editorial_text == ["Intro: Ricercars 1,9,12,14,15,16,18,20"]
+    assert next(bar for bar in comments.bars if bar.source_bar_index == 0).editorial_text == [
+        "Intro: Ricercars 1,9,12,14,15,16,18,20",
+    ]
+
+
+def test_felice_coda_keeps_all_syllables_on_the_final_stanza() -> None:
+    piece = load_ft3(FELICE)
+    assert piece.imported_score is not None
+    lyrics = next(staff for staff in piece.imported_score.staffs if staff.kind == "lyrics")
+
+    assert all(len(lyrics.bars[index].lyric_event_rows) == 12 for index in range(12, 16))
+    assert all(not row for index in range(12, 16) for row in lyrics.bars[index].lyric_event_rows[:11])
+    assert [event.text for index in range(12, 16) for event in lyrics.bars[index].lyric_event_rows[11]] == [
+        "ha",
+        "vran",
+        "suo_in",
+        "ten",
+        "to_i",
+        "dol",
+        "ci",
+        "pen",
+        "sier",
+        "mie",
+        "i.",
+    ]
+    assert [event.onset_index for event in lyrics.bars[12].lyric_event_rows[11]] == [1, 2, 3]
+    comments = next(staff for staff in piece.imported_score.staffs if staff.kind == "comment")
+    assert next(bar for bar in comments.bars if bar.source_bar_index == 12).editorial_text == ["Coda at end only."]
 
 
 def test_felice_high_letter_frets_are_not_dropped() -> None:
