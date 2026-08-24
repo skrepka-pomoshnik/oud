@@ -33,10 +33,10 @@ check_no_tracked_ft3() {
 }
 
 run_check "No tracked FT3 payloads" check_no_tracked_ft3
-run_check "Architecture debt" uv run python scripts/checks/architecture_debt.py
-run_check "Ruff" uv run ruff check .
-run_check "Ruff format" uv run ruff format --check .
-run_check "Ty" uv run ty check
-run_check "Pytest + coverage" uv run pytest
+run_check "Architecture debt" uv run --locked python scripts/checks/architecture_debt.py
+run_check "Ruff" uv run --locked ruff check .
+run_check "Ruff format" uv run --locked ruff format --check .
+run_check "Ty" uv run --locked ty check
+run_check "Pytest + coverage" uv run --locked pytest
 
 exit "$STATUS"

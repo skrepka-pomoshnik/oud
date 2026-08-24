@@ -1,3 +1,4 @@
+# BEGIN COMMON PYTHON WORKSPACE IGNORES
 # Python environments, caches, and build products
 __pycache__/
 *.py[cod]
@@ -27,6 +28,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+# END COMMON PYTHON WORKSPACE IGNORES
+
 downloads/
 .claude/settings.local.json
 /examples/*
