@@ -130,6 +130,48 @@ def test_layout_policy_can_justify_final_or_only_system() -> None:
     assert justified_right.x + justified_right.width > natural_right.x + natural_right.width
 
 
+def test_layout_policy_hides_time_signatures_without_changing_meter_or_spacing() -> None:
+    meters = (
+        TimeSignature(3, 4),
+        TimeSignature(6, 8),
+        TimeSignature(4, 2),
+        TimeSignature(3, 4),
+    )
+    score = NotationScore(
+        id="meter-visibility-score",
+        staffs=(
+            NotationStaff(
+                id="meter-visibility-staff",
+                measures=tuple(
+                    NotationMeasure(
+                        id=f"meter-measure-{index}",
+                        number=index,
+                        events=(_event(f"meter-event-{index}", 0),),
+                        time_signature=meter,
+                    )
+                    for index, meter in enumerate(meters, start=1)
+                ),
+            ),
+        ),
+    )
+    viewport = LayoutViewport(width=120, height=30)
+    visible = layout_score(score, viewport=viewport, policy=NotationLayoutPolicy(show_time_signature=True))
+    hidden = layout_score(score, viewport=viewport, policy=NotationLayoutPolicy(show_time_signature=False))
+
+    visible_signatures = [
+        element.value for element in visible.elements if element.key.role is ElementRole.TIME_SIGNATURE
+    ]
+    assert visible_signatures == ["3/4", "6/8", "4/2", "3/4"]
+    assert not any(element.key.role is ElementRole.TIME_SIGNATURE for element in hidden.elements)
+    assert [measure.time_signature for measure in score.staffs[0].measures] == list(meters)
+    assert [(position.event_id, position.system_index, position.x) for position in visible.onsets] == [
+        (position.event_id, position.system_index, position.x) for position in hidden.onsets
+    ]
+    assert [[(box.x, box.width) for box in system.measure_boxes] for system in visible.systems] == [
+        [(box.x, box.width) for box in system.measure_boxes] for system in hidden.systems
+    ]
+
+
 def test_layout_uses_one_onset_coordinate_for_note_and_lyric_lane() -> None:
     note = _event("same-pitch-1", 0, 60)
     repeated = _event("same-pitch-2", 1, 60)

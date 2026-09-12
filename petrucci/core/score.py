@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from fractions import Fraction
 from typing import NoReturn
@@ -301,6 +301,7 @@ class NotationMeasure:
     forced_break_after: bool = False
     irregular: bool = False
     proportion: ProportionRatio | None = None
+    duration: Fraction | None = None
 
     def __post_init__(self) -> None:
         _validate_id(self.id, "measure")
@@ -314,6 +315,8 @@ class NotationMeasure:
             _fail("measure irregular must be a bool")
         if self.proportion is not None and not isinstance(self.proportion, ProportionRatio):
             _fail("measure proportion must be a ProportionRatio")
+        if self.duration is not None:
+            _validate_fraction(self.duration, "measure duration", allow_zero=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,6 +328,11 @@ class NotationStaff:
     lyrics: tuple[LyricSyllable, ...] = ()
     spans: tuple[NotationSpan, ...] = ()
     lyric_lines: tuple[LyricLine, ...] = ()
+    _measure_states: tuple[tuple[Clef, TimeSignature, KeySignature], ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         _validate_id(self.id, "staff")
@@ -340,6 +348,25 @@ class NotationStaff:
             _fail("staff spans must be NotationSpan values")
         if any(not isinstance(line, LyricLine) for line in self.lyric_lines):
             _fail("staff lyric lines must be LyricLine values")
+        object.__setattr__(self, "_measure_states", _effective_measure_states(self))
+
+    def measure_state(self, measure_index: int) -> tuple[Clef, TimeSignature, KeySignature]:
+        """Return the effective clef, meter, and key at one measure in constant time."""
+
+        return self._measure_states[measure_index]
+
+
+def _effective_measure_states(staff: NotationStaff) -> tuple[tuple[Clef, TimeSignature, KeySignature], ...]:
+    clef = staff.clef
+    time = TimeSignature()
+    key = KeySignature()
+    states: list[tuple[Clef, TimeSignature, KeySignature]] = []
+    for measure in staff.measures:
+        clef = measure.clef or clef
+        time = measure.time_signature or time
+        key = measure.key_signature or key
+        states.append((clef, time, key))
+    return tuple(states)
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,6 +397,9 @@ def validate_score(score: NotationScore) -> None:
         if len(staff.measures) != measure_count:
             _fail("all staffs must contain the same number of measures")
         _validate_staff(staff, seen)
+    reference_durations = _staff_measure_durations(score.staffs[0])
+    if any(_staff_measure_durations(staff) != reference_durations for staff in score.staffs[1:]):
+        _fail("aligned staffs must have matching measure durations")
 
 
 def iter_score_events(score: NotationScore) -> Iterator[NotationEvent]:
@@ -390,6 +420,57 @@ def duration_notation(duration: Fraction) -> tuple[int, int] | None:
         for dots in range(5):
             if value == duration:
                 return denominator, dots
+            addition /= 2
+            value += addition
+    return None
+
+
+class DurationBase(StrEnum):
+    """Named written values independent of reciprocal-denominator notation."""
+
+    BREVE = "breve"
+    WHOLE = "whole"
+    HALF = "half"
+    QUARTER = "quarter"
+    EIGHTH = "eighth"
+    SIXTEENTH = "sixteenth"
+    THIRTY_SECOND = "thirty-second"
+    SIXTY_FOURTH = "sixty-fourth"
+    ONE_HUNDRED_TWENTY_EIGHTH = "one-hundred-twenty-eighth"
+
+
+@dataclass(frozen=True, slots=True)
+class DurationSpelling:
+    """A written rhythmic value and its augmentation dots."""
+
+    base: DurationBase
+    dots: int = 0
+
+
+_DURATION_BASES = (
+    (DurationBase.BREVE, Fraction(2)),
+    (DurationBase.WHOLE, Fraction(1)),
+    (DurationBase.HALF, Fraction(1, 2)),
+    (DurationBase.QUARTER, Fraction(1, 4)),
+    (DurationBase.EIGHTH, Fraction(1, 8)),
+    (DurationBase.SIXTEENTH, Fraction(1, 16)),
+    (DurationBase.THIRTY_SECOND, Fraction(1, 32)),
+    (DurationBase.SIXTY_FOURTH, Fraction(1, 64)),
+    (DurationBase.ONE_HUNDRED_TWENTY_EIGHTH, Fraction(1, 128)),
+)
+
+
+def spell_duration(duration: Fraction) -> DurationSpelling | None:
+    """Spell an exact duration from breve through 128th with up to four dots."""
+
+    if not isinstance(duration, Fraction) or duration <= 0:
+        return None
+    for base, base_duration in _DURATION_BASES:
+        value = base_duration
+        addition = base_duration
+        for dots in range(5):
+            if value == duration:
+                return DurationSpelling(base, dots)
             addition /= 2
             value += addition
     return None
@@ -471,7 +552,7 @@ def _validate_staff_measures(
         measure_ids.add(measure.id)
         if measure.time_signature is not None:
             current_time = measure.time_signature
-        _validate_measure(measure, current_time.duration, seen, event_order)
+        _validate_measure(measure, measure.duration or current_time.duration, seen, event_order)
     return event_order, measure_ids
 
 
@@ -516,8 +597,17 @@ def _validate_measure(
     for event in measure.events:
         _claim_id(event.id, "event", seen)
         event_order[event.id] = len(event_order)
-        if not measure.irregular and event.onset + event.duration > capacity:
+        if (measure.duration is not None or not measure.irregular) and event.onset + event.duration > capacity:
             _fail(f"event {event.id!r} ends after measure {measure.id!r} capacity {capacity}")
+
+
+def _staff_measure_durations(staff: NotationStaff) -> tuple[Fraction, ...]:
+    meter = TimeSignature()
+    durations: list[Fraction] = []
+    for measure in staff.measures:
+        meter = measure.time_signature or meter
+        durations.append(measure.duration or meter.duration)
+    return tuple(durations)
 
 
 def _validate_span_references(span: NotationSpan, event_order: dict[str, int]) -> None:

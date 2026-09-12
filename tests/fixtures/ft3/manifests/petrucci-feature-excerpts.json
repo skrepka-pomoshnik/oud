@@ -57,7 +57,7 @@
         "grace_notes": 0
       },
       "expectations": {
-        "render_sha256": "faafc8b46002a5ce0e9a45489a4c4367d155ff827ed429892c81ea0dfe8d3771",
+        "render_sha256": "0882da38562dcaa565f65042f7d3875b8370a25c6d997b2f8e1e0ca245fdb5d0",
         "tab_sha256": "7acf32dd4a48b94ebc228ecd2ca529f5405ad282eb7b7772721f5e90f806bc6e",
         "tab_projection_sha256": "435c4d4e31bd6fbd4bb2d8c04fda7961ef37de524077ea2a33305a730c29dcf1",
         "lilypond_sha256": "d949ca8b0aad1a64cd0f5d3ee8718f72f6add34e070345f7d775a98a7424248f",

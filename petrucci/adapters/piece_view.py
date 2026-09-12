@@ -190,7 +190,6 @@ def _with_tablature_staff(score: NotationScore) -> NotationScore:
             measure,
             id=f"piece:tab:bar:{index}:measure",
             events=(),
-            time_signature=None,
             key_signature=None,
             clef=None,
         )

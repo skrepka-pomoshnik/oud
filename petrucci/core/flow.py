@@ -200,6 +200,7 @@ def adapt_flow_events(
             ),
             time_signature=active.time_signature if index == 0 else None,
             key_signature=active.key_signature if index == 0 else None,
+            duration=measure_capacity / active.time_signature.beat_unit,
         )
         for index, measure in enumerate(measures)
     )
@@ -274,6 +275,7 @@ def _adapt_explicit_measure(
         key_signature=(measure.key_signature or options.key_signature) if index == 0 else measure.key_signature,
         clef=measure.clef,
         irregular=measure.irregular or capacity != meter.beats,
+        duration=capacity / meter.beat_unit,
     )
     return notation, mappings, lyrics, capacity
 

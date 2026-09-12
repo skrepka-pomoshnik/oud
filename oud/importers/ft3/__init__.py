@@ -15,6 +15,7 @@ from oud.importers.ft3.metadata import (
     extract_text,
     read_ft3,
 )
+from oud.importers.ft3.musical.assembly import _build_imported_score
 from oud.importers.ft3.musical.duration import (
     _apply_legacy_duration_fix,
     _bar_uses_raw_vocal_fallback,
@@ -43,7 +44,6 @@ from oud.importers.ft3.score import (
     _parse_score_text_record,
     _record_has_content,
 )
-from oud.importers.ft3.score_layers import _build_imported_score
 from oud.importers.ft3.source_profiles import apply_ft3_source_tuning
 from oud.importers.ft3.text.codec import (
     FT3TextRecord,

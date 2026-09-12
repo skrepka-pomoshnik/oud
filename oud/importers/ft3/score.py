@@ -793,5 +793,3 @@ def _demote_heuristic_melody(record: FT3TextRecord) -> FT3TextRecord:
             ),
         )
     return replace(record, melody_grid=None, melody_events=[], structured_rows=rows)
-
-

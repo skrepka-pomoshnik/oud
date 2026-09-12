@@ -32,6 +32,20 @@ class _MeasureGeometry:
 
 
 @dataclass(frozen=True, slots=True)
+class _SharedOnsetGroup:
+    onset: Fraction
+    width: int
+
+
+@dataclass(frozen=True, slots=True)
+class _SharedMeasureGeometry:
+    groups: tuple[_SharedOnsetGroup, ...]
+    change_width: int
+    min_width: int
+    natural_width: int
+
+
+@dataclass(frozen=True, slots=True)
 class _MeasureEventContext:
     staff_id: str
     measure_id: str
@@ -60,6 +74,7 @@ class _HorizontalPlan:
     measure_x: int
     available_width: int
     systems: tuple[BoxSystem, ...]
+    measure_geometries: tuple[_SharedMeasureGeometry, ...]
 
 
 @dataclass(frozen=True, slots=True)

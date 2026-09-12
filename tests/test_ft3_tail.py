@@ -5,11 +5,13 @@ from oud.importers.ft3.score import (
     _parallel_raw_bar_targets,
 )
 
+
 def _ft3_bar_with_one_note() -> bytes:
     header = bytes(32)
     chord = bytes([0x02, 0x00, 0x00, 0x00])
     note = bytes([0x02, 0x61, 0x00, 0x00, 0x00])
     return header + chord + note
+
 
 def test_parse_time_signature_ft3_single_triple_code_is_numeric() -> None:
     assert parse_bar(bytes([0x03, 0x00]) + bytes(30)).time_sig == "3/4"

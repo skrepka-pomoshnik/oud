@@ -1,5 +1,25 @@
 # DONE
 
+- 2026-09-13: Added exact source-neutral timeline and pitch projection APIs.
+  `project_timeline` preserves measure, event, split-segment, and span identity
+  at a caller-selected `Fraction` origin/scale, reports viewport clipping and
+  quantization collisions without respacing, and reserves an explicit preamble.
+  Written and continuous pitch projection supports active treble/bass clef
+  changes, accidentals, interpolation, viewport offsets, and explicit rounding.
+  The remaining proportional engraver integration stays blocked in `TODO.md`.
+  Validation: Ruff lint and format, Ty, and 1,648 tests pass with 11 skips and
+  95.03% Petrucci coverage.
+
+- 2026-09-13: Established the Petrucci timeline foundation: canonical measures
+  retain exact pickup/irregular extents, aligned staffs validate shared
+  boundaries, all staffs consume shared onset anchors, clipped events retain
+  logical span geometry, written duration spelling supports breve values, and
+  staff state plus semantic cells use object-owned indexes. Nested timeline and
+  FT3 assembly modules under their domain packages and made the remaining
+  projection/engraving/performance work an explicit blocking gate in `TODO.md`.
+  Validation: Ruff lint and format, Ty, and 1,643 tests pass with 11 skips and
+  95.05% Petrucci coverage.
+
 - 2026-09-12: Retired the remaining test and corpus-script `C901`/`PLR0917`
   suppressions by extracting terminal, snapshot, command, PTY, report, and MIDI
   event helpers. Added export-boundary signature coverage and refreshed the

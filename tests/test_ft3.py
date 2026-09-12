@@ -13,8 +13,6 @@ from oud.importers.ft3.musical.tab import _decode_ft3_note_position, parse_bar
 from oud.importers.ft3.score import (
     _classify_unknown_score_chunk,
     _is_tab_layout_record,
-    _parallel_mixed_score_prefix_count,
-    _parallel_raw_bar_targets,
     _plain_score_annotations,
     _tab_heading_texts,
 )
@@ -978,5 +976,3 @@ def test_ich_bin_blume_ft3_fills_missing_time_signatures_by_section() -> None:
     assert piece.bars[128].time_sig == "6/8"
     assert piece.bars[140].time_sig == "6/8"
     assert piece.bars[159].time_sig == "C|"
-
-

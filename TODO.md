@@ -1,17 +1,58 @@
 # TODO
 
-Priority order:
+Priority order (hard dependency order):
 
-1. Publication-grade FT3 viewer support.
-2. Gerbode-based lute tablature and standard-note typing parity.
-3. Intelligent, score-aware transposition.
-4. Linked Petrucci proof quality and LilyPond publication export.
-5. Architecture debt and secondary release work.
+1. Complete the Petrucci foundation gate below.
+2. Publication-grade FT3 viewer support.
+3. Gerbode-based lute tablature and standard-note typing parity.
+4. Intelligent, score-aware transposition.
+5. Linked Petrucci proof quality and LilyPond publication export.
+6. Architecture debt and secondary release work.
 
 ## P0: Publication blockers
 
 No open P0 items. Publication readiness still depends on the P1 FT3 support and
 acceptance claims below.
+
+## P0: Petrucci reusable notation library
+
+This backlog comes from the 2026-09-12 Petrucci/Voce handoff. Petrucci remains
+source-neutral and owns notation, geometry, clipping, and semantic identity;
+Voce owns assessment, interaction, audio transport, and lesson policy.
+
+**Foundation gate:** do not start or polish any lower-priority Petrucci, FT3,
+viewer, transposition, or LilyPond item while this section has an unchecked
+item. Fixing presentation symptoms before these contracts are complete creates
+backend-specific geometry and is not an acceptable substitute.
+
+- [x] Preserve exact pickup and irregular-measure extents in the canonical score and flow adapter.
+  - Measure boundaries use whole-note units; aligned staffs reject conflicting extents.
+- [x] Build one union of exact onset anchors per measure and consume it across every staff.
+  - Staff-local collision widths may enlarge a shared slot but may not move simultaneous events independently.
+- [x] Retain logical onset geometry beyond the viewport and clip only paintable span segments.
+  - Ties, slurs, and glissandi must expose continuation geometry when an endpoint is clipped.
+- [x] Add typed written-duration spelling independent of reciprocal denominators.
+  - `DurationSpelling` covers breve through 128th values and four augmentation dots.
+- [x] Preindex effective staff state and semantic frame cells with object-owned lifetimes.
+  - Do not add global unbounded caches or repeated full-frame identity scans.
+- [ ] Expose a public proportional timeline projection with explicit origin and scale.
+  - Return exact event/segment positions, measure boundaries, viewport clipping, and collision diagnostics.
+  - [x] Publish exact `TimelineProjectionRequest` and identity-preserving measure/event/span projection records.
+  - [x] Keep requested scale fixed and report distinct onsets that round into one visible staff cell.
+  - [ ] Make the notation engraver consume these anchors for notes, beams, ties, slurs, ledger lines, and accidentals before painting.
+- [x] Expose public written-pitch and continuous-pitch staff projection against the same geometry contract.
+  - Cover treble/bass clefs, clef changes, accidentals, timeline positions, and viewport offsets.
+- [ ] Migrate engraving duration decisions to `DurationSpelling` and render breve/dotted-breve notes and rests.
+  - Add irregular-measure, semantic-cell, terminal-clipping, and no-tied-whole-note regressions.
+- [ ] Add bounded performance regressions for repeated layout, scrolling, resizing, batched lookup, and score replacement.
+  - Record workload size and ceilings; performance claims without measurements do not close this gate.
+
+- [x] Add display-only meter visibility for 3/4, 6/8, 4/2, and mid-score meter changes.
+  - Preserve meter, validation, beaming, event timing, and reserved preamble/change spacing.
+### Deferred: reusable accompaniment data
+
+- [ ] Assess an optional pure canonical-score performance projection with stable part/voice/source IDs.
+  - Keep MIDI serialization, TiMidity processes, transport, latency, and lesson policy outside Petrucci.
 
 ## P1.1: Publication-grade FT3 viewer
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from petrucci.core.music.timeline import score_measure_boundaries
 from petrucci.core.score import (
     Clef,
     EventKind,
@@ -67,6 +68,8 @@ from petrucci.engraving.notation.types import (
     _MeasureEventContext,
     _OnsetGroup,
     _PositionedMeasureEvents,
+    _SharedMeasureGeometry,
+    _SharedOnsetGroup,
     _StaffVerticalNeeds,
 )
 
@@ -133,6 +136,7 @@ def build_score_layout(
         event_locations=_event_locations(score, tuple(systems)),
         systems=tuple(systems),
         onsets=tuple(onsets),
+        measure_boundaries=score_measure_boundaries(score),
     )
 
 
@@ -454,6 +458,7 @@ def _system_elements(
             measure_elements, measure_onsets, measure_clipped_event_ids = _layout_measure(
                 staff,
                 measure,
+                shared_geometry=horizontal.measure_geometries[measure_index],
                 measure_index=measure_index,
                 system_index=system_index,
                 system_start=measure_start,
@@ -490,20 +495,21 @@ def _staff_base_elements(
         )
         for line_index, line_y in enumerate(rows.line_rows)
     ]
-    elements.extend(
-        [
-            LayoutElement(
-                ElementKey(staff.id, ElementRole.CLEF, system_start),
-                Rect(staff_x + 1, rows.line_rows[2] - 1),
-                state.clef.value,
-            ),
+    elements.append(
+        LayoutElement(
+            ElementKey(staff.id, ElementRole.CLEF, system_start),
+            Rect(staff_x + 1, rows.line_rows[2] - 1),
+            state.clef.value,
+        ),
+    )
+    if policy.show_time_signature:
+        elements.append(
             LayoutElement(
                 ElementKey(staff.id, ElementRole.TIME_SIGNATURE, system_start),
                 Rect(staff_x + 4 + abs(state.key.fifths), rows.line_rows[2] - 1, 3, 2),
                 f"{state.time.beats}/{state.time.beat_unit}",
             ),
-        ],
-    )
+        )
     elements.extend(
         _key_signature_elements(
             staff.id,
@@ -540,6 +546,7 @@ def _layout_measure(
     staff: NotationStaff,
     measure: NotationMeasure,
     *,
+    shared_geometry: _SharedMeasureGeometry,
     measure_index: int,
     system_index: int,
     system_start: int,
@@ -554,20 +561,24 @@ def _layout_measure(
     geometry = _measure_geometry(staff, measure_index, metrics=metrics, policy=policy)
     active_clef = _state_at(staff, measure_index).clef
     visible_accidentals = _visible_accidentals(staff, measure_index)
-    change_elements, event_left = _change_elements(
+    change_elements, _local_event_left = _change_elements(
         staff,
         measure,
         measure_index=measure_index,
         system_start=system_start,
         x=x + 1,
         rows=rows,
+        show_time_signature=policy.show_time_signature,
     )
-    group_xs, horizontally_clipped = _group_positions(
-        geometry.groups,
+    event_left = x + 1 + shared_geometry.change_width
+    shared_xs, horizontally_clipped = _group_positions(
+        shared_geometry.groups,
         left=event_left,
         right=x + width - 2,
         base_gap=metrics.event_gap,
     )
+    shared_by_onset = dict(zip((group.onset for group in shared_geometry.groups), shared_xs, strict=True))
+    group_xs = tuple(shared_by_onset[group.onset] for group in geometry.groups)
     elements = list(change_elements)
     if measure.ending_numbers:
         if rows.ending_row is None:
@@ -706,6 +717,7 @@ def _change_elements(
     system_start: int,
     x: int,
     rows: StaffRows,
+    show_time_signature: bool,
 ) -> tuple[tuple[LayoutElement, ...], int]:
     if measure_index == system_start:
         return _proportion_elements(measure, x=x, rows=rows)
@@ -731,13 +743,14 @@ def _change_elements(
         )
         cursor += max(1, abs(measure.key_signature.fifths)) + 1
     if measure.time_signature is not None and measure.time_signature != previous.time:
-        elements.append(
-            LayoutElement(
-                ElementKey(measure.id, ElementRole.TIME_SIGNATURE),
-                Rect(cursor, rows.line_rows[2] - 1, 3, 2),
-                f"{measure.time_signature.beats}/{measure.time_signature.beat_unit}",
-            ),
-        )
+        if show_time_signature:
+            elements.append(
+                LayoutElement(
+                    ElementKey(measure.id, ElementRole.TIME_SIGNATURE),
+                    Rect(cursor, rows.line_rows[2] - 1, 3, 2),
+                    f"{measure.time_signature.beats}/{measure.time_signature.beat_unit}",
+                ),
+            )
         cursor += 4
     proportion, cursor = _proportion_elements(measure, x=cursor, rows=rows)
     elements.extend(proportion)
@@ -762,7 +775,7 @@ def _proportion_elements(
 
 
 def _group_positions(
-    groups: tuple[_OnsetGroup, ...],
+    groups: tuple[_OnsetGroup, ...] | tuple[_SharedOnsetGroup, ...],
     *,
     left: int,
     right: int,
@@ -783,14 +796,13 @@ def _group_positions(
     for index, group in enumerate(groups):
         if cursor > right:
             clipped = True
-            break
         positions.append(cursor)
         if cursor + group.width - 1 > right:
             clipped = True
         cursor += group.width
         if index < len(gaps):
             cursor += gaps[index]
-    return tuple(positions), clipped or len(positions) != len(groups)
+    return tuple(positions), clipped
 
 
 def _spread_gap_slack(gaps: list[int], slack: int) -> None:

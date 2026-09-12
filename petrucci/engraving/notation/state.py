@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
+from petrucci.core.music.pitch import written_staff_position
 from petrucci.core.score import (
     AccidentalDisplay,
     Clef,
@@ -9,7 +10,6 @@ from petrucci.core.score import (
     NotationScore,
     NotationStaff,
     PitchStep,
-    TimeSignature,
     WrittenPitch,
 )
 from petrucci.engraving.layout.engine import ElementKey, ElementRole, LayoutElement, Rect, StaffRows
@@ -17,13 +17,7 @@ from petrucci.engraving.notation.types import _ScoreState
 
 
 def _state_at(staff: NotationStaff, measure_index: int) -> _ScoreState:
-    clef = staff.clef
-    time = TimeSignature()
-    key = KeySignature()
-    for measure in staff.measures[: measure_index + 1]:
-        clef = measure.clef or clef
-        time = measure.time_signature or time
-        key = measure.key_signature or key
+    clef, time, key = staff.measure_state(measure_index)
     return _ScoreState(clef=clef, time=time, key=key)
 
 
@@ -96,8 +90,7 @@ def _key_signature_positions(*, clef: Clef, sharp: bool) -> tuple[int, ...]:
 
 
 def _staff_position(pitch: WrittenPitch, *, clef: Clef) -> int:
-    bottom = WrittenPitch(PitchStep.E, 4) if clef is Clef.TREBLE else WrittenPitch(PitchStep.G, 2)
-    return _diatonic_number(pitch) - _diatonic_number(bottom)
+    return written_staff_position(pitch, clef)
 
 
 def _diatonic_number(pitch: WrittenPitch) -> int:

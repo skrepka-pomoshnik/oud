@@ -116,7 +116,8 @@ def test_clipped_event_keeps_a_visible_identity_marker() -> None:
     result = typeset_score(score, options=ScoreTypesetOptions(width=30, height=24, glyph_mode=GlyphMode.SAFE))
 
     assert result.layout.systems[0].clipped
-    assert result.layout.onset_for(clipped_id) is None
+    clipped_onset = result.layout.onset_for(clipped_id)
+    assert clipped_onset is not None and clipped_onset.x >= result.layout.width
     assert result.layout.location_for(clipped_id) is not None
     assert result.layout.system_for_event(clipped_id) is result.layout.systems[0]
     cells = result.cells_for(clipped_id)

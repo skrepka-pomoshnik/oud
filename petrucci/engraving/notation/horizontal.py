@@ -30,7 +30,13 @@ from petrucci.engraving.notation.state import (
     _state_at,
     _visible_accidentals,
 )
-from petrucci.engraving.notation.types import _HorizontalPlan, _MeasureGeometry, _OnsetGroup
+from petrucci.engraving.notation.types import (
+    _HorizontalPlan,
+    _MeasureGeometry,
+    _OnsetGroup,
+    _SharedMeasureGeometry,
+    _SharedOnsetGroup,
+)
 from petrucci.terminal.display import display_width
 
 
@@ -55,7 +61,8 @@ def _horizontal_plan(
             f"at least {metrics.min_measure_width} are required"
         )
         raise LayoutError(message)
-    boxes = _measure_boxes(score, metrics=metrics, policy=policy)
+    geometries = _shared_measure_geometries(score, metrics=metrics, policy=policy)
+    boxes = _measure_boxes(score, geometries=geometries)
     systems = fit_measured_boxes(
         boxes,
         options=BoxFitOptions(
@@ -66,28 +73,73 @@ def _horizontal_plan(
             max_stretch_per_box=metrics.max_measure_stretch,
         ),
     )
-    return _HorizontalPlan(label_width, staff_x, measure_x, available, systems)
+    return _HorizontalPlan(label_width, staff_x, measure_x, available, systems, geometries)
 
 
 def _measure_boxes(
     score: NotationScore,
     *,
-    metrics: LayoutMetrics,
-    policy: NotationLayoutPolicy,
+    geometries: tuple[_SharedMeasureGeometry, ...],
 ) -> tuple[MeasuredBox, ...]:
     boxes: list[MeasuredBox] = []
     for index in range(len(score.staffs[0].measures)):
-        geometries = [_measure_geometry(staff, index, metrics=metrics, policy=policy) for staff in score.staffs]
+        geometry = geometries[index]
         boxes.append(
             MeasuredBox(
                 id=_slot_id(index),
-                min_width=max(geometry.min_width for geometry in geometries),
-                natural_width=max(geometry.natural_width for geometry in geometries),
-                stretch_weight=max(1, *(len(geometry.groups) for geometry in geometries)),
+                min_width=geometry.min_width,
+                natural_width=geometry.natural_width,
+                stretch_weight=max(1, len(geometry.groups)),
                 break_after=any(staff.measures[index].forced_break_after for staff in score.staffs),
             ),
         )
     return tuple(boxes)
+
+
+def _shared_measure_geometries(
+    score: NotationScore,
+    *,
+    metrics: LayoutMetrics,
+    policy: NotationLayoutPolicy,
+) -> tuple[_SharedMeasureGeometry, ...]:
+    return tuple(
+        _shared_measure_geometry(score, index, metrics=metrics, policy=policy)
+        for index in range(len(score.staffs[0].measures))
+    )
+
+
+def _shared_measure_geometry(
+    score: NotationScore,
+    index: int,
+    *,
+    metrics: LayoutMetrics,
+    policy: NotationLayoutPolicy,
+) -> _SharedMeasureGeometry:
+    geometries = tuple(_measure_geometry(staff, index, metrics=metrics, policy=policy) for staff in score.staffs)
+    onsets = sorted({group.onset for geometry in geometries for group in geometry.groups})
+    groups = tuple(
+        _SharedOnsetGroup(
+            onset,
+            max(group.width for geometry in geometries for group in geometry.groups if group.onset == onset),
+        )
+        for onset in onsets
+    )
+    change_width = max(geometry.change_width for geometry in geometries)
+    token_width = sum(group.width for group in groups)
+    min_gaps = metrics.event_gap * max(0, len(groups) - 1)
+    natural_gaps = sum(
+        _natural_onset_gap(groups[pos].onset, groups[pos + 1].onset, metrics.event_gap)
+        for pos in range(max(0, len(groups) - 1))
+    )
+    fixed = 2 + change_width
+    local_minimum = max(geometry.min_width + change_width - geometry.change_width for geometry in geometries)
+    local_natural = max(geometry.natural_width + change_width - geometry.change_width for geometry in geometries)
+    return _SharedMeasureGeometry(
+        groups,
+        change_width,
+        max(metrics.min_measure_width, local_minimum, fixed + token_width + min_gaps),
+        max(local_natural, fixed + token_width + natural_gaps),
+    )
 
 
 def _measure_geometry(

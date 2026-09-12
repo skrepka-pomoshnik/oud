@@ -8,6 +8,7 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import NoReturn
 
+from petrucci.core.music.timeline import MeasureBoundary
 from petrucci.core.score import NotationScore
 from petrucci.engraving.layout.fitting import BoxSystem, MeasuredBox, PlacedBox, fit_measured_boxes
 
@@ -251,6 +252,8 @@ class LayoutMetrics:
 
 @dataclass(frozen=True, slots=True)
 class NotationLayoutPolicy:
+    """Display policy; hidden time signatures retain their layout reservation."""
+
     justify: bool = True
     justify_last_system: bool = False
     show_title: bool = True
@@ -259,6 +262,7 @@ class NotationLayoutPolicy:
     show_stems: bool = True
     show_barlines: bool = True
     show_pitch_labels: bool = False
+    show_time_signature: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +274,7 @@ class ScoreLayout:
     event_locations: tuple[EventLocation, ...]
     systems: tuple[ScoreSystem, ...]
     onsets: tuple[OnsetPosition, ...]
+    measure_boundaries: tuple[MeasureBoundary, ...] = ()
 
     def __post_init__(self) -> None:
         _validate_layout_references(self)

@@ -176,8 +176,10 @@ def _span_segments(
     for system_index in range(start.system_index, end.system_index + 1):
         system = systems[system_index]
         left, right = _staff_horizontal_bounds(system, staff_id)
-        segment_left = start.x + 1 if system_index == start.system_index else left
-        segment_right = end.x - 1 if system_index == end.system_index else right
+        raw_left = start.x + 1 if system_index == start.system_index else left
+        raw_right = end.x - 1 if system_index == end.system_index else right
+        segment_left = max(left, raw_left)
+        segment_right = min(right, raw_right)
         if segment_right < segment_left:
             continue
         y = _span_row(system, staff_id=staff_id, role=role, lane=lane)
@@ -185,6 +187,8 @@ def _span_segments(
             system_index=system_index,
             start_system=start.system_index,
             end_system=end.system_index,
+            left_clipped=raw_left < left,
+            right_clipped=raw_right > right,
         )
         segments.append(
             (
@@ -193,7 +197,7 @@ def _span_segments(
                     ElementKey(span_id, role, segment_index),
                     Rect(segment_left, y, segment_right - segment_left + 1),
                     segment_value,
-                    continuation=start.system_index != end.system_index,
+                    continuation=start.system_index != end.system_index or raw_left < left or raw_right > right,
                 ),
             ),
         )
@@ -201,9 +205,23 @@ def _span_segments(
     return tuple(segments)
 
 
-def _span_segment_value(*, system_index: int, start_system: int, end_system: int) -> str:
+def _span_segment_value(
+    *,
+    system_index: int,
+    start_system: int,
+    end_system: int,
+    left_clipped: bool,
+    right_clipped: bool,
+) -> str:
     if start_system == end_system:
-        return "complete"
+        value = "complete"
+        if left_clipped and right_clipped:
+            value = "continue"
+        elif left_clipped:
+            value = "end"
+        elif right_clipped:
+            value = "start"
+        return value
     if system_index == start_system:
         return "start"
     if system_index == end_system:

@@ -10,10 +10,10 @@ from oud.importers.ft3.score import (
     _FT3_SCORE_MIN_CONTROL_FRAGMENT_ROWS,
     _FT3_SCORE_MIN_LYRIC_ROWS,
     _FT3_SCORE_MIN_MATRIX_COLUMNS,
-    _ImportedScoreChunk,
     _MATRIX_COORDINATES,
     _SOURCE_RECORD_KINDS,
     _decode_raw_score_record,
+    _ImportedScoreChunk,
     _is_meaningful_lyric_line,
 )
 from oud.importers.ft3.text.codec import FT3TextRecord
@@ -28,6 +28,7 @@ from petrucci.core.model import (
     MelodyEvent,
     Piece,
 )
+
 
 def _imported_bar_base(bar_index: int, bar: Bar) -> ImportedBarContent:
     return ImportedBarContent(

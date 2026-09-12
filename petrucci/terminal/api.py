@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import NoReturn
 
@@ -35,6 +36,15 @@ class SemanticFrame:
     frame: Frame
     roles: tuple[tuple[ElementRole | None, ...], ...]
     element_ids: tuple[tuple[str | None, ...], ...]
+    _cell_index: Mapping[str, tuple[tuple[int, int], ...]] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        cells: dict[str, list[tuple[int, int]]] = {}
+        for y, row in enumerate(self.element_ids):
+            for x, source_id in enumerate(row):
+                if source_id is not None:
+                    cells.setdefault(source_id, []).append((y, x))
+        object.__setattr__(self, "_cell_index", {source_id: tuple(values) for source_id, values in cells.items()})
 
     @property
     def lines(self) -> tuple[str, ...]:
@@ -48,12 +58,12 @@ class SemanticFrame:
         return "\n".join(lines) + ("\n" if lines else "")
 
     def cells_for(self, element_id: str) -> tuple[tuple[int, int], ...]:
-        return tuple(
-            (y, x)
-            for y, row in enumerate(self.element_ids)
-            for x, source_id in enumerate(row)
-            if source_id == element_id
-        )
+        return self._cell_index.get(element_id, ())
+
+    def cells_for_many(self, element_ids: Iterable[str]) -> Mapping[str, tuple[tuple[int, int], ...]]:
+        """Return indexed cells for each requested stable identity."""
+
+        return {element_id: self.cells_for(element_id) for element_id in element_ids}
 
 
 @dataclass(frozen=True, slots=True)
