@@ -43,6 +43,71 @@ def _state() -> EditorState:
     return EditorState(piece, settings)
 
 
+def _patch_curses_smoke(monkeypatch, *, backspace: bool = False) -> None:
+    values = {
+        "curs_set": lambda *_args: None,
+        "napms": lambda *_args: None,
+        "A_REVERSE": 0,
+        "A_BOLD": 0,
+        "KEY_RESIZE": -1,
+        "KEY_EXIT": 27,
+        "KEY_LEFT": -1,
+        "KEY_RIGHT": -1,
+        "KEY_UP": -1,
+        "KEY_DOWN": -1,
+        "KEY_PPAGE": -1,
+        "KEY_NPAGE": -1,
+        "KEY_HOME": -1,
+        "KEY_END": -1,
+        "KEY_IC": -1,
+        "KEY_DC": -1,
+        "ERR": -1,
+    }
+    if backspace:
+        values["KEY_BACKSPACE"] = 127
+    for name, value in values.items():
+        monkeypatch.setattr(curses, name, value)
+
+
+class _SmokeWindow:
+    def __init__(self, keys: tuple[int, ...], size: tuple[int, int]) -> None:
+        self._keys = iter(keys)
+        self._size = size
+        self.added = 0
+
+    def getmaxyx(self) -> tuple[int, int]:
+        return self._size
+
+    def keypad(self, _flag: bool) -> None:
+        return None
+
+    def timeout(self, _delay: int) -> None:
+        return None
+
+    def erase(self) -> None:
+        return None
+
+    def refresh(self) -> None:
+        return None
+
+    def addstr(self, *_args: object, **_kwargs: object) -> None:
+        self.added += 1
+
+    def getch(self) -> int:
+        return next(self._keys, -1)
+
+
+def _run_smoke_window(window: _SmokeWindow, path: str | None = None) -> int:
+    return run_loop(
+        cast(curses.window, window),
+        path,
+        config_path="config.toml",
+        handle_insert=handle_insert,
+        handle_normal=handle_normal,
+        apply_command=apply_command,
+    )
+
+
 def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     state = _state()
     configure_document(state, str(tmp_path / "example.ft3"))
@@ -212,64 +277,9 @@ def test_stave_delete_removes_system() -> None:
     assert 2 not in state.stave_breaks
 
 
-def test_app_main_smoke(monkeypatch) -> None:  # noqa: C901
-    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
-    monkeypatch.setattr(curses, "napms", lambda *_args: None)
-    monkeypatch.setattr(curses, "A_REVERSE", 0)
-    monkeypatch.setattr(curses, "A_BOLD", 0)
-    monkeypatch.setattr(curses, "KEY_RESIZE", -1)
-    monkeypatch.setattr(curses, "KEY_EXIT", 27)
-    monkeypatch.setattr(curses, "KEY_LEFT", -1)
-    monkeypatch.setattr(curses, "KEY_RIGHT", -1)
-    monkeypatch.setattr(curses, "KEY_UP", -1)
-    monkeypatch.setattr(curses, "KEY_DOWN", -1)
-    monkeypatch.setattr(curses, "KEY_PPAGE", -1)
-    monkeypatch.setattr(curses, "KEY_NPAGE", -1)
-    monkeypatch.setattr(curses, "KEY_HOME", -1)
-    monkeypatch.setattr(curses, "KEY_END", -1)
-    monkeypatch.setattr(curses, "KEY_IC", -1)
-    monkeypatch.setattr(curses, "KEY_DC", -1)
-    monkeypatch.setattr(curses, "ERR", -1)
-
-    class FakeWindow:
-        def __init__(self) -> None:
-            self._calls = 0
-
-        def getmaxyx(self):
-            return (1, 1)
-
-        def keypad(self, _flag):
-            return None
-
-        def timeout(self, _delay):
-            return None
-
-        def erase(self):
-            return None
-
-        def refresh(self):
-            return None
-
-        def addstr(self, *_args, **_kwargs):
-            return None
-
-        def getch(self):
-            if self._calls == 0:
-                self._calls += 1
-                return ord("q")
-            return -1
-
-    assert (
-        run_loop(
-            cast(curses.window, FakeWindow()),
-            None,
-            config_path="config.toml",
-            handle_insert=handle_insert,
-            handle_normal=handle_normal,
-            apply_command=apply_command,
-        )
-        == 0
-    )
+def test_app_main_smoke(monkeypatch) -> None:
+    _patch_curses_smoke(monkeypatch)
+    assert _run_smoke_window(_SmokeWindow((ord("q"),), (1, 1))) == 0
 
 
 def test_read_input_batch_drains_queued_repeat_keys_before_render() -> None:
@@ -291,138 +301,19 @@ def test_read_input_batch_drains_queued_repeat_keys_before_render() -> None:
     assert window.timeouts == [50, 0]
 
 
-def test_app_main_smoke_with_path(monkeypatch) -> None:  # noqa: C901
-    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
-    monkeypatch.setattr(curses, "napms", lambda *_args: None)
-    monkeypatch.setattr(curses, "A_REVERSE", 0)
-    monkeypatch.setattr(curses, "A_BOLD", 0)
-    monkeypatch.setattr(curses, "KEY_RESIZE", -1)
-    monkeypatch.setattr(curses, "KEY_EXIT", 27)
-    monkeypatch.setattr(curses, "KEY_LEFT", -1)
-    monkeypatch.setattr(curses, "KEY_RIGHT", -1)
-    monkeypatch.setattr(curses, "KEY_UP", -1)
-    monkeypatch.setattr(curses, "KEY_DOWN", -1)
-    monkeypatch.setattr(curses, "KEY_PPAGE", -1)
-    monkeypatch.setattr(curses, "KEY_NPAGE", -1)
-    monkeypatch.setattr(curses, "KEY_HOME", -1)
-    monkeypatch.setattr(curses, "KEY_END", -1)
-    monkeypatch.setattr(curses, "KEY_IC", -1)
-    monkeypatch.setattr(curses, "KEY_DC", -1)
-    monkeypatch.setattr(curses, "ERR", -1)
+def test_app_main_smoke_with_path(monkeypatch) -> None:
+    _patch_curses_smoke(monkeypatch)
+    window = _SmokeWindow((ord("q"),), (1, 1))
+    assert _run_smoke_window(window, "missing.ft3") == 0
 
-    class FakeWindow:
-        def __init__(self) -> None:
-            self._calls = 0
 
-        def getmaxyx(self):
-            return (1, 1)
-
-        def keypad(self, _flag):
-            return None
-
-        def timeout(self, _delay):
-            return None
-
-        def erase(self):
-            return None
-
-        def refresh(self):
-            return None
-
-        def addstr(self, *_args, **_kwargs):
-            return None
-
-        def getch(self):
-            if self._calls == 0:
-                self._calls += 1
-                return ord("q")
-            return -1
-
-    assert (
-        run_loop(
-            cast(curses.window, FakeWindow()),
-            "missing.ft3",
-            config_path="config.toml",
-            handle_insert=handle_insert,
-            handle_normal=handle_normal,
-            apply_command=apply_command,
-        )
-        == 0
+def test_app_main_smoke_interactions(monkeypatch) -> None:
+    _patch_curses_smoke(monkeypatch, backspace=True)
+    window = _SmokeWindow(
+        (ord(":"), ord("w"), 127, 27, ord("/"), ord("1"), 10, ord("q")),
+        (12, 60),
     )
-
-
-def test_app_main_smoke_interactions(monkeypatch) -> None:  # noqa: C901
-    monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
-    monkeypatch.setattr(curses, "napms", lambda *_args: None)
-    monkeypatch.setattr(curses, "A_REVERSE", 0)
-    monkeypatch.setattr(curses, "A_BOLD", 0)
-    monkeypatch.setattr(curses, "KEY_RESIZE", -1)
-    monkeypatch.setattr(curses, "KEY_EXIT", 27)
-    monkeypatch.setattr(curses, "KEY_LEFT", -1)
-    monkeypatch.setattr(curses, "KEY_RIGHT", -1)
-    monkeypatch.setattr(curses, "KEY_UP", -1)
-    monkeypatch.setattr(curses, "KEY_DOWN", -1)
-    monkeypatch.setattr(curses, "KEY_PPAGE", -1)
-    monkeypatch.setattr(curses, "KEY_NPAGE", -1)
-    monkeypatch.setattr(curses, "KEY_HOME", -1)
-    monkeypatch.setattr(curses, "KEY_END", -1)
-    monkeypatch.setattr(curses, "KEY_IC", -1)
-    monkeypatch.setattr(curses, "KEY_DC", -1)
-    monkeypatch.setattr(curses, "KEY_BACKSPACE", 127)
-    monkeypatch.setattr(curses, "ERR", -1)
-
-    class FakeWindow:
-        def __init__(self) -> None:
-            self._calls = 0
-            self.added = 0
-            self._keys = [
-                ord(":"),
-                ord("w"),
-                127,
-                27,
-                ord("/"),
-                ord("1"),
-                10,
-                ord("q"),
-            ]
-
-        def getmaxyx(self):
-            return (12, 60)
-
-        def keypad(self, _flag):
-            return None
-
-        def timeout(self, _delay):
-            return None
-
-        def erase(self):
-            return None
-
-        def refresh(self):
-            return None
-
-        def addstr(self, *_args, **_kwargs):
-            self.added += 1
-
-        def getch(self):
-            if self._calls < len(self._keys):
-                key = self._keys[self._calls]
-                self._calls += 1
-                return key
-            return -1
-
-    window = FakeWindow()
-    assert (
-        run_loop(
-            cast(curses.window, window),
-            None,
-            config_path="config.toml",
-            handle_insert=handle_insert,
-            handle_normal=handle_normal,
-            apply_command=apply_command,
-        )
-        == 0
-    )
+    assert _run_smoke_window(window) == 0
     assert window.added > 0
 
 
@@ -627,8 +518,8 @@ def test_run_loop_passes_playback_position_to_imported_score_renderer(monkeypatc
     def _fake_init_state(*_args, **_kwargs):
         return state
 
-    def _fake_render_piece(*args, **kwargs):
-        rendered_positions.append((args[29], args[30], kwargs["playback_cache"]))
+    def _fake_render_piece(*_args, **kwargs):
+        rendered_positions.append((kwargs["playback_bar"], kwargs["playback_col"], kwargs["playback_cache"]))
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", lambda _state: False)

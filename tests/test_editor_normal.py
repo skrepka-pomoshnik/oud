@@ -43,33 +43,33 @@ def _render_lines(state: EditorState, *, width: int = 80, height: int = 24) -> l
         state.bar_offset,
         state.cursor_bar,
         state.cursor_string,
-        state.cursor_col,
-        state.bar_width,
-        state.overrides,
-        state.durations,
-        state.ornaments,
-        state.annotations,
-        state.highlights,
-        state.dotted,
-        state.slurs,
-        state.ties,
-        state.holds,
-        state.mode,
-        state.cmdline,
-        "",
-        "",
-        state.searchline,
-        state.settings,
-        None,
-        state.stave_breaks,
-        state.plugin_title,
-        [],
-        state.plugin_index,
-        state.plugin_offset,
-        state.help_offset,
-        state.playback_bar,
-        state.playback_col,
-        getattr(state, "glisses", []),
+        cursor_col=state.cursor_col,
+        bar_width=state.bar_width,
+        overrides=state.overrides,
+        durations=state.durations,
+        ornaments=state.ornaments,
+        annotations=state.annotations,
+        highlights=state.highlights,
+        dotted=state.dotted,
+        slurs=state.slurs,
+        ties=state.ties,
+        holds=state.holds,
+        mode=state.mode,
+        cmdline=state.cmdline,
+        message="",
+        status_line="",
+        searchline=state.searchline,
+        settings=state.settings,
+        ascii_lines=None,
+        stave_breaks=state.stave_breaks,
+        plugin_title=state.plugin_title,
+        plugin_items=[],
+        plugin_index=state.plugin_index,
+        plugin_offset=state.plugin_offset,
+        help_offset=state.help_offset,
+        playback_bar=state.playback_bar,
+        playback_col=state.playback_col,
+        glisses=getattr(state, "glisses", []),
     )
     return fb.snapshot().lines
 
@@ -534,7 +534,47 @@ def test_insert_bass_slash_shorthand() -> None:
     assert state.overrides[(0, 6, 0)] == "a"
 
 
-def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> None:  # noqa: C901
+def _first_flag_row(lines: list[str], top_g_idx: int) -> str:
+    for line in reversed(lines[:top_g_idx]):
+        if any(f"{label}|" in line for label in ("g", "d", "a", "f", "c")):
+            continue
+        if any(ch in line for ch in ("|", "\\", "=")):
+            return line
+    return ""
+
+
+def _flag_and_note_x(lines: list[str], top_g_idx: int) -> tuple[int, int]:
+    top_g_row = lines[top_g_idx]
+    note_x = top_g_row.find("a")
+    assert note_x >= 0
+    flag_row = _first_flag_row(lines, top_g_idx)
+    assert flag_row
+    glyph_positions = [i for i, ch in enumerate(flag_row) if ch in ("|", "\\", "=")]
+    assert glyph_positions
+    return glyph_positions[0], note_x
+
+
+def _assert_time_cue_is_clear(lines: list[str], flag_row: str) -> None:
+    time_rows = [line for line in lines if "|-C" in line or " C" in line]
+    if not time_rows:
+        return
+    time_x = time_rows[0].find("C")
+    if time_x >= 0:
+        assert flag_row[time_x] == " "
+
+
+def _assert_inserted_a_alignment(lines: list[str], expected_flag_x: int | None) -> int:
+    top_g_idx = next(i for i, line in enumerate(lines) if "g|" in line)
+    flag_x, note_x = _flag_and_note_x(lines, top_g_idx)
+    if expected_flag_x is None:
+        expected_flag_x = flag_x
+    assert flag_x == expected_flag_x
+    assert flag_x == note_x
+    _assert_time_cue_is_clear(lines, _first_flag_row(lines, top_g_idx))
+    return expected_flag_x
+
+
+def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> None:
     state = _state()
     state.screen_width = 28
     state.screen_height = 20
@@ -555,37 +595,13 @@ def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> Non
             "flagredundant": "on",
         },
     )
-    if not hasattr(state, "glisses"):
-        state.glisses = []
+    state.glisses = getattr(state, "glisses", [])
     _press(state, ord("i"))
     first_flag_x: int | None = None
     for _ in range(4):
         _press(state, ord("a"))
         lines = _render_lines(state, width=state.screen_width, height=state.screen_height)
-        top_g_idx = next(i for i, line in enumerate(lines) if "g|" in line)
-        top_g_row = lines[top_g_idx]
-        note_x = top_g_row.find("a")
-        assert note_x >= 0
-        flag_row = ""
-        for line in reversed(lines[:top_g_idx]):
-            if any(f"{label}|" in line for label in ("g", "d", "a", "f", "c")):
-                continue
-            if any(ch in line for ch in ("|", "\\", "=")):
-                flag_row = line
-                break
-        assert flag_row
-        glyph_positions = [i for i, ch in enumerate(flag_row) if ch in ("|", "\\", "=")]
-        assert glyph_positions
-        flag_x = glyph_positions[0]
-        if first_flag_x is None:
-            first_flag_x = flag_x
-        assert flag_x == first_flag_x
-        assert flag_x == note_x
-        time_rows = [line for line in lines if "|-C" in line or " C" in line]
-        if time_rows:
-            time_x = time_rows[0].find("C")
-            if time_x >= 0:
-                assert flag_row[time_x] == " "
+        first_flag_x = _assert_inserted_a_alignment(lines, first_flag_x)
 
 
 def test_keypress_insert_aaaa_then_l_moves_one_cell_per_press_on_grid_bar() -> None:

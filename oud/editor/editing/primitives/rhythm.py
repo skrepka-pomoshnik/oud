@@ -78,21 +78,15 @@ def _row_has_note(state: EditorState, bar_index: int, string: int, col: int) -> 
     return False
 
 
-def row_duration_sum(state: EditorState, bar_index: int, string: int) -> float:  # noqa: C901
-    if bar_index < 0 or bar_index >= len(state.piece.bars):
-        return 0.0
-    bar = state.piece.bars[bar_index]
-    if bar.chords:
-        total = 0.0
-        for chord in bar.chords:
-            if not any(note.string == string + 1 for note in chord.notes):
-                continue
-            denom = note_type_to_denom(chord.note_type) or 4
-            duration = 4.0 / denom
-            if chord.dotted:
-                duration *= 1.5
-            total += duration
-        return total
+def _row_chord_duration_sum(bar, string: int) -> float:
+    return sum(
+        4.0 / (note_type_to_denom(chord.note_type) or 4) * (1.5 if chord.dotted else 1.0)
+        for chord in bar.chords
+        if any(note.string == string + 1 for note in chord.notes)
+    )
+
+
+def _row_grid_duration_sum(state: EditorState, bar_index: int, string: int) -> float:
     total = 0.0
     for col in range(state.bar_width):
         if not _row_has_note(state, bar_index, string, col):
@@ -105,39 +99,34 @@ def row_duration_sum(state: EditorState, bar_index: int, string: int) -> float: 
     return total
 
 
-def bar_duration_sum_by_col(state: EditorState, bar_index: int) -> float:  # noqa: C901
+def row_duration_sum(state: EditorState, bar_index: int, string: int) -> float:
     if bar_index < 0 or bar_index >= len(state.piece.bars):
         return 0.0
     bar = state.piece.bars[bar_index]
     if bar.chords:
-        total = 0.0
-        for chord in bar.chords:
-            denom = note_type_to_denom(chord.note_type) or 4
-            duration = 4.0 / denom
-            if chord.dotted:
-                duration *= 1.5
-            total += duration
-        return total
-    total = 0.0
-    for col in range(state.bar_width):
-        has_note = any((bar_index, s_idx, col) in state.overrides for s_idx in range(state.piece.strings))
-        has_duration = any((bar_index, s_idx, col) in state.durations for s_idx in range(state.piece.strings))
-        if not (has_note or has_duration):
-            continue
-        found = None
-        for s_idx in range(state.piece.strings):
-            key = (bar_index, s_idx, col)
-            if key in state.durations:
-                denom = state.durations[key]
-                if found is None or denom > found:
-                    found = denom
-        if found is None:
-            found = 4
-        duration = 4.0 / found
-        if (bar_index, col) in state.dotted:
-            duration *= 1.5
-        total += duration
-    return total
+        return _row_chord_duration_sum(bar, string)
+    return _row_grid_duration_sum(state, bar_index, string)
+
+
+def _column_grid_duration(state: EditorState, bar_index: int, col: int) -> float:
+    has_note = any((bar_index, s_idx, col) in state.overrides for s_idx in range(state.piece.strings))
+    has_duration = any((bar_index, s_idx, col) in state.durations for s_idx in range(state.piece.strings))
+    if not (has_note or has_duration):
+        return 0.0
+    denom = column_denom(state, bar_index, col)
+    duration = 4.0 / denom
+    return duration * (1.5 if (bar_index, col) in state.dotted else 1.0)
+
+
+def bar_duration_sum_by_col(state: EditorState, bar_index: int) -> float:
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return 0.0
+    bar = state.piece.bars[bar_index]
+    if bar.chords:
+        return sum(
+            4.0 / (note_type_to_denom(chord.note_type) or 4) * (1.5 if chord.dotted else 1.0) for chord in bar.chords
+        )
+    return sum(_column_grid_duration(state, bar_index, col) for col in range(state.bar_width))
 
 
 def advance_to_next_bar(state: EditorState) -> None:

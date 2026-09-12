@@ -29,14 +29,13 @@ availability is not reserved until the first upload.
 curl -sS -o /dev/null -w '%{http_code}\n' https://pypi.org/pypi/oud/json
 ```
 
-The Ubuntu Python 3.11 quality job must be green before tagging. Run the focused
-`macos-curses` workflow manually when terminal input, resize handling, or curses
-presentation changes; it does not spend macOS runner minutes on unrelated
-commits.
+This project intentionally does not use GitHub Actions CI. Run the local quality
+and release checks above before tagging. Platform-specific curses behavior is
+covered by the macOS-marked tests when they are run on a macOS host.
 
 ## Publication decisions
 
 - The canonical repository, homepage, and issue tracker are
   `https://github.com/skrepka-pomoshnik/oud`.
-- `uv.lock`, `.github/workflows/ci.yml`, and `tests/fixtures/ft3/README.md` are tracked
-  and present on `origin/main` from commit `390ebe8`.
+- `uv.lock` and `tests/fixtures/ft3/README.md` are tracked; proprietary FT3
+  files remain local fixtures and are not redistributed.

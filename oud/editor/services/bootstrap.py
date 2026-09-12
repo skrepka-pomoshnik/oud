@@ -9,11 +9,80 @@ from oud.editor.services.io.loading import import_warning_summary, load_piece_da
 from oud.importers.ft3 import build_durations
 from oud.importers.tab import load_tab_data
 from oud.settings import DEFAULT_SETTINGS, load_settings
-from petrucci.core.model import Bar
+from petrucci.core.model import Bar, Piece
 from petrucci.core.music.tuning import tuning_count
 
+_MIN_PIECE_STRINGS = 4
+_MAX_PIECE_STRINGS = 7
 
-def init_state(  # noqa: C901, PLR0912
+
+def _invalid_source(path: str | None, piece: Piece) -> bool:
+    return bool(path and (Path(path).is_dir() or (piece.import_warnings and not piece.bars)))
+
+
+def _ensure_initial_bars(piece: Piece, settings: dict[str, str]) -> None:
+    if piece.bars:
+        return
+    try:
+        initial_bars = int(settings.get("newbars", DEFAULT_SETTINGS.get("newbars", "8")))
+    except ValueError:
+        initial_bars = int(DEFAULT_SETTINGS.get("newbars", "8"))
+    piece.bars = [Bar() for _ in range(max(1, initial_bars))]
+
+
+def _apply_piece_metadata(state: EditorState) -> None:
+    piece = state.piece
+    if piece.style:
+        state.settings["style"] = piece.style
+    if piece.tempo is not None:
+        state.settings["tempo"] = str(piece.tempo)
+    if not piece.tuning:
+        return
+    state.settings["tuning"] = piece.tuning
+    tuned_strings = tuning_count(piece.tuning)
+    if tuned_strings:
+        piece.strings = tuned_strings
+
+
+def _setting_int(settings: dict[str, str], key: str, fallback_key: str) -> int:
+    try:
+        return int(settings.get(key, DEFAULT_SETTINGS[fallback_key]))
+    except ValueError:
+        return int(DEFAULT_SETTINGS[fallback_key])
+
+
+def _apply_path_defaults(state: EditorState, path: str | None) -> None:
+    is_tab = bool(path and path.lower().endswith(".tab"))
+    if not is_tab and path is None:
+        strings = _setting_int(state.settings, "strings", "strings")
+        if _MIN_PIECE_STRINGS <= strings <= _MAX_PIECE_STRINGS:
+            state.piece.strings = strings
+        return
+    if is_tab and not state.piece.tuning:
+        state.piece.strings = int(DEFAULT_SETTINGS["strings"])
+        if not state.settings.get("tuning"):
+            state.settings["tuning"] = "g2c3f3a3d4g4"
+
+
+def _apply_spacing(state: EditorState, imported_bar_width: int | None) -> None:
+    if imported_bar_width:
+        state.bar_width = max(4, imported_bar_width)
+        return
+    spacing = _setting_int(state.settings, "spacing", "spacing")
+    state.bar_width = max(4, spacing)
+
+
+def _apply_import_feedback(state: EditorState, *, read_only: bool) -> None:
+    if state.piece.import_warnings:
+        warning = import_warning_summary(state.piece)
+        state.persistent_notice = warning
+        state.persistent_notice_level = MessageLevel.WARNING
+        state.message = warning
+    elif read_only:
+        state.message = READ_ONLY_VIEWER
+
+
+def init_state(
     path: str | None,
     *,
     config_path: str,
@@ -22,16 +91,8 @@ def init_state(  # noqa: C901, PLR0912
     settings = load_settings(config_path)
     requested_path = path
     piece, overrides, durations, dotted, bar_width = load_piece_data(path)
-    invalid_source = bool(
-        requested_path and (Path(requested_path).is_dir() or (piece.import_warnings and not piece.bars)),
-    )
-    if not piece.bars:
-        try:
-            initial_bars = int(settings.get("newbars", DEFAULT_SETTINGS.get("newbars", "8")))
-        except ValueError:
-            initial_bars = int(DEFAULT_SETTINGS.get("newbars", "8"))
-        initial_bars = max(1, initial_bars)
-        piece.bars = [Bar() for _ in range(initial_bars)]
+    invalid_source = _invalid_source(requested_path, piece)
+    _ensure_initial_bars(piece, settings)
 
     state = EditorState(piece, settings, config_path=config_path)
     state.overrides = overrides
@@ -41,50 +102,12 @@ def init_state(  # noqa: C901, PLR0912
         state.tab_data = load_tab_data(path)
     valid_path = None if invalid_source else path
     configure_document(state, valid_path, forced_read_only=read_only)
-    is_tab = bool(path and path.lower().endswith(".tab"))
-    if piece.style:
-        state.settings["style"] = piece.style
-    if piece.tempo is not None:
-        state.settings["tempo"] = str(piece.tempo)
-    if piece.tuning:
-        tuned_strings = tuning_count(piece.tuning)
-        if tuned_strings:
-            state.piece.strings = tuned_strings
-            state.settings["tuning"] = piece.tuning
-    if not is_tab and path is None:
-        try:
-            strings = int(settings.get("strings", DEFAULT_SETTINGS["strings"]))
-        except ValueError:
-            strings = int(DEFAULT_SETTINGS["strings"])
-        minimum_supported_strings = 4
-        maximum_supported_strings = 7
-        if minimum_supported_strings <= strings <= maximum_supported_strings:
-            state.piece.strings = strings
-    elif is_tab and not piece.tuning:
-        # Legacy .tab files often omit explicit tuning; keep default 6-course fallback
-        # only for TAB import, not FT3/MusicXML where parser may already infer >6 courses.
-        state.piece.strings = int(DEFAULT_SETTINGS["strings"])
-        if not state.settings.get("tuning"):
-            state.settings["tuning"] = "g2c3f3a3d4g4"
-    try:
-        spacing = int(settings.get("spacing", DEFAULT_SETTINGS["spacing"]))
-    except ValueError:
-        spacing = int(DEFAULT_SETTINGS["spacing"])
-    if bar_width:
-        state.bar_width = max(4, bar_width)
-    else:
-        state.bar_width = max(4, spacing)
+    _apply_piece_metadata(state)
+    _apply_path_defaults(state, path)
+    _apply_spacing(state, bar_width)
     if piece.bars and piece.bars[0].time_sig:
         state.settings["time"] = piece.bars[0].time_sig or state.settings.get("time", "C")
-    if piece.tuning:
-        state.settings["tuning"] = piece.tuning
     if not state.durations:
         state.durations = build_durations(piece)
-    if piece.import_warnings:
-        warning = import_warning_summary(piece)
-        state.persistent_notice = warning
-        state.persistent_notice_level = MessageLevel.WARNING
-        state.message = warning
-    elif read_only:
-        state.message = READ_ONLY_VIEWER
+    _apply_import_feedback(state, read_only=read_only)
     return state

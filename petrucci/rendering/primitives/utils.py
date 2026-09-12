@@ -45,11 +45,12 @@ def _place_legacy_note(
     next_col[string_index] = min(bar_width, col + max(1, len(text)) + 1)
 
 
-def bar_cells(  # noqa: PLR0917 - public compatibility; replace options with a typed tab policy
+def bar_cells(
     bar: Bar,
     strings: int,
     bar_width: int,
     style: str,
+    *,
     french_c_shape: str = "normal",
     label_mode: str = "auto",
     **legacy: str,
@@ -138,12 +139,13 @@ def chord_slot_positions(
     return chord_positions(bar, bar_width, default_duration)
 
 
-def bar_cells_from_chords(  # noqa: PLR0917 - public compatibility; replace options with a typed tab policy
+def bar_cells_from_chords(
     bar: Bar,
     strings: int,
     bar_width: int,
     default_duration: int,
     style: str,
+    *,
     french_c_shape: str = "normal",
     label_mode: str = "auto",
     **legacy: str,
@@ -392,12 +394,13 @@ def stem_row_style(
     return row
 
 
-def flag_positions_from_durations(  # noqa: PLR0917 - legacy grid projection pending a typed input record
+def flag_positions_from_durations(
     durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
     bar_width: int,
     default_duration: int,
+    *,
     dotted: set[tuple[int, int]] | None = None,
 ) -> list[tuple[int, int, bool]]:
     if bar_width <= 0:

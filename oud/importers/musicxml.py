@@ -236,7 +236,7 @@ def _technical_count(part: ET.Element) -> int:
     )
 
 
-def _parse_piece(root: ET.Element) -> Piece:
+def _piece_metadata(root: ET.Element) -> tuple[str, str | None]:
     work = _child(root, "work")
     work_title = _child(work, "work-title") if work is not None else None
     title = _text(work_title) or "Untitled"
@@ -248,16 +248,25 @@ def _parse_piece(root: ET.Element) -> Piece:
             if ctype == "composer":
                 composer = _text(creator) or None
                 break
-    part = max(_children(root, "part"), key=_technical_count, default=None)
+    return title, composer
+
+
+def _parse_musicxml_part(part: ET.Element) -> tuple[list[Bar], int]:
     bars: list[Bar] = []
     strings = 6
     divisions = 1
-    if part is not None:
-        for measure in _children(part, "measure"):
-            divisions = _measure_divisions(measure, divisions)
-            bar, max_string = _parse_measure(measure, divisions)
-            bars.append(bar)
-            strings = max(_staff_lines(measure, strings), max_string)
+    for measure in _children(part, "measure"):
+        divisions = _measure_divisions(measure, divisions)
+        bar, max_string = _parse_measure(measure, divisions)
+        bars.append(bar)
+        strings = max(_staff_lines(measure, strings), max_string)
+    return bars, strings
+
+
+def _parse_piece(root: ET.Element) -> Piece:
+    title, composer = _piece_metadata(root)
+    part = max(_children(root, "part"), key=_technical_count, default=None)
+    bars, strings = _parse_musicxml_part(part) if part is not None else ([], 6)
     return Piece(title=title, composer=composer, bars=bars, strings=strings)
 
 

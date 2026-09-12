@@ -118,30 +118,22 @@ def test_render_piece_applies_message_severity_to_status_row() -> None:
     assert status_calls[-1][3] == status_attr_for_message("error")
 
 
-def _first_melody_row_idx(lines: list[str]) -> int:  # noqa: C901
-    notehead_glyphs = (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)
-    block_rows = melody_row_count()
-    for idx in range(len(lines)):
-        if not lines[idx].startswith("  |"):
-            continue
-        if idx > 0 and lines[idx - 1].startswith("  |"):
-            continue
-        block = lines[idx : idx + block_rows]
-        if len(block) < block_rows:
-            continue
-        if not all(line.startswith("  |") for line in block):
-            continue
-        if any(
-            ("\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line)
-            for line in block
-        ):
-            return idx
-    anchor = next(
-        i
-        for i, line in enumerate(lines)
-        if line.startswith("  |")
-        and ("\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line)
+def _melody_line_has_glyph(line: str, notehead_glyphs: tuple[str, str]) -> bool:
+    return "\\" in line or any(glyph in line for glyph in notehead_glyphs) or "^" in line or "v" in line
+
+
+def _is_melody_block(lines: list[str], idx: int, block_rows: int, notehead_glyphs: tuple[str, str]) -> bool:
+    if not lines[idx].startswith("  |") or (idx > 0 and lines[idx - 1].startswith("  |")):
+        return False
+    block = lines[idx : idx + block_rows]
+    return (
+        len(block) >= block_rows
+        and all(line.startswith("  |") for line in block)
+        and any(_melody_line_has_glyph(line, notehead_glyphs) for line in block)
     )
+
+
+def _expand_melody_anchor(lines: list[str], anchor: int) -> int:
     while anchor > 0:
         prev = lines[anchor - 1]
         if prev.startswith("  |") or not prev.strip():
@@ -149,6 +141,18 @@ def _first_melody_row_idx(lines: list[str]) -> int:  # noqa: C901
             continue
         break
     return anchor
+
+
+def _first_melody_row_idx(lines: list[str]) -> int:
+    notehead_glyphs = (MELODY_NOTEHEAD_GLYPH, MELODY_FILLED_NOTEHEAD_GLYPH)
+    block_rows = melody_row_count()
+    for idx in range(len(lines)):
+        if _is_melody_block(lines, idx, block_rows, notehead_glyphs):
+            return idx
+    anchor = next(
+        i for i, line in enumerate(lines) if line.startswith("  |") and _melody_line_has_glyph(line, notehead_glyphs)
+    )
+    return _expand_melody_anchor(lines, anchor)
 
 
 def _first_lyric_row(lines: list[str]) -> str:

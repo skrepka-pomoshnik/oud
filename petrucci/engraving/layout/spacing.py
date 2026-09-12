@@ -63,8 +63,8 @@ def collision_base_bar_widths(
             bar_width,
             overrides,
             durations,
-            default_duration,
-            dotted,
+            default_duration=default_duration,
+            dotted=dotted,
         )
         for bar_index in bar_indices
     ]
@@ -102,10 +102,10 @@ def _selected_bar_indices(request: _AutoBarRequest) -> tuple[list[int], int, int
         request.bar_gap,
         request.usable_width,
         request.bar_width,
-        request.overrides,
-        request.durations,
-        request.default_duration,
-        request.dotted,
+        overrides=request.overrides,
+        durations=request.durations,
+        default_duration=request.default_duration,
+        dotted=request.dotted,
         max_chords=request.max_chords,
         compact=compact,
         chord_wrap_limit=request.chord_wrap_limit,
@@ -132,8 +132,8 @@ def _measured_widths(request: _AutoBarRequest, indices: list[int]) -> list[int]:
             request.bar_width,
             request.overrides,
             request.durations,
-            request.default_duration,
-            request.dotted,
+            default_duration=request.default_duration,
+            dotted=request.dotted,
         )
         for index in indices
     ]

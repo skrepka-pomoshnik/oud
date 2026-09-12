@@ -186,11 +186,12 @@ def _header_lines(context: _TabExportContext) -> list[str]:
     return lines
 
 
-def export_tab(  # noqa: PLR0917 - public compatibility; replace options with a typed request
+def export_tab(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
+    *,
     settings: dict[str, str] | None = None,
     dotted: set[tuple[int, int]] | None = None,
     ornaments: dict[tuple[int, int], str] | None = None,
@@ -220,11 +221,12 @@ def export_tab(  # noqa: PLR0917 - public compatibility; replace options with a 
     return "\n".join(lines) + "\n"
 
 
-def export_ascii(  # noqa: PLR0917 - public compatibility; replace options with a typed request
+def export_ascii(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
+    *,
     settings: dict[str, str] | None = None,
     ornaments: dict[tuple[int, int], str] | None = None,
     annotations: dict[tuple[int, int], str] | None = None,
@@ -275,6 +277,7 @@ def export_ascii(  # noqa: PLR0917 - public compatibility; replace options with 
                 piece.strings,
                 bar_width,
                 default_duration,
+                dotted=None,
             )
             flag_cells = flag_row(flag_positions, bar_width)
             lines.append("".join(flag_cells))
@@ -287,12 +290,13 @@ def export_ascii(  # noqa: PLR0917 - public compatibility; replace options with 
     return "\n".join(lines).rstrip() + "\n"
 
 
-def export_tab_to_file(  # noqa: PLR0917 - public compatibility; replace options with a typed request
+def export_tab_to_file(
     path: str,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
+    *,
     settings: dict[str, str] | None = None,
     dotted: set[tuple[int, int]] | None = None,
     ornaments: dict[tuple[int, int], str] | None = None,

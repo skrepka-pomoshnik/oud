@@ -91,7 +91,31 @@ def _bar_uses_raw_vocal_fallback(bar: Bar) -> bool:
     return False
 
 
-def _normalize_vocal_event_accidentals(  # noqa: C901
+def _normalized_vocal_event(
+    event: MelodyEvent,
+    defaults: dict[str, str],
+    *,
+    raw_fallback: bool,
+) -> MelodyEvent:
+    if event.is_rest:
+        return event
+    match = re.fullmatch(r"([a-g])([#b]?)([',]*)", event.text)
+    if match is None:
+        return event
+    name, _accidental, octave = match.groups()
+    flags = event.accidental_flags or 0
+    if flags & 0x1000:
+        accidental = "b"
+    elif flags & 0x0002:
+        accidental = "#"
+    elif flags & 0x2000:
+        accidental = defaults.get(name, "") if raw_fallback else ""
+    else:
+        accidental = defaults.get(name, "")
+    return replace(event, text=f"{name}{accidental}{octave}")
+
+
+def _normalize_vocal_event_accidentals(
     bar: Bar,
     *,
     key: str | None,
@@ -100,27 +124,10 @@ def _normalize_vocal_event_accidentals(  # noqa: C901
     defaults = key_signature_accidentals(key)
     if not defaults:
         return
-    normalized: list[MelodyEvent] = []
-    for event in getattr(bar, "melody_events", None) or []:
-        if event.is_rest:
-            normalized.append(event)
-            continue
-        match = re.fullmatch(r"([a-g])([#b]?)([',]*)", event.text)
-        if match is None:
-            normalized.append(event)
-            continue
-        name, _accidental, octave = match.groups()
-        flags = event.accidental_flags or 0
-        if flags & 0x1000:
-            accidental = "b"
-        elif flags & 0x0002:
-            accidental = "#"
-        elif flags & 0x2000:
-            accidental = defaults.get(name, "") if raw_fallback else ""
-        else:
-            accidental = defaults.get(name, "")
-        normalized.append(replace(event, text=f"{name}{accidental}{octave}"))
-    bar.melody_events = normalized
+    bar.melody_events = [
+        _normalized_vocal_event(event, defaults, raw_fallback=raw_fallback)
+        for event in getattr(bar, "melody_events", None) or []
+    ]
 
 
 def _bar_sum_quarter_beats(bar: Bar) -> float:
@@ -211,29 +218,37 @@ def _infer_meter_from_sum(sum_quarter_beats: float) -> str | None:
     return None
 
 
-def _fill_missing_time_signatures(bars: list[Bar]) -> None:  # noqa: C901
-    if not bars:
-        return
-    explicit = [idx for idx, bar in enumerate(bars) if bar.time_sig]
-    if not explicit:
-        for bar in bars:
-            if bar.time_sig is None and bar.chords:
-                guessed = _infer_meter_from_sum(_bar_sum_quarter_beats(bar))
-                if guessed:
-                    bar.time_sig = guessed
-        return
+def _guess_missing_time_signatures(bars: list[Bar]) -> None:
+    for bar in bars:
+        if bar.time_sig is None and bar.chords:
+            guessed = _infer_meter_from_sum(_bar_sum_quarter_beats(bar))
+            if guessed:
+                bar.time_sig = guessed
 
-    first = explicit[0]
-    first_meter = bars[first].time_sig
-    for bar in bars[:first]:
+
+def _propagate_time_signatures(bars: list[Bar], first_explicit: int) -> None:
+    first_meter = bars[first_explicit].time_sig
+    for bar in bars[:first_explicit]:
         if bar.time_sig is None:
             bar.time_sig = first_meter
     current_meter: str | None = None
-    for bar in bars[first:]:
+    for bar in bars[first_explicit:]:
         if bar.time_sig is not None:
             current_meter = bar.time_sig
         else:
             bar.time_sig = current_meter
+
+
+def _fill_missing_time_signatures(bars: list[Bar]) -> None:
+    if not bars:
+        return
+    explicit = [idx for idx, bar in enumerate(bars) if bar.time_sig]
+    if not explicit:
+        _guess_missing_time_signatures(bars)
+        return
+
+    first = explicit[0]
+    _propagate_time_signatures(bars, first)
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:

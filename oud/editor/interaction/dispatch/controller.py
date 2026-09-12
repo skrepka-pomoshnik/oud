@@ -8,7 +8,33 @@ from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 
 
-def handle_key(  # noqa: C901, PLR0911, PLR0912
+def _move_overlay_offset(state: EditorState, delta: int) -> None:
+    if state.mode == "help":
+        state.help_offset = menu_scroll_offset(state.help_offset, delta)
+    elif state.mode == "info":
+        state.info_offset = menu_scroll_offset(state.info_offset, delta)
+    else:
+        state.notes_offset = menu_scroll_offset(state.notes_offset, delta)
+
+
+def _handle_overlay_key(state: EditorState, key: int) -> bool:
+    if state.mode not in ("help", "info", "notes"):
+        return False
+    keycodes = state.keycodes
+    bindings = help_bindings()
+    if key in (*bindings.exit, keycodes.exit):
+        set_mode(state, "normal")
+        return True
+    if key in (*bindings.down, keycodes.down):
+        _move_overlay_offset(state, 1)
+        return True
+    if key in (*bindings.up, keycodes.up):
+        _move_overlay_offset(state, -1)
+        return True
+    return True
+
+
+def handle_key(
     state: EditorState,
     key: int,
     *,
@@ -19,31 +45,7 @@ def handle_key(  # noqa: C901, PLR0911, PLR0912
 ) -> bool:
     if state.pending_quit and key not in normal_bindings(state).quit:
         state.pending_quit = False
-    if state.mode in ("help", "info", "notes"):
-        keycodes = state.keycodes
-        bindings = help_bindings()
-        exit_keys = (*bindings.exit, keycodes.exit)
-        up_keys = (*bindings.up, keycodes.up)
-        down_keys = (*bindings.down, keycodes.down)
-        if key in exit_keys:
-            set_mode(state, "normal")
-            return True
-        if key in down_keys:
-            if state.mode == "help":
-                state.help_offset = menu_scroll_offset(state.help_offset, 1)
-            elif state.mode == "info":
-                state.info_offset = menu_scroll_offset(state.info_offset, 1)
-            else:
-                state.notes_offset = menu_scroll_offset(state.notes_offset, 1)
-            return True
-        if key in up_keys:
-            if state.mode == "help":
-                state.help_offset = menu_scroll_offset(state.help_offset, -1)
-            elif state.mode == "info":
-                state.info_offset = menu_scroll_offset(state.info_offset, -1)
-            else:
-                state.notes_offset = menu_scroll_offset(state.notes_offset, -1)
-            return True
+    if _handle_overlay_key(state, key):
         return True
     if state.mode == "plugin":
         from oud.editor.commands.plugins.operations import handle_plugin_key  # noqa: PLC0415

@@ -30,7 +30,6 @@ from oud.exports.midi.projection import (
     _default_tuning,
     _duration_ticks,
     _fret_from_override,
-    _parse_tuning,
     _resolved_tuning_for_piece,
     build_playback_timeline,
 )
@@ -46,6 +45,7 @@ from petrucci.core.model import (
     Note,
     Piece,
 )
+from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
 from petrucci.rendering.primitives.utils import chord_positions as render_chord_positions
 
 

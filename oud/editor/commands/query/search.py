@@ -136,7 +136,7 @@ def target_repeat_word_search(
     return None
 
 
-def target_jump_match(state: EditorState) -> tuple[int, int] | None:  # noqa: C901
+def _span_jump_target(state: EditorState) -> tuple[int, int] | None:
     for spans in (state.slurs, state.ties, state.holds):
         for bar, start, end in spans:
             if bar != state.cursor_bar:
@@ -145,6 +145,10 @@ def target_jump_match(state: EditorState) -> tuple[int, int] | None:  # noqa: C9
                 return (bar, end)
             if state.cursor_col == end:
                 return (bar, start)
+    return None
+
+
+def _repeat_jump_target(state: EditorState) -> tuple[int, int] | None:
     current = state.piece.bars[state.cursor_bar]
     if current.repeat == ".:":
         for idx in range(state.cursor_bar + 1, len(state.piece.bars)):
@@ -155,6 +159,10 @@ def target_jump_match(state: EditorState) -> tuple[int, int] | None:  # noqa: C9
             if state.piece.bars[idx].repeat == ".:":
                 return (idx, 0)
     return None
+
+
+def target_jump_match(state: EditorState) -> tuple[int, int] | None:
+    return _span_jump_target(state) or _repeat_jump_target(state)
 
 
 def target_jump_mark(state: EditorState, name: str) -> tuple[int, int, int] | None:

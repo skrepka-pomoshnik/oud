@@ -1,5 +1,6 @@
 import subprocess
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -54,43 +55,66 @@ def _wait_pdf(state: EditorState) -> None:
     drain_background_messages(state)
 
 
-def test_cmd_midi_lilypond_pdf_play_source(  # noqa: C901
+def _successful_export(message: str) -> Callable[..., str]:
+    def _export(_path: str, *_args: object, **_kwargs: object) -> str:
+        return message
+
+    return _export
+
+
+def _pdf_recorder(calls: dict[str, str]) -> Callable[..., str]:
+    def _print_pdf(path: str, _base: str | None = None, **_kwargs: object) -> str:
+        calls["path"] = path
+        return "Pdf ok"
+
+    return _print_pdf
+
+
+def _save_settings_stub(_path: str, _settings: dict[str, str]) -> None:
+    return None
+
+
+def _start_midi_stub(
+    state: EditorState,
+    *,
+    start_bar: int | None = None,
+    path: str | None = None,
+    bpm: int | None = None,
+    end_bar: int | None = None,
+    loop_count: int = 1,
+) -> None:
+    _ = (bpm, end_bar, loop_count)
+    state.message = f"Played {start_bar} {path}"
+
+
+def _record_command_stub(calls: list[str], name: str, *, with_config: bool) -> Callable[..., None]:
+    if with_config:
+
+        def _stub(_state: EditorState, _args: str, _config_path: str) -> None:
+            calls.append(name)
+
+        return _stub
+
+    def _stub(_state: EditorState, _args: str) -> None:
+        calls.append(name)
+
+    return _stub
+
+
+def test_cmd_midi_lilypond_pdf_play_source(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     state = _state()
-
-    def _export_midi(_path: str, *_args: object, **_kwargs: object) -> str:
-        return "Midi ok"
-
-    def _export_lilypond(_path: str, *_args: object, **_kwargs: object) -> str:
-        return "Ly ok"
-
-    def _export_musicxml(_path: str, *_args: object, **_kwargs: object) -> str:
-        return "Xml ok"
-
-    def _export_mxl(_path: str, *_args: object, **_kwargs: object) -> str:
-        return "Mxl ok"
-
     pdf_called: dict[str, str] = {}
 
-    def _print_pdf(_path: str, _base: str | None = None, **_kwargs: object) -> str:
-        pdf_called["path"] = _path
-        return "Pdf ok"
-
-    def _save(_path: str, _settings: dict[str, str]) -> None:
-        return None
-
-    def _start_midi(state: EditorState, start_bar: int | None = None, path: str | None = None) -> None:
-        state.message = f"Played {start_bar} {path}"
-
-    monkeypatch.setattr(cmd_ops, "export_midi", _export_midi)
-    monkeypatch.setattr(cmd_ops, "export_lilypond", _export_lilypond)
-    monkeypatch.setattr(cmd_ops, "export_musicxml", _export_musicxml)
-    monkeypatch.setattr(cmd_ops, "export_mxl", _export_mxl)
-    monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _print_pdf)
-    monkeypatch.setattr(cmd_ops, "save_settings", _save)
-    monkeypatch.setattr("oud.editor.services.media.midi.start_midi", _start_midi)
+    monkeypatch.setattr(cmd_ops, "export_midi", _successful_export("Midi ok"))
+    monkeypatch.setattr(cmd_ops, "export_lilypond", _successful_export("Ly ok"))
+    monkeypatch.setattr(cmd_ops, "export_musicxml", _successful_export("Xml ok"))
+    monkeypatch.setattr(cmd_ops, "export_mxl", _successful_export("Mxl ok"))
+    monkeypatch.setattr(cmd_ops, "print_lilypond_pdf", _pdf_recorder(pdf_called))
+    monkeypatch.setattr(cmd_ops, "save_settings", _save_settings_stub)
+    monkeypatch.setattr("oud.editor.services.media.midi.start_midi", _start_midi_stub)
 
     cmd.cmd_midi(state, "", str(tmp_path / "cfg.toml"))
     assert state.message == "Midi ok"
@@ -153,8 +177,9 @@ def test_cmd_play_loop_uses_visual_or_cursor_range(
     state = _state(bars=4)
     calls: list[dict[str, int | None]] = []
 
-    def _start_midi(  # noqa: PLR0917 - mirrors the legacy playback callback
+    def _start_midi(
         state: EditorState,
+        *,
         start_bar: int | None = None,
         path: str | None = None,
         bpm: int | None = None,
@@ -296,24 +321,12 @@ def test_tui_notation_commands_export_to_musicxml_and_mxl(tmp_path: Path) -> Non
         assert any(name.endswith(".xml") for name in names)
 
 
-def test_apply_command_dispatch_executes_all_registered_specs(  # noqa: C901
+def test_apply_command_dispatch_executes_all_registered_specs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     state = _state()
     calls: list[str] = []
-
-    def _record2(name: str):
-        def _stub(_state: EditorState, _args: str) -> None:
-            calls.append(name)
-
-        return _stub
-
-    def _record3(name: str):
-        def _stub(_state: EditorState, _args: str, _cfg: str) -> None:
-            calls.append(name)
-
-        return _stub
 
     patched_2arg = {
         "cmd_open",
@@ -376,9 +389,9 @@ def test_apply_command_dispatch_executes_all_registered_specs(  # noqa: C901
         "cmd_redo",
     }
     for name in patched_2arg:
-        monkeypatch.setattr(cmd, name, _record2(name))
+        monkeypatch.setattr(cmd, name, _record_command_stub(calls, name, with_config=False))
     for name in patched_3arg:
-        monkeypatch.setattr(cmd, name, _record3(name))
+        monkeypatch.setattr(cmd, name, _record_command_stub(calls, name, with_config=True))
     cmd._command_specs.cache_clear()
     cmd._command_map.cache_clear()
     out_path = tmp_path / "out.tab"

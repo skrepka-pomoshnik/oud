@@ -45,33 +45,33 @@ def render_state_lines(state: RenderSnapshotState, *, height: int = 24) -> list[
         0,
         0,
         0,
-        0,
-        state.bar_width,
-        state.overrides,
-        build_durations(state.piece),
-        state.ornaments,
-        state.annotations,
-        state.highlights,
-        state.dotted,
-        state.slurs,
-        state.ties,
-        state.holds,
-        "normal",
-        "",
-        "",
-        "",
-        "",
-        state.settings,
-        None,
-        state.stave_breaks,
-        "Plugins",
-        [],
-        0,
-        0,
-        0,
-        None,
-        None,
-        getattr(cast(Any, state), "glisses", None),
+        cursor_col=0,
+        bar_width=state.bar_width,
+        overrides=state.overrides,
+        durations=build_durations(state.piece),
+        ornaments=state.ornaments,
+        annotations=state.annotations,
+        highlights=state.highlights,
+        dotted=state.dotted,
+        slurs=state.slurs,
+        ties=state.ties,
+        holds=state.holds,
+        mode="normal",
+        cmdline="",
+        message="",
+        status_line="",
+        searchline="",
+        settings=state.settings,
+        ascii_lines=None,
+        stave_breaks=state.stave_breaks,
+        plugin_title="Plugins",
+        plugin_items=[],
+        plugin_index=0,
+        plugin_offset=0,
+        help_offset=0,
+        playback_bar=None,
+        playback_col=None,
+        glisses=getattr(cast(Any, state), "glisses", None),
     )
     return fb.snapshot().lines
 
@@ -89,9 +89,8 @@ def normalize_snapshot_lines(lines: list[str]) -> list[str]:
     return core
 
 
-def snapshot_signature(lines: list[str]) -> dict[str, object]:  # noqa: C901
-    norm = normalize_snapshot_lines(lines)
-    staff_rows: list[str] = [line for line in norm if line.count("|") >= 2 and "-" in line]
+def _staff_signature(lines: list[str]) -> tuple[list[str], list[int], set[int]]:
+    staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
     staff_note_cols: set[int] = set()
     staff_right_edges: list[int] = []
     for row in staff_rows:
@@ -104,15 +103,26 @@ def snapshot_signature(lines: list[str]) -> dict[str, object]:  # noqa: C901
             ch = row[idx]
             if ch not in (" ", "-", "|"):
                 staff_note_cols.add(idx)
-    first_staff_idx = next((i for i, line in enumerate(norm) if line in staff_rows), len(norm))
+    return staff_rows, staff_right_edges, staff_note_cols
+
+
+def _flag_columns(lines: list[str], first_staff_idx: int) -> set[int]:
     flag_cols: set[int] = set()
     flag_symbols = set("|IΓF/\\=.-")
-    for line in norm[:first_staff_idx]:
+    for line in lines[:first_staff_idx]:
         if "-" in line and "|" in line:
             continue
         for idx, ch in enumerate(line):
             if ch in flag_symbols:
                 flag_cols.add(idx)
+    return flag_cols
+
+
+def snapshot_signature(lines: list[str]) -> dict[str, object]:
+    norm = normalize_snapshot_lines(lines)
+    staff_rows, staff_right_edges, staff_note_cols = _staff_signature(norm)
+    first_staff_idx = next((i for i, line in enumerate(norm) if line in staff_rows), len(norm))
+    flag_cols = _flag_columns(norm, first_staff_idx)
     return {
         "line_count": len(norm),
         "row_widths": [len(line) for line in norm],

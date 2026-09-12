@@ -19,22 +19,24 @@ def is_casual(state: EditorState) -> bool:
     return state.settings.get("keys", "vim+arrows") in ("casual", "casual+arrows")
 
 
-def _bass_strings_used(state: EditorState) -> set[int]:  # noqa: C901
+def _bass_override_strings(state: EditorState) -> set[int]:
+    return {
+        string for bar, string, _col in state.overrides if bar < len(state.piece.bars) and string >= _BASS_STRING_INDEX
+    }
+
+
+def _bass_note_strings(state: EditorState) -> set[int]:
     used: set[int] = set()
-    for bar, string, _col in state.overrides:
-        if bar < len(state.piece.bars) and string >= _BASS_STRING_INDEX:
-            used.add(string)
     for bar in state.piece.bars:
-        for note in bar.notes:
-            idx = note.string - 1
-            if idx >= _BASS_STRING_INDEX:
-                used.add(idx)
-        for chord in bar.chords:
-            for note in chord.notes:
-                idx = note.string - 1
-                if idx >= _BASS_STRING_INDEX:
-                    used.add(idx)
+        used.update(note.string - 1 for note in bar.notes if note.string - 1 >= _BASS_STRING_INDEX)
+        used.update(
+            note.string - 1 for chord in bar.chords for note in chord.notes if note.string - 1 >= _BASS_STRING_INDEX
+        )
     return used
+
+
+def _bass_strings_used(state: EditorState) -> set[int]:
+    return _bass_override_strings(state) | _bass_note_strings(state)
 
 
 def visible_string_indices(state: EditorState) -> list[int]:

@@ -29,7 +29,6 @@ from oud.importers.ft3.musical.tab import (
 )
 from oud.importers.ft3.score import (
     _BodyEntry,
-    _build_imported_score,
     _classify_unknown_score_chunk,
     _decode_raw_score_record,
     _ensemble_staff_labels,
@@ -44,6 +43,7 @@ from oud.importers.ft3.score import (
     _parse_score_text_record,
     _record_has_content,
 )
+from oud.importers.ft3.score_layers import _build_imported_score
 from oud.importers.ft3.source_profiles import apply_ft3_source_tuning
 from oud.importers.ft3.text.codec import (
     FT3TextRecord,

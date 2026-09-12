@@ -385,32 +385,50 @@ def _set_repeat(state: EditorState, value: str) -> None:
     set_repeat(state, value)
 
 
-def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:  # noqa: C901
-    cmdline = cmdline.strip()
-    if not cmdline:
-        return
+def _handle_quit_command(state: EditorState, cmdline: str) -> bool:
     if cmdline in ("q", "quit"):
         if state.modified and not state.pending_quit:
             state.pending_quit = True
             state.message = UNSAVED_QUIT_CMD
-            return
+            return True
         raise SystemExit(0)
     if cmdline in ("q!", "quit!"):
         raise SystemExit(0)
-    cmd, *rest = cmdline.split(maxsplit=1)
-    args = rest[0] if rest else ""
+    return False
+
+
+def _command_is_blocked(state: EditorState, cmd: str) -> bool:
     if state.read_only and cmd in ("wq", "x"):
         _readonly_block_message(state)
-        return
+        return True
     if state.read_only and cmd in READ_ONLY_BLOCKED_COMMANDS:
         _readonly_block_message(state)
+        return True
+    return False
+
+
+def _handle_missing_command(state: EditorState, cmd: str, args: str) -> bool:
+    if cmd not in ("wq", "x"):
+        return False
+    wrote = cmd_write_default(state, args, prompt_command=cmd)
+    if wrote:
+        raise SystemExit(0)
+    return True
+
+
+def apply_command(state: EditorState, cmdline: str, config_path: str) -> None:
+    cmdline = cmdline.strip()
+    if not cmdline:
+        return
+    if _handle_quit_command(state, cmdline):
+        return
+    cmd, *rest = cmdline.split(maxsplit=1)
+    args = rest[0] if rest else ""
+    if _command_is_blocked(state, cmd):
         return
     handler = _command_map().get(cmd)
     if handler is None:
-        if cmd in ("wq", "x"):
-            wrote = cmd_write_default(state, args, prompt_command=cmd)
-            if wrote:
-                raise SystemExit(0)
+        if _handle_missing_command(state, cmd, args):
             return
         state.message = f"Unknown command: {cmdline}"
         return

@@ -101,7 +101,7 @@ class MenuNavState:
     pending_prefix: str = ""
 
 
-def menu_reduce_nav(  # noqa: PLR0911
+def menu_reduce_nav(
     key: int,
     nav: MenuNavState,
     *,
@@ -109,32 +109,36 @@ def menu_reduce_nav(  # noqa: PLR0911
     length: int,
     page_size: int,
 ) -> tuple[MenuNavState, bool]:
+    result: tuple[MenuNavState, bool] | None = None
     if key in bindings.top_prefix:
         if nav.pending_prefix == "g":
             index, offset = menu_jump_top(length)
-            return MenuNavState(index=index, offset=offset, pending_prefix=""), True
-        return MenuNavState(
-            index=nav.index,
-            offset=nav.offset,
-            pending_prefix="g",
-        ), True
-
-    if key in bindings.bottom:
+            result = MenuNavState(index=index, offset=offset, pending_prefix=""), True
+        else:
+            result = (
+                MenuNavState(
+                    index=nav.index,
+                    offset=nav.offset,
+                    pending_prefix="g",
+                ),
+                True,
+            )
+    elif key in bindings.bottom:
         index, offset = menu_jump_bottom(length, page_size)
-        return MenuNavState(index=index, offset=offset, pending_prefix=""), True
-
-    if key in bindings.down:
+        result = MenuNavState(index=index, offset=offset, pending_prefix=""), True
+    elif key in bindings.down:
         index, offset = menu_move_down(nav.index, nav.offset, length, page_size)
-        return MenuNavState(index=index, offset=offset, pending_prefix=""), True
-
-    if key in bindings.up:
+        result = MenuNavState(index=index, offset=offset, pending_prefix=""), True
+    elif key in bindings.up:
         index, offset = menu_move_up(nav.index, nav.offset, length, page_size)
-        return MenuNavState(index=index, offset=offset, pending_prefix=""), True
-
-    if nav.pending_prefix:
-        return MenuNavState(
-            index=nav.index,
-            offset=nav.offset,
-            pending_prefix="",
-        ), False
-    return nav, False
+        result = MenuNavState(index=index, offset=offset, pending_prefix=""), True
+    elif nav.pending_prefix:
+        result = (
+            MenuNavState(
+                index=nav.index,
+                offset=nav.offset,
+                pending_prefix="",
+            ),
+            False,
+        )
+    return (nav, False) if result is None else result

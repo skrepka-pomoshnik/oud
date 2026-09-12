@@ -98,10 +98,7 @@ def _report_ascii_failure(exc: BaseException) -> int:
     return EXIT_OUTPUT
 
 
-def _parse_bars_spec(spec: str, total: int) -> tuple[int, int]:  # noqa: C901
-    text = spec.strip()
-    if not text:
-        raise ValueError(ERR_BARS_EMPTY)
+def _parse_bar_bounds(text: str) -> tuple[int, int]:
     if ":" in text:
         left, right = text.split(":", 1)
         if not left.isdigit() or not right.isdigit():
@@ -113,6 +110,14 @@ def _parse_bars_spec(spec: str, total: int) -> tuple[int, int]:  # noqa: C901
         end = start
     else:
         raise ValueError(ERR_BARS_FORMAT)
+    return start, end
+
+
+def _parse_bars_spec(spec: str, total: int) -> tuple[int, int]:
+    text = spec.strip()
+    if not text:
+        raise ValueError(ERR_BARS_EMPTY)
+    start, end = _parse_bar_bounds(text)
     if start <= 0 or end <= 0:
         raise ValueError(ERR_BARS_POSITIVE)
     if start > end:

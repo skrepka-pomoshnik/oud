@@ -38,8 +38,9 @@ def stop_midi(state: EditorState) -> None:
     state.message = "MIDI stopped"
 
 
-def start_midi(  # noqa: PLR0917 - legacy editor callback; replace with a playback request record
+def start_midi(
     state: EditorState,
+    *,
     start_bar: int | None = None,
     path: str | None = None,
     bpm: int | None = None,

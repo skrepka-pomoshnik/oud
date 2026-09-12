@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import zipfile
+from collections.abc import Sequence
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from petrucci.core.model import Bar, Piece
 from petrucci.core.music.time import parse_time_signature_value
+from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
 MUSICXML_DOCTYPE = (
@@ -14,43 +16,6 @@ MUSICXML_DOCTYPE = (
 )
 
 DIVISIONS = 480
-
-
-def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
-    pitches: list[int] = []
-    idx = 0
-    text = tuning.strip()
-    while idx < len(text):
-        ch = text[idx]
-        if not ch.isalpha():
-            idx += 1
-            continue
-        note = ch.upper()
-        idx += 1
-        accidental = ""
-        if idx < len(text) and text[idx] in "+-#b":
-            accidental = text[idx]
-            idx += 1
-        start = idx
-        while idx < len(text) and text[idx].isdigit():
-            idx += 1
-        octave_text = text[start:idx]
-        octave = int(octave_text) if octave_text else 3
-        semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-            note,
-            0,
-        )
-        if accidental in ("+", "#"):
-            semitones += 1
-        elif accidental in ("-", "b"):
-            semitones -= 1
-        midi = (octave + 1) * 12 + semitones
-        midi_min = 0
-        midi_max = 127
-        if midi_min <= midi <= midi_max:
-            pitches.append(midi)
-    pitches.reverse()
-    return pitches
 
 
 def _default_tuning(strings: int) -> list[int]:
@@ -234,7 +199,52 @@ def _events_for_bar(
     )
 
 
-def _add_note(  # noqa: C901
+def _append_rest_note(
+    xml_note: Element,
+    *,
+    duration_units: int,
+    duration_type: str,
+    dotted: bool,
+    fermata: bool,
+) -> None:
+    SubElement(xml_note, "rest")
+    SubElement(xml_note, "duration").text = str(duration_units)
+    SubElement(xml_note, "type").text = duration_type
+    if dotted:
+        SubElement(xml_note, "dot")
+    if fermata:
+        notations = SubElement(xml_note, "notations")
+        SubElement(notations, "fermata").text = "normal"
+
+
+def _append_note_technical(
+    xml_note: Element,
+    *,
+    string: int,
+    fret: int,
+    note_model: object | None,
+    fermata: bool,
+) -> None:
+    notations = SubElement(xml_note, "notations")
+    if fermata:
+        SubElement(notations, "fermata").text = "normal"
+    technical = SubElement(notations, "technical")
+    SubElement(technical, "string").text = str(string)
+    SubElement(technical, "fret").text = str(max(0, fret))
+    if note_model is None:
+        return
+    left_f = getattr(note_model, "left_fingering", None)
+    if left_f:
+        SubElement(technical, "fingering").text = str(left_f)
+    right_f = getattr(note_model, "right_fingering", None)
+    if right_f and right_f not in {"dot1", "dot2", "dot3"}:
+        pluck = "p" if right_f == "thumb" else str(right_f)
+        SubElement(technical, "pluck").text = pluck
+    if getattr(note_model, "arpeggio", None) in {"single", "top"}:
+        SubElement(notations, "arpeggiate")
+
+
+def _add_note(
     measure: Element,
     note: tuple[int, int],
     *,
@@ -251,14 +261,13 @@ def _add_note(  # noqa: C901
     if chord:
         SubElement(xml_note, "chord")
     if not (1 <= string <= len(pitch_for_string)):
-        SubElement(xml_note, "rest")
-        SubElement(xml_note, "duration").text = str(duration_units)
-        SubElement(xml_note, "type").text = duration_type
-        if dotted:
-            SubElement(xml_note, "dot")
-        if fermata:
-            notations = SubElement(xml_note, "notations")
-            SubElement(notations, "fermata").text = "normal"
+        _append_rest_note(
+            xml_note,
+            duration_units=duration_units,
+            duration_type=duration_type,
+            dotted=dotted,
+            fermata=fermata,
+        )
         return
     pitch_value = pitch_for_string[string - 1] + max(0, fret)
     step, alter, octave = _midi_to_pitch(pitch_value)
@@ -271,22 +280,13 @@ def _add_note(  # noqa: C901
     SubElement(xml_note, "type").text = duration_type
     if dotted:
         SubElement(xml_note, "dot")
-    notations = SubElement(xml_note, "notations")
-    if fermata:
-        SubElement(notations, "fermata").text = "normal"
-    technical = SubElement(notations, "technical")
-    SubElement(technical, "string").text = str(string)
-    SubElement(technical, "fret").text = str(max(0, fret))
-    if note_model is not None:
-        left_f = getattr(note_model, "left_fingering", None)
-        if left_f:
-            SubElement(technical, "fingering").text = str(left_f)
-        right_f = getattr(note_model, "right_fingering", None)
-        if right_f and right_f not in {"dot1", "dot2", "dot3"}:
-            pluck = "p" if right_f == "thumb" else str(right_f)
-            SubElement(technical, "pluck").text = pluck
-        if getattr(note_model, "arpeggio", None) in {"single", "top"}:
-            SubElement(notations, "arpeggiate")
+    _append_note_technical(
+        xml_note,
+        string=string,
+        fret=fret,
+        note_model=note_model,
+        fermata=fermata,
+    )
 
 
 def _add_barline(measure: Element, *, location: str, style: str, repeat: str | None = None) -> None:
@@ -484,7 +484,227 @@ def export_mxl(
     return f"Wrote {path}"
 
 
-def _musicxml_text(  # noqa: C901, PLR0912
+def _musicxml_pitch_context(piece: Piece, settings: dict[str, str]) -> tuple[list[int], str]:
+    tuning_text = piece.tuning or settings.get("tuning", "")
+    pitch_for_string = _parse_tuning(tuning_text) if tuning_text else _default_tuning(piece.strings)
+    defaults = _default_tuning(piece.strings)
+    if len(pitch_for_string) < piece.strings:
+        pitch_for_string.extend(defaults[len(pitch_for_string) : piece.strings])
+    pitch_for_string = pitch_for_string[: piece.strings]
+    style = settings.get("style") or piece.style or "french"
+    return pitch_for_string, style
+
+
+def _append_musicxml_note_group(
+    measure: Element,
+    notes: list[tuple[int, int]],
+    *,
+    duration_units: int,
+    duration_type: str,
+    dotted: bool,
+    pitch_for_string: list[int],
+    fermata: bool,
+    note_models: Sequence[object] | None = None,
+) -> None:
+    if not notes:
+        _add_note(
+            measure,
+            (0, 0),
+            duration_units=duration_units,
+            duration_type=duration_type,
+            dotted=dotted,
+            pitch_for_string=pitch_for_string,
+            chord=False,
+            fermata=fermata,
+        )
+        return
+    for index, note in enumerate(notes):
+        _add_note(
+            measure,
+            note,
+            duration_units=duration_units,
+            duration_type=duration_type,
+            dotted=dotted,
+            pitch_for_string=pitch_for_string,
+            chord=index > 0,
+            note_model=note_models[index] if note_models else None,
+            fermata=fermata and index == 0,
+        )
+
+
+def _append_musicxml_chord_notes(
+    measure: Element,
+    bar: Bar,
+    *,
+    pitch_for_string: list[int],
+    fermata_pending: bool,
+) -> None:
+    remaining_fermata = fermata_pending
+    for chord in bar.chords:
+        denom = _note_type_to_denom(chord.note_type)
+        _append_musicxml_note_group(
+            measure,
+            [(note.string, note.fret) for note in chord.notes],
+            duration_units=_duration_units(denom, bool(chord.dotted)),
+            duration_type=_duration_type(denom),
+            dotted=bool(chord.dotted),
+            pitch_for_string=pitch_for_string,
+            fermata=remaining_fermata,
+            note_models=chord.notes,
+        )
+        remaining_fermata = False
+
+
+def _append_musicxml_override_notes(
+    measure: Element,
+    bar: Bar,
+    bar_index: int,
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    style: str,
+    dotted: set[tuple[int, int]] | None,
+    pitch_for_string: list[int],
+    fermata_pending: bool,
+) -> None:
+    remaining_fermata = fermata_pending
+    for denom, is_dotted, notes in _events_for_bar(
+        bar,
+        bar_index,
+        piece.strings,
+        overrides=overrides,
+        durations=durations,
+        style=style,
+        dotted=dotted,
+    ):
+        _append_musicxml_note_group(
+            measure,
+            notes,
+            duration_units=_duration_units(denom, is_dotted),
+            duration_type=_duration_type(denom),
+            dotted=is_dotted,
+            pitch_for_string=pitch_for_string,
+            fermata=remaining_fermata,
+        )
+        remaining_fermata = False
+
+
+def _append_musicxml_measure_notes(
+    measure: Element,
+    bar: Bar,
+    bar_index: int,
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    style: str,
+    dotted: set[tuple[int, int]] | None,
+    pitch_for_string: list[int],
+) -> None:
+    if bar.chords:
+        _append_musicxml_chord_notes(
+            measure,
+            bar,
+            pitch_for_string=pitch_for_string,
+            fermata_pending=bool(bar.fermata),
+        )
+        return
+    _append_musicxml_override_notes(
+        measure,
+        bar,
+        bar_index,
+        piece,
+        overrides=overrides,
+        durations=durations,
+        style=style,
+        dotted=dotted,
+        pitch_for_string=pitch_for_string,
+        fermata_pending=bool(bar.fermata),
+    )
+
+
+def _append_musicxml_measure_prefix(
+    part: Element,
+    piece: Piece,
+    bar: Bar,
+    bar_number: int,
+    *,
+    settings: dict[str, str],
+    pitch_for_string: list[int],
+    carry_repeat_forward: bool,
+) -> tuple[Element, str]:
+    measure = SubElement(part, "measure", number=str(bar_number))
+    if carry_repeat_forward:
+        _add_barline(measure, location="left", style="heavy-light", repeat="forward")
+    repeat = (bar.repeat or "").strip()
+    if repeat:
+        _add_repeat_directions(measure, repeat)
+    repeat_words = _repeat_words(repeat)
+    if repeat_words:
+        _add_direction_words(measure, repeat_words)
+    if bar.dynamic:
+        _add_direction_dynamic(measure, bar.dynamic)
+    if bar_number == 1:
+        _append_first_measure_attributes(
+            measure,
+            piece,
+            settings,
+            bar,
+            pitch_for_string,
+        )
+    else:
+        _append_time_change(measure, bar, settings)
+    return measure, repeat
+
+
+def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str) -> bool:
+    carry_repeat_forward = repeat in (".:", ":|:")
+    right_repeat = "backward" if repeat in (":.", ":|:") else None
+    bar_style = "light-heavy" if right_repeat else _barline_style(bar.barline)
+    if repeat or bar.barline:
+        _add_barline(measure, location="right", style=bar_style, repeat=right_repeat)
+    return carry_repeat_forward
+
+
+def _append_musicxml_measure(
+    part: Element,
+    piece: Piece,
+    bar: Bar,
+    bar_index: int,
+    *,
+    settings: dict[str, str],
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    style: str,
+    dotted: set[tuple[int, int]] | None,
+    pitch_for_string: list[int],
+    carry_repeat_forward: bool,
+) -> bool:
+    measure, repeat = _append_musicxml_measure_prefix(
+        part,
+        piece,
+        bar,
+        bar_index + 1,
+        settings=settings,
+        pitch_for_string=pitch_for_string,
+        carry_repeat_forward=carry_repeat_forward,
+    )
+    _append_musicxml_measure_notes(
+        measure,
+        bar,
+        bar_index,
+        piece,
+        overrides=overrides,
+        durations=durations,
+        style=style,
+        dotted=dotted,
+        pitch_for_string=pitch_for_string,
+    )
+    return _finish_musicxml_measure(measure, bar, repeat)
+
+
+def _musicxml_text(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -495,15 +715,9 @@ def _musicxml_text(  # noqa: C901, PLR0912
 ) -> str:
     _ = bar_width
     settings_map = settings or {}
-    tuning_text = piece.tuning or settings_map.get("tuning", "")
-    pitch_for_string = _parse_tuning(tuning_text) if tuning_text else _default_tuning(piece.strings)
-    defaults = _default_tuning(piece.strings)
-    if len(pitch_for_string) < piece.strings:
-        pitch_for_string.extend(defaults[len(pitch_for_string) : piece.strings])
-    pitch_for_string = pitch_for_string[: piece.strings]
+    pitch_for_string, style = _musicxml_pitch_context(piece, settings_map)
     title = piece.title or "Untitled"
     composer = piece.composer or piece.author or "Unknown"
-    style = settings_map.get("style") or piece.style or "french"
 
     root = Element("score-partwise", version="3.1")
     work = SubElement(root, "work")
@@ -518,111 +732,20 @@ def _musicxml_text(  # noqa: C901, PLR0912
     part = SubElement(root, "part", id="P1")
 
     carry_repeat_forward = False
-    for b_idx, bar in enumerate(piece.bars, start=1):
-        measure = SubElement(part, "measure", number=str(b_idx))
-        if carry_repeat_forward:
-            _add_barline(measure, location="left", style="heavy-light", repeat="forward")
-            carry_repeat_forward = False
-        repeat = (bar.repeat or "").strip()
-        if repeat:
-            _add_repeat_directions(measure, repeat)
-        repeat_words = _repeat_words(repeat)
-        if repeat_words:
-            _add_direction_words(measure, repeat_words)
-        if bar.dynamic:
-            _add_direction_dynamic(measure, bar.dynamic)
-        if b_idx == 1:
-            _append_first_measure_attributes(
-                measure,
-                piece,
-                settings_map,
-                bar,
-                pitch_for_string,
-            )
-        else:
-            _append_time_change(measure, bar, settings_map)
-
-        fermata_pending = bool(bar.fermata)
-        if bar.chords:
-            for chord in bar.chords:
-                denom = _note_type_to_denom(chord.note_type)
-                is_dotted = bool(chord.dotted)
-                duration_units = _duration_units(denom, is_dotted)
-                note_type = _duration_type(denom)
-                if not chord.notes:
-                    _add_note(
-                        measure,
-                        (0, 0),
-                        duration_units=duration_units,
-                        duration_type=note_type,
-                        dotted=is_dotted,
-                        pitch_for_string=pitch_for_string,
-                        chord=False,
-                        fermata=fermata_pending,
-                    )
-                    fermata_pending = False
-                    continue
-                first = True
-                for note_model in chord.notes:
-                    _add_note(
-                        measure,
-                        (note_model.string, note_model.fret),
-                        duration_units=duration_units,
-                        duration_type=note_type,
-                        dotted=is_dotted,
-                        pitch_for_string=pitch_for_string,
-                        chord=not first,
-                        note_model=note_model,
-                        fermata=fermata_pending and first,
-                    )
-                    first = False
-                fermata_pending = False
-        else:
-            for denom, is_dotted, notes in _events_for_bar(
-                bar,
-                b_idx - 1,
-                piece.strings,
-                overrides=overrides,
-                durations=durations,
-                style=style,
-                dotted=dotted,
-            ):
-                duration_units = _duration_units(denom, is_dotted)
-                note_type = _duration_type(denom)
-                if not notes:
-                    _add_note(
-                        measure,
-                        (0, 0),
-                        duration_units=duration_units,
-                        duration_type=note_type,
-                        dotted=is_dotted,
-                        pitch_for_string=pitch_for_string,
-                        chord=False,
-                        fermata=fermata_pending,
-                    )
-                    fermata_pending = False
-                    continue
-                first = True
-                for note in notes:
-                    _add_note(
-                        measure,
-                        note,
-                        duration_units=duration_units,
-                        duration_type=note_type,
-                        dotted=is_dotted,
-                        pitch_for_string=pitch_for_string,
-                        chord=not first,
-                        fermata=fermata_pending and first,
-                    )
-                    first = False
-                fermata_pending = False
-
-        if repeat in (".:", ":|:"):
-            carry_repeat_forward = True
-        right_repeat = "backward" if repeat in (":.", ":|:") else None
-        bar_style = "light-heavy" if right_repeat else _barline_style(bar.barline)
-        if repeat or bar.barline:
-            _add_barline(measure, location="right", style=bar_style, repeat=right_repeat)
+    for bar_index, bar in enumerate(piece.bars):
+        carry_repeat_forward = _append_musicxml_measure(
+            part,
+            piece,
+            bar,
+            bar_index,
+            settings=settings_map,
+            overrides=overrides,
+            durations=durations,
+            style=style,
+            dotted=dotted,
+            pitch_for_string=pitch_for_string,
+            carry_repeat_forward=carry_repeat_forward,
+        )
 
     xml_bytes = tostring(root, encoding="utf-8")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + MUSICXML_DOCTYPE + "\n" + xml_bytes.decode("utf-8") + "\n"

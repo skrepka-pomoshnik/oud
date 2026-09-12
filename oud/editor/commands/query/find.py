@@ -38,37 +38,37 @@ def _row_chars(state: EditorState, bar_index: int, row_index: int) -> list[str]:
     return row
 
 
-def _find_target_col(  # noqa: C901
+def _find_forward_target(row: list[str], index: int, target: str, count: int) -> int | None:
+    for _ in range(max(1, count)):
+        index = next((pos for pos in range(index + 1, len(row)) if row[pos] == target), -1)
+        if index < 0:
+            return None
+    return index
+
+
+def _find_backward_target(row: list[str], index: int, target: str, count: int) -> int | None:
+    for _ in range(max(1, count)):
+        index = next((pos for pos in range(index - 1, -1, -1) if row[pos] == target), -1)
+        if index < 0:
+            return None
+    return index
+
+
+def _find_target_col(
     row: list[str],
     cursor_col: int,
     target: str,
     find_mode: str,
     count: int,
 ) -> int | None:
-    index = cursor_col
-    remaining = max(1, count)
     if find_mode in ("f", "t"):
-        while remaining > 0:
-            found = None
-            for pos in range(index + 1, len(row)):
-                if row[pos] == target:
-                    found = pos
-                    break
-            if found is None:
-                return None
-            index = found
-            remaining -= 1
-        return max(0, index - 1) if find_mode == "t" else index
-    while remaining > 0:
-        found = None
-        for pos in range(index - 1, -1, -1):
-            if row[pos] == target:
-                found = pos
-                break
-        if found is None:
+        index = _find_forward_target(row, cursor_col, target, count)
+        if index is None:
             return None
-        index = found
-        remaining -= 1
+        return max(0, index - 1) if find_mode == "t" else index
+    index = _find_backward_target(row, cursor_col, target, count)
+    if index is None:
+        return None
     return min(len(row) - 1, index + 1) if find_mode == "T" else index
 
 

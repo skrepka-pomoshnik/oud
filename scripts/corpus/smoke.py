@@ -109,7 +109,24 @@ def scan_files(paths: Iterable[Path]) -> list[ScanResult]:
     return results
 
 
-def _collect_remote_items(url: str, limit: int) -> tuple[list[RemoteTab], list[ScanResult]]:  # noqa: C901
+def _fetch_remote_items(url: str) -> tuple[list[RemoteTab], ScanResult | None]:
+    try:
+        return fetch_supported_tabs(url, limit=2000), None
+    except Exception as exc:
+        return [], ScanResult(path=url, error=f"listing {type(exc).__name__}: {exc}")
+
+
+def _append_remote_item(item: RemoteTab, pending: deque[str], files: list[RemoteTab], limit: int) -> bool:
+    if item.is_dir:
+        pending.append(item.url)
+        return False
+    if not _supported(item.url):
+        return False
+    files.append(item)
+    return len(files) >= limit
+
+
+def _collect_remote_items(url: str, limit: int) -> tuple[list[RemoteTab], list[ScanResult]]:
     pending = deque([url])
     seen: set[str] = set()
     files: list[RemoteTab] = []
@@ -119,23 +136,13 @@ def _collect_remote_items(url: str, limit: int) -> tuple[list[RemoteTab], list[S
         if current in seen:
             continue
         seen.add(current)
-        try:
-            items = fetch_supported_tabs(current, limit=2000)
-        except Exception as exc:
-            errors.append(
-                ScanResult(
-                    path=current,
-                    error=f"listing {type(exc).__name__}: {exc}",
-                ),
-            )
+        items, error = _fetch_remote_items(current)
+        if error is not None:
+            errors.append(error)
             continue
         for item in items:
-            if item.is_dir:
-                pending.append(item.url)
-            elif _supported(item.url):
-                files.append(item)
-                if len(files) >= limit:
-                    break
+            if _append_remote_item(item, pending, files, limit):
+                break
     return files, errors
 
 
@@ -166,7 +173,51 @@ def download_remote_corpus(
     return sorted(downloaded), errors
 
 
-def report_results(  # noqa: C901
+def _print_json_report(
+    results: list[ScanResult],
+    loaded: list[ScanResult],
+    errors: list[ScanResult],
+    warned: list[ScanResult],
+    warning_counts: Counter[str],
+) -> None:
+    payload = {
+        "attempted": len(results),
+        "loaded": len(loaded),
+        "errors": len(errors),
+        "warned_files": len(warned),
+        "warning_classes": dict(sorted(warning_counts.items())),
+        "files": [asdict(result) for result in results],
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _print_text_report(
+    results: list[ScanResult],
+    loaded: list[ScanResult],
+    errors: list[ScanResult],
+    warned: list[ScanResult],
+    warning_counts: Counter[str],
+    *,
+    verbose: bool,
+) -> None:
+    print(
+        f"Scanned {len(results)} file(s): {len(loaded)} loaded, {len(errors)} errors, {len(warned)} with warnings.",
+    )
+    if warning_counts:
+        print("Warning classes:")
+        for name, count in sorted(warning_counts.items()):
+            print(f"  {count:4d}  {name}")
+    if errors:
+        print("Errors:")
+        for result in errors:
+            print(f"  {result.path}: {result.error}")
+    if verbose:
+        for result in loaded:
+            status = ", ".join(result.warning_classes) or "ok"
+            print(f"  {result.path}: {result.bars} bars [{status}]")
+
+
+def report_results(
     results: list[ScanResult],
     *,
     json_output: bool,
@@ -178,31 +229,16 @@ def report_results(  # noqa: C901
     warned = [result for result in loaded if result.warnings]
     warning_counts = Counter(warning_class for result in loaded for warning_class in result.warning_classes)
     if json_output:
-        payload = {
-            "attempted": len(results),
-            "loaded": len(loaded),
-            "errors": len(errors),
-            "warned_files": len(warned),
-            "warning_classes": dict(sorted(warning_counts.items())),
-            "files": [asdict(result) for result in results],
-        }
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        _print_json_report(results, loaded, errors, warned, warning_counts)
     else:
-        print(
-            f"Scanned {len(results)} file(s): {len(loaded)} loaded, {len(errors)} errors, {len(warned)} with warnings.",
+        _print_text_report(
+            results,
+            loaded,
+            errors,
+            warned,
+            warning_counts,
+            verbose=verbose,
         )
-        if warning_counts:
-            print("Warning classes:")
-            for name, count in sorted(warning_counts.items()):
-                print(f"  {count:4d}  {name}")
-        if errors:
-            print("Errors:")
-            for result in errors:
-                print(f"  {result.path}: {result.error}")
-        if verbose:
-            for result in loaded:
-                status = ", ".join(result.warning_classes) or "ok"
-                print(f"  {result.path}: {result.bars} bars [{status}]")
     if not results:
         return 2
     if errors or (fail_on_warning and warned):

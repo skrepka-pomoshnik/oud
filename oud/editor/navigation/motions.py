@@ -421,7 +421,73 @@ def target_advance_next_bar_home(state: EditorState) -> CursorMotionTarget:
     return CursorMotionTarget(min(state.cursor_bar + 1, len(state.piece.bars) - 1), 0)
 
 
-def target_jump_row_visual(state: EditorState, delta: int) -> CursorMotionTarget:  # noqa: C901, PLR0912
+def _visual_row_position(actual_string: int, visual_rows: list[int], fallback: int) -> int:
+    if actual_string in visual_rows:
+        return visual_rows.index(actual_string)
+    return min(max(0, fallback), max(0, len(visual_rows) - 1))
+
+
+def _visual_system_spans(
+    indices: list[int],
+    widths: list[int],
+    gaps: list[int],
+) -> list[tuple[int, int, int]]:
+    x = 0
+    spans: list[tuple[int, int, int]] = []
+    for idx, abs_bar in enumerate(indices):
+        width = max(1, widths[idx])
+        spans.append((abs_bar, x, x + width))
+        x += width + (gaps[idx] if idx < len(gaps) else 0)
+    return spans
+
+
+def _visual_system_index(starts: list[int], bar: int, total: int) -> int:
+    return next(
+        (
+            idx
+            for idx, start in enumerate(starts)
+            if start <= bar < (starts[idx + 1] if idx + 1 < len(starts) else total)
+        ),
+        0,
+    )
+
+
+def _auto_visual_target_bar(state: EditorState, bar: int, delta: int, anchor: int, barpad: int) -> int:
+    starts = dynamic_system_starts(state, state.screen_width)
+    if not starts:
+        return bar
+    current_idx = _visual_system_index(starts, bar, len(state.piece.bars))
+    target_idx = min(len(starts) - 1, max(0, current_idx + delta))
+    if target_idx == current_idx:
+        return bar
+    current_indices, current_widths, current_gaps = auto_system_bar_plan_with_gaps(
+        state,
+        starts[current_idx],
+        state.screen_width,
+    )
+    target_indices, target_widths, target_gaps = auto_system_bar_plan_with_gaps(
+        state,
+        starts[target_idx],
+        state.screen_width,
+    )
+    current_spans = _visual_system_spans(current_indices, current_widths, current_gaps)
+    target_spans = _visual_system_spans(target_indices, target_widths, target_gaps)
+    current_span = next((span for span in current_spans if span[0] == bar), None)
+    if current_span is None or not target_spans:
+        return jump_system_row_dynamic(state, bar, delta, state.screen_width)
+    _bar_abs, x0, x1 = current_span
+    local_x = min(max(0, barpad + anchor), max(0, x1 - x0 - 1))
+    anchor_x = x0 + local_x
+    containing = next(
+        (abs_bar for abs_bar, start, end in target_spans if start <= anchor_x < end),
+        None,
+    )
+    if containing is not None:
+        return containing
+    return min(target_spans, key=lambda span: abs(((span[1] + span[2]) // 2) - anchor_x))[0]
+
+
+def target_jump_row_visual(state: EditorState, delta: int) -> CursorMotionTarget:
     prev_bar = state.cursor_bar
     prev_col = state.cursor_col
     prev_actual_string = string_index(state, state.cursor_string)
@@ -432,10 +498,7 @@ def target_jump_row_visual(state: EditorState, delta: int) -> CursorMotionTarget
     )
     prev_display_indices = system_display_indices_for_bar(state, prev_bar)
     prev_visual_rows = visual_row_indices(prev_display_indices, reverse=reverse_strings)
-    if prev_actual_string in prev_visual_rows:
-        prev_visual_row = prev_visual_rows.index(prev_actual_string)
-    else:
-        prev_visual_row = min(max(0, state.cursor_string), max(0, len(prev_visual_rows) - 1))
+    prev_visual_row = _visual_row_position(prev_actual_string, prev_visual_rows, state.cursor_string)
     prev_content = bar_content_width_for_cursor(state, prev_bar)
     prev_map = cursor_display_map_for_bar(state, prev_bar, prev_content)
     anchor = prev_map[prev_col]
@@ -443,68 +506,7 @@ def target_jump_row_visual(state: EditorState, delta: int) -> CursorMotionTarget
     barpad = int(barpad_text) if barpad_text.isdigit() else 1
 
     if state.settings.get("layout", "packed") == "auto":
-        starts = dynamic_system_starts(state, state.screen_width)
-        current_idx = 0
-        for idx, start in enumerate(starts):
-            end = starts[idx + 1] if idx + 1 < len(starts) else len(state.piece.bars)
-            if start <= prev_bar < end:
-                current_idx = idx
-                break
-        target_idx = min(len(starts) - 1, max(0, current_idx + delta))
-        if target_idx == current_idx:
-            target_bar = prev_bar
-        else:
-            current_start = starts[current_idx]
-            target_start = starts[target_idx]
-            current_indices, current_widths, current_gaps = auto_system_bar_plan_with_gaps(
-                state,
-                current_start,
-                state.screen_width,
-            )
-            target_indices, target_widths, target_gaps = auto_system_bar_plan_with_gaps(
-                state,
-                target_start,
-                state.screen_width,
-            )
-
-            def _spans(
-                indices: list[int],
-                widths: list[int],
-                gaps: list[int],
-            ) -> list[tuple[int, int, int]]:
-                x = 0
-                spans: list[tuple[int, int, int]] = []
-                for idx2, abs_bar in enumerate(indices):
-                    w = max(1, widths[idx2])
-                    spans.append((abs_bar, x, x + w))
-                    x += w + (gaps[idx2] if idx2 < len(gaps) else 0)
-                return spans
-
-            current_spans = _spans(current_indices, current_widths, current_gaps)
-            target_spans = _spans(target_indices, target_widths, target_gaps)
-            current_span = next((span for span in current_spans if span[0] == prev_bar), None)
-            if current_span is None or not target_spans:
-                target_bar = jump_system_row_dynamic(
-                    state,
-                    prev_bar,
-                    delta,
-                    state.screen_width,
-                )
-            else:
-                _bar_abs, x0, x1 = current_span
-                local_x = min(max(0, barpad + anchor), max(0, x1 - x0 - 1))
-                anchor_x = x0 + local_x
-                containing = next(
-                    (abs_bar for (abs_bar, t0, t1) in target_spans if t0 <= anchor_x < t1),
-                    None,
-                )
-                if containing is not None:
-                    target_bar = containing
-                else:
-                    target_bar = min(
-                        target_spans,
-                        key=lambda span: abs(((span[1] + span[2]) // 2) - anchor_x),
-                    )[0]
+        target_bar = _auto_visual_target_bar(state, prev_bar, delta, anchor, barpad)
     else:
         per_line = bars_per_line(state, state.screen_width)
         target_bar = jump_system_row(state, prev_bar, delta, per_line)

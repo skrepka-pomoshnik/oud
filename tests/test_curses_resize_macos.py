@@ -99,8 +99,9 @@ def _reports(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in lines if line.strip()]
 
 
-def _wait_for_report(  # noqa: PLR0917 - PTY polling keeps all process state explicit
+def _wait_for_report(
     process: subprocess.Popen[bytes],
+    *,
     master_fd: int,
     report_path: Path,
     size: tuple[int, int],
@@ -174,11 +175,25 @@ def _run_resize_session(tmp_path: Path) -> tuple[dict[str, Any], dict[str, Any]]
         slave_fd = -1
         command = f":w {target}\nia\x1bllj!".encode()
         os.write(master_fd, command)
-        small = _wait_for_report(process, master_fd, report, _SMALL_SIZE, target, terminal_output)
+        small = _wait_for_report(
+            process,
+            master_fd=master_fd,
+            report_path=report,
+            size=_SMALL_SIZE,
+            target_path=target,
+            terminal_output=terminal_output,
+        )
 
         _set_terminal_size(master_fd, _LARGE_SIZE)
         process.send_signal(signal.SIGWINCH)
-        large = _wait_for_report(process, master_fd, report, _LARGE_SIZE, target, terminal_output)
+        large = _wait_for_report(
+            process,
+            master_fd=master_fd,
+            report_path=report,
+            size=_LARGE_SIZE,
+            target_path=target,
+            terminal_output=terminal_output,
+        )
 
         os.write(master_fd, b":q!\n")
         assert _wait_for_exit(process, master_fd, terminal_output) == 0

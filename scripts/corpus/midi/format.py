@@ -50,7 +50,46 @@ def _read_vlq(data: bytes, offset: int) -> tuple[int, int]:
     raise MidiFormatError(ERR_VLQ)
 
 
-def _track_notes(track: bytes, ppq: int) -> list[MidiNote]:  # noqa: C901
+def _read_track_status(track: bytes, offset: int, running_status: int | None) -> tuple[int, int, int | None]:
+    status = track[offset]
+    if status >= _MIDI_DATA_BYTE_LIMIT:
+        offset += 1
+        if status < _MIDI_STATUS_BYTE_LIMIT:
+            running_status = status
+    elif running_status is not None:
+        status = running_status
+    else:
+        raise MidiFormatError(ERR_RUNNING)
+    return status, offset, running_status
+
+
+def _consume_system_event(track: bytes, status: int, offset: int) -> tuple[int, bool]:
+    if status == _MIDI_META_STATUS:
+        if offset >= len(track):
+            raise MidiFormatError(ERR_META)
+        offset += 1
+        size, offset = _read_vlq(track, offset)
+        offset += size
+        return offset, True
+    if status in {0xF0, 0xF7}:
+        size, offset = _read_vlq(track, offset)
+        return offset + size, True
+    return offset, False
+
+
+def _read_channel_event(track: bytes, status: int, offset: int) -> tuple[int, int | None]:
+    kind = status & 0xF0
+    size = 1 if kind in {0xC0, 0xD0} else 2
+    if offset + size > len(track):
+        raise MidiFormatError(ERR_CHANNEL)
+    first = track[offset]
+    second = track[offset + 1] if size == _TWO_BYTE_MESSAGE_SIZE else 0
+    offset += size
+    pitch = first if kind == _MIDI_NOTE_ON_STATUS and second else None
+    return offset, pitch
+
+
+def _track_notes(track: bytes, ppq: int) -> list[MidiNote]:
     notes: list[MidiNote] = []
     offset = 0
     tick = 0
@@ -60,35 +99,13 @@ def _track_notes(track: bytes, ppq: int) -> list[MidiNote]:  # noqa: C901
         tick += delta
         if offset >= len(track):
             raise MidiFormatError(ERR_EVENT)
-        status = track[offset]
-        if status >= _MIDI_DATA_BYTE_LIMIT:
-            offset += 1
-            if status < _MIDI_STATUS_BYTE_LIMIT:
-                running_status = status
-        elif running_status is not None:
-            status = running_status
-        else:
-            raise MidiFormatError(ERR_RUNNING)
-        if status == _MIDI_META_STATUS:
-            if offset >= len(track):
-                raise MidiFormatError(ERR_META)
-            offset += 1
-            size, offset = _read_vlq(track, offset)
-            offset += size
+        status, offset, running_status = _read_track_status(track, offset, running_status)
+        offset, is_system = _consume_system_event(track, status, offset)
+        if is_system:
             continue
-        if status in {0xF0, 0xF7}:
-            size, offset = _read_vlq(track, offset)
-            offset += size
-            continue
-        kind = status & 0xF0
-        size = 1 if kind in {0xC0, 0xD0} else 2
-        if offset + size > len(track):
-            raise MidiFormatError(ERR_CHANNEL)
-        first = track[offset]
-        second = track[offset + 1] if size == _TWO_BYTE_MESSAGE_SIZE else 0
-        offset += size
-        if kind == _MIDI_NOTE_ON_STATUS and second:
-            notes.append(MidiNote(Fraction(tick, ppq), status & 0x0F, first))
+        offset, pitch = _read_channel_event(track, status, offset)
+        if pitch is not None:
+            notes.append(MidiNote(Fraction(tick, ppq), status & 0x0F, pitch))
     return notes
 
 

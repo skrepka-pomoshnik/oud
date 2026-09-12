@@ -208,18 +208,21 @@ def yank_bar_range(state: EditorState, bar_range: BarRange) -> int:
     return bar_range.count
 
 
-def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> None:  # noqa: C901
-    insert_bar(state, index)
-    bar_copy = copy.deepcopy(yanked.bar)
-    state.piece.bars[index] = bar_copy
+def _paste_yanked_notes(state: EditorState, index: int, yanked: YankedBar) -> None:
     for (b, s, c), value in yanked.overrides.items():
         state.overrides[(index + b, s, c)] = value
     for (b, s, c), value in yanked.durations.items():
         state.durations[(index + b, s, c)] = value
+
+
+def _paste_yanked_marks(state: EditorState, index: int, yanked: YankedBar) -> None:
     for (b, c), value in yanked.annotations.items():
         state.annotations[(index + b, c)] = value
     for (b, c), value in yanked.ornaments.items():
         state.ornaments[(index + b, c)] = value
+
+
+def _paste_yanked_spans(state: EditorState, index: int, yanked: YankedBar) -> None:
     for b, c in yanked.dotted:
         state.dotted.add((index + b, c))
     for b, start, end in yanked.slurs:
@@ -230,8 +233,20 @@ def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> 
         state.holds.append((index + b, start, end))
     for b, start, end in yanked.glisses:
         state.glisses.append((index + b, start, end))
+
+
+def _paste_yanked_marks_at_cursor(state: EditorState, index: int, yanked: YankedBar) -> None:
     for name, (b, string, col) in yanked.marks.items():
         state.marks[name] = (index + b, string, col)
+
+
+def _paste_one_yanked_bar(state: EditorState, index: int, yanked: YankedBar) -> None:
+    insert_bar(state, index)
+    state.piece.bars[index] = copy.deepcopy(yanked.bar)
+    _paste_yanked_notes(state, index, yanked)
+    _paste_yanked_marks(state, index, yanked)
+    _paste_yanked_spans(state, index, yanked)
+    _paste_yanked_marks_at_cursor(state, index, yanked)
     state.modified = True
 
 
@@ -402,80 +417,93 @@ def cmd_bar(state: EditorState, args: str) -> None:
     state.message = "Bar action: add/after/before/insert/del/yank/paste [count]"
 
 
-def cmd_stave(state: EditorState, args: str) -> None:  # noqa: C901
-    action = args.strip() or "break"
+def _record_stave_breaks(state: EditorState, previous: set[int], message: str) -> None:
+    record_action(
+        state,
+        UndoAction(
+            kind="stave-breaks",
+            data={"prev": previous, "new": set(state.stave_breaks)},
+        ),
+    )
+    state.message = message
+
+
+def _cmd_stave_break(state: EditorState) -> None:
+    idx = state.cursor_bar + 1
+    if idx >= len(state.piece.bars):
+        state.message = "No bar to break after"
+        return
+    previous = set(state.stave_breaks)
+    state.stave_breaks.add(idx)
+    _record_stave_breaks(state, previous, "Stave break added")
+
+
+def _cmd_stave_join(state: EditorState) -> None:
+    idx = state.cursor_bar + 1
+    if idx not in state.stave_breaks:
+        state.message = "No break at cursor"
+        return
+    previous = set(state.stave_breaks)
+    state.stave_breaks.discard(idx)
+    _record_stave_breaks(state, previous, "Stave break removed")
+
+
+def _cmd_stave_insert(state: EditorState) -> None:
+    idx = state.cursor_bar + 1
+    previous = set(state.stave_breaks)
+    insert_bar(state, idx)
+    state.stave_breaks.add(idx)
+    record_action(
+        state,
+        UndoAction(
+            kind="bar-insert",
+            data={"index": idx, "prev": previous, "new": set(state.stave_breaks)},
+        ),
+    )
+    state.message = "Stave inserted"
+
+
+def _cmd_stave_delete(state: EditorState) -> None:
     per_line = bars_per_line(state, state.screen_width or 80)
     start, end = system_range(state, state.cursor_bar, per_line)
+    bar_range = BarRange.from_bounds(start, end).clamp(len(state.piece.bars))
+    if bar_range.is_empty:
+        state.message = "No stave to delete"
+        return
+    snapshots = [snapshot_bar(state, idx) for idx in bar_range.indices()]
+    previous = set(state.stave_breaks)
+    for _ in range(bar_range.count):
+        delete_bar(state, bar_range.start)
+    record_action(
+        state,
+        UndoAction(
+            kind="bars-delete",
+            data={
+                "start": bar_range.start,
+                "count": bar_range.count,
+                "snapshots": snapshots,
+                "prev": previous,
+                "new": set(state.stave_breaks),
+            },
+        ),
+    )
+    apply_motion_target(state, target_home_bar(state, bar_range.start))
+    state.message = "Stave deleted"
+
+
+def cmd_stave(state: EditorState, args: str) -> None:
+    action = args.strip() or "break"
     if action in ("break", "split"):
-        idx = state.cursor_bar + 1
-        if idx < len(state.piece.bars):
-            prev = set(state.stave_breaks)
-            state.stave_breaks.add(idx)
-            record_action(
-                state,
-                UndoAction(
-                    kind="stave-breaks",
-                    data={"prev": prev, "new": set(state.stave_breaks)},
-                ),
-            )
-            state.message = "Stave break added"
-        else:
-            state.message = "No bar to break after"
+        _cmd_stave_break(state)
         return
     if action in ("join", "merge"):
-        idx = state.cursor_bar + 1
-        if idx in state.stave_breaks:
-            prev = set(state.stave_breaks)
-            state.stave_breaks.discard(idx)
-            record_action(
-                state,
-                UndoAction(
-                    kind="stave-breaks",
-                    data={"prev": prev, "new": set(state.stave_breaks)},
-                ),
-            )
-            state.message = "Stave break removed"
-        else:
-            state.message = "No break at cursor"
+        _cmd_stave_join(state)
         return
     if action in ("new", "insert"):
-        idx = state.cursor_bar + 1
-        prev_breaks = set(state.stave_breaks)
-        insert_bar(state, idx)
-        state.stave_breaks.add(idx)
-        record_action(
-            state,
-            UndoAction(
-                kind="bar-insert",
-                data={"index": idx, "prev": prev_breaks, "new": set(state.stave_breaks)},
-            ),
-        )
-        state.message = "Stave inserted"
+        _cmd_stave_insert(state)
         return
     if action in ("del", "delete", "remove"):
-        bar_range = BarRange.from_bounds(start, end).clamp(len(state.piece.bars))
-        if bar_range.is_empty:
-            state.message = "No stave to delete"
-            return
-        snapshots = [snapshot_bar(state, idx) for idx in bar_range.indices()]
-        prev_breaks = set(state.stave_breaks)
-        for _ in range(bar_range.count):
-            delete_bar(state, bar_range.start)
-        record_action(
-            state,
-            UndoAction(
-                kind="bars-delete",
-                data={
-                    "start": bar_range.start,
-                    "count": bar_range.count,
-                    "snapshots": snapshots,
-                    "prev": prev_breaks,
-                    "new": set(state.stave_breaks),
-                },
-            ),
-        )
-        apply_motion_target(state, target_home_bar(state, bar_range.start))
-        state.message = "Stave deleted"
+        _cmd_stave_delete(state)
         return
     state.message = "Stave action: break/join/new/del"
 

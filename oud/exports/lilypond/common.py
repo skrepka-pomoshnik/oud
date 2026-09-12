@@ -4,6 +4,7 @@ import re
 from dataclasses import replace
 
 from petrucci.core.model import Bar, ImportedBarContent, ImportedStaff, Piece
+from petrucci.core.music.tuning import parse_tuning_pitches
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
 
@@ -92,40 +93,8 @@ def _lilypond_header(
     return header
 
 
-def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
-    pitches: list[int] = []
-    idx = 0
-    text = tuning.strip()
-    while idx < len(text):
-        ch = text[idx]
-        if ch.isalpha():
-            note = ch.upper()
-            idx += 1
-            accidental = ""
-            if idx < len(text) and text[idx] in "+-#b":
-                accidental = text[idx]
-                idx += 1
-            start = idx
-            while idx < len(text) and text[idx].isdigit():
-                idx += 1
-            octave = text[start:idx]
-            octave_num = int(octave) if octave else 3
-            semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-                note,
-                0,
-            )
-            if accidental in ("+", "#"):
-                semis += 1
-            elif accidental in ("-", "b"):
-                semis -= 1
-            midi = (octave_num + 1) * 12 + semis
-            midi_min = 0
-            midi_max = 127
-            if midi_min <= midi <= midi_max:
-                pitches.append(midi)
-        else:
-            idx += 1
-    return pitches
+def _parse_tuning(tuning: str) -> list[int]:
+    return list(reversed(parse_tuning_pitches(tuning)))
 
 
 def _split_tuning(pitches: list[int], strings: int) -> tuple[list[int], list[int]]:
@@ -328,11 +297,55 @@ def _span_maps(
     return starts, ends
 
 
-def _collect_override_chords(  # noqa: C901, PLR0917 - legacy grid projection pending typed export context
+def _override_notes_for_column(
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar_index: int,
+    col: int,
+    strings: int,
+    style: str,
+    french_c: str,
+) -> list[tuple[int, int]]:
+    notes: list[tuple[int, int]] = []
+    for s_idx in range(strings):
+        key = (bar_index, s_idx, col)
+        if key not in overrides:
+            continue
+        fret = editor_fret_at(
+            overrides,
+            durations,
+            bar_index=bar_index,
+            string_index=s_idx,
+            column=col,
+            style=style,
+            french_c_shape=french_c,
+        )
+        if fret is not None:
+            notes.append((s_idx, fret))
+    return notes
+
+
+def _override_duration(
+    durations: dict[tuple[int, int, int], int],
+    *,
+    bar_index: int,
+    col: int,
+    strings: int,
+    default_duration: int,
+) -> int:
+    for s_idx in range(strings):
+        if (bar_index, s_idx, col) in durations:
+            return durations[(bar_index, s_idx, col)]
+    return default_duration
+
+
+def _collect_override_chords(
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_index: int,
     strings: int,
+    *,
     style: str,
     default_duration: int,
     french_c: str,
@@ -340,30 +353,24 @@ def _collect_override_chords(  # noqa: C901, PLR0917 - legacy grid projection pe
     cols = editor_event_columns(overrides, bar_index=bar_index)
     events: list[tuple[int, list[tuple[int, int]], int]] = []
     for col in cols:
-        notes: list[tuple[int, int]] = []
-        for s_idx in range(strings):
-            key = (bar_index, s_idx, col)
-            if key not in overrides:
-                continue
-            fret = editor_fret_at(
-                overrides,
-                durations,
-                bar_index=bar_index,
-                string_index=s_idx,
-                column=col,
-                style=style,
-                french_c_shape=french_c,
-            )
-            if fret is not None:
-                notes.append((s_idx, fret))
+        notes = _override_notes_for_column(
+            overrides,
+            durations,
+            bar_index=bar_index,
+            col=col,
+            strings=strings,
+            style=style,
+            french_c=french_c,
+        )
         if not notes:
             continue
-        denom = default_duration
-        for s_idx in range(strings):
-            key = (bar_index, s_idx, col)
-            if key in durations:
-                denom = durations[key]
-                break
+        denom = _override_duration(
+            durations,
+            bar_index=bar_index,
+            col=col,
+            strings=strings,
+            default_duration=default_duration,
+        )
         events.append((col, notes, denom))
     return events
 
@@ -510,7 +517,76 @@ def _note_native_rh_fingering_suffix(note, settings: dict[str, str]) -> str:
     return ""
 
 
-def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C901, PLR0912
+def _chord_fingering_markup(
+    chord,
+    *,
+    show_fingerings: bool,
+    finger_mode: str,
+) -> tuple[list[str], list[str]]:
+    if not (show_fingerings and finger_mode != "off"):
+        return [], []
+    above = _left_fingering_markup(chord, finger_mode)
+    below = _right_fingering_markup(chord, finger_mode)
+    return above, below
+
+
+def _left_fingering_markup(chord, finger_mode: str) -> list[str]:
+    above: list[str] = []
+    if finger_mode in {"left", "both"}:
+        for note in chord.notes:
+            left_f = _note_left_fingering_text_for_export(note)
+            if left_f and not left_f.isdigit():
+                above.append(left_f)
+            barre_text = _note_barre_text_for_export(note)
+            if barre_text:
+                above.append(barre_text)
+    return above
+
+
+def _right_fingering_markup(chord, finger_mode: str) -> list[str]:
+    below: list[str] = []
+    if finger_mode in {"right", "both"}:
+        for note in chord.notes:
+            right_f = _ft3_fingering_text(getattr(note, "right_fingering", None))
+            if right_f and not (right_f.isdigit() or right_f == "t"):
+                below.append(right_f)
+    return below
+
+
+def _chord_ornament_markup(
+    chord,
+    *,
+    show_ornaments: bool,
+    ornament_mode: str,
+) -> tuple[list[str], list[str]]:
+    if not (show_ornaments and ornament_mode != "off"):
+        return [], []
+    above = _left_ornament_markup(chord, ornament_mode)
+    below = _right_ornament_markup(chord, ornament_mode)
+    return above, below
+
+
+def _left_ornament_markup(chord, ornament_mode: str) -> list[str]:
+    above: list[str] = []
+    if ornament_mode in {"left", "both"}:
+        for note in chord.notes:
+            left_ornament = _ft3_ornament_text(getattr(note, "left_ornament", None))
+            if left_ornament:
+                above.append(left_ornament)
+    return above
+
+
+def _right_ornament_markup(chord, ornament_mode: str) -> list[str]:
+    below: list[str] = []
+    if ornament_mode in {"right", "both"}:
+        for note in chord.notes:
+            right_ornament = _ft3_ornament_text(getattr(note, "right_ornament", None))
+            if right_ornament:
+                below.append(right_ornament)
+    return below
+
+
+def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:
     if not _ft3_full_mode(settings):
         return ""
     show_fingerings = _ft3_show_fingerings(settings)
@@ -520,36 +596,18 @@ def _chord_ft3_markup_suffix(chord, settings: dict[str, str]) -> str:  # noqa: C
 
     finger_mode = settings.get("ft3fingering", "both")
     orn_mode = settings.get("ft3ornaments", "both")
-    above: list[str] = []
-    below: list[str] = []
-
-    if show_fingerings and finger_mode != "off":
-        if finger_mode in {"left", "both"}:
-            for note in chord.notes:
-                left_f = _note_left_fingering_text_for_export(note)
-                # Numeric LH fingerings are exported natively on note/chord pitches.
-                if left_f and not left_f.isdigit():
-                    above.append(left_f)
-                barre_text = _note_barre_text_for_export(note)
-                if barre_text:
-                    above.append(barre_text)
-        if finger_mode in {"right", "both"}:
-            for note in chord.notes:
-                right_f = _ft3_fingering_text(getattr(note, "right_fingering", None))
-                # Numeric RH fingerings and thumb are exported natively.
-                if right_f and not (right_f.isdigit() or right_f == "t"):
-                    below.append(right_f)
-    if show_ornaments and orn_mode != "off":
-        if orn_mode in {"left", "both"}:
-            for note in chord.notes:
-                left_o = _ft3_ornament_text(getattr(note, "left_ornament", None))
-                if left_o:
-                    above.append(left_o)
-        if orn_mode in {"right", "both"}:
-            for note in chord.notes:
-                right_o = _ft3_ornament_text(getattr(note, "right_ornament", None))
-                if right_o:
-                    below.append(right_o)
+    above, below = _chord_fingering_markup(
+        chord,
+        show_fingerings=show_fingerings,
+        finger_mode=finger_mode,
+    )
+    ornament_above, ornament_below = _chord_ornament_markup(
+        chord,
+        show_ornaments=show_ornaments,
+        ornament_mode=orn_mode,
+    )
+    above.extend(ornament_above)
+    below.extend(ornament_below)
 
     above = _dedup_keep_order(above)
     below = _dedup_keep_order(below)
@@ -686,21 +744,23 @@ def _piece_has_imported_lyrics(piece: Piece) -> bool:
     )
 
 
-def _initial_time_sig(piece: Piece, settings: dict[str, str]) -> str | None:  # noqa: C901
-    time_sig = settings.get("time", "") or ""
+def _first_piece_time_sig(piece: Piece) -> str:
+    return next((bar.time_sig for bar in piece.bars if bar.time_sig), "")
+
+
+def _first_imported_time_sig(piece: Piece) -> str:
+    if piece.imported_score is None:
+        return ""
+    return next(
+        (bar.time_sig for staff in piece.imported_score.staffs for bar in staff.bars if bar.time_sig),
+        "",
+    )
+
+
+def _initial_time_sig(piece: Piece, settings: dict[str, str]) -> str | None:
+    time_sig = settings.get("time", "") or _first_piece_time_sig(piece)
     if not time_sig:
-        for bar in piece.bars:
-            if bar.time_sig:
-                time_sig = bar.time_sig
-                break
-    if not time_sig and piece.imported_score is not None:
-        for staff in piece.imported_score.staffs:
-            for bar in staff.bars:
-                if bar.time_sig:
-                    time_sig = bar.time_sig
-                    break
-            if time_sig:
-                break
+        time_sig = _first_imported_time_sig(piece)
     return _normalized_time_sig_or_none(time_sig)
 
 

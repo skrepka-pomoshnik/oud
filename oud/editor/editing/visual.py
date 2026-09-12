@@ -64,7 +64,34 @@ def visual_bar_range(state: EditorState) -> BarRange:
     return BarRange(start, end).clamp(len(state.piece.bars))
 
 
-def _visual_selection_ranges(state: EditorState) -> list[tuple[int, int, int, int]]:  # noqa: C901
+def _visual_selection_columns(
+    *,
+    bar_index: int,
+    anchor_bar: int,
+    cursor_bar: int,
+    anchor_col: int,
+    cursor_col: int,
+    col_lo: int,
+    col_hi: int,
+    bar_width: int,
+    linewise: bool,
+    forward: bool,
+) -> tuple[int, int]:
+    if linewise or anchor_bar == cursor_bar:
+        start_col = 0 if linewise else col_lo
+        end_col = bar_width - 1 if linewise else col_hi
+    elif forward:
+        start_col = anchor_col if bar_index == anchor_bar else 0
+        end_col = cursor_col if bar_index == cursor_bar else bar_width - 1
+    else:
+        start_col = cursor_col if bar_index == cursor_bar else 0
+        end_col = anchor_col if bar_index == anchor_bar else bar_width - 1
+    start_col = max(0, min(start_col, bar_width - 1))
+    end_col = max(start_col, min(end_col, bar_width - 1))
+    return start_col, end_col
+
+
+def _visual_selection_ranges(state: EditorState) -> list[tuple[int, int, int, int]]:
     anchor = state.visual_anchor or (state.cursor_bar, state.cursor_string, state.cursor_col)
     a_bar, a_row, a_col = anchor
     c_bar, c_row, c_col = state.cursor_bar, state.cursor_string, state.cursor_col
@@ -81,30 +108,18 @@ def _visual_selection_ranges(state: EditorState) -> list[tuple[int, int, int, in
             actual_string = string_index(state, display_row)
             if not (0 <= actual_string < state.piece.strings):
                 continue
-            if linewise or bar_start == bar_end:
-                start_col = 0 if linewise else col_lo
-                end_col = state.bar_width - 1 if linewise else col_hi
-            elif forward:
-                if bar_index == a_bar:
-                    start_col = a_col
-                    end_col = state.bar_width - 1
-                elif bar_index == c_bar:
-                    start_col = 0
-                    end_col = c_col
-                else:
-                    start_col = 0
-                    end_col = state.bar_width - 1
-            elif bar_index == c_bar:
-                start_col = c_col
-                end_col = state.bar_width - 1
-            elif bar_index == a_bar:
-                start_col = 0
-                end_col = a_col
-            else:
-                start_col = 0
-                end_col = state.bar_width - 1
-            start_col = max(0, min(start_col, state.bar_width - 1))
-            end_col = max(start_col, min(end_col, state.bar_width - 1))
+            start_col, end_col = _visual_selection_columns(
+                bar_index=bar_index,
+                anchor_bar=a_bar,
+                cursor_bar=c_bar,
+                anchor_col=a_col,
+                cursor_col=c_col,
+                col_lo=col_lo,
+                col_hi=col_hi,
+                bar_width=state.bar_width,
+                linewise=linewise,
+                forward=forward,
+            )
             out.append((bar_index, actual_string, start_col, end_col))
     return out
 

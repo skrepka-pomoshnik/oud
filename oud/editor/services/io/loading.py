@@ -75,35 +75,35 @@ def _invalid_load_result(path: str | None, message: str) -> LoadResult:
     return piece, {}, {}, set(), None
 
 
-def load_piece_data(path: str | None) -> LoadResult:  # noqa: C901, PLR0911
+def _load_existing_path(path: str) -> LoadResult:
     overrides: dict[tuple[int, int, int], str] = {}
     durations: dict[tuple[int, int, int], int] = {}
     dotted: set[tuple[int, int]] = set()
     bar_width: int | None = None
-    if path and not Path(path).exists():
+    if path.lower().endswith(".tab"):
+        parsed = load_tab_data(path)
+        if parsed is not None:
+            return parsed.piece, parsed.overrides, parsed.durations, parsed.dotted, parsed.bar_width
+        return load_tab(path), overrides, durations, dotted, bar_width
+    if path.lower().endswith(".mxl"):
+        return load_mxl(path), overrides, durations, dotted, bar_width
+    if path.lower().endswith((".musicxml", ".xml")):
+        return load_musicxml(path), overrides, durations, dotted, bar_width
+    return load_ft3(path), overrides, durations, dotted, bar_width
+
+
+def load_piece_data(path: str | None) -> LoadResult:
+    if not path:
+        return Piece(title="Untitled", bars=[]), {}, {}, set(), None
+    path_obj = Path(path)
+    if not path_obj.exists():
         return _invalid_load_result(path, f"Missing file: {path}")
-    if path:
-        path_obj = Path(path)
-        if path_obj.is_dir():
-            return _invalid_load_result(path, f"Ignored directory path: {path}")
-        try:
-            if path.lower().endswith(".tab"):
-                parsed = load_tab_data(path)
-                if parsed is not None:
-                    overrides = parsed.overrides
-                    durations = parsed.durations
-                    dotted = parsed.dotted
-                    bar_width = parsed.bar_width
-                    return parsed.piece, overrides, durations, dotted, bar_width
-                return load_tab(path), overrides, durations, dotted, bar_width
-            if path.lower().endswith(".mxl"):
-                return load_mxl(path), overrides, durations, dotted, bar_width
-            if path.lower().endswith((".musicxml", ".xml")):
-                return load_musicxml(path), overrides, durations, dotted, bar_width
-            return load_ft3(path), overrides, durations, dotted, bar_width
-        except Exception as exc:
-            return _invalid_load_result(path, f"Could not open {path_obj.name}: {exc}")
-    return Piece(title="Untitled", bars=[]), overrides, durations, dotted, bar_width
+    if path_obj.is_dir():
+        return _invalid_load_result(path, f"Ignored directory path: {path}")
+    try:
+        return _load_existing_path(path)
+    except Exception as exc:
+        return _invalid_load_result(path, f"Could not open {path_obj.name}: {exc}")
 
 
 def load_piece(path: str | None) -> Piece:
@@ -137,7 +137,38 @@ def reset_loaded_file_state(state: EditorState) -> None:
     state.pending_quit = False
 
 
-def cmd_open(  # noqa: C901
+def _commit_opened_piece(
+    state: EditorState,
+    *,
+    path: str,
+    loaded_piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    dotted: set[tuple[int, int]],
+    bar_width: int | None,
+    parsed: TabData | None,
+    build_durations_fn,
+) -> None:
+    state.piece = loaded_piece
+    state.tab_data = parsed
+    state.overrides = overrides
+    state.durations = durations
+    state.dotted = dotted
+    reset_loaded_file_state(state)
+    configure_document(state, path, forced_read_only=state.forced_read_only)
+    if bar_width:
+        state.bar_width = max(4, bar_width)
+    state.cursor_bar = 0
+    state.cursor_string = 0
+    state.cursor_col = 0
+    state.bar_offset = 0
+    set_mode(state, "normal")
+    if not state.durations and build_durations_fn is not None:
+        state.durations = build_durations_fn(state.piece)
+    state.message = f"Opened {path}"
+
+
+def cmd_open(
     state: EditorState,
     args: str,
     *,
@@ -171,23 +202,17 @@ def cmd_open(  # noqa: C901
     if not loaded_piece.bars and loaded_piece.import_warnings:
         state.message = import_warning_summary(loaded_piece)
         return
-    state.piece = loaded_piece
-    state.tab_data = parsed
-    state.overrides = overrides
-    state.durations = durations
-    state.dotted = dotted
-    reset_loaded_file_state(state)
-    configure_document(state, path, forced_read_only=state.forced_read_only)
-    if bar_width:
-        state.bar_width = max(4, bar_width)
-    state.cursor_bar = 0
-    state.cursor_string = 0
-    state.cursor_col = 0
-    state.bar_offset = 0
-    set_mode(state, "normal")
-    if not state.durations and build_durations_fn is not None:
-        state.durations = build_durations_fn(state.piece)
-    state.message = f"Opened {path}"
+    _commit_opened_piece(
+        state,
+        path=path,
+        loaded_piece=loaded_piece,
+        overrides=overrides,
+        durations=durations,
+        dotted=dotted,
+        bar_width=bar_width,
+        parsed=parsed,
+        build_durations_fn=build_durations_fn,
+    )
     if state.piece.import_warnings:
         warning = import_warning_summary(state.piece)
         state.persistent_notice = warning

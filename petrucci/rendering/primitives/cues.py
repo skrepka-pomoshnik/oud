@@ -24,9 +24,9 @@ def draw_static_bar_rows(
     row_start: int,
 ) -> ScaledCueRows:
     _draw_meta(context, system, metadata, layout, abs_bar=abs_bar, bar_x=bar_x, row_start=row_start)
-    _draw_named_row(context, system, "ann", marks.ann_cells, layout, bar_x, row_start)
-    _draw_named_row(context, system, "orn", marks.orn_cells, layout, bar_x, row_start)
-    _draw_named_row(context, system, "tactus", metadata.tactus, layout, bar_x, row_start)
+    _draw_named_row(context, system, "ann", marks.ann_cells, layout, bar_x=bar_x, row_start=row_start)
+    _draw_named_row(context, system, "orn", marks.orn_cells, layout, bar_x=bar_x, row_start=row_start)
+    _draw_named_row(context, system, "tactus", metadata.tactus, layout, bar_x=bar_x, row_start=row_start)
     return ScaledCueRows(
         slur=_scaled_named_row(system, "slur", marks.slur_cells, layout),
         tie=_scaled_named_row(system, "tie", marks.tie_cells, layout),
@@ -61,12 +61,13 @@ def _draw_meta(
         safe_addstr(context.stdscr, y, cue_x, " ".join(cue_parts))
 
 
-def _draw_named_row(  # noqa: PLR0917 - row geometry is explicit at this rendering boundary
+def _draw_named_row(
     context: SystemRenderContext,
     system: SystemLayout,
     key: str,
     cells: list[str],
     layout: BarLayout,
+    *,
     bar_x: int,
     row_start: int,
 ) -> None:

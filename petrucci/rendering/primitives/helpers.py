@@ -238,12 +238,13 @@ def render_help(
     safe_addstr(stdscr, height - 1, 0, clean_text(status), status_attr)
 
 
-def render_plugin(  # noqa: PLR0917 - legacy facade pending a typed menu view model
+def render_plugin(
     stdscr: Screen,
     status: str,
     status_attr: int,
     title: str,
     items: list[str],
+    *,
     index: int,
     offset: int,
     message: str,
@@ -264,12 +265,13 @@ def render_plugin(  # noqa: PLR0917 - legacy facade pending a typed menu view mo
     safe_addstr(stdscr, height - 1, 0, clean_text(status_text), status_attr)
 
 
-def render_info(  # noqa: PLR0917 - legacy facade pending a typed info view model
+def render_info(
     stdscr: Screen,
     status: str,
     status_attr: int,
     info_offset: int,
     piece: Piece,
+    *,
     settings: dict[str, str],
 ) -> None:
     height, _width = stdscr.getmaxyx()

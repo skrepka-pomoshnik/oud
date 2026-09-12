@@ -172,7 +172,20 @@ def download_tab(item: RemoteTab, dest_dir: Path) -> Path:
     return _download_url_to(item.url, dest)
 
 
-def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -> list[Path]:  # noqa: C901
+def _download_ft3_child(child: RemoteTab, root_path: str, dest_dir: Path) -> Path | None:
+    if not _is_ft3_link(child.url):
+        return None
+    child_path = urlparse(child.url).path or ""
+    rel = child_path
+    if child_path.startswith(root_path):
+        rel = child_path[len(root_path) :]
+    rel = normpath(rel).lstrip("/")
+    if not rel or rel.startswith(".."):
+        rel = Path(child_path).name
+    return _download_url_to(child.url, dest_dir / _safe_rel_path(rel))
+
+
+def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -> list[Path]:
     if not item.is_dir:
         raise DownloadError
     root_url = item.url if item.url.endswith("/") else f"{item.url}/"
@@ -190,21 +203,34 @@ def download_folder_ft3(item: RemoteTab, dest_dir: Path, *, limit: int = 2000) -
                 child_url = child.url if child.url.endswith("/") else f"{child.url}/"
                 stack.append(child_url)
                 continue
-            if not _is_ft3_link(child.url):
-                continue
-            child_path = urlparse(child.url).path or ""
-            rel = child_path
-            if child_path.startswith(root_path):
-                rel = child_path[len(root_path) :]
-            rel = normpath(rel).lstrip("/")
-            if not rel or rel.startswith(".."):
-                rel = Path(child_path).name
-            local_path = dest_dir / _safe_rel_path(rel)
-            downloaded.append(_download_url_to(child.url, local_path))
+            if local_path := _download_ft3_child(child, root_path, dest_dir):
+                downloaded.append(local_path)
     return downloaded
 
 
-def random_ft3(  # noqa: C901
+def _random_item_groups(
+    items: list[RemoteTab],
+    walker: random.Random,
+) -> tuple[RemoteTab | None, list[RemoteTab]]:
+    walker.shuffle(items)
+    dirs: list[RemoteTab] = []
+    files: list[RemoteTab] = []
+    for item in items:
+        if item.is_dir:
+            dirs.append(item)
+        elif _is_ft3_link(item.url):
+            files.append(item)
+    return (walker.choice(files) if files else None), dirs
+
+
+def _queue_random_dirs(pending: list[str], seen_dirs: set[str], dirs: list[RemoteTab]) -> None:
+    for item in dirs:
+        next_url = item.url if item.url.endswith("/") else f"{item.url}/"
+        if next_url not in seen_dirs:
+            pending.append(next_url)
+
+
+def random_ft3(
     *,
     start_urls: list[str] | None = None,
     limit: int = 200,
@@ -225,19 +251,8 @@ def random_ft3(  # noqa: C901
         items = fetch_supported_tabs(url, limit=limit)
         if not items:
             continue
-        walker.shuffle(items)
-        dirs: list[RemoteTab] = []
-        files: list[RemoteTab] = []
-        for item in items:
-            if item.is_dir:
-                dirs.append(item)
-                continue
-            if _is_ft3_link(item.url):
-                files.append(item)
-        if files:
-            return walker.choice(files)
-        for item in dirs:
-            next_url = item.url if item.url.endswith("/") else f"{item.url}/"
-            if next_url not in seen_dirs:
-                pending.append(next_url)
+        selected, dirs = _random_item_groups(items, walker)
+        if selected is not None:
+            return selected
+        _queue_random_dirs(pending, seen_dirs, dirs)
     return None

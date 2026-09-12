@@ -97,7 +97,161 @@ def _candidate_frets_for_pitch(
     return candidates
 
 
-def assign_chord_pitches(  # noqa: C901
+class _AssignmentSearch:
+    def __init__(
+        self,
+        ordered_items: list[tuple[int, int]],
+        tuning_pitches: list[int],
+        policy: AssignmentPolicy,
+        forced_strings: dict[int, int],
+    ) -> None:
+        self.ordered_items = ordered_items
+        self.tuning_pitches = tuning_pitches
+        self.policy = policy
+        self.forced_strings = forced_strings
+        self.best_notes: list[AssignedTabNote] | None = None
+        self.best_score: tuple[int, int, int, int] | None = None
+
+    def run(self) -> list[AssignedTabNote] | None:
+        self._backtrack(0, [], set())
+        return self.best_notes
+
+    def _record_complete_assignment(self, assigned: list[AssignedTabNote]) -> None:
+        open_count = sum(1 for note in assigned if note.fret == 0)
+        max_fret = max((note.fret for note in assigned), default=0)
+        stretch = _fretted_stretch(assigned)
+        penalized_open_count = open_count if self.policy.restrain_open_strings else 0
+        total_fret = sum(note.fret for note in assigned)
+        score = (penalized_open_count, stretch, total_fret, max_fret)
+        if self.best_score is None or score < self.best_score:
+            self.best_score = score
+            self.best_notes = list(assigned)
+
+    def _backtrack(
+        self,
+        position: int,
+        assigned: list[AssignedTabNote],
+        used_strings: set[int],
+    ) -> None:
+        if position >= len(self.ordered_items):
+            self._record_complete_assignment(assigned)
+            return
+
+        item_index, pitch = self.ordered_items[position]
+        candidates = _candidate_frets_for_pitch(
+            pitch,
+            self.tuning_pitches,
+            policy=self.policy,
+            used_strings=used_strings,
+            forced_string=self.forced_strings.get(item_index),
+        )
+        if not candidates:
+            return
+        candidates.sort(
+            key=lambda candidate: _penalty_for_candidate(
+                candidate.fret,
+                policy=self.policy,
+                current=assigned,
+            ),
+        )
+        for candidate in candidates:
+            assigned.append(candidate)
+            if not _stretch_ok(assigned, self.policy.max_stretch):
+                assigned.pop()
+                continue
+            used_strings.add(candidate.string)
+            self._backtrack(position + 1, assigned, used_strings)
+            used_strings.remove(candidate.string)
+            assigned.pop()
+
+
+def _ordered_assignment_items(pitches: list[int], forced_strings: dict[int, int]) -> list[tuple[int, int]]:
+    ordered_items = list(enumerate(pitches))
+    ordered_items.sort(
+        key=lambda item: (
+            0 if item[0] in forced_strings else 1,
+            -item[1],
+        ),
+    )
+    return ordered_items
+
+
+def _assignment_failure_diagnostics(
+    ordered_items: list[tuple[int, int]],
+    tuning_pitches: list[int],
+    policy: AssignmentPolicy,
+    forced_strings: dict[int, int],
+) -> list[AssignmentDiagnostic]:
+    diagnostics: list[AssignmentDiagnostic] = []
+    used_dummy: set[int] = set()
+    for item_index, pitch in ordered_items:
+        forced = forced_strings.get(item_index)
+        if forced is not None and (forced < 1 or forced > len(tuning_pitches)):
+            diagnostics.append(
+                AssignmentDiagnostic(
+                    "forced_string_out_of_range",
+                    f"Forced string {forced} is outside available strings.",
+                    item_index=item_index,
+                ),
+            )
+            continue
+        candidates = _candidate_frets_for_pitch(
+            pitch,
+            tuning_pitches,
+            policy=policy,
+            used_strings=used_dummy,
+            forced_string=forced,
+        )
+        if not candidates:
+            code = "forced_string_impossible" if forced is not None else "no_candidate"
+            diagnostics.append(
+                AssignmentDiagnostic(
+                    code,
+                    "No valid string/fret assignment under current constraints.",
+                    item_index=item_index,
+                ),
+            )
+            continue
+        if policy.max_stretch is not None:
+            diagnostics.append(
+                AssignmentDiagnostic(
+                    "max_stretch_exceeded",
+                    "Candidates exist but no chord assignment satisfies max_stretch.",
+                    item_index=item_index,
+                ),
+            )
+            break
+        diagnostics.append(
+            AssignmentDiagnostic(
+                "assignment_failed",
+                "No valid chord assignment found.",
+                item_index=item_index,
+            ),
+        )
+        break
+    return diagnostics or [AssignmentDiagnostic("assignment_failed", "No valid chord assignment found.")]
+
+
+def _restore_assignment_order(
+    pitches: list[int],
+    best_notes: list[AssignedTabNote],
+) -> list[AssignedTabNote]:
+    by_pitch_occurrence: dict[tuple[int, int], AssignedTabNote] = {}
+    counts: dict[int, int] = {}
+    for note in best_notes:
+        occurrence = counts.get(note.pitch, 0)
+        by_pitch_occurrence[(note.pitch, occurrence)] = note
+        counts[note.pitch] = occurrence + 1
+    out: list[AssignedTabNote] = []
+    seen: dict[int, int] = {}
+    for pitch in pitches:
+        occurrence = seen.get(pitch, 0)
+        out.append(by_pitch_occurrence[(pitch, occurrence)])
+        seen[pitch] = occurrence + 1
+    return out
+
+
+def assign_chord_pitches(
     pitches: list[int],
     tuning_pitches: list[int],
     *,
@@ -106,7 +260,6 @@ def assign_chord_pitches(  # noqa: C901
 ) -> AssignmentResult:
     policy = policy or AssignmentPolicy()
     forced_strings = forced_strings or {}
-    diagnostics: list[AssignmentDiagnostic] = []
     if not pitches:
         return AssignmentResult(notes=[])
     if not tuning_pitches:
@@ -115,131 +268,22 @@ def assign_chord_pitches(  # noqa: C901
             diagnostics=[AssignmentDiagnostic("no_tuning", "No tuning pitches provided.")],
         )
 
-    ordered_items = list(enumerate(pitches))
-    # LilyPond-like idea: allocate constrained notes first.
-    # Forced-string notes first, then higher pitches.
-    ordered_items.sort(
-        key=lambda item: (
-            0 if item[0] in forced_strings else 1,
-            -item[1],
-        ),
-    )
-
-    best_notes: list[AssignedTabNote] | None = None
-    best_score: tuple[int, int, int] | None = None
-
-    def backtrack(
-        pos: int,
-        assigned: list[AssignedTabNote],
-        used_strings: set[int],
-    ) -> None:
-        nonlocal best_notes, best_score
-        if pos >= len(ordered_items):
-            open_count = sum(1 for note in assigned if note.fret == 0)
-            max_fret = max((note.fret for note in assigned), default=0)
-            stretch = _fretted_stretch(assigned)
-            penalized_open_count = open_count if policy.restrain_open_strings else 0
-            total_fret = sum(note.fret for note in assigned)
-            score = (penalized_open_count, stretch, total_fret, max_fret)
-            if best_score is None or score < best_score:
-                best_score = score
-                best_notes = list(assigned)
-            return
-
-        item_index, pitch = ordered_items[pos]
-        forced = forced_strings.get(item_index)
-        candidates = _candidate_frets_for_pitch(
-            pitch,
-            tuning_pitches,
-            policy=policy,
-            used_strings=used_strings,
-            forced_string=forced,
-        )
-        if not candidates:
-            return
-
-        candidates.sort(
-            key=lambda cand: _penalty_for_candidate(cand.fret, policy=policy, current=assigned),
-        )
-        for cand in candidates:
-            assigned.append(cand)
-            if not _stretch_ok(assigned, policy.max_stretch):
-                assigned.pop()
-                continue
-            used_strings.add(cand.string)
-            backtrack(pos + 1, assigned, used_strings)
-            used_strings.remove(cand.string)
-            assigned.pop()
-
-    backtrack(0, [], set())
-
+    ordered_items = _ordered_assignment_items(pitches, forced_strings)
+    best_notes = _AssignmentSearch(
+        ordered_items,
+        tuning_pitches,
+        policy,
+        forced_strings,
+    ).run()
     if best_notes is None:
-        # Produce deterministic diagnostics for the first failing constraint per pitch.
-        used_dummy: set[int] = set()
-        for item_index, pitch in ordered_items:
-            forced = forced_strings.get(item_index)
-            if forced is not None and (forced < 1 or forced > len(tuning_pitches)):
-                diagnostics.append(
-                    AssignmentDiagnostic(
-                        "forced_string_out_of_range",
-                        f"Forced string {forced} is outside available strings.",
-                        item_index=item_index,
-                    ),
-                )
-                continue
-            candidates = _candidate_frets_for_pitch(
-                pitch,
-                tuning_pitches,
-                policy=policy,
-                used_strings=used_dummy,
-                forced_string=forced,
-            )
-            if not candidates:
-                code = "forced_string_impossible" if forced is not None else "no_candidate"
-                diagnostics.append(
-                    AssignmentDiagnostic(
-                        code,
-                        "No valid string/fret assignment under current constraints.",
-                        item_index=item_index,
-                    ),
-                )
-                continue
-            if policy.max_stretch is not None:
-                diagnostics.append(
-                    AssignmentDiagnostic(
-                        "max_stretch_exceeded",
-                        "Candidates exist but no chord assignment satisfies max_stretch.",
-                        item_index=item_index,
-                    ),
-                )
-                break
-            diagnostics.append(
-                AssignmentDiagnostic(
-                    "assignment_failed",
-                    "No valid chord assignment found.",
-                    item_index=item_index,
-                ),
-            )
-            break
         return AssignmentResult(
             notes=[],
-            diagnostics=diagnostics
-            or [
-                AssignmentDiagnostic("assignment_failed", "No valid chord assignment found."),
-            ],
+            diagnostics=_assignment_failure_diagnostics(
+                ordered_items,
+                tuning_pitches,
+                policy,
+                forced_strings,
+            ),
         )
 
-    # Return in original pitch-item order for stable caller mapping.
-    by_pitch_occurrence: dict[tuple[int, int], AssignedTabNote] = {}
-    counts: dict[int, int] = {}
-    for note in best_notes:
-        n = counts.get(note.pitch, 0)
-        by_pitch_occurrence[(note.pitch, n)] = note
-        counts[note.pitch] = n + 1
-    out: list[AssignedTabNote] = []
-    seen: dict[int, int] = {}
-    for pitch in pitches:
-        n = seen.get(pitch, 0)
-        out.append(by_pitch_occurrence[(pitch, n)])
-        seen[pitch] = n + 1
-    return AssignmentResult(notes=out, diagnostics=[])
+    return AssignmentResult(notes=_restore_assignment_order(pitches, best_notes), diagnostics=[])

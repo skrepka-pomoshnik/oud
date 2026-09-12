@@ -36,7 +36,155 @@ from petrucci.adapters.duet import (
 from petrucci.core.model import Piece
 
 
-def _build_main_blocks(  # noqa: C901
+def _duet_main_blocks(
+    *,
+    piece: Piece,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    settings: dict[str, str],
+    slurs: list[tuple[int, int, int]] | None,
+    ties: list[tuple[int, int, int]] | None,
+    holds: list[tuple[int, int, int]] | None,
+    registration,
+) -> list[str]:
+    mode = settings.get("duetscoreview", "auto")
+    staff_indices = [0, 1] if mode in {"auto", "both"} else [0 if mode == "1" else 1]
+    labels = duet_staff_labels(piece)
+    blocks = [r"\new StaffGroup <<"]
+    for staff_index in staff_indices:
+        sub_piece = split_duet_piece_staff(piece, staff_index)
+        sub_body = _build_tab_body(
+            piece=sub_piece,
+            overrides=split_duet_triplet_map(overrides, staff_index=staff_index, piece=piece),
+            durations=split_duet_triplet_map(durations, staff_index=staff_index, piece=piece),
+            bar_width=bar_width,
+            settings=settings,
+            slurs=split_duet_span_list(slurs or [], staff_index=staff_index, piece=piece),
+            ties=split_duet_span_list(ties or [], staff_index=staff_index, piece=piece),
+            holds=split_duet_span_list(holds or [], staff_index=staff_index, piece=piece),
+            registration=registration,
+        )
+        blocks.extend(_tab_staff_with_block(labels[staff_index], sub_body, settings, sub_piece))
+    blocks.append(r">>")
+    return blocks
+
+
+def _imported_note_vocal_stack(
+    *,
+    piece: Piece,
+    settings: dict[str, str],
+    note_staffs,
+    lyric_staffs,
+    barline_staff,
+    show_lyrics: bool,
+    registration,
+) -> list[str]:
+    vocal_stack: list[str] = []
+    for index, note_staff in enumerate(note_staffs):
+        lyric_staff = _matching_imported_lyric_staff(note_staff, lyric_staffs, index)
+        melody_body, lyric_bodies = _build_imported_vocal_bodies(
+            piece,
+            settings,
+            note_staff,
+            lyric_staff,
+            barline_staff,
+            registration=registration,
+        )
+        vocal_stack.extend(
+            _vocal_blocks(
+                melody_body,
+                lyric_bodies,
+                show_lyrics=show_lyrics,
+                identifier="melody" if index == 0 else f"melody{index + 1}",
+                label=note_staff.label if len(note_staffs) > 1 else None,
+            ),
+        )
+    return vocal_stack
+
+
+def _build_vocal_stack(
+    *,
+    piece: Piece,
+    settings: dict[str, str],
+    note_staffs,
+    lyric_staffs,
+    barline_staff,
+    show_lyrics: bool,
+    has_imported_notation: bool,
+    has_imported_lyrics: bool,
+    registration,
+) -> list[str]:
+    if note_staffs:
+        return _imported_note_vocal_stack(
+            piece=piece,
+            settings=settings,
+            note_staffs=note_staffs,
+            lyric_staffs=lyric_staffs,
+            barline_staff=barline_staff,
+            show_lyrics=show_lyrics,
+            registration=registration,
+        )
+    if has_imported_notation or has_imported_lyrics:
+        melody_body, lyric_bodies = _build_imported_vocal_bodies(
+            piece,
+            settings,
+            None,
+            lyric_staffs[0] if lyric_staffs else None,
+            barline_staff,
+            registration=registration,
+        )
+    else:
+        melody_body, lyric_bodies = _build_vocal_bodies(piece, settings, registration)
+    return _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
+
+
+def _regular_main_blocks(
+    *,
+    piece: Piece,
+    tab_body: list[str],
+    settings: dict[str, str],
+    overrides: dict[tuple[int, int, int], str],
+    note_staffs,
+    lyric_staffs,
+    barline_staff,
+    registration,
+) -> list[str]:
+    has_imported_notation = bool(note_staffs) or barline_staff is not None
+    has_imported_lyrics = bool(lyric_staffs) and _piece_has_imported_lyrics(piece)
+    show_melody = settings.get("showmelody", "on") == "on" and (has_imported_notation or _piece_has_melody(piece))
+    show_lyrics = settings.get("showlyrics", "on") == "on" and (has_imported_lyrics or _piece_has_lyrics(piece))
+    has_tab = _piece_has_tab_content(piece) or bool(overrides)
+    if not has_tab and not show_melody and not show_lyrics:
+        return [r"\new Staff {", "  r4", r"}"]
+    if not show_melody and not show_lyrics:
+        return _tab_staff_with_block(None, tab_body, settings, piece)
+    vocal_stack = _build_vocal_stack(
+        piece=piece,
+        settings=settings,
+        note_staffs=note_staffs,
+        lyric_staffs=lyric_staffs,
+        barline_staff=barline_staff,
+        show_lyrics=show_lyrics,
+        has_imported_notation=has_imported_notation,
+        has_imported_lyrics=has_imported_lyrics,
+        registration=registration,
+    )
+    if not has_tab:
+        return [r"\new StaffGroup <<", *vocal_stack, r">>"]
+    tab_block = _tab_staff_with_block(None, tab_body, settings, piece)
+    blocks = [r"\new StaffGroup <<"]
+    if settings.get("vocalpos", "top") == "bottom":
+        blocks.extend(tab_block)
+        blocks.extend(vocal_stack)
+    else:
+        blocks.extend(vocal_stack)
+        blocks.extend(tab_block)
+    blocks.append(r">>")
+    return blocks
+
+
+def _build_main_blocks(
     *,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
@@ -49,31 +197,17 @@ def _build_main_blocks(  # noqa: C901
 ) -> list[str]:
     registration = build_lilypond_registration(piece, settings)
     if is_duet_score_piece(piece):
-        mode = settings.get("duetscoreview", "auto")
-        staff_indices = [0, 1] if mode in {"auto", "both"} else [0 if mode == "1" else 1]
-        labels = duet_staff_labels(piece)
-        blocks = [r"\new StaffGroup <<"]
-        for staff_index in staff_indices:
-            sub_piece = split_duet_piece_staff(piece, staff_index)
-            sub_overrides = split_duet_triplet_map(overrides, staff_index=staff_index, piece=piece)
-            sub_durations = split_duet_triplet_map(durations, staff_index=staff_index, piece=piece)
-            sub_slurs = split_duet_span_list(slurs or [], staff_index=staff_index, piece=piece)
-            sub_ties = split_duet_span_list(ties or [], staff_index=staff_index, piece=piece)
-            sub_holds = split_duet_span_list(holds or [], staff_index=staff_index, piece=piece)
-            sub_body = _build_tab_body(
-                piece=sub_piece,
-                overrides=sub_overrides,
-                durations=sub_durations,
-                bar_width=bar_width,
-                settings=settings,
-                slurs=sub_slurs,
-                ties=sub_ties,
-                holds=sub_holds,
-                registration=registration,
-            )
-            blocks.extend(_tab_staff_with_block(labels[staff_index], sub_body, settings, sub_piece))
-        blocks.append(r">>")
-        return blocks
+        return _duet_main_blocks(
+            piece=piece,
+            overrides=overrides,
+            durations=durations,
+            bar_width=bar_width,
+            settings=settings,
+            slurs=slurs,
+            ties=ties,
+            holds=holds,
+            registration=registration,
+        )
 
     imported_note_staffs = _imported_staffs_by_kind(piece, "note")
     imported_lyric_staffs = _imported_staffs_by_kind(piece, "lyrics")
@@ -89,68 +223,16 @@ def _build_main_blocks(  # noqa: C901
         holds=holds,
         registration=registration,
     )
-    has_imported_notation = bool(imported_note_staffs) or imported_barline_staff is not None
-    has_imported_lyrics = bool(imported_lyric_staffs) and _piece_has_imported_lyrics(piece)
-    show_melody = settings.get("showmelody", "on") == "on" and (has_imported_notation or _piece_has_melody(piece))
-    show_lyrics = settings.get("showlyrics", "on") == "on" and (has_imported_lyrics or _piece_has_lyrics(piece))
-    has_tab = _piece_has_tab_content(piece) or bool(overrides)
-    if not has_tab and not show_melody and not show_lyrics:
-        return [r"\new Staff {", "  r4", r"}"]
-    if not show_melody and not show_lyrics:
-        return _tab_staff_with_block(None, tab_body, settings, piece)
-
-    if imported_note_staffs:
-        vocal_stack: list[str] = []
-        for index, note_staff in enumerate(imported_note_staffs):
-            lyric_staff = _matching_imported_lyric_staff(note_staff, imported_lyric_staffs, index)
-            melody_body, lyric_bodies = _build_imported_vocal_bodies(
-                piece,
-                settings,
-                note_staff,
-                lyric_staff,
-                imported_barline_staff,
-                registration=registration,
-            )
-            vocal_stack.extend(
-                _vocal_blocks(
-                    melody_body,
-                    lyric_bodies,
-                    show_lyrics=show_lyrics,
-                    identifier="melody" if index == 0 else f"melody{index + 1}",
-                    label=note_staff.label if len(imported_note_staffs) > 1 else None,
-                ),
-            )
-    elif has_imported_notation or has_imported_lyrics:
-        melody_body, lyric_bodies = _build_imported_vocal_bodies(
-            piece,
-            settings,
-            None,
-            imported_lyric_staffs[0] if imported_lyric_staffs else None,
-            imported_barline_staff,
-            registration=registration,
-        )
-        vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
-    else:
-        melody_body, lyric_bodies = _build_vocal_bodies(piece, settings, registration)
-        vocal_stack = _vocal_blocks(melody_body, lyric_bodies, show_lyrics=show_lyrics)
-
-    if not has_tab:
-        blocks = [r"\new StaffGroup <<"]
-        blocks.extend(vocal_stack)
-        blocks.append(r">>")
-        return blocks
-
-    tab_block = _tab_staff_with_block(None, tab_body, settings, piece)
-    blocks = [r"\new StaffGroup <<"]
-    vocal_pos = settings.get("vocalpos", "top")
-    if vocal_pos == "bottom":
-        blocks.extend(tab_block)
-        blocks.extend(vocal_stack)
-    else:
-        blocks.extend(vocal_stack)
-        blocks.extend(tab_block)
-    blocks.append(r">>")
-    return blocks
+    return _regular_main_blocks(
+        piece=piece,
+        tab_body=tab_body,
+        settings=settings,
+        overrides=overrides,
+        note_staffs=imported_note_staffs,
+        lyric_staffs=imported_lyric_staffs,
+        barline_staff=imported_barline_staff,
+        registration=registration,
+    )
 
 
 def lilypond_text(

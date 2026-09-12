@@ -348,35 +348,38 @@ def _set_soundfont(state: EditorState, value: str) -> bool:
     return True
 
 
-def _apply_meta_preset(state: EditorState, name: str) -> bool:  # noqa: C901
-    preset = META_PRESETS.get(name)
-    if preset is None:
-        return False
-    conversion_note: str | None = None
+def _meta_preset_conversion_note(
+    state: EditorState,
+    name: str,
+    preset: dict[str, str],
+) -> str | None:
     target_tuning = preset.get("tuning")
-    target_strings_raw = preset.get("strings")
-    if target_tuning and any(bar.notes or bar.chords for bar in state.piece.bars):
-        from oud.editor.editing.transforms import transform_score_to_tuning  # noqa: PLC0415
+    if not target_tuning or not any(bar.notes or bar.chords for bar in state.piece.bars):
+        return None
+    from oud.editor.editing.transforms import transform_score_to_tuning  # noqa: PLC0415
 
-        target_strings = None
-        if target_strings_raw is not None:
-            try:
-                target_strings = int(target_strings_raw)
-            except ValueError:
-                target_strings = None
-        report = transform_score_to_tuning(
-            state,
-            target_tuning_text=target_tuning,
-            target_strings=target_strings,
-            semitones=0,
-            label=f"preset {name}",
-            update_settings_tuning=False,
-        )
-        if report.total > 0:
-            diag = ""
-            if report.skipped and report.first_diagnostic:
-                diag = f" ({report.first_diagnostic})"
-            conversion_note = f"converted content: changed {report.changed}, skipped {report.skipped}{diag}"
+    target_strings_raw = preset.get("strings")
+    target_strings = None
+    if target_strings_raw is not None:
+        try:
+            target_strings = int(target_strings_raw)
+        except ValueError:
+            target_strings = None
+    report = transform_score_to_tuning(
+        state,
+        target_tuning_text=target_tuning,
+        target_strings=target_strings,
+        semitones=0,
+        label=f"preset {name}",
+        update_settings_tuning=False,
+    )
+    if report.total <= 0:
+        return None
+    diagnostic = f" ({report.first_diagnostic})" if report.skipped and report.first_diagnostic else ""
+    return f"converted content: changed {report.changed}, skipped {report.skipped}{diagnostic}"
+
+
+def _apply_meta_preset_values(state: EditorState, preset: dict[str, str]) -> None:
     style = preset.get("style")
     if style is not None:
         _set_enum(state, "style", style)
@@ -387,9 +390,16 @@ def _apply_meta_preset(state: EditorState, name: str) -> bool:  # noqa: C901
     if tuning is not None:
         _set_tuning(state, tuning)
     for key, value in preset.items():
-        if key in {"style", "strings", "tuning"}:
-            continue
-        state.settings[key] = value
+        if key not in {"style", "strings", "tuning"}:
+            state.settings[key] = value
+
+
+def _apply_meta_preset(state: EditorState, name: str) -> bool:
+    preset = META_PRESETS.get(name)
+    if preset is None:
+        return False
+    conversion_note = _meta_preset_conversion_note(state, name, preset)
+    _apply_meta_preset_values(state, preset)
     state.message = f"Applied preset: {name}" + (f" ({conversion_note})" if conversion_note else "")
     return True
 
@@ -489,7 +499,54 @@ _HANDLERS: dict[str, SetHandler] = {
 }
 
 
-def apply_set_command(  # noqa: C901
+def _apply_ft3extras_value(state: EditorState, value: str) -> None:
+    if value not in ("on", "off"):
+        state.message = "showft3extras must be on/off"
+        return
+    state.settings["showfingerings"] = value
+    state.settings["showornaments"] = value
+    state.settings["showft3extras"] = value
+
+
+def _apply_registered_set_value(state: EditorState, key: str, value: str) -> bool:
+    if key in _HANDLERS:
+        _HANDLERS[key](state, value)
+        return True
+    if key in _BOOL_KEYS:
+        _set_bool(state, key, value)
+        return True
+    if key in _INT_KEYS:
+        _set_int(state, key, value)
+        return True
+    if key in _ENUM_VALUES:
+        _set_enum(state, key, value)
+        return True
+    return False
+
+
+def _apply_set_value(state: EditorState, key: str, value: str) -> None:
+    alias = _DEPRECATED_SET_ALIASES.get(key)
+    if alias == "__ft3extras_bundle__":
+        _apply_ft3extras_value(state, value)
+        return
+    if alias is not None:
+        key = alias
+    if _apply_registered_set_value(state, key, value):
+        return
+    state.message = f"Unknown set key: {key}"
+
+
+def _apply_set_token(state: EditorState, token: str) -> None:
+    if "=" not in token:
+        if _apply_bool_token(state, token) or _apply_meta_preset(state, token):
+            return
+        state.message = f"Invalid set token: {token}"
+        return
+    key, value = token.split("=", 1)
+    _apply_set_value(state, key, value)
+
+
+def apply_set_command(
     state: EditorState,
     args: str,
     config_path: str,
@@ -500,61 +557,26 @@ def apply_set_command(  # noqa: C901
         state.message = "No set args"
         return
     for token in args.split():
-        if "=" not in token:
-            if _apply_bool_token(state, token):
-                continue
-            if _apply_meta_preset(state, token):
-                continue
-            state.message = f"Invalid set token: {token}"
-            continue
-        key, value = token.split("=", 1)
-        alias = _DEPRECATED_SET_ALIASES.get(key)
-        if alias == "__ft3extras_bundle__":
-            if value not in ("on", "off"):
-                state.message = "showft3extras must be on/off"
-                continue
-            state.settings["showfingerings"] = value
-            state.settings["showornaments"] = value
-            # Keep deprecated key mirrored for config/read compatibility during transition.
-            state.settings["showft3extras"] = value
-            continue
-        if alias is not None:
-            key = alias
-        if key in _HANDLERS:
-            _HANDLERS[key](state, value)
-            continue
-        if key in _BOOL_KEYS:
-            _set_bool(state, key, value)
-            continue
-        if key in _INT_KEYS:
-            _set_int(state, key, value)
-            continue
-        if key in _ENUM_VALUES:
-            _set_enum(state, key, value)
-            continue
-        state.message = f"Unknown set key: {key}"
+        _apply_set_token(state, token)
     save_fn(config_path, state.settings)
 
 
-def _apply_bool_token(state: EditorState, token: str) -> bool:  # noqa: C901
+def _toggle_bool_key(state: EditorState, key: str) -> bool:
+    if key not in _BOOL_KEYS:
+        return False
+    current = state.settings.get(key, DEFAULT_SETTINGS.get(key, "off"))
+    return _set_bool(state, key, "off" if current == "on" else "on")
+
+
+def _apply_bool_token(state: EditorState, token: str) -> bool:
     if token in _BOOL_KEYS:
         return _set_bool(state, token, "on")
     if token.startswith("no"):
-        key = token[2:]
-        if key in _BOOL_KEYS:
-            return _set_bool(state, key, "off")
+        return _set_bool(state, token[2:], "off") if token[2:] in _BOOL_KEYS else False
     if token.startswith("inv"):
-        key = token[3:]
-        if key in _BOOL_KEYS:
-            current = state.settings.get(key, DEFAULT_SETTINGS.get(key, "off"))
-            value = "off" if current == "on" else "on"
-            return _set_bool(state, key, value)
+        return _toggle_bool_key(state, token[3:])
     if token.endswith("!"):
-        key = token[:-1]
-        if key in _BOOL_KEYS:
-            current = state.settings.get(key, DEFAULT_SETTINGS.get(key, "off"))
-            value = "off" if current == "on" else "on"
-            return _set_bool(state, key, value)
+        return _toggle_bool_key(state, token[:-1])
     return False
 
 

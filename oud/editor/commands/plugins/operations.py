@@ -267,46 +267,47 @@ def open_plugin_item(state: EditorState) -> None:
     cmd_open(state, str(path))
 
 
-def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: C901, PLR0911
+def _finish_plugin_search(state: EditorState) -> bool:
+    query = plugin_search_finish(state)
+    if not query:
+        state.message = ""
+        return True
+    idx = menu_find_index(state.plugin_items, query, lambda item: item.title)
+    if idx is None:
+        state.message = "No match"
+        return True
+    page_size = menu_page_size(state.screen_height)
+    state.plugin_index = idx
+    state.plugin_offset = menu_sync_offset(
+        state.plugin_index,
+        state.plugin_offset,
+        page_size,
+        len(state.plugin_items),
+    )
+    state.message = f"Found: {state.plugin_items[idx].title}"
+    return True
+
+
+def _handle_plugin_search(state: EditorState, key: int) -> bool:
     bindings = plugin_bindings(state)
+    handled = True
     if key in bindings.search:
         plugin_search_start(state)
         state.message = "Search: "
-        return True
-    if not state.plugin_query_active:
-        return False
-    if key in bindings.escape:
+    elif not state.plugin_query_active:
+        handled = False
+    elif key in bindings.escape:
         plugin_search_cancel(state)
         state.message = ""
-        return True
-    if key in bindings.backspace:
+    elif key in bindings.backspace:
         plugin_search_backspace(state)
         state.message = f"Search: {state.plugin_query}"
-        return True
-    if key in bindings.enter:
-        query = plugin_search_finish(state)
-        if not query:
-            state.message = ""
-            return True
-        idx = menu_find_index(state.plugin_items, query, lambda item: item.title)
-        if idx is not None:
-            page_size = menu_page_size(state.screen_height)
-            state.plugin_index = idx
-            state.plugin_offset = menu_sync_offset(
-                state.plugin_index,
-                state.plugin_offset,
-                page_size,
-                len(state.plugin_items),
-            )
-            state.message = f"Found: {state.plugin_items[idx].title}"
-            return True
-        state.message = "No match"
-        return True
-    if ord(" ") <= key <= ord("~"):
+    elif key in bindings.enter:
+        handled = _finish_plugin_search(state)
+    elif ord(" ") <= key <= ord("~"):
         plugin_search_append(state, chr(key))
         state.message = f"Search: {state.plugin_query}"
-        return True
-    return True
+    return handled
 
 
 def _plugin_action(state: EditorState, key: int) -> str | None:
@@ -328,29 +329,13 @@ def _plugin_action(state: EditorState, key: int) -> str | None:
     return None
 
 
-def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C901
-    if key == ord("?"):
-        from oud.editor.commands.dispatch import show_help  # noqa: PLC0415
+def _leave_plugin_mode(state: EditorState) -> None:
+    _clear_plugin_confirm(state)
+    if not _pop_stack(state):
+        set_mode(state, "normal")
 
-        show_help(state)
-        return True
-    if not state.plugin_items:
-        return True
-    if _handle_plugin_search(state, key):
-        return True
-    bindings = plugin_bindings(state)
-    action = _plugin_action(state, key)
-    if action == "exit":
-        _clear_plugin_confirm(state)
-        if not _pop_stack(state):
-            set_mode(state, "normal")
-        return True
-    if action == "back":
-        _clear_plugin_confirm(state)
-        if not _pop_stack(state):
-            set_mode(state, "normal")
-        return True
 
+def _handle_plugin_navigation(state: EditorState, key: int, bindings) -> bool:
     nav_bindings = MenuNavBindings(
         up=bindings.up,
         down=bindings.down,
@@ -373,15 +358,36 @@ def handle_plugin_key(state: EditorState, key: int) -> bool:  # noqa: PLR0911, C
     plugin_apply_nav(state, index=nav.index, offset=nav.offset, pending=nav.pending_prefix)
     if handled:
         _clear_plugin_confirm(state)
-        return True
+    return handled
+
+
+def _handle_plugin_command_action(state: EditorState, action: str | None) -> None:
     if action == "open":
         open_plugin_item(state)
-        return True
-    if action == "download":
+    elif action == "download":
         download_plugin_item(state)
-        return True
-    if action == "download_tree":
+    elif action == "download_tree":
         download_plugin_folder_recursive(state)
+    else:
+        _clear_plugin_confirm(state)
+
+
+def handle_plugin_key(state: EditorState, key: int) -> bool:
+    if key == ord("?"):
+        from oud.editor.commands.dispatch import show_help  # noqa: PLC0415
+
+        show_help(state)
         return True
-    _clear_plugin_confirm(state)
+    if not state.plugin_items:
+        return True
+    if _handle_plugin_search(state, key):
+        return True
+    bindings = plugin_bindings(state)
+    action = _plugin_action(state, key)
+    if action in {"exit", "back"}:
+        _leave_plugin_mode(state)
+        return True
+    if _handle_plugin_navigation(state, key, bindings):
+        return True
+    _handle_plugin_command_action(state, action)
     return True

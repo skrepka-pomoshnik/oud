@@ -62,18 +62,15 @@ def rows_per_screen(state: EditorState, height: int) -> int:
     return max(1, available // block_h)
 
 
-def _duet_viewport_row_mapping(state: EditorState, width: int, height: int):  # noqa: C901
-    per_line = bars_per_line(state, width)
-    rows = rows_per_screen(state, height)
-    logical_bars = duet_logical_bar_count(state.piece)
-    logical_breaks = sorted(
-        {
-            logical
-            for raw in state.stave_breaks
-            if raw > 0
-            for _staff, logical in [duet_bar_mapping(raw, piece=state.piece)]
-        },
+def _duet_logical_breaks(state: EditorState) -> list[int]:
+    return sorted(
+        {duet_bar_mapping(raw, piece=state.piece)[1] for raw in state.stave_breaks if raw > 0},
     )
+
+
+def _duet_system_starts(state: EditorState, per_line: int) -> list[int]:
+    logical_bars = duet_logical_bar_count(state.piece)
+    logical_breaks = _duet_logical_breaks(state)
     starts = [0]
     idx = 0
     while idx < logical_bars:
@@ -83,56 +80,77 @@ def _duet_viewport_row_mapping(state: EditorState, width: int, height: int):  # 
             break
         starts.append(limit)
         idx = limit
+    return starts
+
+
+def _duet_row_for_bar(state: EditorState, starts: list[int], bar_index: int) -> int:
+    _staff, logical = duet_bar_mapping(max(0, bar_index), piece=state.piece)
+    for idx in range(len(starts)):
+        if idx + 1 >= len(starts) or logical < starts[idx + 1]:
+            return idx
+    return max(0, len(starts) - 1)
+
+
+def _duet_start_for_row(state: EditorState, starts: list[int], row_index: int) -> int:
+    if row_index <= 0:
+        logical_start = starts[0] if starts else 0
+    elif row_index >= len(starts):
+        logical_start = starts[-1] if starts else 0
+    else:
+        logical_start = starts[row_index]
+    return duet_raw_bar_index(0, logical_start, piece=state.piece)
+
+
+def _duet_viewport_row_mapping(state: EditorState, width: int, height: int):
+    per_line = bars_per_line(state, width)
+    rows = rows_per_screen(state, height)
+    starts = _duet_system_starts(state, per_line)
 
     def row_for_bar(bar_index: int) -> int:
-        _staff, logical = duet_bar_mapping(max(0, bar_index), piece=state.piece)
-        for idx, _start in enumerate(starts):
-            if idx + 1 < len(starts) and logical >= starts[idx + 1]:
-                continue
-            return idx
-        return max(0, len(starts) - 1)
+        return _duet_row_for_bar(state, starts, bar_index)
 
     def start_for_row(row_index: int) -> int:
-        logical_start = 0
-        if row_index <= 0:
-            logical_start = starts[0] if starts else 0
-        elif row_index >= len(starts):
-            logical_start = starts[-1] if starts else 0
-        else:
-            logical_start = starts[row_index]
-        return duet_raw_bar_index(0, logical_start, piece=state.piece)
+        return _duet_start_for_row(state, starts, row_index)
 
     return rows, row_for_bar, start_for_row
 
 
-def _viewport_row_mapping(state: EditorState, width: int, height: int):  # noqa: C901
+def _auto_viewport_row_mapping(state: EditorState, width: int, rows: int):
+    starts = dynamic_system_starts(state, width)
+
+    def row_for_bar(bar_index: int) -> int:
+        row = 0
+        for idx, start in enumerate(starts):
+            next_start = starts[idx + 1] if idx + 1 < len(starts) else len(state.piece.bars)
+            if start <= bar_index < next_start:
+                row = idx
+                break
+        return row
+
+    def start_for_row(row_index: int) -> int:
+        if row_index <= 0:
+            return starts[0] if starts else 0
+        if row_index >= len(starts):
+            return starts[-1] if starts else 0
+        return starts[row_index]
+
+    return rows, row_for_bar, start_for_row
+
+
+def _packed_viewport_row_mapping(state: EditorState, rows: int, per_line: int):
+    row_for_bar = lambda bar_index: system_index(state, bar_index, per_line)  # noqa: E731
+    start_for_row = lambda row_index: system_start_index(state, row_index, per_line)  # noqa: E731
+    return rows, row_for_bar, start_for_row
+
+
+def _viewport_row_mapping(state: EditorState, width: int, height: int):
     if is_duet_score_piece(state.piece):
         return _duet_viewport_row_mapping(state, width, height)
-
     per_line = bars_per_line(state, width)
     rows = rows_per_screen(state, height)
     if state.settings.get("layout", "packed") == "auto":
-        starts = dynamic_system_starts(state, width)
-
-        def row_for_bar(bar_index: int) -> int:
-            row = 0
-            for idx, start in enumerate(starts):
-                next_start = starts[idx + 1] if idx + 1 < len(starts) else len(state.piece.bars)
-                if start <= bar_index < next_start:
-                    row = idx
-                    break
-            return row
-
-        def start_for_row(row_index: int) -> int:
-            if row_index <= 0:
-                return starts[0] if starts else 0
-            if row_index >= len(starts):
-                return starts[-1] if starts else 0
-            return starts[row_index]
-    else:
-        row_for_bar = lambda bar_index: system_index(state, bar_index, per_line)  # noqa: E731
-        start_for_row = lambda row_index: system_start_index(state, row_index, per_line)  # noqa: E731
-    return rows, row_for_bar, start_for_row
+        return _auto_viewport_row_mapping(state, width, rows)
+    return _packed_viewport_row_mapping(state, rows, per_line)
 
 
 def _playback_target_bar(state: EditorState) -> int | None:
@@ -233,7 +251,38 @@ def _section_page_boundaries(state: EditorState) -> list[int]:
     ]
 
 
-def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:  # noqa: C901
+def _scroll_cursor_row(state: EditorState, rows: int, cursor_row: int, first_row: int, start_for_row) -> None:
+    scroll_mode = state.settings.get("scrollmode", "smooth")
+
+    def _page_start_row(row: int) -> int:
+        if rows <= 1:
+            return row
+        return max(0, (row // rows) * rows)
+
+    if cursor_row < first_row:
+        target_row = cursor_row if scroll_mode != "page" else _page_start_row(cursor_row)
+        state.bar_offset = start_for_row(target_row)
+    if cursor_row >= first_row + rows:
+        target_row = _page_start_row(cursor_row) if scroll_mode == "page" else cursor_row - rows + 1
+        state.bar_offset = start_for_row(target_row)
+
+
+def _clamp_cursor_to_visible_rows(state: EditorState) -> None:
+    reverse_strings = state.settings.get("viewinvert", "off") == "on" or (
+        state.settings.get("style") == "italian" and state.settings.get("italianorient", "normal") == "reverse"
+    )
+    display_indices = _system_display_indices_for_bar(state, state.cursor_bar)
+    if not display_indices:
+        return
+    actual = string_index(state, state.cursor_string)
+    visual_rows = list(reversed(display_indices)) if reverse_strings else display_indices
+    if actual in visual_rows:
+        state.cursor_string = visual_rows.index(actual)
+    else:
+        state.cursor_string = max(0, min(state.cursor_string, len(visual_rows) - 1))
+
+
+def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None:
     hold = int(getattr(state, "viewport_scroll_hold_ticks", 0))
     if hold > 0:
         state.viewport_scroll_hold_ticks = hold - 1
@@ -248,32 +297,5 @@ def ensure_cursor_visible(state: EditorState, width: int, height: int) -> None: 
         target_bar = duet_raw_bar_index(0, logical, piece=state.piece)
     cursor_row = _row_for_bar(target_bar)
     first_row = _row_for_bar(state.bar_offset)
-    scroll_mode = state.settings.get("scrollmode", "smooth")
-
-    def _page_start_row(row: int) -> int:
-        if rows <= 1:
-            return row
-        return max(0, (row // rows) * rows)
-
-    if cursor_row < first_row:
-        target_row = cursor_row if scroll_mode != "page" else _page_start_row(cursor_row)
-        state.bar_offset = _start_for_row(target_row)
-    if cursor_row >= first_row + rows:
-        target_row = _page_start_row(cursor_row) if scroll_mode == "page" else cursor_row - rows + 1
-        state.bar_offset = _start_for_row(target_row)
-
-    # Clamp cursor to rows that are actually visible in the current rendered system.
-    # Auto layout hides unused bass rows per system, so a globally valid cursor_string
-    # can become invisible after J/K jumps.
-    reverse_strings = state.settings.get("viewinvert", "off") == "on" or (
-        state.settings.get("style") == "italian" and state.settings.get("italianorient", "normal") == "reverse"
-    )
-    display_indices = _system_display_indices_for_bar(state, state.cursor_bar)
-    if not display_indices:
-        return
-    actual = string_index(state, state.cursor_string)
-    visual_rows = list(reversed(display_indices)) if reverse_strings else display_indices
-    if actual in visual_rows:
-        state.cursor_string = visual_rows.index(actual)
-    else:
-        state.cursor_string = max(0, min(state.cursor_string, len(visual_rows) - 1))
+    _scroll_cursor_row(state, rows, cursor_row, first_row, _start_for_row)
+    _clamp_cursor_to_visible_rows(state)

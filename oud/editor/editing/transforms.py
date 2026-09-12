@@ -86,7 +86,27 @@ def _record_score_transform(
     )
 
 
-def _reassign_chord_notes(  # noqa: C901
+def _source_chord_pitches(chord, source_tuning: list[int], semitones: int) -> list[int] | None:
+    pitches: list[int] = []
+    for note in chord.notes:
+        pitch = _note_pitch(note, source_tuning)
+        if pitch is None:
+            return None
+        pitches.append(pitch + semitones)
+    return pitches
+
+
+def _apply_chord_assignments(chord, assigned_notes) -> int:
+    changed = 0
+    for note, assigned in zip(chord.notes, assigned_notes, strict=False):
+        if note.string != assigned.string or note.fret != assigned.fret:
+            changed += 1
+        note.string = assigned.string
+        note.fret = assigned.fret
+    return changed
+
+
+def _reassign_chord_notes(
     chord,
     *,
     source_tuning: list[int],
@@ -97,24 +117,17 @@ def _reassign_chord_notes(  # noqa: C901
     report = TransformReport()
     if not chord.notes:
         return report
-    pitches: list[int] = []
-    for note in chord.notes:
-        pitch = _note_pitch(note, source_tuning)
-        if pitch is None:
-            report.skipped += 1
-            return report
-        pitches.append(pitch + semitones)
+    pitches = _source_chord_pitches(chord, source_tuning, semitones)
+    if pitches is None:
+        report.skipped += 1
+        return report
     result = assign_chord_pitches(pitches, target_tuning, policy=policy)
     if not result.ok or len(result.notes) != len(chord.notes):
         report.skipped += len(chord.notes)
         if report.first_diagnostic is None and result.diagnostics:
             report.first_diagnostic = result.diagnostics[0].code
         return report
-    for note, assigned in zip(chord.notes, result.notes, strict=False):
-        if note.string != assigned.string or note.fret != assigned.fret:
-            report.changed += 1
-        note.string = assigned.string
-        note.fret = assigned.fret
+    report.changed = _apply_chord_assignments(chord, result.notes)
     return report
 
 
@@ -146,7 +159,81 @@ def _reassign_bar_notes(
     return report
 
 
-def _reassign_overrides(  # noqa: C901
+def _override_pitch(
+    key: tuple[int, int, int],
+    value: str,
+    *,
+    style: str,
+    source_tuning: list[int],
+    semitones: int,
+) -> tuple[int, str, int] | None:
+    fret = _parse_override_fret(value, style)
+    if fret is None:
+        return None
+    _bar_idx, s_idx, _col = key
+    if s_idx < 0 or s_idx >= len(source_tuning):
+        return (0, value, -1)
+    return (source_tuning[s_idx] + fret + semitones, value, 0)
+
+
+def _format_reassigned_override(
+    pitch: int,
+    *,
+    target_tuning: list[int],
+    policy: AssignmentPolicy,
+    style: str,
+) -> tuple[str, int | None, str | None]:
+    result = assign_chord_pitches([pitch], target_tuning, policy=policy)
+    if not result.ok or not result.notes:
+        return "", None, result.diagnostics[0].code if result.diagnostics else "assignment_failed"
+    out = _format_override_fret(result.notes[0].fret, style)
+    if out is None:
+        return "", None, "override_format_failed"
+    return out, result.notes[0].string - 1, None
+
+
+def _reassigned_override(
+    key: tuple[int, int, int],
+    value: str,
+    *,
+    style: str,
+    source_tuning: list[int],
+    target_tuning: list[int],
+    semitones: int,
+    policy: AssignmentPolicy,
+) -> tuple[tuple[int, int, int], str, bool, str | None]:
+    pitch_info = _override_pitch(
+        key,
+        value,
+        style=style,
+        source_tuning=source_tuning,
+        semitones=semitones,
+    )
+    if pitch_info is None:
+        return key, value, False, None
+    pitch, _source_value, pitch_error = pitch_info
+    if pitch_error:
+        return key, value, False, "source_string_out_of_range"
+    out, target_string, error = _format_reassigned_override(
+        pitch,
+        target_tuning=target_tuning,
+        policy=policy,
+        style=style,
+    )
+    if error is not None or target_string is None:
+        return key, value, False, error or "assignment_failed"
+    bar_idx, _string, col = key
+    new_key = (bar_idx, target_string, col)
+    return new_key, out, new_key != key or out != value, None
+
+
+def _record_transform_skip(report: TransformReport, diagnostic: str) -> None:
+    report.skipped += 1
+    if report.first_diagnostic is None:
+        report.first_diagnostic = diagnostic
+
+
+def _reassign_overrides(
     state: EditorState,
     *,
     source_tuning: list[int],
@@ -160,48 +247,93 @@ def _reassign_overrides(  # noqa: C901
     # Process in deterministic order to keep collision behavior stable.
     for key in sorted(state.overrides.keys()):
         value = state.overrides[key]
-        bar_idx, s_idx, col = key
-        fret = _parse_override_fret(value, style)
-        if fret is None:
+        new_key, out, changed, diagnostic = _reassigned_override(
+            key,
+            value,
+            style=style,
+            source_tuning=source_tuning,
+            target_tuning=target_tuning,
+            semitones=semitones,
+            policy=policy,
+        )
+        if diagnostic is not None:
+            _record_transform_skip(report, diagnostic)
             new_overrides[key] = value
             continue
-        if s_idx < 0 or s_idx >= len(source_tuning):
-            report.skipped += 1
-            if report.first_diagnostic is None:
-                report.first_diagnostic = "source_string_out_of_range"
-            new_overrides[key] = value
-            continue
-        pitch = source_tuning[s_idx] + fret + semitones
-        result = assign_chord_pitches([pitch], target_tuning, policy=policy)
-        if not result.ok or not result.notes:
-            report.skipped += 1
-            if report.first_diagnostic is None and result.diagnostics:
-                report.first_diagnostic = result.diagnostics[0].code
-            new_overrides[key] = value
-            continue
-        assigned = result.notes[0]
-        out = _format_override_fret(assigned.fret, style)
-        if out is None:
-            report.skipped += 1
-            if report.first_diagnostic is None:
-                report.first_diagnostic = "override_format_failed"
-            new_overrides[key] = value
-            continue
-        new_key = (bar_idx, assigned.string - 1, col)
         if new_key in new_overrides and new_key != key:
-            report.skipped += 1
-            if report.first_diagnostic is None:
-                report.first_diagnostic = "override_collision"
+            _record_transform_skip(report, "override_collision")
             new_overrides[key] = value
             continue
-        if new_key != key or out != value:
+        if changed:
             report.changed += 1
         new_overrides[new_key] = out
     state.overrides = new_overrides
     return report
 
 
-def transform_score_to_tuning(  # noqa: C901
+def _resolve_transform_tuning(
+    state: EditorState,
+    target_tuning_text: str,
+    target_strings: int | None,
+) -> tuple[list[int], list[int], int, str | None]:
+    source_tuning = _editor_tuning_pitches(
+        state.settings.get("tuning", ""),
+        strings=state.piece.strings,
+    )
+    target_tuning = _editor_tuning_pitches(target_tuning_text)
+    if not source_tuning:
+        return [], [], 0, "Invalid tuning for transform"
+    if not target_tuning:
+        return [], [], 0, "Invalid target tuning"
+    resolved_strings = target_strings if target_strings is not None else len(target_tuning)
+    target_tuning = target_tuning[:resolved_strings]
+    if not target_tuning:
+        return [], [], 0, "Invalid target tuning"
+    return source_tuning, target_tuning, resolved_strings, None
+
+
+def _merge_transform_report(target: TransformReport, source: TransformReport) -> None:
+    target.changed += source.changed
+    target.skipped += source.skipped
+    if target.first_diagnostic is None:
+        target.first_diagnostic = source.first_diagnostic
+
+
+def _transform_bars(
+    state: EditorState,
+    *,
+    source_tuning: list[int],
+    target_tuning: list[int],
+    semitones: int,
+    policy: AssignmentPolicy,
+) -> TransformReport:
+    report = TransformReport()
+    for bar in state.piece.bars:
+        _merge_transform_report(
+            report,
+            _reassign_bar_notes(
+                bar,
+                source_tuning=source_tuning,
+                target_tuning=target_tuning,
+                semitones=semitones,
+                policy=policy,
+            ),
+        )
+        for chord in bar.chords:
+            _merge_transform_report(
+                report,
+                _reassign_chord_notes(
+                    chord,
+                    source_tuning=source_tuning,
+                    target_tuning=target_tuning,
+                    semitones=semitones,
+                    policy=policy,
+                ),
+            )
+    return report
+
+
+def transform_score_to_tuning(
     state: EditorState,
     *,
     target_tuning_text: str,
@@ -210,47 +342,24 @@ def transform_score_to_tuning(  # noqa: C901
     label: str,
     update_settings_tuning: bool = False,
 ) -> TransformReport:
-    source_tuning = _editor_tuning_pitches(
-        state.settings.get("tuning", ""),
-        strings=state.piece.strings,
+    source_tuning, target_tuning, target_strings, error = _resolve_transform_tuning(
+        state,
+        target_tuning_text,
+        target_strings,
     )
-    target_tuning = _editor_tuning_pitches(target_tuning_text)
-    if not source_tuning or not target_tuning:
-        state.message = "Invalid tuning for transform"
-        return TransformReport()
-    if target_strings is None:
-        target_strings = len(target_tuning) if target_tuning else state.piece.strings
-    target_tuning = target_tuning[:target_strings]
-    if not target_tuning:
-        state.message = "Invalid target tuning"
+    if error is not None:
+        state.message = error
         return TransformReport()
 
     before = _snapshot_score_transform(state)
     policy = _policy_from_settings(state)
-    report = TransformReport()
-    for bar in state.piece.bars:
-        r1 = _reassign_bar_notes(
-            bar,
-            source_tuning=source_tuning,
-            target_tuning=target_tuning,
-            semitones=semitones,
-            policy=policy,
-        )
-        r2 = TransformReport()
-        for chord in bar.chords:
-            rc = _reassign_chord_notes(
-                chord,
-                source_tuning=source_tuning,
-                target_tuning=target_tuning,
-                semitones=semitones,
-                policy=policy,
-            )
-            r2.changed += rc.changed
-            r2.skipped += rc.skipped
-        report.changed += r1.changed + r2.changed
-        report.skipped += r1.skipped + r2.skipped
-        if report.first_diagnostic is None:
-            report.first_diagnostic = r1.first_diagnostic or r2.first_diagnostic
+    report = _transform_bars(
+        state,
+        source_tuning=source_tuning,
+        target_tuning=target_tuning,
+        semitones=semitones,
+        policy=policy,
+    )
     ro = _reassign_overrides(
         state,
         source_tuning=source_tuning,
@@ -382,7 +491,36 @@ def _assign_shifted_chord(
     return True
 
 
-def _find_cursor_grid_entries_for_shift(  # noqa: C901
+def _cursor_grid_entries(
+    state: EditorState,
+    *,
+    bar: int,
+    col: int,
+    style: str,
+) -> list[tuple[tuple[int, int, int], int, str]]:
+    entries: list[tuple[tuple[int, int, int], int, str]] = []
+    for key, value in sorted(state.overrides.items()):
+        b, _s_idx, c = key
+        if b != bar or c != col:
+            continue
+        fret = _parse_override_fret(value, style)
+        if fret is not None:
+            entries.append((key, fret, value))
+    return entries
+
+
+def _cursor_grid_entry_index(
+    state: EditorState,
+    entries: list[tuple[tuple[int, int, int], int, str]],
+) -> int | None:
+    actual_string_idx = string_index(state, state.cursor_string)
+    return next(
+        (i for i, (key, _fret, _value) in enumerate(entries) if key[1] == actual_string_idx),
+        None,
+    )
+
+
+def _find_cursor_grid_entries_for_shift(
     state: EditorState,
 ) -> tuple[list[tuple[tuple[int, int, int], int, str]], int | None]:
     if not state.piece.bars:
@@ -394,23 +532,11 @@ def _find_cursor_grid_entries_for_shift(  # noqa: C901
     bar = state.cursor_bar
     col = state.cursor_col
     style = state.settings.get("style", "french")
-    entries: list[tuple[tuple[int, int, int], int, str]] = []
-    for key, value in sorted(state.overrides.items()):
-        b, _s_idx, c = key
-        if b != bar or c != col:
-            continue
-        fret = _parse_override_fret(value, style)
-        if fret is None:
-            continue
-        entries.append((key, fret, value))
+    entries = _cursor_grid_entries(state, bar=bar, col=col, style=style)
     if not entries:
         state.message = "No note at cursor"
         return [], None
-    actual_string_idx = string_index(state, state.cursor_string)
-    note_idx = next(
-        (i for i, (key, _fret, _value) in enumerate(entries) if key[1] == actual_string_idx),
-        None,
-    )
+    note_idx = _cursor_grid_entry_index(state, entries)
     if note_idx is None:
         state.message = "No note on cursor string"
         return entries, None

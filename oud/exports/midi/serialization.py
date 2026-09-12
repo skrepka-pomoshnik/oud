@@ -172,9 +172,9 @@ def _tablature_bar_tick_lengths(
             piece.strings,
             overrides,
             durations,
-            bar_width,
-            style,
-            default_duration,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
             dotted=dotted,
         )
         if chord_events:
@@ -222,9 +222,9 @@ def _single_score_midi_note_events(
             piece.strings,
             overrides,
             durations,
-            bar_width,
-            style,
-            default_duration,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
             dotted=dotted,
         )
         chord_events = chord_events or _melody_chord_events(

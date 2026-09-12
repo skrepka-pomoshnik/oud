@@ -8,7 +8,6 @@ from pathlib import Path
 from oud.exports.midi.bytes import DEFAULT_VOCAL_PATCH
 from oud.exports.midi.projection import (
     _default_tuning,
-    _parse_tuning,
     _repeat_hop_limit,
     _resolved_tuning_for_piece,
 )
@@ -20,14 +19,16 @@ from oud.exports.midi.serialization import (
 )
 from petrucci.adapters.duet import is_duet_score_piece
 from petrucci.core.model import Piece
+from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
 
 
-def export_midi(  # noqa: PLR0917 - public compatibility; replace options with a typed export request
+def export_midi(
     path: str,
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     bar_width: int,
+    *,
     settings: dict[str, str] | None = None,
     bpm: int = 90,
     start_bar: int = 0,
@@ -107,8 +108,36 @@ def export_midi(  # noqa: PLR0917 - public compatibility; replace options with a
     )
 
 
-def _midi_command(  # noqa: C901, PLR0917 - explicit executable inputs keep player selection deterministic
+def _resolve_midi_player(
+    *,
+    soundfont_path: str | None,
+    platform: str,
+    fluidsynth: str | None,
+    timidity: str | None,
+    opener: str | None,
+) -> str | None:
+    if soundfont_path and fluidsynth:
+        return fluidsynth
+    if timidity:
+        return timidity
+    if platform == "darwin" and opener:
+        return opener
+    return fluidsynth
+
+
+def _fluidsynth_command(player: str, path: str, *, platform: str, soundfont_path: str | None) -> list[str]:
+    cmd = [player, "-q"]
+    if platform == "darwin":
+        cmd += ["-a", "coreaudio"]
+    if soundfont_path:
+        cmd += ["-ni", soundfont_path]
+    cmd.append(path)
+    return cmd
+
+
+def _midi_command(
     path: str,
+    *,
     soundfont: str | None,
     platform: str,
     fluidsynth: str | None,
@@ -120,26 +149,19 @@ def _midi_command(  # noqa: C901, PLR0917 - explicit executable inputs keep play
         candidate = Path(soundfont).expanduser()
         if candidate.exists():
             soundfont_path = str(candidate)
-    player = None
-    if soundfont_path and fluidsynth:
-        player = fluidsynth
-    elif timidity:
-        player = timidity
-    elif platform == "darwin" and opener:
+    player = _resolve_midi_player(
+        soundfont_path=soundfont_path,
+        platform=platform,
+        fluidsynth=fluidsynth,
+        timidity=timidity,
+        opener=opener,
+    )
+    if platform == "darwin" and player == opener and opener:
         return [opener, path]
-    else:
-        player = fluidsynth
     if player is None:
         return None
     if player.endswith("fluidsynth"):
-        cmd = [player]
-        cmd.append("-q")
-        if platform == "darwin":
-            cmd += ["-a", "coreaudio"]
-        if soundfont_path:
-            cmd += ["-ni", soundfont_path]
-        cmd.append(path)
-        return cmd
+        return _fluidsynth_command(player, path, platform=platform, soundfont_path=soundfont_path)
     return [player, path]
 
 

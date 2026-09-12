@@ -109,43 +109,6 @@ def _duration_ticks(denom: int, dotted: bool) -> int:
     return ticks
 
 
-def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
-    pitches: list[int] = []
-    midi_min = 0
-    midi_max = 127
-    idx = 0
-    text = tuning.strip()
-    while idx < len(text):
-        ch = text[idx]
-        if ch.isalpha():
-            note = ch.upper()
-            idx += 1
-            accidental = ""
-            if idx < len(text) and text[idx] in "+-#b":
-                accidental = text[idx]
-                idx += 1
-            start = idx
-            while idx < len(text) and text[idx].isdigit():
-                idx += 1
-            octave = text[start:idx]
-            octave_num = 3 if not octave else int(octave)
-            semis = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(
-                note,
-                0,
-            )
-            if accidental in ("+", "#"):
-                semis += 1
-            elif accidental in ("-", "b"):
-                semis -= 1
-            midi = (octave_num + 1) * 12 + semis
-            if midi_min <= midi <= midi_max:
-                pitches.append(midi)
-        else:
-            idx += 1
-    pitches.reverse()
-    return pitches
-
-
 def _default_tuning(strings: int) -> list[int]:
     return default_tuning_pitches(strings)
 
@@ -174,12 +137,54 @@ def _fret_from_override(ch: str, style: str) -> int | None:
     return letters.index(ch) if ch in letters else None
 
 
-def _collect_manual_chords(  # noqa: C901, PLR0917 - legacy grid projection pending typed export context
+def _manual_notes_at_column(
+    bar_index: int,
+    col: int,
+    strings: int,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    *,
+    style: str,
+) -> list[Note]:
+    notes: list[Note] = []
+    for s_idx in range(strings):
+        key = (bar_index, s_idx, col)
+        if key not in overrides:
+            continue
+        fret = editor_fret_at(
+            overrides,
+            durations,
+            bar_index=bar_index,
+            string_index=s_idx,
+            column=col,
+            style=style,
+        )
+        if fret is not None:
+            notes.append(Note(string=s_idx + 1, fret=fret, raw_pos=0))
+    return notes
+
+
+def _manual_duration_at_column(
+    bar_index: int,
+    col: int,
+    strings: int,
+    durations: dict[tuple[int, int, int], int],
+    default_duration: int,
+) -> int:
+    for s_idx in range(strings):
+        key = (bar_index, s_idx, col)
+        if key in durations:
+            return durations[key]
+    return default_duration
+
+
+def _collect_manual_chords(
     bar_index: int,
     strings: int,
     bar_width: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     style: str,
     default_duration: int,
     dotted: set[tuple[int, int]] | None,
@@ -189,30 +194,10 @@ def _collect_manual_chords(  # noqa: C901, PLR0917 - legacy grid projection pend
     events: list[tuple[int, int, int, list[Note]]] = []
     current_time = 0
     for col in columns:
-        notes: list[Note] = []
-        for s_idx in range(strings):
-            key = (bar_index, s_idx, col)
-            if key not in overrides:
-                continue
-            fret = editor_fret_at(
-                overrides,
-                durations,
-                bar_index=bar_index,
-                string_index=s_idx,
-                column=col,
-                style=style,
-            )
-            if fret is None:
-                continue
-            notes.append(Note(string=s_idx + 1, fret=fret, raw_pos=0))
+        notes = _manual_notes_at_column(bar_index, col, strings, overrides, durations, style=style)
         if not notes:
             continue
-        denom = default_duration
-        for s_idx in range(strings):
-            key = (bar_index, s_idx, col)
-            if key in durations:
-                denom = durations[key]
-                break
+        denom = _manual_duration_at_column(bar_index, col, strings, durations, default_duration)
         is_dotted = dotted is not None and (bar_index, col) in dotted
         duration = _duration_ticks(denom, is_dotted)
         events.append((current_time, duration, col, notes))
@@ -256,11 +241,12 @@ def _chord_positions(
     return positions
 
 
-def _apply_overrides(  # noqa: PLR0917 - legacy grid projection pending typed export context
+def _apply_overrides(
     notes: list[Note],
     overrides: dict[tuple[int, int, int], str],
     bar_index: int,
     col: int,
+    *,
     style: str,
     strings: int,
     durations: dict[tuple[int, int, int], int],
@@ -286,12 +272,13 @@ def _apply_overrides(  # noqa: PLR0917 - legacy grid projection pending typed ex
     return list(by_string.values())
 
 
-def _bar_chord_events(  # noqa: PLR0917 - legacy grid projection pending typed export context
+def _bar_chord_events(
     bar: Bar,
     bar_index: int,
     strings: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     bar_width: int,
     style: str,
     default_duration: int,
@@ -305,9 +292,9 @@ def _bar_chord_events(  # noqa: PLR0917 - legacy grid projection pending typed e
             bar_width,
             overrides,
             durations,
-            style,
-            default_duration,
-            dotted,
+            style=style,
+            default_duration=default_duration,
+            dotted=dotted,
         )
         for start, duration, col, notes in manual:
             events.append((start, duration, col, notes))
@@ -327,7 +314,15 @@ def _bar_chord_events(  # noqa: PLR0917 - legacy grid projection pending typed e
         is_dotted = chord.dotted or (dotted is not None and (bar_index, col) in dotted)
         duration = _duration_ticks(denom, is_dotted)
         if chord.notes:
-            notes = _apply_overrides(chord.notes, overrides, bar_index, col, style, strings, durations)
+            notes = _apply_overrides(
+                chord.notes,
+                overrides,
+                bar_index,
+                col,
+                style=style,
+                strings=strings,
+                durations=durations,
+            )
             events.append((time, duration, col, notes))
         time += duration
     return events
@@ -458,9 +453,9 @@ def _duet_timeline_events(
                 piece.strings,
                 overrides,
                 durations,
-                bar_width,
-                style,
-                default_duration,
+                bar_width=bar_width,
+                style=style,
+                default_duration=default_duration,
                 dotted=dotted,
             )
             if not chord_events:
@@ -477,7 +472,78 @@ def _duet_timeline_events(
     return timeline_events
 
 
-def _duet_note_events(  # noqa: C901
+def _append_duet_chord_notes(
+    events: list[tuple[int, bytes]],
+    *,
+    chord_event: tuple[int, int, int, list[Note]],
+    bar_index: int,
+    base_time: int,
+    beats: int,
+    unit: int,
+    gate: float,
+    pitches: list[int],
+    show_ornaments: bool,
+    ornament_mode: str,
+    ornaments: dict[tuple[int, int], str] | None,
+) -> None:
+    start, duration, col, notes = chord_event
+    velocity = _accent_velocity(start, beats, unit)
+    note_len = max(1, int(duration * gate))
+    bar_ornament = ornaments.get((bar_index, col)) if (show_ornaments and ornaments) else None
+    for note in notes:
+        string_index = note.string - 1
+        if string_index < 0 or string_index >= len(pitches):
+            continue
+        pitch = pitches[string_index] + note.fret
+        ornament_symbol = None
+        if show_ornaments:
+            ornament_symbol = _picked_note_ornament(note, ornament_mode=ornament_mode) or bar_ornament
+        _append_note_messages(
+            events,
+            channel=0,
+            start_tick=base_time + start,
+            note_len=note_len,
+            pitch=pitch,
+            velocity=velocity,
+            ornament_symbol=ornament_symbol,
+        )
+
+
+def _append_duet_bar_notes(
+    events: list[tuple[int, bytes]],
+    *,
+    chord_events: list[tuple[int, int, int, list[Note]]],
+    bar_index: int,
+    base_time: int,
+    beats: int,
+    unit: int,
+    gate: float,
+    pitches: list[int],
+    show_ornaments: bool,
+    ornament_mode: str,
+    ornaments: dict[tuple[int, int], str] | None,
+) -> int:
+    max_end = 0
+    for chord_event in chord_events:
+        _append_duet_chord_notes(
+            events,
+            chord_event=chord_event,
+            bar_index=bar_index,
+            base_time=base_time,
+            beats=beats,
+            unit=unit,
+            gate=gate,
+            pitches=pitches,
+            show_ornaments=show_ornaments,
+            ornament_mode=ornament_mode,
+            ornaments=ornaments,
+        )
+        start, duration, _col, _notes = chord_event
+        max_end = max(max_end, start + duration)
+    return max_end
+
+
+def _duet_note_events(
     piece: Piece,
     *,
     overrides: dict[tuple[int, int, int], str],
@@ -515,42 +581,26 @@ def _duet_note_events(  # noqa: C901
                 piece.strings,
                 overrides,
                 durations,
-                bar_width,
-                style,
-                default_duration,
+                bar_width=bar_width,
+                style=style,
+                default_duration=default_duration,
                 dotted=dotted,
             )
             if not chord_events:
                 continue
-            max_end = 0
-            for start, duration, col, notes in chord_events:
-                velocity = _accent_velocity(start, beats, unit)
-                note_len = max(1, int(duration * gate))
-                bar_ornament = ornaments.get((b_idx, col)) if (show_ornaments and ornaments) else None
-                for note in notes:
-                    s_idx = note.string - 1
-                    if s_idx < 0 or s_idx >= len(pitches):
-                        continue
-                    pitch = pitches[s_idx] + note.fret
-                    ornament_symbol = None
-                    if show_ornaments:
-                        ornament_symbol = (
-                            _picked_note_ornament(
-                                note,
-                                ornament_mode=ornament_mode,
-                            )
-                            or bar_ornament
-                        )
-                    _append_note_messages(
-                        events,
-                        channel=0,
-                        start_tick=pair_base_time + start,
-                        note_len=note_len,
-                        pitch=pitch,
-                        velocity=velocity,
-                        ornament_symbol=ornament_symbol,
-                    )
-                max_end = max(max_end, start + duration)
+            max_end = _append_duet_bar_notes(
+                events,
+                chord_events=chord_events,
+                bar_index=b_idx,
+                base_time=pair_base_time,
+                beats=beats,
+                unit=unit,
+                gate=gate,
+                pitches=pitches,
+                show_ornaments=show_ornaments,
+                ornament_mode=ornament_mode,
+                ornaments=ornaments,
+            )
             _append_vocal_messages(
                 events,
                 bar=bar,
@@ -564,7 +614,33 @@ def _duet_note_events(  # noqa: C901
     return events
 
 
-def _append_vocal_messages(  # noqa: C901
+def _append_vocal_event_message(
+    events: list[tuple[int, bytes]],
+    *,
+    event: VocalEvent,
+    start: int,
+    duration: int,
+    base_time: int,
+    gate: float,
+    channel: int,
+) -> None:
+    if getattr(event, "is_rest", False) or event.pitch is None:
+        return
+    note_len = max(1, int(duration * gate))
+    if event.fermata:
+        note_len = max(note_len, int(duration * 1.5))
+    _append_note_messages(
+        events,
+        channel=_vocal_channel(channel, event.voice),
+        start_tick=base_time + start,
+        note_len=note_len,
+        pitch=event.pitch,
+        velocity=min(127, BASE_NOTE_VELOCITY + 4),
+        ornament_symbol=None,
+    )
+
+
+def _append_vocal_messages(
     events: list[tuple[int, bytes]],
     *,
     bar: Bar,
@@ -594,21 +670,14 @@ def _append_vocal_messages(  # noqa: C901
         has_explicit_melody=has_explicit_melody,
         target_ticks=target_ticks,
     ):
-        if getattr(event, "is_rest", False):
-            continue
-        if event.pitch is None:
-            continue
-        note_len = max(1, int(duration * gate))
-        if event.fermata:
-            note_len = max(note_len, int(duration * 1.5))
-        _append_note_messages(
+        _append_vocal_event_message(
             events,
-            channel=_vocal_channel(channel, event.voice),
-            start_tick=base_time + start,
-            note_len=note_len,
-            pitch=event.pitch,
-            velocity=min(127, BASE_NOTE_VELOCITY + 4),
-            ornament_symbol=None,
+            event=event,
+            start=start,
+            duration=duration,
+            base_time=base_time,
+            gate=gate,
+            channel=channel,
         )
 
 
@@ -716,7 +785,120 @@ def _midi_total_ticks(events: list[tuple[int, bytes]]) -> int:
     return max((start for start, _payload in events), default=0)
 
 
-def build_playback_timeline(  # noqa: C901
+def _append_standard_bar_events(
+    timeline_events: list[tuple[int, int, int, int]],
+    *,
+    bar: Bar,
+    bar_index: int,
+    current_time: int,
+    chord_events: list[tuple[int, int, int, list[Note]]],
+) -> int:
+    max_end = 0
+    has_explicit_melody = bool(bar.melody_events)
+    for event_idx, (start, duration, col, notes) in enumerate(chord_events):
+        if not notes and not has_explicit_melody:
+            continue
+        marker_col = event_idx if bar.chords else col
+        timeline_events.append((bar_index, current_time + start, duration, marker_col))
+        max_end = max(max_end, start + duration)
+    return max_end
+
+
+def _standard_timeline_events(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    max_repeat_hops: int,
+    dotted: set[tuple[int, int]] | None,
+) -> list[tuple[int, int, int, int]]:
+    events: list[tuple[int, int, int, int]] = []
+    current_time = 0
+    bar_order = _repeat_play_order(
+        len(piece.bars),
+        start_bar,
+        get_repeat=lambda idx: piece.bars[idx].repeat,
+        get_endings=lambda idx: piece.bars[idx].ending_numbers,
+        max_repeat_hops=max_repeat_hops,
+    )
+    for bar_index in bar_order:
+        bar = piece.bars[bar_index]
+        chord_events = _bar_chord_events(
+            bar,
+            bar_index,
+            piece.strings,
+            overrides,
+            durations,
+            bar_width=bar_width,
+            style=style,
+            default_duration=default_duration,
+            dotted=dotted,
+        )
+        if not chord_events:
+            continue
+        current_time += _append_standard_bar_events(
+            events,
+            bar=bar,
+            bar_index=bar_index,
+            current_time=current_time,
+            chord_events=chord_events,
+        )
+    return events
+
+
+def _timeline_for_passes(
+    events: list[tuple[int, int, int, int]],
+    *,
+    pass_count: int,
+    sec_per_tick: float,
+) -> list[PlaybackCursor]:
+    pass_ticks = _timeline_total_ticks(events)
+    if pass_count <= 1 or pass_ticks <= 0:
+        return build_timeline_from_events(events, sec_per_tick=sec_per_tick)
+    timeline: list[PlaybackCursor] = []
+    for pass_idx in range(pass_count):
+        shifted = _shift_timeline_events(events, tick_offset=pass_idx * pass_ticks)
+        timeline.extend(build_timeline_from_events(shifted, sec_per_tick=sec_per_tick, verse=pass_idx))
+    return timeline
+
+
+def _duet_playback_timeline(
+    piece: Piece,
+    *,
+    overrides: dict[tuple[int, int, int], str],
+    durations: dict[tuple[int, int, int], int],
+    bar_width: int,
+    style: str,
+    default_duration: int,
+    start_bar: int,
+    dotted: set[tuple[int, int]] | None,
+    max_repeat_hops: int,
+    settings: dict[str, str],
+    sec_per_tick: float,
+) -> list[PlaybackCursor]:
+    events = _duet_timeline_events(
+        piece,
+        overrides=overrides,
+        durations=durations,
+        bar_width=bar_width,
+        style=style,
+        default_duration=default_duration,
+        start_bar=start_bar,
+        dotted=dotted,
+        max_repeat_hops=max_repeat_hops,
+    )
+    return _timeline_for_passes(
+        events,
+        pass_count=_playverse_count(piece, settings),
+        sec_per_tick=sec_per_tick,
+    )
+
+
+def build_playback_timeline(
     piece: Piece,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
@@ -730,11 +912,10 @@ def build_playback_timeline(  # noqa: C901
     settings = settings or {}
     style = settings.get("style") or "french"
     default_duration = 4
-    timeline_events: list[tuple[int, int, int, int]] = []
     sec_per_tick = 60.0 / (max(1, bpm) * TICKS_PER_QUARTER)
     max_repeat_hops = _repeat_hop_limit(len(piece.bars), settings)
     if is_duet_score_piece(piece):
-        base_events = _duet_timeline_events(
+        return _duet_playback_timeline(
             piece,
             overrides=overrides,
             durations=durations,
@@ -744,55 +925,22 @@ def build_playback_timeline(  # noqa: C901
             start_bar=start_bar,
             dotted=dotted,
             max_repeat_hops=max_repeat_hops,
+            settings=settings,
+            sec_per_tick=sec_per_tick,
         )
-        pass_count = _playverse_count(piece, settings)
-        pass_ticks = _timeline_total_ticks(base_events)
-        timeline: list[PlaybackCursor] = []
-        for pass_idx in range(pass_count):
-            shifted = _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks)
-            timeline.extend(build_timeline_from_events(shifted, sec_per_tick=sec_per_tick, verse=pass_idx))
-        return timeline
-    current_time = 0
-    bar_order = _repeat_play_order(
-        len(piece.bars),
-        start_bar,
-        get_repeat=lambda idx: piece.bars[idx].repeat,
-        get_endings=lambda idx: piece.bars[idx].ending_numbers,
+    base_events = _standard_timeline_events(
+        piece,
+        overrides=overrides,
+        durations=durations,
+        bar_width=bar_width,
+        style=style,
+        default_duration=default_duration,
+        start_bar=start_bar,
         max_repeat_hops=max_repeat_hops,
+        dotted=dotted,
     )
-    for b_idx in bar_order:
-        bar = piece.bars[b_idx]
-        has_explicit_melody = bool(bar.melody_events)
-        chord_events = _bar_chord_events(
-            bar,
-            b_idx,
-            piece.strings,
-            overrides,
-            durations,
-            bar_width,
-            style,
-            default_duration,
-            dotted=dotted,
-        )
-        if not chord_events:
-            continue
-        max_end = 0
-        for event_idx, (start, duration, col, notes) in enumerate(chord_events):
-            if not notes and not has_explicit_melody:
-                continue
-            marker_col = event_idx if bar.chords else col
-            timeline_events.append(
-                (b_idx, current_time + start, duration, marker_col),
-            )
-            max_end = max(max_end, start + duration)
-        current_time += max_end
-    base_events = list(timeline_events)
-    pass_count = _playverse_count(piece, settings)
-    pass_ticks = _timeline_total_ticks(base_events)
-    if pass_count > 1 and pass_ticks > 0:
-        timeline: list[PlaybackCursor] = []
-        for pass_idx in range(pass_count):
-            shifted = _shift_timeline_events(base_events, tick_offset=pass_idx * pass_ticks)
-            timeline.extend(build_timeline_from_events(shifted, sec_per_tick=sec_per_tick, verse=pass_idx))
-        return timeline
-    return build_timeline_from_events(timeline_events, sec_per_tick=sec_per_tick)
+    return _timeline_for_passes(
+        base_events,
+        pass_count=_playverse_count(piece, settings),
+        sec_per_tick=sec_per_tick,
+    )

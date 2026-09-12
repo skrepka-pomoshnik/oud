@@ -102,7 +102,7 @@ ignore = [
 
 [tool.ruff.lint.mccabe]
 # The ceiling is enforced for new code. Exact legacy C901 findings and their
-# retirement targets are tracked by docs/architecture/debt.json and TODO.md.
+# enforced directly by the architecture quality check.
 max-complexity = 7
 
 [tool.ruff.format]

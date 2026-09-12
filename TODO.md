@@ -206,23 +206,15 @@ algorithm that preserves sounding pitch and produces playable tablature.
   - Record intentional differences from Gerbode/Fronimo output instead of
     claiming pixel identity.
 
-## P2: Architecture debt retirement
+## P2: Architecture limits
 
-CI enforces complexity 7, a 1,000-line module ceiling, and at most seven direct
-Python entities per package. Function debt uses the exact non-growth baseline
-in `docs/architecture/debt.json`; rationale, counts, and ownership targets are in
-`docs/architecture/debt.md`.
+The architecture quality check enforces complexity 7, a 1,000-line module ceiling,
+at most seven direct Python entities per package, and the UI-independent dependency
+boundary directly against the current tree. No debt baseline is carried; new
+violations fail immediately.
 
-- [ ] Retire the remaining non-Petrucci function-level C901 findings without raising
-  limits, broad per-file ignores, compatibility wrappers, or count-only helper
-  modules. Insert dispatch and command completion are split; continue through
-  the next highest domain coordinators.
-- [ ] Replace the 28 narrowly suppressed production `PLR0917` surfaces with
-  typed render, layout, playback, and export request records as their owning
-  modules are split; do not add per-file ignores or forwarding wrappers.
 ## P3: Secondary release work
 
-- [ ] Confirm GitHub Actions green on macOS.
 - [x] Ship a real `oud(1)` manual page that works with `man oud`.
   - Maintain `man/oud.1.scd` as the readable source and commit generated
     `man/oud.1` roff output.
@@ -272,9 +264,8 @@ These items refine the existing FT3, terminal-viewer, and publication work. They
 - [ ] Decide whether a dedicated mensural input DSL is needed only after the diplomatic model and round trips expose concrete limitations in FT3/TAB entry. Do not design syntax before that evidence exists.
 - [ ] Treat neumes, `gabc`, chant editing, facsimile overlays, and terminal image protocols as separate future scopes, not extensions implied by mensural or tablature support.
 
-## P0 - Static audit findings (review before fixing)
+## P0 - Static audit follow-up
 
-Review the syntax state first, then re-run the audit before addressing secondary findings. Do not mass-suppress Ruff or Vulture findings; rerun the project quality gate after accepted fixes.
-
-- [ ] Re-run Vulture now that the parser sources are syntactically valid; the
-  initial run produced parser errors rather than a trustworthy dead-code list.
+The parser sources are syntactically valid and the current Ruff and Vulture
+audits are clean. Keep future static checks local and update this section only
+with reproducible findings.

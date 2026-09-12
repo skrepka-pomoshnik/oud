@@ -50,7 +50,15 @@ def render_chord_rhythm(context: RhythmRenderContext) -> RhythmRenderResult:
     draw_span_rows(context, grid_map, overlay_sparse=context.scale_bar)
     _draw_flag_rows(context, plan)
     duration_cells, duration_map, duration_padded = _draw_durations(context, ordered_flags, plan)
-    _draw_cursor(context, positions, grid_map, plan.flag_cells, duration_cells, duration_map, duration_padded)
+    _draw_cursor(
+        context,
+        positions=positions,
+        grid_map=grid_map,
+        flag_cells=plan.flag_cells,
+        duration_cells=duration_cells,
+        duration_map=duration_map,
+        duration_padded=duration_padded,
+    )
     return RhythmRenderResult(positions, plan.src_to_dest, grid_map, text_onsets)
 
 
@@ -285,8 +293,9 @@ def _draw_durations(
     return duration_cells, duration_map, padded
 
 
-def _draw_cursor(  # noqa: PLR0917 - coordinated rhythm cells are one render operation
+def _draw_cursor(
     context: RhythmRenderContext,
+    *,
     positions: list[tuple[int, int, bool]],
     grid_map: list[int],
     flag_cells: list[str],
@@ -309,11 +318,19 @@ def _draw_cursor(  # noqa: PLR0917 - coordinated rhythm cells are one render ope
         flag_cells[flag_idx],
         A_BOLD,
     )
-    _draw_duration_cursor(context, matching, scaled_col, duration_cells, duration_map, duration_padded)
+    _draw_duration_cursor(
+        context,
+        raw_col=matching,
+        scaled_col=scaled_col,
+        duration_cells=duration_cells,
+        duration_map=duration_map,
+        padded=duration_padded,
+    )
 
 
-def _draw_duration_cursor(  # noqa: PLR0917 - coordinated rhythm cells are one render operation
+def _draw_duration_cursor(
     context: RhythmRenderContext,
+    *,
     raw_col: int,
     scaled_col: int,
     duration_cells: list[str],

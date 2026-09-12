@@ -478,8 +478,9 @@ def test_visual_mode_play_loops_selected_bar_range(monkeypatch) -> None:
     state = _state()
     calls: list[dict[str, int | None]] = []
 
-    def _start_midi(  # noqa: PLR0917 - mirrors the legacy playback callback
+    def _start_midi(
         state: EditorState,
+        *,
         start_bar: int | None = None,
         path: str | None = None,
         bpm: int | None = None,

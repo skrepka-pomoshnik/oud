@@ -49,7 +49,66 @@ def _lyric_tokens_for_row(row, sung_onsets: tuple[int, ...]) -> list[str]:
     return tokens
 
 
-def _build_vocal_bodies(  # noqa: C901
+def _append_vocal_events(
+    melody_body: list[str],
+    vocal_events,
+    *,
+    scale: Fraction,
+) -> tuple[int, ...]:
+    if scale != 1:
+        melody_body.append(f"  \\scaleDurations {scale.numerator}/{scale.denominator} {{")
+    sung_onsets = tuple(event.onset_index for event in vocal_events if not event.is_rest)
+    for event in vocal_events:
+        duration = _duration_token(note_type_to_denom(event.note_type) or 4, event.dotted)
+        if getattr(event, "is_rest", False) or event.pitch is None:
+            melody_body.append(f"  r{duration}")
+            continue
+        melody_body.append(f"  {_midi_to_lilypond(event.pitch)}{duration}")
+    if not vocal_events:
+        melody_body.append("  r4")
+    if scale != 1:
+        melody_body.append("  }")
+    return tuple(sung_onsets)
+
+
+def _append_vocal_lyrics(lyric_bodies: list[list[str]], bar, sung_onsets: tuple[int, ...]) -> None:
+    rows = getattr(bar, "lyric_event_rows", None) or []
+    if rows:
+        while len(lyric_bodies) < len(rows):
+            lyric_bodies.append([])
+        for idx, row in enumerate(rows):
+            lyric_bodies[idx].extend(_lyric_tokens_for_row(row, sung_onsets))
+        return
+    for row in lyric_bodies:
+        row.extend(["_"] * len(sung_onsets))
+
+
+def _append_vocal_bar(
+    melody_body: list[str],
+    lyric_bodies: list[list[str]],
+    *,
+    bar,
+    bar_index: int,
+    current_time_sig: str | None,
+    tuning_lookup: list[int],
+    registration: LilyPondRegistration,
+) -> str | None:
+    _append_editorial_marks(melody_body, registration, bar_index)
+    current_time_sig = _append_bar_time_change(melody_body, bar, current_time_sig)
+    vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_lookup)
+    scale = duration_scale(
+        registration.duration_for(bar_index),
+        timed_items_duration(vocal_events, fallback=Fraction(1, 4)),
+    )
+    sung_onsets = _append_vocal_events(melody_body, vocal_events, scale=scale)
+    _append_barline(melody_body, bar)
+    if command := registration.command_after(bar_index):
+        melody_body.append(f"  {command}")
+    _append_vocal_lyrics(lyric_bodies, bar, sung_onsets)
+    return current_time_sig
+
+
+def _build_vocal_bodies(
     piece: Piece,
     settings: dict[str, str],
     registration: LilyPondRegistration,
@@ -62,39 +121,15 @@ def _build_vocal_bodies(  # noqa: C901
     tuning_lookup = list(reversed(_normalize_tuning_length(tuning_pitches, piece.strings)))
 
     for bar_index, bar in enumerate(piece.bars):
-        _append_editorial_marks(melody_body, registration, bar_index)
-        current_time_sig = _append_bar_time_change(melody_body, bar, current_time_sig)
-        vocal_events = infer_vocal_events(bar, tuning_pitches=tuning_lookup)
-        scale = duration_scale(
-            registration.duration_for(bar_index),
-            timed_items_duration(vocal_events, fallback=Fraction(1, 4)),
+        current_time_sig = _append_vocal_bar(
+            melody_body,
+            lyric_bodies,
+            bar=bar,
+            bar_index=bar_index,
+            current_time_sig=current_time_sig,
+            tuning_lookup=tuning_lookup,
+            registration=registration,
         )
-        if scale != 1:
-            melody_body.append(f"  \\scaleDurations {scale.numerator}/{scale.denominator} {{")
-        for event in vocal_events:
-            duration = _duration_token(note_type_to_denom(event.note_type) or 4, event.dotted)
-            if getattr(event, "is_rest", False) or event.pitch is None:
-                melody_body.append(f"  r{duration}")
-                continue
-            melody_body.append(f"  {_midi_to_lilypond(event.pitch)}{duration}")
-        if not vocal_events:
-            melody_body.append("  r4")
-        if scale != 1:
-            melody_body.append("  }")
-        _append_barline(melody_body, bar)
-        if command := registration.command_after(bar_index):
-            melody_body.append(f"  {command}")
-
-        rows = getattr(bar, "lyric_event_rows", None) or []
-        sung_onsets = tuple(event.onset_index for event in vocal_events if not event.is_rest)
-        if rows:
-            while len(lyric_bodies) < len(rows):
-                lyric_bodies.append([])
-            for idx, row in enumerate(rows):
-                lyric_bodies[idx].extend(_lyric_tokens_for_row(row, sung_onsets))
-        elif lyric_bodies:
-            for row in lyric_bodies:
-                row.extend(["_"] * len(sung_onsets))
     return melody_body, lyric_bodies
 
 

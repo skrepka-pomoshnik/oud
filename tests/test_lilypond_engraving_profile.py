@@ -24,6 +24,11 @@ def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:
     assert matrix["publication_engines"]["compatibility"] == "2.24"
     assert len(matrix["cases"]) >= 5
     assert "gerbode-multiverse-registration" in {case["id"] for case in matrix["cases"]}
+    case_ids = {case["id"] for case in matrix["cases"]}
+    assert len(matrix["microcases"]) >= 3
+    for microcase in matrix["microcases"]:
+        assert microcase["case"] in case_ids
+        assert microcase["assertions"]
     for case in matrix["cases"]:
         assert case["features"]
         assert case["petrucci_contract"]

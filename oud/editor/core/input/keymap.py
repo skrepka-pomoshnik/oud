@@ -198,43 +198,43 @@ class HelpActionBindings:
     viewer: tuple[int, ...]
 
 
-def _parse_key_token(state, token: str) -> int | None:  # noqa: PLR0911
+def _parse_key_token(state, token: str) -> int | None:
     keycodes = state.keycodes
     text = token.strip()
-    if not text:
-        return None
-    lower = text.lower()
-    named = {
-        "left": keycodes.left,
-        "right": keycodes.right,
-        "up": keycodes.up,
-        "down": keycodes.down,
-        "home": keycodes.home,
-        "end": keycodes.end,
-        "pgup": keycodes.ppage,
-        "pageup": keycodes.ppage,
-        "pgdn": keycodes.npage,
-        "pagedown": keycodes.npage,
-        "enter": keycodes.enter,
-        "return": keycodes.enter,
-        "esc": 27,
-        "escape": 27,
-        "tab": keycodes.tab,
-        "backspace": keycodes.backspace,
-        "delete": keycodes.dc,
-        "space": ord(" "),
-    }
-    if lower in named:
-        return named[lower]
-    if lower.startswith("ctrl-") and len(lower) == len("ctrl-x") and lower[-1].isalpha():
-        return ord(lower[-1].upper()) & 31
-    if lower.startswith("^") and len(lower) == len("^x") and lower[-1].isalpha():
-        return ord(lower[-1].upper()) & 31
-    if text.isdigit():
-        return int(text)
-    if len(text) == 1:
-        return ord(text)
-    return None
+    result: int | None = None
+    if text:
+        lower = text.lower()
+        named = {
+            "left": keycodes.left,
+            "right": keycodes.right,
+            "up": keycodes.up,
+            "down": keycodes.down,
+            "home": keycodes.home,
+            "end": keycodes.end,
+            "pgup": keycodes.ppage,
+            "pageup": keycodes.ppage,
+            "pgdn": keycodes.npage,
+            "pagedown": keycodes.npage,
+            "enter": keycodes.enter,
+            "return": keycodes.enter,
+            "esc": 27,
+            "escape": 27,
+            "tab": keycodes.tab,
+            "backspace": keycodes.backspace,
+            "delete": keycodes.dc,
+            "space": ord(" "),
+        }
+        if lower in named:
+            result = named[lower]
+        elif (lower.startswith("ctrl-") and len(lower) == len("ctrl-x") and lower[-1].isalpha()) or (
+            lower.startswith("^") and len(lower) == len("^x") and lower[-1].isalpha()
+        ):
+            result = ord(lower[-1].upper()) & 31
+        elif text.isdigit():
+            result = int(text)
+        elif len(text) == 1:
+            result = ord(text)
+    return result
 
 
 def _remap_tuple(state, setting_key: str, default: tuple[int, ...]) -> tuple[int, ...]:

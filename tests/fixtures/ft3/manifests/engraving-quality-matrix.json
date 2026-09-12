@@ -6,6 +6,32 @@
     "baseline": "2.26",
     "compatibility": "2.24"
   },
+  "microcases": [
+    {
+      "id": "collision-layout",
+      "case": "polyphonic-collisions",
+      "assertions": [
+        "same-onset voices remain distinguishable",
+        "layout collision report is empty"
+      ]
+    },
+    {
+      "id": "tab-rhythm-export",
+      "case": "tab-registration-and-rhythm",
+      "assertions": [
+        "rhythm marks share the note onset column",
+        "dotted values remain explicit in the export"
+      ]
+    },
+    {
+      "id": "mixed-voice-lute-lyrics-export",
+      "case": "voice-lute-lyrics",
+      "assertions": [
+        "voice and lute staves share one registration",
+        "lyrics remain attached to the vocal staff"
+      ]
+    }
+  ],
   "cases": [
     {
       "id": "tab-registration-and-rhythm",

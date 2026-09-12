@@ -1,23 +1,13 @@
-from collections import Counter
-
-from scripts.checks.architecture_debt import _complexity_improvements, _complexity_regressions
+from scripts.checks.architecture_debt import MAX_COMPLEXITY, MAX_MODULE_LINES, _is_ui_only_module
 
 
-def test_lower_complexity_is_an_improvement_not_a_regression() -> None:
-    baseline = Counter({("module.py", "function", 10): 1})
-    current = Counter({("module.py", "function", 8): 1})
-
-    assert _complexity_regressions(current, baseline) == Counter()
-    assert _complexity_improvements(current, baseline) == 1
+def test_architecture_limits_are_explicit() -> None:
+    assert MAX_COMPLEXITY == 7
+    assert MAX_MODULE_LINES == 1_000
 
 
-def test_higher_or_duplicate_complexity_findings_are_regressions() -> None:
-    baseline = Counter({("module.py", "function", 8): 1})
-    current = Counter({("module.py", "function", 9): 1, ("module.py", "function", 8): 1})
-
-    assert _complexity_regressions(current, baseline) == Counter(
-        {
-            ("module.py", "function", 9): 1,
-            ("module.py", "function", 8): 1,
-        },
-    )
+def test_ui_only_module_classifier_is_directional() -> None:
+    assert _is_ui_only_module("curses")
+    assert _is_ui_only_module("oud.presentation.tui.loop")
+    assert not _is_ui_only_module("oud.presentation.ui")
+    assert not _is_ui_only_module("petrucci.rendering")

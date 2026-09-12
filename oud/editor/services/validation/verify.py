@@ -15,28 +15,29 @@ from petrucci.rendering.primitives.utils import (
 )
 
 
-def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) -> float:  # noqa: C901
-    if bar_index < 0 or bar_index >= len(state.piece.bars):
-        return 0.0
-    bar = state.piece.bars[bar_index]
-    total = 0.0
-    if bar.chords:
-        for chord in bar.chords:
-            denom = note_type_to_denom(chord.note_type) or default_duration
-            duration = 4.0 / denom
-            if chord.dotted:
-                duration *= 1.5
-            total += duration
-        return total
+def _chord_duration_sum(bar, default_duration: int) -> float:
+    return sum(
+        4.0 / (note_type_to_denom(chord.note_type) or default_duration) * (1.5 if chord.dotted else 1.0)
+        for chord in bar.chords
+    )
+
+
+def _grid_column_denom(state: EditorState, bar_index: int, col: int) -> int | None:
+    found = None
+    for s_idx in range(state.piece.strings):
+        key = (bar_index, s_idx, col)
+        if key in state.durations:
+            denom = state.durations[key]
+            if found is None or denom > found:
+                found = denom
+    return found
+
+
+def _grid_duration_sum(state: EditorState, bar_index: int, default_duration: int) -> float:
     last = None
+    total = 0.0
     for col in range(state.bar_width):
-        found = None
-        for s_idx in range(state.piece.strings):
-            key = (bar_index, s_idx, col)
-            if key in state.durations:
-                denom = state.durations[key]
-                if found is None or denom > found:
-                    found = denom
+        found = _grid_column_denom(state, bar_index, col)
         if found is None:
             found = default_duration
         if found != last:
@@ -46,6 +47,15 @@ def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) 
             total += duration
             last = found
     return total
+
+
+def bar_duration_sum(state: EditorState, bar_index: int, default_duration: int) -> float:
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return 0.0
+    bar = state.piece.bars[bar_index]
+    if bar.chords:
+        return _chord_duration_sum(bar, default_duration)
+    return _grid_duration_sum(state, bar_index, default_duration)
 
 
 def _rule_time_signature(state: EditorState, _context: RuleContext) -> RuleIssue | None:
@@ -100,7 +110,54 @@ def _assignment_issue_from_result(result) -> RuleIssue:
     )
 
 
-def _rule_assignment_constraints(  # noqa: C901, PLR0911
+def _note_pitch(note, tuning: list[int]) -> int | None:
+    idx = note.string - 1
+    if idx < 0 or idx >= len(tuning):
+        return None
+    return tuning[idx] + note.fret
+
+
+def _assignment_issue_for_chord(
+    chord,
+    tuning: list[int],
+    policy: AssignmentPolicy,
+) -> RuleIssue | None:
+    if not chord.notes:
+        return None
+    pitches: list[int] = []
+    forced: dict[int, int] = {}
+    for index, note in enumerate(chord.notes):
+        pitch = _note_pitch(note, tuning)
+        if pitch is None:
+            return RuleIssue(
+                code="assignment.string_out_of_range",
+                message="Note string is outside current tuning.",
+                level="warning",
+            )
+        pitches.append(pitch)
+        forced[index] = note.string
+    result = assign_chord_pitches(pitches, tuning, policy=policy, forced_strings=forced)
+    return _assignment_issue_from_result(result) if not result.ok else None
+
+
+def _assignment_issue_for_note(note, tuning: list[int], policy: AssignmentPolicy) -> RuleIssue | None:
+    pitch = _note_pitch(note, tuning)
+    if pitch is None:
+        return RuleIssue(
+            code="assignment.string_out_of_range",
+            message="Note string is outside current tuning.",
+            level="warning",
+        )
+    result = assign_chord_pitches(
+        [pitch],
+        tuning,
+        policy=policy,
+        forced_strings={0: note.string},
+    )
+    return _assignment_issue_from_result(result) if not result.ok else None
+
+
+def _rule_assignment_constraints(
     state: EditorState,
     context: RuleContext,
 ) -> RuleIssue | None:
@@ -112,46 +169,14 @@ def _rule_assignment_constraints(  # noqa: C901, PLR0911
     bar = state.piece.bars[context.bar_index]
     policy = _assignment_policy_from_state(state)
 
-    def _note_pitch(note) -> int | None:
-        idx = note.string - 1
-        if idx < 0 or idx >= len(tuning):
-            return None
-        return tuning[idx] + note.fret
-
     for chord in bar.chords:
-        if not chord.notes:
-            continue
-        pitches: list[int] = []
-        forced: dict[int, int] = {}
-        for i, note in enumerate(chord.notes):
-            pitch = _note_pitch(note)
-            if pitch is None:
-                return RuleIssue(
-                    code="assignment.string_out_of_range",
-                    message="Note string is outside current tuning.",
-                    level="warning",
-                )
-            pitches.append(pitch)
-            forced[i] = note.string
-        result = assign_chord_pitches(pitches, tuning, policy=policy, forced_strings=forced)
-        if not result.ok:
-            return _assignment_issue_from_result(result)
+        issue = _assignment_issue_for_chord(chord, tuning, policy)
+        if issue is not None:
+            return issue
     for note in bar.notes:
-        pitch = _note_pitch(note)
-        if pitch is None:
-            return RuleIssue(
-                code="assignment.string_out_of_range",
-                message="Note string is outside current tuning.",
-                level="warning",
-            )
-        result = assign_chord_pitches(
-            [pitch],
-            tuning,
-            policy=policy,
-            forced_strings={0: note.string},
-        )
-        if not result.ok:
-            return _assignment_issue_from_result(result)
+        issue = _assignment_issue_for_note(note, tuning, policy)
+        if issue is not None:
+            return issue
     return None
 
 
@@ -170,73 +195,62 @@ def verify_bar(state: EditorState, bar_index: int) -> str:
     return issues[0].message
 
 
-def verify_render_bar_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:  # noqa: C901
-    issues: list[RuleIssue] = []
-    if bar_index < 0 or bar_index >= len(state.piece.bars):
-        return [RuleIssue(code="render.out_of_range", message="Bar out of range")]
-    bar = state.piece.bars[bar_index]
-    positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
-    if bar.chords and not positions:
-        issues.append(
-            RuleIssue(code="render.no_positions", message="No render positions for bar chords"),
-        )
-        return issues
+def _render_orphan_issue(state: EditorState, bar, positions) -> RuleIssue | None:
+    if not positions:
+        return None
+    style = state.settings.get("style", "french")
+    cells = bar_cells_from_chords(
+        bar,
+        state.piece.strings,
+        state.bar_width,
+        4,
+        style,
+        french_c_shape=state.settings.get("frenchc", "normal"),
+        label_mode=state.settings.get("fretlabelmode", "auto"),
+    )
+    visible_cols = {
+        col
+        for col in range(state.bar_width)
+        if any(cells[s_idx][col] not in ("-", " ") for s_idx in range(state.piece.strings))
+    }
+    for col, _denom, _dot in positions:
+        if col not in visible_cols:
+            return RuleIssue(
+                code="render.orphan_flag",
+                message=f"Flag without note under it at col {col + 1}",
+            )
+    return None
 
-    if positions:
-        style = state.settings.get("style", "french")
-        french_c = state.settings.get("frenchc", "normal")
-        label_mode = state.settings.get("fretlabelmode", "auto")
-        cells = bar_cells_from_chords(
-            bar,
-            state.piece.strings,
-            state.bar_width,
-            4,
-            style,
-            french_c_shape=french_c,
-            label_mode=label_mode,
-        )
-        visible_cols = {
-            col
-            for col in range(state.bar_width)
-            if any(cells[s_idx][col] not in ("-", " ") for s_idx in range(state.piece.strings))
-        }
-        for col, _denom, _dot in positions:
-            if col not in visible_cols:
-                issues.append(
-                    RuleIssue(
-                        code="render.orphan_flag",
-                        message=f"Flag without note under it at col {col + 1}",
-                    ),
-                )
-                return issues
 
+def _render_map_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:
     content_width = max(1, bar_content_width_for_cursor(state, bar_index))
     mapping = cursor_display_map_for_bar(state, bar_index, content_width)
     if len(mapping) != state.bar_width:
-        issues.append(
-            RuleIssue(
-                code="render.map_width",
-                message="Render cursor map width mismatch",
-            ),
-        )
-        return issues
+        return [RuleIssue(code="render.map_width", message="Render cursor map width mismatch")]
     if any(left > right for left, right in pairwise(mapping)):
-        issues.append(
-            RuleIssue(
-                code="render.map_non_monotonic",
-                message="Render map is non-monotonic",
-            ),
-        )
-        return issues
+        return [RuleIssue(code="render.map_non_monotonic", message="Render map is non-monotonic")]
     if mapping and state.bar_width > 1 and len(set(mapping)) <= 1:
-        issues.append(
+        return [
             RuleIssue(
                 code="render.map_collapsed",
                 message="Render map collapsed to one column",
                 level="warning",
             ),
-        )
-    return issues
+        ]
+    return []
+
+
+def verify_render_bar_issues(state: EditorState, bar_index: int) -> list[RuleIssue]:
+    if bar_index < 0 or bar_index >= len(state.piece.bars):
+        return [RuleIssue(code="render.out_of_range", message="Bar out of range")]
+    bar = state.piece.bars[bar_index]
+    positions = chord_slot_positions(bar, state.bar_width, default_duration=4)
+    if bar.chords and not positions:
+        return [RuleIssue(code="render.no_positions", message="No render positions for bar chords")]
+    orphan_issue = _render_orphan_issue(state, bar, positions)
+    if orphan_issue is not None:
+        return [orphan_issue]
+    return _render_map_issues(state, bar_index)
 
 
 def verify_render_bar(state: EditorState, bar_index: int) -> str:

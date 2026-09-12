@@ -140,14 +140,14 @@ def test_info_help_plugin_and_info_render() -> None:
     assert "[1] Source comment" in notes
     s = _Screen(h=6, w=30)
     render_help(s, "help", 1, 0)
-    render_plugin(s, "plugin", 1, "Plugins", ["a", "b"], 1, 0, "msg")
+    render_plugin(s, "plugin", 1, "Plugins", ["a", "b"], index=1, offset=0, message="msg")
     render_info(
         s,
         "info",
         1,
         0,
         piece,
-        {"style": "french", "time": "C", "filepath": "tests/fixtures/ft3/corpus/examples/x.ft3"},
+        settings={"style": "french", "time": "C", "filepath": "tests/fixtures/ft3/corpus/examples/x.ft3"},
     )
     render_notes(s, "notes", 1, 0, piece)
     assert s.calls

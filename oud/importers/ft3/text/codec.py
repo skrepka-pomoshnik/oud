@@ -34,7 +34,7 @@ from oud.importers.ft3.text.rows import (
     is_ft3_text_record,
 )
 from oud.importers.ft3.text.types import FT3TextRecord, empty_text_record
-from petrucci.core.model import LyricEvent, MelodyEvent
+from petrucci.core.model import ImportedTextRow, LyricEvent, MelodyEvent
 
 _FT3_HEADER_SIZE = 32
 _FT3_CONTROL_BYTE_LIMIT = 32
@@ -51,33 +51,37 @@ __all__ = [
 ]
 
 
-def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:  # noqa: C901
-    rows = _split_record_rows(tail)
-    if not rows:
-        return None
-    has_controls = any(any(0 < b < _FT3_CONTROL_BYTE_LIMIT and b not in (9, 10, 13) for b in row) for row in rows)
-    if not has_controls:
-        return None
-    classified_rows = [
+def _structured_classifications(
+    rows: list[bytes],
+) -> list[tuple[bytes, ImportedTextRow]]:
+    return [
         (row, classified)
         for row_index, row in enumerate(rows)
         if (classified := _classify_structured_row(row, row_index)) is not None
     ]
-    structured_rows = [classified for _row, classified in classified_rows]
-    raw_tokens_by_row = [tokens for row in rows if (tokens := _raw_control_tokens_from_row(row))]
-    editorial_text: list[str] = []
-    if len(raw_tokens_by_row) == 1 and _looks_like_editorial_tokens(raw_tokens_by_row[0]):
-        editorial_text = [" ".join(raw_tokens_by_row[0]).strip()]
-        return FT3TextRecord(
-            melody_grid=None,
-            lyrics=[],
-            melody_events=[],
-            lyric_event_rows=[],
-            editorial_text=editorial_text,
-            structured_rows=structured_rows,
-            parse_mode="structured",
-        )
-    classified_tokens = [
+
+
+def _structured_editorial_record(
+    structured_rows: list[ImportedTextRow],
+    raw_tokens_by_row: list[list[str]],
+) -> FT3TextRecord | None:
+    if len(raw_tokens_by_row) != 1 or not _looks_like_editorial_tokens(raw_tokens_by_row[0]):
+        return None
+    return FT3TextRecord(
+        melody_grid=None,
+        lyrics=[],
+        melody_events=[],
+        lyric_event_rows=[],
+        editorial_text=[" ".join(raw_tokens_by_row[0]).strip()],
+        structured_rows=structured_rows,
+        parse_mode="structured",
+    )
+
+
+def _structured_lyric_tokens(
+    classified_rows: list[tuple[bytes, ImportedTextRow]],
+) -> list[tuple[str, list[str]]]:
+    return [
         (classified.kind, filtered)
         for row, classified in classified_rows
         if classified.kind not in {"font", "control", "editorial"}
@@ -88,6 +92,14 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:  # noqa:
         )
         if (filtered := _filtered_structured_lyric_tokens(tokens))
     ]
+
+
+def _structured_lyric_record(
+    rows: list[bytes],
+    classified_rows: list[tuple[bytes, ImportedTextRow]],
+    structured_rows: list[ImportedTextRow],
+) -> FT3TextRecord | None:
+    classified_tokens = _structured_lyric_tokens(classified_rows)
     if not classified_tokens:
         return None
     tokens_by_row = [tokens for _kind, tokens in classified_tokens]
@@ -112,6 +124,22 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:  # noqa:
     )
 
 
+def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:
+    rows = _split_record_rows(tail)
+    if not rows:
+        return None
+    has_controls = any(any(0 < b < _FT3_CONTROL_BYTE_LIMIT and b not in (9, 10, 13) for b in row) for row in rows)
+    if not has_controls:
+        return None
+    classified_rows = _structured_classifications(rows)
+    structured_rows = [classified for _row, classified in classified_rows]
+    raw_tokens_by_row = [tokens for row in rows if (tokens := _raw_control_tokens_from_row(row))]
+    editorial = _structured_editorial_record(structured_rows, raw_tokens_by_row)
+    if editorial is not None:
+        return editorial
+    return _structured_lyric_record(rows, classified_rows, structured_rows)
+
+
 def _melody_events_from_line(line: str | None) -> list[MelodyEvent]:
     if not line:
         return []
@@ -133,7 +161,56 @@ def _melody_events_from_line(line: str | None) -> list[MelodyEvent]:
     return events
 
 
-def _lyric_events_from_line(line: str) -> list[LyricEvent]:  # noqa: C901
+def _lyric_event_for_token(
+    raw: str,
+    *,
+    position: int,
+    onset_index: int,
+    chain_open: bool,
+) -> tuple[LyricEvent | None, bool]:
+    if set(raw) <= {"_", "-"} and "_" in raw:
+        return (
+            LyricEvent(
+                text="",
+                onset_index=onset_index,
+                verse=0,
+                syllabic="single",
+                src_pos=position,
+                extender=True,
+            ),
+            chain_open,
+        )
+    trailing_hyphen = raw.endswith("-")
+    text = raw.rstrip("-").strip()
+    if not text and trailing_hyphen:
+        text = "-"
+    if not text or (text != "-" and not _keep_lyric_token(text)):
+        return None, chain_open
+    syllabic = _lyric_syllabic(trailing_hyphen, chain_open)
+    return (
+        LyricEvent(
+            text=text,
+            onset_index=onset_index,
+            verse=0,
+            syllabic=syllabic,
+            src_pos=position,
+            extender=False,
+        ),
+        trailing_hyphen,
+    )
+
+
+def _lyric_syllabic(trailing_hyphen: bool, chain_open: bool) -> str:
+    if trailing_hyphen and chain_open:
+        return "middle"
+    if trailing_hyphen:
+        return "begin"
+    if chain_open:
+        return "end"
+    return "single"
+
+
+def _lyric_events_from_line(line: str) -> list[LyricEvent]:
     events: list[LyricEvent] = []
     onset_idx = 0
     chain_open = False
@@ -141,59 +218,20 @@ def _lyric_events_from_line(line: str) -> list[LyricEvent]:  # noqa: C901
         raw = _clean_lyric_token(tok)
         if not raw:
             continue
-        if set(raw) <= {"_", "-"} and "_" in raw:
-            events.append(
-                LyricEvent(
-                    text="",
-                    onset_index=onset_idx,
-                    verse=0,
-                    syllabic="single",
-                    src_pos=pos,
-                    extender=True,
-                ),
-            )
-            onset_idx += 1
-            continue
-        trailing_hyphen = raw.endswith("-")
-        text = raw.rstrip("-").strip()
-        if not text and trailing_hyphen:
-            text = "-"
-        if not text:
-            continue
-        if text != "-" and not _keep_lyric_token(text):
-            continue
-        if trailing_hyphen and chain_open:
-            syllabic = "middle"
-        elif trailing_hyphen:
-            syllabic = "begin"
-        elif chain_open:
-            syllabic = "end"
-        else:
-            syllabic = "single"
-        events.append(
-            LyricEvent(
-                text=text,
-                onset_index=onset_idx,
-                verse=0,
-                syllabic=syllabic,
-                src_pos=pos,
-                extender=False,
-            ),
+        event, chain_open = _lyric_event_for_token(
+            raw,
+            position=pos,
+            onset_index=onset_idx,
+            chain_open=chain_open,
         )
-        chain_open = trailing_hyphen
+        if event is None:
+            continue
+        events.append(event)
         onset_idx += 1
     return events
 
 
-def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:  # noqa: C901
-    tail = chunk[_FT3_HEADER_SIZE:] if len(chunk) > _FT3_HEADER_SIZE else chunk
-    structured = _parse_structured_text_record(tail)
-    if structured is not None:
-        return structured
-    lines = _asciiish_lines(tail)
-    if not lines:
-        return empty_text_record()
-
+def _ascii_text_parts(lines: list[str]) -> tuple[list[str], list[str]]:
     melody_candidates: list[str] = []
     lyrics: list[str] = []
     for raw in lines:
@@ -202,7 +240,10 @@ def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:  # noqa: C901
             melody_candidates.append(melody)
         if lyric:
             lyrics.append(lyric)
+    return melody_candidates, lyrics
 
+
+def _deduplicate_lyric_lines(lyrics: list[str]) -> tuple[list[str], list[list[LyricEvent]]]:
     dedup_lyrics: list[str] = []
     lyric_event_rows: list[list[LyricEvent]] = []
     seen: set[str] = set()
@@ -215,6 +256,20 @@ def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:  # noqa: C901
         lyric_events = _lyric_events_from_line(line)
         if lyric_events:
             lyric_event_rows.append(lyric_events)
+    return dedup_lyrics, lyric_event_rows
+
+
+def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:
+    tail = chunk[_FT3_HEADER_SIZE:] if len(chunk) > _FT3_HEADER_SIZE else chunk
+    structured = _parse_structured_text_record(tail)
+    if structured is not None:
+        return structured
+    lines = _asciiish_lines(tail)
+    if not lines:
+        return empty_text_record()
+
+    melody_candidates, lyrics = _ascii_text_parts(lines)
+    dedup_lyrics, lyric_event_rows = _deduplicate_lyric_lines(lyrics)
     melody_line = _pick_melody_line(melody_candidates)
     melody_events = _melody_events_from_line(melody_line)
     return FT3TextRecord(

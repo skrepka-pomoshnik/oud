@@ -8,6 +8,10 @@ from petrucci.core.model import (
     Piece,
 )
 
+_MIN_PLAIN_TEXT_SIZE = 8
+_MAX_PLAIN_TEXT_SIZE = 160
+_MIN_PLAIN_TEXT_ALPHA = 4
+
 
 def _strip_rtf(text: str) -> str:
     if "\\rtf" not in text:
@@ -45,36 +49,47 @@ def _embedded_rtf_blocks(data: bytes) -> list[str]:
         index = end + 1
 
 
-def _embedded_plain_text(data: bytes) -> list[str]:  # noqa: C901
-    texts: list[str] = []
+def _mask_embedded_rtf(data: bytes) -> bytearray:
     scan_data = bytearray(data)
     rtf_index = 0
     while True:
         start = data.find(b"{\\rtf", rtf_index)
         if start < 0:
-            break
+            return scan_data
         end = _find_matching_brace(data, start, len(data))
         if end is None:
-            break
+            return scan_data
         scan_data[start : end + 1] = bytes(end + 1 - start)
         rtf_index = end + 1
-    scan_start = 32
-    min_text_record_size = 8
-    max_text_record_size = 160
-    min_metadata_letters = 4
-    index = scan_start
+
+
+def _text_record_at(data: bytearray, index: int) -> tuple[str, int] | None:
+    size = data[index]
+    end = index + 1 + size
+    if not (_MIN_PLAIN_TEXT_SIZE <= size <= _MAX_PLAIN_TEXT_SIZE and end <= len(data)):
+        return None
+    raw = data[index + 1 : end]
+    if not all(ord(" ") <= value <= ord("~") for value in raw):
+        return None
+    text = raw.decode("latin1").strip()
+    alpha = sum(char.isalpha() for char in text)
+    if alpha < _MIN_PLAIN_TEXT_ALPHA or "\\rtf" in text:
+        return None
+    return text, end
+
+
+def _embedded_plain_text(data: bytes) -> list[str]:
+    texts: list[str] = []
+    scan_data = _mask_embedded_rtf(data)
+    index = 32
     while index < len(scan_data):
-        size = scan_data[index]
-        end = index + 1 + size
-        if min_text_record_size <= size <= max_text_record_size and end <= len(scan_data):
-            raw = scan_data[index + 1 : end]
-            if all(ord(" ") <= value <= ord("~") for value in raw):
-                text = raw.decode("latin1").strip()
-                alpha = sum(char.isalpha() for char in text)
-                if alpha >= min_metadata_letters and "\\rtf" not in text and text not in texts:
-                    texts.append(text)
-                index = end
-                continue
+        record = _text_record_at(scan_data, index)
+        if record is not None:
+            text, end = record
+            if text not in texts:
+                texts.append(text)
+            index = end
+            continue
         index += 1
     return texts
 
@@ -91,31 +106,40 @@ def read_ft3(path: str) -> bytes:
         return f.read()
 
 
-def extract_text(data: bytes, marker: bytes) -> tuple[str | None, int | None]:  # noqa: C901
+def _extract_cpiece_text(data: bytes, pos: int) -> tuple[str | None, int | None] | None:
+    start = data.find(b"{\\rtf", pos)
+    if start != -1:
+        end = data.find(b"}\r\n~", start)
+        if end != -1:
+            raw = data[start : end + 1]
+            return raw.decode("utf-8", errors="ignore"), end + 1
+    if pos + 4 > len(data):
+        return None
+    length = int.from_bytes(data[pos : pos + 4], "little")
+    if not (0 < length <= len(data) - (pos + 4)):
+        return None
+    raw = data[pos + 4 : pos + 4 + length]
+    start = raw.find(b"{")
+    if start != -1:
+        raw = raw[start:]
+    return raw.decode("utf-8", errors="ignore"), pos + 4 + length
+
+
+def _extract_length_prefixed_text(data: bytes, pos: int) -> tuple[str, int]:
+    length = data[pos]
+    return data[pos + 1 : pos + 1 + length].decode("utf-8", errors="ignore"), pos + 1 + length
+
+
+def extract_text(data: bytes, marker: bytes) -> tuple[str | None, int | None]:
     pos = data.find(marker)
     if pos == -1:
         return None, None
     pos += len(marker)
     if marker == b"CPiece":
-        start = data.find(b"{\\rtf", pos)
-        if start != -1:
-            end = data.find(b"}\r\n~", start)
-            if end != -1:
-                raw = data[start : end + 1]
-                text = raw.decode("utf-8", errors="ignore")
-                return text, end + 1
-        if pos + 4 <= len(data):
-            length = int.from_bytes(data[pos : pos + 4], "little")
-            if 0 < length <= len(data) - (pos + 4):
-                raw = data[pos + 4 : pos + 4 + length]
-                start = raw.find(b"{")
-                if start != -1:
-                    raw = raw[start:]
-                text = raw.decode("utf-8", errors="ignore")
-                return text, pos + 4 + length
-    length = data[pos]
-    text = data[pos + 1 : pos + 1 + length].decode("utf-8", errors="ignore")
-    return text, pos + 1 + length
+        cpiece_text = _extract_cpiece_text(data, pos)
+        if cpiece_text is not None:
+            return cpiece_text
+    return _extract_length_prefixed_text(data, pos)
 
 
 def _find_matching_brace(data: bytes, start: int, stop: int) -> int | None:

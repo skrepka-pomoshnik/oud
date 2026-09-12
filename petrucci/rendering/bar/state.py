@@ -176,13 +176,13 @@ def prepare_bar_marks(
         context,
         system,
         basics,
-        ann_cells,
-        orn_cells,
-        tie_cells,
-        slur_cells,
-        hold_cells,
-        gliss_cells,
-        abs_bar,
+        ann_cells=ann_cells,
+        orn_cells=orn_cells,
+        tie_cells=tie_cells,
+        slur_cells=slur_cells,
+        hold_cells=hold_cells,
+        gliss_cells=gliss_cells,
+        abs_bar=abs_bar,
     )
     return BarMarks(
         ann_cells,
@@ -238,7 +238,18 @@ def _span_row(
     grid_width: int,
     chars: tuple[str, str, str] | None,
 ) -> list[str]:
-    return [" "] * grid_width if chars is None else _bar_span_row(spans, abs_bar, grid_width, *chars)
+    return (
+        [" "] * grid_width
+        if chars is None
+        else _bar_span_row(
+            spans,
+            abs_bar,
+            grid_width,
+            start_char=chars[0],
+            end_char=chars[1],
+            fill_char=chars[2],
+        )
+    )
 
 
 def _resolved_target_rows(base: list[int], imported: list[int], cells: list[str]) -> list[int]:
@@ -249,10 +260,11 @@ def _resolved_target_rows(base: list[int], imported: list[int], cells: list[str]
     return resolved
 
 
-def _apply_tie_notehead_policy(  # noqa: PLR0917 - coordinated cue rows are one render operation
+def _apply_tie_notehead_policy(
     context: SystemRenderContext,
     system: SystemLayout,
     basics: BarBasics,
+    *,
     ann_cells: list[str],
     orn_cells: list[str],
     tie_cells: list[str],

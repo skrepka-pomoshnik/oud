@@ -1,5 +1,31 @@
 # DONE
 
+- 2026-09-12: Retired the remaining test and corpus-script `C901`/`PLR0917`
+  suppressions by extracting terminal, snapshot, command, PTY, report, and MIDI
+  event helpers. Added export-boundary signature coverage and refreshed the
+  architecture debt inventory; validation was not run in this change.
+
+- 2026-09-12: Retired all production `C901` and `PLR0917` suppressions by splitting
+  editor, importer, playback, and engraving coordinators and making render/export
+  boundaries keyword-explicit. Updated direct callers and the architecture debt
+  record; validation was not run in this change.
+
+- 2026-09-12: Retired the next five legacy C901 suppressions by separating
+  tablature assignment search, overlay key handling, assignment validation,
+  `:set` token dispatch, and metadata preset conversion. Updated the
+  architecture debt inventory; validation was not run in this change.
+
+- 2026-09-12: Retired five legacy C901 suppressions by splitting tab and
+  MusicXML measure emission, FT3 LilyPond markup collection, editor bootstrap,
+  and dynamic system-start planning into focused operations. Updated the
+  architecture debt inventory; validation was not run in this change.
+
+- 2026-09-12: Removed the GitHub Actions workflow by project decision; local
+  quality and release checks are authoritative. Vulture reported no
+  high-confidence findings (`--min-confidence 80`) after parser repair. Added
+  shared engraving-matrix microcases for collision, rhythm, and mixed
+  voice/lute/lyrics contracts. Validation was not run in this change.
+
 - 2026-09-12: Fixed MusicXML round-trip ordering and rest-only measures, and
   updated the first-write regression for prefilled Save As. Added the complete
   `oud(1)` manual source, generated roff page, reproducible build, and

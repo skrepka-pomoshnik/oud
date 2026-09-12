@@ -106,7 +106,7 @@ def _render_auxiliary(
             request.status_attr,
             request.help_offset,
             piece,
-            {**request.settings, "terminal": f"{width}x{height}"},
+            settings={**request.settings, "terminal": f"{width}x{height}"},
         )
     elif request.mode == "notes":
         _render_notes(screen, request.status_line, request.status_attr, request.help_offset, piece)
@@ -117,9 +117,9 @@ def _render_auxiliary(
             request.status_attr,
             request.plugin_title,
             request.plugin_items,
-            request.plugin_index,
-            request.plugin_offset,
-            request.message,
+            index=request.plugin_index,
+            offset=request.plugin_offset,
+            message=request.message,
         )
     elif request.ascii_lines is not None:
         _render_ascii_preview(
@@ -176,12 +176,13 @@ def _render_canonical(
     return True
 
 
-def render_piece(  # noqa: PLR0917 - legacy public facade pending an editor-side request record
+def render_piece(
     stdscr: Screen,
     piece: Piece,
     bar_offset: int,
     cursor_bar: int,
     cursor_string: int,
+    *,
     cursor_col: int,
     bar_width: int,
     overrides: dict[tuple[int, int, int], str],

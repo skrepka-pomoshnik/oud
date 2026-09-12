@@ -54,12 +54,13 @@ def _positions_width(positions: list[tuple[int, int, bool]], *, tail_pad: int = 
     )
 
 
-def _bar_compact_width(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
+def _bar_compact_width(
     bar: Bar,
     bar_index: int,
     bar_width: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     default_duration: int,
     dotted: set[tuple[int, int]] | None = None,
 ) -> int:
@@ -70,8 +71,8 @@ def _bar_compact_width(  # noqa: PLR0917 - legacy grid projection pending typed 
         strings,
         overrides,
         durations,
-        default_duration,
-        dotted,
+        default_duration=default_duration,
+        dotted=dotted,
     )
     min_flag_width = 2 + max_slash + max_dot
     positions = _bar_flag_positions(
@@ -275,12 +276,13 @@ def _bar_note_columns(
     return cols
 
 
-def _bar_display_width(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
+def _bar_display_width(
     bar: Bar,
     bar_index: int,
     bar_width: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     default_duration: int,
     dotted: set[tuple[int, int]] | None = None,
 ) -> int:
@@ -291,10 +293,10 @@ def _bar_display_width(  # noqa: PLR0917 - legacy grid projection pending typed 
         strings,
         overrides,
         durations,
-        default_duration,
-        dotted,
+        default_duration=default_duration,
+        dotted=dotted,
     )
-    count = _bar_note_count(bar, bar_index, bar_width, overrides, durations, default_duration)
+    count = _bar_note_count(bar, bar_index, bar_width, overrides, durations, default_duration=default_duration)
     count = max(1, count)
     min_flag_width = 2 + max_slash + max_dot
     positions = _bar_flag_positions(
@@ -311,12 +313,13 @@ def _bar_display_width(  # noqa: PLR0917 - legacy grid projection pending typed 
     return max(3, width_needed, (count * min_unit) + 1)
 
 
-def _bar_flag_span(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
+def _bar_flag_span(
     bar: Bar,
     bar_index: int,
     strings: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     default_duration: int,
     dotted: set[tuple[int, int]] | None = None,
 ) -> tuple[int, int]:
@@ -343,12 +346,13 @@ def _bar_flag_span(  # noqa: PLR0917 - legacy grid projection pending typed bar 
     return max_slash, max_dot
 
 
-def _bar_note_count(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
+def _bar_note_count(
     bar: Bar,
     bar_index: int,
     bar_width: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     default_duration: int,
 ) -> int:
     _ = bar_width, default_duration
@@ -357,12 +361,13 @@ def _bar_note_count(  # noqa: PLR0917 - legacy grid projection pending typed bar
     return len(_bar_note_columns(overrides, durations, bar_index=bar_index))
 
 
-def _bar_chord_count(  # noqa: PLR0917 - legacy grid projection pending typed bar inputs
+def _bar_chord_count(
     bar: Bar,
     bar_index: int,
     bar_width: int,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
+    *,
     default_duration: int,
 ) -> int:
     if bar.chords:
@@ -373,7 +378,7 @@ def _bar_chord_count(  # noqa: PLR0917 - legacy grid projection pending typed ba
         bar_width,
         overrides,
         durations,
-        default_duration,
+        default_duration=default_duration,
     )
     if count > 0:
         return count
@@ -382,17 +387,17 @@ def _bar_chord_count(  # noqa: PLR0917 - legacy grid projection pending typed ba
     return 0
 
 
-def _bars_fit(  # noqa: PLR0917 - legacy grid projection pending typed system inputs
+def _bars_fit(
     bars: list[Bar],
     bar_offset: int,
     bar_gap: int,
     usable_width: int,
     bar_width: int,
+    *,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     default_duration: int,
     dotted: set[tuple[int, int]] | None,
-    *,
     max_chords: int = 0,
     compact: bool = False,
     chord_wrap_limit: int = 0,
@@ -409,7 +414,7 @@ def _bars_fit(  # noqa: PLR0917 - legacy grid projection pending typed system in
             bar_width,
             overrides,
             durations,
-            default_duration,
+            default_duration=default_duration,
         )
         if chord_wrap_limit > 0 and count > 0 and (chords_total + chord_count) > chord_wrap_limit:
             break
@@ -420,8 +425,8 @@ def _bars_fit(  # noqa: PLR0917 - legacy grid projection pending typed system in
                 bar_width,
                 overrides,
                 durations,
-                default_duration,
-                dotted,
+                default_duration=default_duration,
+                dotted=dotted,
             )
         else:
             display = _bar_display_width(
@@ -430,8 +435,8 @@ def _bars_fit(  # noqa: PLR0917 - legacy grid projection pending typed system in
                 bar_width,
                 overrides,
                 durations,
-                default_duration,
-                dotted,
+                default_duration=default_duration,
+                dotted=dotted,
             )
         if max_chords > 0:
             display = max(display, (max_chords * 2) + 1)

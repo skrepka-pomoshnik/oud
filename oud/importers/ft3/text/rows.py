@@ -152,28 +152,38 @@ def _line_features(line: str) -> _LineFeatures:
     )
 
 
-def _split_wide_gap(line: str) -> tuple[str, str] | None:  # noqa: C901
+def _gap_score(left: str, right: str) -> int:
+    left_features = _line_features(left)
+    right_features = _line_features(right)
+    score = 0
+    if _features_look_like_melody(left_features):
+        score += 10 + _score_kind(left_features, MELODY_SCORE_RULES)
+    if _features_look_like_lyrics(right_features):
+        score += 10 + _score_kind(right_features, LYRIC_SCORE_RULES)
+    if left and right:
+        score += 2
+    return score
+
+
+def _gap_candidate(line: str, gap: re.Match[str]) -> tuple[int, str, str] | None:
+    left = line[: gap.start()].rstrip()
+    right = line[gap.end() :].rstrip()
+    if not left and not right:
+        return None
+    return _gap_score(left, right), left, right
+
+
+def _split_wide_gap(line: str) -> tuple[str, str] | None:
     gaps = list(re.finditer(r" {4,}", line))
     if not gaps:
         return None
     best: tuple[int, str, str] | None = None
     for gap in gaps:
-        left = line[: gap.start()].rstrip()
-        right = line[gap.end() :].rstrip()
-        if not left and not right:
+        candidate = _gap_candidate(line, gap)
+        if candidate is None:
             continue
-        left_features = _line_features(left)
-        right_features = _line_features(right)
-        score = 0
-        if _features_look_like_melody(left_features):
-            score += 10 + _score_kind(left_features, MELODY_SCORE_RULES)
-        if _features_look_like_lyrics(right_features):
-            score += 10 + _score_kind(right_features, LYRIC_SCORE_RULES)
-        # Prefer splits that leave both sides non-empty and preserve some right text.
-        if left and right:
-            score += 2
-        if best is None or score > best[0]:
-            best = (score, left, right)
+        if best is None or candidate[0] > best[0]:
+            best = candidate
     if best is None:
         return None
     _, left, right = best
@@ -210,18 +220,17 @@ def _is_lyric_candidate(line: str) -> bool:
     return _looks_like_lyric_text(line)
 
 
-def _classify_raw_line(raw: str) -> tuple[str | None, str | None]:  # noqa: C901
+def _classify_unsplit_line(raw: str) -> tuple[str | None, str | None]:
+    if _is_melody_candidate(raw):
+        return raw.rstrip(), None
+    if _is_lyric_candidate(raw):
+        return None, raw.strip()
+    return None, None
+
+
+def _classify_split_line(raw: str, left: str, right: str) -> tuple[str | None, str | None]:
     melody: str | None = None
     lyric: str | None = None
-    split = _split_wide_gap(raw)
-    if split is None:
-        if _is_melody_candidate(raw):
-            melody = raw.rstrip()
-        elif _is_lyric_candidate(raw):
-            lyric = raw.strip()
-        return melody, lyric
-
-    left, right = split
     if _is_melody_candidate(left):
         melody = left.rstrip()
         if _is_lyric_candidate(right):
@@ -233,6 +242,13 @@ def _classify_raw_line(raw: str) -> tuple[str | None, str | None]:  # noqa: C901
     elif _is_lyric_candidate(right):
         lyric = right.strip()
     return melody, lyric
+
+
+def _classify_raw_line(raw: str) -> tuple[str | None, str | None]:
+    split = _split_wide_gap(raw)
+    if split is None:
+        return _classify_unsplit_line(raw)
+    return _classify_split_line(raw, *split)
 
 
 def _clean_text_token(token: str) -> str:
@@ -308,21 +324,19 @@ def _split_record_rows(data: bytes) -> list[bytes]:
     return rows
 
 
-def _tokenize_control_row(row: bytes) -> list[tuple[int, str]]:  # noqa: C901
+def _flush_control_token(tokens: list[tuple[int, str]], buf: list[str], start_col: int) -> None:
+    if not buf:
+        return
+    cleaned = _clean_text_token("".join(buf))
+    if cleaned:
+        tokens.append((start_col, cleaned))
+
+
+def _tokenize_control_row(row: bytes) -> list[tuple[int, str]]:
     tokens: list[tuple[int, str]] = []
     buf: list[str] = []
     col = 0
     start_col = 0
-
-    def flush() -> None:
-        nonlocal buf
-        if not buf:
-            return
-        token = "".join(buf)
-        cleaned = _clean_text_token(token)
-        if cleaned:
-            tokens.append((start_col, cleaned))
-        buf = []
 
     for b in row:
         if _FT3_ASCII_PRINTABLE_MIN <= b <= _FT3_ASCII_PRINTABLE_MAX:
@@ -331,11 +345,12 @@ def _tokenize_control_row(row: bytes) -> list[tuple[int, str]]:  # noqa: C901
             buf.append(chr(b))
             col += 1
             continue
-        flush()
+        _flush_control_token(tokens, buf, start_col)
+        buf.clear()
         if _FT3_CONTROL_BYTE_MIN <= b <= _FT3_CONTROL_BYTE_MAX:
             # FT3 lyric records use control bytes as horizontal anchors.
             col = int(b)
-    flush()
+    _flush_control_token(tokens, buf, start_col)
     return tokens
 
 
@@ -355,14 +370,7 @@ def _likely_non_lyric_token(token: str) -> bool:
     return bool(any(ch in '@?><=|[]{}!";:' for ch in probe))
 
 
-def _lyric_tokens_from_control_row(row: bytes) -> list[str]:  # noqa: C901
-    positioned = _tokenize_control_row(row)
-    if not positioned:
-        return []
-    tokens = [_clean_lyric_token(tok) for _pos, tok in positioned]
-    tokens = [tok for tok in tokens if tok]
-    if not tokens:
-        return []
+def _control_lyric_candidates(tokens: list[str]) -> list[str]:
     last_non_lyric = -1
     for idx, tok in enumerate(tokens):
         if _likely_non_lyric_token(tok) or not _keep_lyric_token(tok):
@@ -370,17 +378,32 @@ def _lyric_tokens_from_control_row(row: bytes) -> list[str]:  # noqa: C901
                 continue
             last_non_lyric = idx
     start = last_non_lyric + 1
-    out = [tok for tok in tokens[start:] if _keep_lyric_token(tok) or set(tok) <= {"_"}]
+    return [tok for tok in tokens[start:] if _keep_lyric_token(tok) or set(tok) <= {"_"}]
+
+
+def _is_font_noise_line(tokens: list[str]) -> bool:
+    return " ".join(tok.lower() for tok in tokens) in {"times new roman", "new roman"}
+
+
+def _lyric_tokens_from_control_row(row: bytes) -> list[str]:
+    positioned = _tokenize_control_row(row)
+    if not positioned:
+        return []
+    tokens = [_clean_lyric_token(tok) for _pos, tok in positioned]
+    tokens = [tok for tok in tokens if tok]
+    if not tokens:
+        return []
+    out = _control_lyric_candidates(tokens)
     out = _trim_leading_single_letter_lyric_noise(out)
     if out:
-        if " ".join(tok.lower() for tok in out) in {"times new roman", "new roman"}:
+        if _is_font_noise_line(out):
             return []
         return out
     fallback = [
         tok for tok in tokens if (_keep_lyric_token(tok) or set(tok) <= {"_"}) and not _likely_non_lyric_token(tok)
     ]
     fallback = _trim_leading_single_letter_lyric_noise(fallback)
-    if " ".join(tok.lower() for tok in fallback) in {"times new roman", "new roman"}:
+    if _is_font_noise_line(fallback):
         return []
     return fallback
 
@@ -446,37 +469,101 @@ def _vocal_text_tokens(raw_tokens: list[str]) -> list[str]:
     return [tok for tok in raw_tokens if not _likely_non_lyric_token(tok)]
 
 
-def _classify_structured_row(row: bytes, row_index: int) -> ImportedTextRow | None:  # noqa: C901
+def _structured_row_parts(
+    row: bytes,
+    row_index: int,
+    *,
+    text: str,
+    raw_tokens: list[str],
+    lyric_tokens: list[str],
+    fallback_lyric_tokens: list[str],
+) -> tuple[str, str, list[str]]:
+    kind = "unknown"
+    row_text = text
+    row_tokens = raw_tokens
+    if row_index == 0 and _structured_vocal_events(row):
+        return "vocal", text, _vocal_text_tokens(raw_tokens)
+    if raw_tokens and _looks_like_editorial_tokens(raw_tokens):
+        return "editorial", " ".join(raw_tokens).strip(), raw_tokens
+    if _is_font_noise_text(text):
+        return "font", row_text, row_tokens
+    if lyric_tokens:
+        return "lyrics", row_text, lyric_tokens
+    if fallback_lyric_tokens:
+        return "lyrics", _normalized_legacy_lyric_text(text), fallback_lyric_tokens
+    if _looks_like_control_text(text, raw_tokens):
+        kind = "control"
+    return kind, row_text, row_tokens
+
+
+def _classify_structured_row(row: bytes, row_index: int) -> ImportedTextRow | None:
     text = _structured_row_text(row)
     raw_tokens = _raw_control_tokens_from_row(row)
     lyric_tokens = _lyric_tokens_from_control_row(row)
     fallback_lyric_tokens = _fallback_lyric_tokens_from_text(text)
     if not text and not raw_tokens and not lyric_tokens:
         return None
-    kind = "unknown"
-    row_text = text
-    row_tokens = raw_tokens
-    if row_index == 0 and _structured_vocal_events(row):
-        kind = "vocal"
-        row_tokens = _vocal_text_tokens(raw_tokens)
-    elif raw_tokens and _looks_like_editorial_tokens(raw_tokens):
-        kind = "editorial"
-        row_text = " ".join(raw_tokens).strip()
-    elif _is_font_noise_text(text):
-        kind = "font"
-    elif lyric_tokens:
-        kind = "lyrics"
-        row_tokens = lyric_tokens
-    elif fallback_lyric_tokens:
-        kind = "lyrics"
-        row_text = _normalized_legacy_lyric_text(text)
-        row_tokens = fallback_lyric_tokens
-    elif _looks_like_control_text(text, raw_tokens):
-        kind = "control"
+    kind, row_text, row_tokens = _structured_row_parts(
+        row,
+        row_index,
+        text=text,
+        raw_tokens=raw_tokens,
+        lyric_tokens=lyric_tokens,
+        fallback_lyric_tokens=fallback_lyric_tokens,
+    )
     return ImportedTextRow(row_index=row_index, kind=kind, text=row_text, tokens=row_tokens)
 
 
-def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEvent]:  # noqa: C901
+def _row_lyric_event(
+    raw: str,
+    *,
+    verse: int,
+    onset_index: int,
+    chain_open: bool,
+) -> tuple[LyricEvent | None, bool]:
+    if set(raw) <= {"_"}:
+        return (
+            LyricEvent(
+                text="",
+                onset_index=onset_index,
+                verse=verse,
+                syllabic="single",
+                src_pos=onset_index,
+                extender=True,
+            ),
+            chain_open,
+        )
+    trailing_hyphen = raw.endswith("-")
+    text = raw.rstrip("-").strip()
+    if not text and trailing_hyphen:
+        text = "-"
+    if not text or (text != "-" and not _keep_lyric_token(text)):
+        return None, chain_open
+    syllabic = _lyric_syllabic(trailing_hyphen, chain_open)
+    return (
+        LyricEvent(
+            text=text,
+            onset_index=onset_index,
+            verse=verse,
+            syllabic=syllabic,
+            src_pos=onset_index,
+            extender=False,
+        ),
+        trailing_hyphen,
+    )
+
+
+def _lyric_syllabic(trailing_hyphen: bool, chain_open: bool) -> str:
+    if trailing_hyphen and chain_open:
+        return "middle"
+    if trailing_hyphen:
+        return "begin"
+    if chain_open:
+        return "end"
+    return "single"
+
+
+def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEvent]:
     events: list[LyricEvent] = []
     onset_idx = 0
     chain_open = False
@@ -484,46 +571,15 @@ def _events_from_lyric_tokens(tokens: list[str], *, verse: int) -> list[LyricEve
         raw = _clean_lyric_token(tok)
         if not raw:
             continue
-        if set(raw) <= {"_"}:
-            events.append(
-                LyricEvent(
-                    text="",
-                    onset_index=onset_idx,
-                    verse=verse,
-                    syllabic="single",
-                    src_pos=onset_idx,
-                    extender=True,
-                ),
-            )
-            onset_idx += 1
-            continue
-        trailing_hyphen = raw.endswith("-")
-        text = raw.rstrip("-").strip()
-        if not text and trailing_hyphen:
-            text = "-"
-        if not text:
-            continue
-        if text != "-" and not _keep_lyric_token(text):
-            continue
-        if trailing_hyphen and chain_open:
-            syllabic = "middle"
-        elif trailing_hyphen:
-            syllabic = "begin"
-        elif chain_open:
-            syllabic = "end"
-        else:
-            syllabic = "single"
-        events.append(
-            LyricEvent(
-                text=text,
-                onset_index=onset_idx,
-                verse=verse,
-                syllabic=syllabic,
-                src_pos=onset_idx,
-                extender=False,
-            ),
+        event, chain_open = _row_lyric_event(
+            raw,
+            verse=verse,
+            onset_index=onset_idx,
+            chain_open=chain_open,
         )
-        chain_open = trailing_hyphen
+        if event is None:
+            continue
+        events.append(event)
         onset_idx += 1
     return events
 
@@ -711,7 +767,14 @@ def _record_with_verse_rows(record: FT3TextRecord, verse_rows: list[list[str]]) 
     return replace(record, lyrics=lyric_lines, lyric_event_rows=lyric_event_rows)
 
 
-def _coalesce_raw_multi_verse_rows(  # noqa: C901
+def _flatten_verse_rows(rows: list[list[str]]) -> list[str]:
+    flattened: list[str] = []
+    for row in rows:
+        flattened.extend(row)
+    return flattened
+
+
+def _coalesce_raw_multi_verse_rows(
     verse_rows: list[list[str]],
     *,
     melody_event_count: int,
@@ -725,12 +788,8 @@ def _coalesce_raw_multi_verse_rows(  # noqa: C901
         lead_rows += 1
     if lead_rows < _FT3_MIN_CLUSTER_ROWS:
         return verse_rows
-    primary: list[str] = []
-    for row in verse_rows[:lead_rows]:
-        primary.extend(row)
-    secondary: list[str] = []
-    for row in verse_rows[lead_rows:]:
-        secondary.extend(row)
+    primary = _flatten_verse_rows(verse_rows[:lead_rows])
+    secondary = _flatten_verse_rows(verse_rows[lead_rows:])
     out = [primary]
     if secondary:
         out.append(secondary)

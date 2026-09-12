@@ -110,19 +110,19 @@ DEFAULT_SETTINGS: dict[str, str] = {
 }
 
 
-def load_settings(path: str) -> dict[str, str]:  # noqa: C901
-    data: dict[str, str] = dict(DEFAULT_SETTINGS)
-    file_path = _resolve_config_path(path)
+def _read_settings_file(file_path: Path) -> dict[str, object] | None:
     if not file_path.exists():
-        return data
+        return None
     try:
         with file_path.open("rb") as f:
             raw = tomllib.load(f)
     except (OSError, tomllib.TOMLDecodeError):
-        return data
+        return None
     settings = raw.get("settings", {})
-    if not isinstance(settings, dict):
-        return data
+    return settings if isinstance(settings, dict) else None
+
+
+def _merge_settings(data: dict[str, str], settings: dict[str, object]) -> None:
     for key, value in settings.items():
         if key not in data:
             continue
@@ -130,6 +130,15 @@ def load_settings(path: str) -> dict[str, str]:  # noqa: C901
             data[key] = value
         elif isinstance(value, int):
             data[key] = str(value)
+
+
+def load_settings(path: str) -> dict[str, str]:
+    data: dict[str, str] = dict(DEFAULT_SETTINGS)
+    file_path = _resolve_config_path(path)
+    settings = _read_settings_file(file_path)
+    if settings is None:
+        return data
+    _merge_settings(data, settings)
     if data.get("layout") == "stretch":
         data["layout"] = "auto"
         data["justify"] = "edge"

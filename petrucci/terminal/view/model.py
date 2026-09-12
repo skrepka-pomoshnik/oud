@@ -481,10 +481,11 @@ def _bar_imported_ft3_ornaments(
     return row
 
 
-def _bar_span_row(  # noqa: PLR0917 - span glyphs form one compact rendering operation
+def _bar_span_row(
     spans: list[tuple[int, int, int]],
     bar_index: int,
     bar_width: int,
+    *,
     start_char: str,
     end_char: str,
     fill_char: str,
@@ -675,7 +676,14 @@ def _bar_view_span_row(
 ) -> list[str]:
     if chars is None:
         return [" " for _ in range(request.bar_width)]
-    return _bar_span_row(spans, request.bar_index, request.bar_width, *chars)
+    return _bar_span_row(
+        spans,
+        request.bar_index,
+        request.bar_width,
+        start_char=chars[0],
+        end_char=chars[1],
+        fill_char=chars[2],
+    )
 
 
 def _bar_view_spans(request: _BarViewRequest) -> tuple[list[str], list[str], list[str], list[str]]:
@@ -719,12 +727,13 @@ def _build_bar_view(request: _BarViewRequest) -> dict[str, list[str]]:
     }
 
 
-def build_bar_view(  # noqa: PLR0917 - public compatibility; options are captured in a typed view request
+def build_bar_view(
     bar: Bar,
     overrides: dict[tuple[int, int, int], str],
     durations: dict[tuple[int, int, int], int],
     ornaments: dict[tuple[int, int], str],
     annotations: dict[tuple[int, int], str],
+    *,
     slurs: list[tuple[int, int, int]],
     ties: list[tuple[int, int, int]],
     holds: list[tuple[int, int, int]],
@@ -733,7 +742,6 @@ def build_bar_view(  # noqa: PLR0917 - public compatibility; options are capture
     bar_width: int,
     default_duration: int,
     style: str,
-    *,
     french_c: str = "normal",
     slurcuestyle: str = "paren",
     tiecuestyle: str = "bracket",
