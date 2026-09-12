@@ -63,7 +63,8 @@ def _rule_bar_duration(state: EditorState, context: RuleContext) -> RuleIssue | 
     expected = beats * (4.0 / unit)
     total = bar_duration_sum(state, context.bar_index, default_duration=4)
     delta = total - expected
-    if abs(delta) < 0.01:
+    duration_tolerance = 0.01
+    if abs(delta) < duration_tolerance:
         return None
     if delta > 0:
         return RuleIssue(

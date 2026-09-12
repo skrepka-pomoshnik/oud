@@ -240,8 +240,34 @@ def _parallel_note_tab_plan(
     return tab_entries, mapped, labels
 
 
+_FT3_SCORE_HEADER_SIZE = 32
+_FT3_SCORE_MAX_OBJECT_INDEX = 128
+_FT3_SCORE_OBJECT_HEADER_SIZE = 30
+_FT3_SCORE_MIN_NONZERO_PAYLOAD = 12
+_FT3_SCORE_MAX_CONTROL_BYTES = 4
+_FT3_SCORE_UPPER_LETTER_MIN = 0x41
+_FT3_SCORE_UPPER_LETTER_MAX = 0x5A
+_FT3_SCORE_LOWER_LETTER_MIN = 0x61
+_FT3_SCORE_LOWER_LETTER_MAX = 0x7A
+_FT3_SCORE_LAYOUT_LENGTH = 74
+_FT3_SCORE_EXERCISE_LAYOUT_LENGTH = 97
+_FT3_SCORE_PARENTHESES_LAYOUT_LENGTH = 95
+_FT3_SCORE_FIXED_TAB_LENGTH = 64
+_FT3_SCORE_EMPTY_STAFF_LENGTH = 62
+_FT3_SCORE_HEADING_MIN_LENGTH = 40
+_FT3_SCORE_MIN_NOTE_GROUPS = 2
+_FT3_SCORE_MIN_LYRIC_ROWS = 8
+_FT3_SCORE_MIN_MATRIX_COLUMNS = 2
+_FT3_SCORE_MIN_CONTROL_FRAGMENT_ROWS = 4
+_FT3_SCORE_MAX_CONTROL_FRAGMENT_TEXT = 2
+_FT3_SCORE_CONTROL_BYTE_LIMIT = 0x20
+_FT3_SCORE_MIN_POSITIONED_ROWS = 3
+
+
 def _is_parallel_score_padding(entry: _BodyEntry) -> bool:
-    return entry.score_kind in {"layout-raw", "barline-raw"} or (entry.kind == "other" and len(entry.chunk) <= 32)
+    return entry.score_kind in {"layout-raw", "barline-raw"} or (
+        entry.kind == "other" and len(entry.chunk) <= _FT3_SCORE_HEADER_SIZE
+    )
 
 
 def _parallel_padding_mappings(
@@ -447,7 +473,7 @@ def _parse_score_text_record(
     *,
     text_record_cache: dict[bytes, FT3TextRecord] | None,
 ) -> FT3TextRecord:
-    payload = chunk[32:] if len(chunk) > 32 else chunk
+    payload = chunk[_FT3_SCORE_HEADER_SIZE:] if len(chunk) > _FT3_SCORE_HEADER_SIZE else chunk
     normalized = bytes(32) + payload
     if text_record_cache is not None and payload in text_record_cache:
         return text_record_cache[payload]
@@ -539,16 +565,20 @@ def _classify_score_payload(chunk: bytes) -> str | None:
     is_score_settings = chunk[2:7] == b"\x00\x11\x00\x00\xff" and b"\r\n" not in payload
     if is_score_settings and not has_note_staff_markers:
         return "score-settings-raw"
-    object_index = int.from_bytes(chunk[28:30], "little") if len(chunk) >= 30 else 0
-    if object_index > 128 and chunk[30:32] == b"\x02\x00":
+    object_index = int.from_bytes(chunk[28:30], "little") if len(chunk) >= _FT3_SCORE_OBJECT_HEADER_SIZE else 0
+    if object_index > _FT3_SCORE_MAX_OBJECT_INDEX and chunk[30:_FT3_SCORE_HEADER_SIZE] == b"\x02\x00":
         return "annotation-group-raw"
     nonzero = sum(1 for value in payload if value)
-    controls = sum(1 for value in payload if 0 < value < 32 and value not in (9, 10, 13))
-    if nonzero < 12 and controls < 4:
+    controls = sum(1 for value in payload if 0 < value < _FT3_SCORE_CONTROL_BYTE_LIMIT and value not in (9, 10, 13))
+    if nonzero < _FT3_SCORE_MIN_NONZERO_PAYLOAD and controls < _FT3_SCORE_MAX_CONTROL_BYTES:
         return None
     if b"{\\rtf" in payload or b"\\fonttbl" in payload:
         return "comment-rtf-raw"
-    has_text = b"\r\n" in payload and any((0x41 <= value <= 0x5A) or (0x61 <= value <= 0x7A) for value in payload)
+    has_text = b"\r\n" in payload and any(
+        (_FT3_SCORE_UPPER_LETTER_MIN <= value <= _FT3_SCORE_UPPER_LETTER_MAX)
+        or (_FT3_SCORE_LOWER_LETTER_MIN <= value <= _FT3_SCORE_LOWER_LETTER_MAX)
+        for value in payload
+    )
     if has_note_staff_markers:
         return "note-lyric-raw" if has_text else "note-staff-raw"
     return "text-score-raw" if has_text else "unknown"
@@ -558,7 +588,7 @@ def _is_tab_layout_record(chunk: bytes) -> bool:
     fixed_layout = _is_fixed_empty_tab_record(chunk) and chunk[4:7] == b"\x00\x00\xff"
     # A later FT3 layout variant carries three placement tuples and no objects.
     placement_layout = (
-        len(chunk) == 74
+        len(chunk) == _FT3_SCORE_LAYOUT_LENGTH
         and chunk[2:7] == b"\x04\x11\x00\x00\xff"
         and chunk[28:32] == b"\x00\x00\x03\x03"
         and chunk[-18:-16] == b"\x02\x00"
@@ -571,13 +601,16 @@ def _is_tab_layout_record(chunk: bytes) -> bool:
         and chunk[-16:] == bytes(16)
     )
     exercise_layout = (
-        len(chunk) == 97
+        len(chunk) == _FT3_SCORE_EXERCISE_LAYOUT_LENGTH
         and chunk[2:7] == b"\x04\x11\x00\x00\xff"
         and chunk[8:10] == b"\x7e\x80"
         and chunk[-20:] == bytes(20)
     )
     parenthesized_layout = (
-        len(chunk) == 95 and chunk[2:7] == b"\x04\x11\x00\x00\xff" and b"(   )" in chunk and chunk[-8:] == bytes(8)
+        len(chunk) == _FT3_SCORE_PARENTHESES_LAYOUT_LENGTH
+        and chunk[2:7] == b"\x04\x11\x00\x00\xff"
+        and b"(   )" in chunk
+        and chunk[-8:] == bytes(8)
     )
     padding_layout = chunk == b"\x00\x00\x04\x11\x00\x00\xff\x00"
     return (
@@ -592,7 +625,7 @@ def _is_tab_layout_record(chunk: bytes) -> bool:
 
 def _is_fixed_empty_tab_record(chunk: bytes) -> bool:
     return (
-        len(chunk) == 64
+        len(chunk) == _FT3_SCORE_FIXED_TAB_LENGTH
         and chunk[2:4] == b"\x04\x11"
         and chunk[6] in {0xF4, 0xFF}
         and chunk[28:32] == b"\x00\x00\x01\x00"
@@ -603,7 +636,7 @@ def _is_fixed_empty_tab_record(chunk: bytes) -> bool:
 
 def _is_empty_standard_staff_record(chunk: bytes) -> bool:
     return (
-        len(chunk) == 62
+        len(chunk) == _FT3_SCORE_EMPTY_STAFF_LENGTH
         and chunk[2:7] == b"\x04\x11\x00\x00\xff"
         and chunk[28:33] == b"\x00\x00\x00\x02\x00"
         and chunk[41:54] == b"\x02\x00" + bytes(10) + b"\x01"
@@ -611,7 +644,11 @@ def _is_empty_standard_staff_record(chunk: bytes) -> bool:
 
 
 def _tab_heading_texts(chunk: bytes) -> list[str]:
-    if len(chunk) < 40 or chunk[2:7] != b"\x04\x11\x78\x00\x00" or chunk[32:36] != b"\x01\x00\x00\x00":
+    if (
+        len(chunk) < _FT3_SCORE_HEADING_MIN_LENGTH
+        or chunk[2:7] != b"\x04\x11\x78\x00\x00"
+        or chunk[32:36] != b"\x01\x00\x00\x00"
+    ):
         return []
     cursor = 36
     values: list[str] = []
@@ -653,7 +690,7 @@ def _classify_unknown_score_chunk(
     text_record_cache: dict[bytes, FT3TextRecord] | None = None,
 ) -> str | None:
     note_group_count = ft3_note_record_group_count(chunk)
-    if note_group_count and (not _is_tab_bar(bar) or note_group_count >= 2):
+    if note_group_count and (not _is_tab_bar(bar) or note_group_count >= _FT3_SCORE_MIN_NOTE_GROUPS):
         return _decoded_note_record_kind(chunk, text_record_cache=text_record_cache)
     if score_kind := _score_record_kind(chunk, text_record_cache=text_record_cache):
         if (
@@ -667,7 +704,7 @@ def _classify_unknown_score_chunk(
         return None
     if _has_structural_score_marker(bar):
         return "barline-raw"
-    payload_kind = _classify_score_payload(chunk) if len(chunk) > 32 else None
+    payload_kind = _classify_score_payload(chunk) if len(chunk) > _FT3_SCORE_HEADER_SIZE else None
     return "text-score-raw" if payload_kind == "unknown" and _plain_score_annotations(chunk) else payload_kind
 
 
@@ -684,7 +721,7 @@ def _decode_raw_score_record(  # noqa: C901
         return heading
     if raw_kind not in {"barline-raw", "note-staff-raw", "note-lyric-raw", "text-score-raw"}:
         return None
-    payload = chunk[32:] if len(chunk) > 32 else chunk
+    payload = chunk[_FT3_SCORE_HEADER_SIZE:] if len(chunk) > _FT3_SCORE_HEADER_SIZE else chunk
     normalized_chunk = bytes(32) + payload
     record = _parse_score_text_record(normalized_chunk, text_record_cache=text_record_cache)
     if raw_kind in {"barline-raw", "note-lyric-raw", "text-score-raw"} and record.parse_mode != "structured":
@@ -843,7 +880,13 @@ def _restore_matrix_source_prefix(
     decoded: FT3TextRecord,
 ) -> tuple[list[str], list[list[LyricEvent]]]:
     lyrics, rows = matrix
-    if len(rows) >= 8 or not rows or not rows[0] or not decoded.lyric_event_rows or not decoded.lyric_event_rows[0]:
+    if (
+        len(rows) >= _FT3_SCORE_MIN_LYRIC_ROWS
+        or not rows
+        or not rows[0]
+        or not decoded.lyric_event_rows
+        or not decoded.lyric_event_rows[0]
+    ):
         return matrix
     matrix_text = rows[0][0].text
     source_text = decoded.lyric_event_rows[0][0].text
@@ -884,14 +927,14 @@ def _resolved_lyric_columns(
         columns = _matrix_columns(cells, column_count)
         if columns is None:
             continue
-        if column_count == len(onsets) or len(columns[0]) >= 8:
+        if column_count == len(onsets) or len(columns[0]) >= _FT3_SCORE_MIN_LYRIC_ROWS:
             return onsets[:column_count], columns
     return None
 
 
 def _matrix_cells(chunk: bytes) -> list[bytes]:
     parts = chunk.split(b"\r\n")
-    if len(parts) < 2:
+    if len(parts) < _FT3_SCORE_MIN_MATRIX_COLUMNS:
         return []
     first = re.search(rb"[\x20-\x7e\x80-\xff]+$", parts[0])
     last = re.match(rb"[\x20-\x7e\x80-\xff]+", parts[-1])
@@ -908,7 +951,7 @@ def _matrix_columns(cells: list[bytes], column_count: int) -> list[list[bytes]] 
     if len(cells) == column_count:
         return [[cell] for cell in cells]
     expanded_count = len(cells) + column_count - 1
-    if column_count < 2 or expanded_count % column_count:
+    if column_count < _FT3_SCORE_MIN_MATRIX_COLUMNS or expanded_count % column_count:
         return None
     verse_count = expanded_count // column_count
     columns: list[list[bytes]] = []
@@ -943,7 +986,7 @@ def _split_matrix_boundary(cell: bytes) -> tuple[bytes, bytes] | None:
 
 
 def _is_matrix_marker(value: bytes) -> bool:
-    return bool(value) and all(byte < 0x20 or byte in _MATRIX_COORDINATES for byte in value)
+    return bool(value) and all(byte < _FT3_SCORE_CONTROL_BYTE_LIMIT or byte in _MATRIX_COORDINATES for byte in value)
 
 
 def _valid_matrix_token(value: bytes) -> bool:
@@ -1145,6 +1188,6 @@ def _build_imported_score(
 
 def _is_control_fragment_lyric_staff(staff: ImportedStaff) -> bool:
     rows = [row for bar in staff.bars for row in bar.lyric_event_rows if row]
-    if len(rows) < 4:
+    if len(rows) < _FT3_SCORE_MIN_CONTROL_FRAGMENT_ROWS:
         return False
-    return all(len(row) == 1 and 0 < len(row[0].text.strip()) <= 2 for row in rows)
+    return all(len(row) == 1 and 0 < len(row[0].text.strip()) <= _FT3_SCORE_MAX_CONTROL_FRAGMENT_TEXT for row in rows)

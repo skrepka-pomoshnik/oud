@@ -146,7 +146,9 @@ def _needs_legacy_duration_fix(bars: list[Bar]) -> bool:
     sums = _bar_sums_with_chords(bars)
     if not sums:
         return False
-    return abs(median(sums) - 1.5) < 0.05
+    legacy_bar_beats = 1.5
+    legacy_tolerance = 0.05
+    return abs(median(sums) - legacy_bar_beats) < legacy_tolerance
 
 
 def _needs_common_time_halfbar_fix(bars: list[Bar]) -> bool:
@@ -158,10 +160,19 @@ def _needs_common_time_halfbar_fix(bars: list[Bar]) -> bool:
     if not sums:
         return False
     med = median(sums)
-    near_half = sum(1 for value in sums if abs(value - 2.0) <= 0.2)
+    half_bar_beats = 2.0
+    full_bar_beats = 4.0
+    meter_tolerance = 0.2
+    near_half = sum(1 for value in sums if abs(value - half_bar_beats) <= meter_tolerance)
     # Avoid scaling already-correct 4/4 material.
-    near_full = sum(1 for value in sums if abs(value - 4.0) <= 0.2)
-    return abs(med - 2.0) <= 0.15 and near_half >= int(len(sums) * 0.7) and near_full == 0
+    near_full = sum(1 for value in sums if abs(value - full_bar_beats) <= meter_tolerance)
+    half_bar_tolerance = 0.15
+    half_bar_ratio = 0.7
+    return (
+        abs(med - half_bar_beats) <= half_bar_tolerance
+        and near_half >= int(len(sums) * half_bar_ratio)
+        and near_full == 0
+    )
 
 
 def _shift_note_types_one_step_longer(bars: list[Bar], time_sig: str) -> None:
@@ -169,7 +180,8 @@ def _shift_note_types_one_step_longer(bars: list[Bar], time_sig: str) -> None:
         if bar.time_sig is None:
             bar.time_sig = time_sig
         for chord in bar.chords:
-            if chord.note_type > 2:
+            minimum_shifted_note_type = 2
+            if chord.note_type > minimum_shifted_note_type:
                 chord.note_type -= 1
 
 
@@ -185,11 +197,16 @@ def _apply_legacy_duration_fix(bars: list[Bar]) -> None:
 
 
 def _infer_meter_from_sum(sum_quarter_beats: float) -> str | None:
-    if abs(sum_quarter_beats - 1.5) <= 0.15:
+    legacy_bar_beats = 1.5
+    half_bar_beats = 2.0
+    full_bar_beats = 4.0
+    half_bar_tolerance = 0.15
+    meter_tolerance = 0.2
+    if abs(sum_quarter_beats - legacy_bar_beats) <= half_bar_tolerance:
         return "O"
-    if abs(sum_quarter_beats - 2.0) <= 0.15:
+    if abs(sum_quarter_beats - half_bar_beats) <= half_bar_tolerance:
         return "C|"
-    if abs(sum_quarter_beats - 4.0) <= 0.2:
+    if abs(sum_quarter_beats - full_bar_beats) <= meter_tolerance:
         return "C"
     return None
 
@@ -220,17 +237,22 @@ def _fill_missing_time_signatures(bars: list[Bar]) -> None:  # noqa: C901
 
 
 def parse_time_signature(bar_data: bytes) -> str | None:
-    if len(bar_data) < 10:
+    minimum_bar_header_size = 10
+    if len(bar_data) < minimum_bar_header_size:
         return None
     # Repeats, endings, closers, and an observed 0x08 control flag share byte 0.
     time_signature = bar_data[0] & 0x07
-    if time_signature == 0x01:
+    common_time_signature = 0x01
+    cut_common_time_signature = 0x02
+    triple_time_signature = 0x03
+    explicit_time_signature = 0x06
+    if time_signature == common_time_signature:
         return "C"
-    if time_signature == 0x02:
+    if time_signature == cut_common_time_signature:
         return "C|"
-    if time_signature == 0x03:
+    if time_signature == triple_time_signature:
         return "3/4"
-    if time_signature == 0x06:
+    if time_signature == explicit_time_signature:
         beats = bar_data[9]
         beat_type = bar_data[8]
         if beats and beat_type:

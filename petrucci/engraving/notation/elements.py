@@ -303,7 +303,8 @@ def _note_elements(
         else ()
     )
     elements.extend(stems)
-    if denominator >= 8 and event.beam is BeamKind.NONE and stems:
+    flag_denominator_threshold = 8
+    if denominator >= flag_denominator_threshold and event.beam is BeamKind.NONE and stems:
         elements.extend(_flag_elements(event, stem=stems[0], denominator=denominator, rows=rows))
     return tuple(elements), clipped
 
@@ -389,9 +390,10 @@ def _ledger_elements(
     rows: StaffRows,
 ) -> tuple[LayoutElement, ...]:
     ledger_positions: Iterable[int]
+    maximum_staff_position = 8
     if position < 0:
         ledger_positions = range(-2, position - 1, -2)
-    elif position > 8:
+    elif position > maximum_staff_position:
         ledger_positions = range(10, position + 1, 2)
     else:
         ledger_positions = ()
@@ -484,7 +486,8 @@ def _beam_elements(
             rows.notation_top + (lane * _BEAM_LANE_HEIGHT) if up else rows.notation_bottom - (lane * _BEAM_LANE_HEIGHT)
         )
         beams.extend(_beam_stem_extensions(group_stems, up=up, beam_y=beam_y))
-        if len(group_stems) >= 2:
+        minimum_beam_stems = 2
+        if len(group_stems) >= minimum_beam_stems:
             beams.extend(_complete_beam_elements(group, group_stems, up=up, beam_y=beam_y))
         elif group[0].beam is not BeamKind.NONE:
             beams.extend(
@@ -679,7 +682,8 @@ def _stem_up(event: NotationEvent, positions: list[int]) -> bool:
         return True
     if event.stem is StemDirection.DOWN:
         return False
-    return (sum(positions) / max(1, len(positions))) < 4
+    staff_center_position = 4
+    return (sum(positions) / max(1, len(positions))) < staff_center_position
 
 
 def _lyric_elements(

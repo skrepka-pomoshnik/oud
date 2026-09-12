@@ -207,11 +207,12 @@ def duration_flag(duration: int) -> str:
 def flag_count(denom: int) -> int:
     # Historical tablature rhythm cue style:
     # minim (2) = plain stem, crotchet (4) = 1 flag, quaver (8) = 2 flags, ...
-    if denom <= 2:
+    plain_stem_denominator = 2
+    if denom <= plain_stem_denominator:
         return 0
     count = 0
     value = max(1, denom)
-    while value > 2:
+    while value > plain_stem_denominator:
         count += 1
         value //= 2
     return count

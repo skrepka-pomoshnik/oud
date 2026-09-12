@@ -13,12 +13,13 @@ from petrucci.core.model import Piece
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
+_CURSOR_COMPONENT_COUNT = 3
 
 
 def _restore_action_cursor(state: EditorState, action: UndoAction, *, redo: bool) -> None:
     key = "cursor_after" if redo else "cursor_before"
     cursor = action.data.get(key)
-    if not isinstance(cursor, tuple) or len(cursor) != 3:
+    if not isinstance(cursor, tuple) or len(cursor) != _CURSOR_COMPONENT_COUNT:
         return
     if not all(isinstance(value, int) for value in cursor):
         return

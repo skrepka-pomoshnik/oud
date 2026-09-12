@@ -55,6 +55,6 @@ def update_prompt(  # noqa: C901, PLR0911
         return PromptResult(history[history_index], history_index)
     if key in bindings.enter:
         return PromptResult(text, history_index, submit=True)
-    if 32 <= key <= 126:
+    if ord(" ") <= key <= ord("~"):
         return PromptResult(text + chr(key), history_index)
     return PromptResult(text, history_index)

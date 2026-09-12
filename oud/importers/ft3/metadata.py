@@ -58,16 +58,20 @@ def _embedded_plain_text(data: bytes) -> list[str]:  # noqa: C901
             break
         scan_data[start : end + 1] = bytes(end + 1 - start)
         rtf_index = end + 1
-    index = 32
+    scan_start = 32
+    min_text_record_size = 8
+    max_text_record_size = 160
+    min_metadata_letters = 4
+    index = scan_start
     while index < len(scan_data):
         size = scan_data[index]
         end = index + 1 + size
-        if 8 <= size <= 160 and end <= len(scan_data):
+        if min_text_record_size <= size <= max_text_record_size and end <= len(scan_data):
             raw = scan_data[index + 1 : end]
-            if all(32 <= value <= 126 for value in raw):
+            if all(ord(" ") <= value <= ord("~") for value in raw):
                 text = raw.decode("latin1").strip()
                 alpha = sum(char.isalpha() for char in text)
-                if alpha >= 4 and "\\rtf" not in text and text not in texts:
+                if alpha >= min_metadata_letters and "\\rtf" not in text and text not in texts:
                     texts.append(text)
                 index = end
                 continue
@@ -159,7 +163,7 @@ def _extract_ft3_preamble_notes(data: bytes) -> list[str]:
     if cpiece <= 0:
         return []
     preamble = data[:cpiece]
-    printable = "".join(chr(byte) if 32 <= byte <= 126 else " " for byte in preamble)
+    printable = "".join(chr(byte) if ord(" ") <= byte <= ord("~") else " " for byte in preamble)
     printable = re.sub(r"\s+", " ", printable)
     pattern = re.compile(
         r"([A-Z][A-Za-z][A-Za-z0-9 ,.'()/-]{8,}?"
@@ -215,9 +219,11 @@ def _parse_footnote_parts(footnote: str | None) -> tuple[str | None, str | None,
     if not footnote:
         return None, None, None
     parts = [part.strip() for part in re.split(r"\s{2,}", footnote.strip(), maxsplit=2)]
+    editor_part_count = 2
+    comment_part_count = 3
     source = parts[0] if len(parts) >= 1 and parts[0] else None
-    editor = parts[1] if len(parts) >= 2 and parts[1] else None
-    comment = parts[2] if len(parts) >= 3 and parts[2] else None
+    editor = parts[1] if len(parts) >= editor_part_count and parts[1] else None
+    comment = parts[2] if len(parts) >= comment_part_count and parts[2] else None
     return source, editor, comment
 
 

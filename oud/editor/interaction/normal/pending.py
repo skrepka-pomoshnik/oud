@@ -20,7 +20,7 @@ def handle_prefix_input(state: EditorState, key: int) -> bool:
 def _handle_pending_mark(state: EditorState, key: int) -> bool:
     if not state.pending_mark:
         return False
-    if 32 <= key <= 126:
+    if ord(" ") <= key <= ord("~"):
         state.count_prefix = ""
         name = chr(key)
         if state.pending_mark == "set":
@@ -34,7 +34,7 @@ def _handle_pending_mark(state: EditorState, key: int) -> bool:
 def _handle_pending_find(state: EditorState, key: int) -> bool:
     if not state.pending_find:
         return False
-    if 32 <= key <= 126:
+    if ord(" ") <= key <= ord("~"):
         perform_find(state, state.pending_find, chr(key), count=consume_count(state))
     state.pending_find = ""
     return True

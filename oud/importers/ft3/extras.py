@@ -104,10 +104,12 @@ def decode_ft3_extras(extras: int) -> DecodedFT3Extras:
         consumed |= high_byte
     layout_flags = high_byte if high_byte in _LAYOUT_HIGH_BYTE_PATTERNS else 0
     consumed |= layout_flags
-    editorial_brackets = high_byte == 0x3600
+    editorial_brackets_marker = 0x3600
+    editorial_brackets = high_byte == editorial_brackets_marker
     if editorial_brackets:
         consumed |= high_byte
-    bass_course = 9 if high_byte == 0x3C00 else None
+    bass_course_marker = 0x3C00
+    bass_course = 9 if high_byte == bass_course_marker else None
     if bass_course is not None:
         consumed |= high_byte
     arpeggio = _ARPEGGIO_HIGH_BYTE_PATTERNS.get(high_byte)

@@ -48,7 +48,9 @@ def _parse_tuning_pitch(text: str, index: int) -> tuple[int | None, int]:
     semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}.get(note, 0)
     semitones += {"+": 1, "#": 1, "-": -1, "b": -1}.get(accidental, 0)
     midi = (octave + 1) * 12 + semitones
-    return (midi if 0 <= midi <= 127 else None), index
+    midi_min = 0
+    midi_max = 127
+    return (midi if midi_min <= midi <= midi_max else None), index
 
 
 def tuning_preset(value: str) -> str | None:

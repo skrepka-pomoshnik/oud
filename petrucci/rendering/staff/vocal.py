@@ -114,7 +114,8 @@ def _is_strong_lyric_token(ev: LyricEvent) -> bool:
     if not text:
         return False
     alpha = sum(ch.isalpha() for ch in text)
-    if alpha >= 2:
+    minimum_strong_lyric_letters = 2
+    if alpha >= minimum_strong_lyric_letters:
         return True
     return text.lower() in {"i", "a", "o"}
 

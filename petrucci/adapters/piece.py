@@ -647,7 +647,8 @@ def _bar_lyrics(
 
 def _event_duration(event: MelodyEvent) -> Fraction:
     denominator = note_type_to_denom(event.note_type or 4)
-    if denominator is None or denominator > 64:
+    maximum_supported_denominator = 64
+    if denominator is None or denominator > maximum_supported_denominator:
         _fail(f"unsupported notation note type {event.note_type!r}")
     duration = Fraction(1, denominator)
     if event.dotted:

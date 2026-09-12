@@ -69,6 +69,9 @@ def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
     state.modified = True
 
     apply_command(state, "w", config)
+    assert state.mode == "command"
+    assert state.cmdline == f"w {source.with_suffix('.tab')}"
+    handle_command(state, 10, lambda current, command: apply_command(current, command, config))
 
     assert state.mode == "normal"
     assert state.modified is False

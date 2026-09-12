@@ -26,7 +26,10 @@ def _print_summary(records: list[AuditRecord]) -> None:
     compared = [record for record in records if record.status == "compared"]
     exact = sum(bool(record.comparison and record.comparison.exact) for record in compared)
     shifted = sum(bool(record.comparison and record.comparison.best_transposition) for record in compared)
-    weak = sum(bool(record.comparison and record.comparison.onset_similarity < 0.9) for record in compared)
+    minimum_onset_similarity = 0.9
+    weak = sum(
+        bool(record.comparison and record.comparison.onset_similarity < minimum_onset_similarity) for record in compared
+    )
     print(f"corpus={len(records)} compared={len(compared)} exact={exact} shifted={shifted} weak={weak}")
     print("statuses=" + ", ".join(f"{key}:{statuses[key]}" for key in sorted(statuses)))
 

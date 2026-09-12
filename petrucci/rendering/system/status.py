@@ -186,7 +186,8 @@ def bar_meter_integrity_marker(
             durations=durations,
             dotted=dotted,
         )
-    if abs(total - expected) < 0.01:
+    duration_tolerance = 0.01
+    if abs(total - expected) < duration_tolerance:
         return None
     return "M"
 

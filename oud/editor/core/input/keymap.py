@@ -226,9 +226,9 @@ def _parse_key_token(state, token: str) -> int | None:  # noqa: PLR0911
     }
     if lower in named:
         return named[lower]
-    if lower.startswith("ctrl-") and len(lower) == 6 and lower[-1].isalpha():
+    if lower.startswith("ctrl-") and len(lower) == len("ctrl-x") and lower[-1].isalpha():
         return ord(lower[-1].upper()) & 31
-    if lower.startswith("^") and len(lower) == 2 and lower[-1].isalpha():
+    if lower.startswith("^") and len(lower) == len("^x") and lower[-1].isalpha():
         return ord(lower[-1].upper()) & 31
     if text.isdigit():
         return int(text)

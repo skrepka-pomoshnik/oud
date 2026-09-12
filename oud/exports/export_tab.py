@@ -78,9 +78,10 @@ def _denom_to_flag(denom: int) -> str:
 
 
 def _format_fret_char(context: _TabExportContext, fret: int) -> str:
-    if context.style == "italian" and fret > 10:
+    italian_x_fret = 10
+    if context.style == "italian" and fret > italian_x_fret:
         raise TabExportError(fret)
-    if context.style == "italian" and fret == 10:
+    if context.style == "italian" and fret == italian_x_fret:
         return "x"
     text = format_fret(context.style, fret, french_c=context.french_c)
     return text[0] if text else "-"

@@ -56,7 +56,9 @@ def init_state(  # noqa: C901, PLR0912
             strings = int(settings.get("strings", DEFAULT_SETTINGS["strings"]))
         except ValueError:
             strings = int(DEFAULT_SETTINGS["strings"])
-        if 4 <= strings <= 7:
+        minimum_supported_strings = 4
+        maximum_supported_strings = 7
+        if minimum_supported_strings <= strings <= maximum_supported_strings:
             state.piece.strings = strings
     elif is_tab and not piece.tuning:
         # Legacy .tab files often omit explicit tuning; keep default 6-course fallback

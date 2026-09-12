@@ -36,6 +36,9 @@ from oud.importers.ft3.text.rows import (
 from oud.importers.ft3.text.types import FT3TextRecord, empty_text_record
 from petrucci.core.model import LyricEvent, MelodyEvent
 
+_FT3_HEADER_SIZE = 32
+_FT3_CONTROL_BYTE_LIMIT = 32
+
 __all__ = [
     "FT3TextRecord",
     "decode_ft3_annotation_group",
@@ -52,7 +55,7 @@ def _parse_structured_text_record(tail: bytes) -> FT3TextRecord | None:  # noqa:
     rows = _split_record_rows(tail)
     if not rows:
         return None
-    has_controls = any(any(0 < b < 32 and b not in (9, 10, 13) for b in row) for row in rows)
+    has_controls = any(any(0 < b < _FT3_CONTROL_BYTE_LIMIT and b not in (9, 10, 13) for b in row) for row in rows)
     if not has_controls:
         return None
     classified_rows = [
@@ -183,7 +186,7 @@ def _lyric_events_from_line(line: str) -> list[LyricEvent]:  # noqa: C901
 
 
 def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:  # noqa: C901
-    tail = chunk[32:] if len(chunk) > 32 else chunk
+    tail = chunk[_FT3_HEADER_SIZE:] if len(chunk) > _FT3_HEADER_SIZE else chunk
     structured = _parse_structured_text_record(tail)
     if structured is not None:
         return structured
@@ -228,7 +231,7 @@ def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:  # noqa: C901
 def refine_ft3_raw_text_record(record: FT3TextRecord, chunk: bytes) -> FT3TextRecord:
     if record.parse_mode != "structured" or not record.structured_rows:
         return record
-    tail = chunk[32:] if len(chunk) > 32 else chunk
+    tail = chunk[_FT3_HEADER_SIZE:] if len(chunk) > _FT3_HEADER_SIZE else chunk
     positioned_tokens_by_row = _structured_positioned_lyric_rows(tail)
     if not positioned_tokens_by_row:
         return record

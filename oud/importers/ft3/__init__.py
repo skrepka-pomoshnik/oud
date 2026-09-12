@@ -95,9 +95,12 @@ def _document_metadata(data: bytes, path: str) -> _DocumentMetadata:
     blocks, metadata_blob = _extract_cpiece_blocks(data)
     preamble_notes = _extract_ft3_preamble_notes(data)
     title = blocks[0] if len(blocks) >= 1 else None
-    subtitle = blocks[1] if len(blocks) >= 2 else None
-    composer = blocks[2] if len(blocks) >= 3 else None
-    footnote = blocks[3] if len(blocks) >= 4 else None
+    subtitle_block_count = 2
+    composer_block_count = 3
+    footnote_block_count = 4
+    subtitle = blocks[1] if len(blocks) >= subtitle_block_count else None
+    composer = blocks[2] if len(blocks) >= composer_block_count else None
+    footnote = blocks[3] if len(blocks) >= footnote_block_count else None
     if not title:
         title, _pos = extract_text(data, b"CPiece")
         if title:

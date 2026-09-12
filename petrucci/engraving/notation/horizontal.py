@@ -274,14 +274,17 @@ def _event_lane_width(event: NotationEvent, width: int, *, show_stems: bool) -> 
     denominator, _dots = _event_notation(event)
     if denominator <= 1:
         return width
-    return max(width, 3 if denominator >= 8 and event.beam is BeamKind.NONE else 2)
+    beam_denominator_threshold = 8
+    return max(width, 3 if denominator >= beam_denominator_threshold and event.beam is BeamKind.NONE else 2)
 
 
 def _natural_onset_gap(left: Fraction, right: Fraction, base: int) -> int:
     quarter_delta = (right - left) * 4
-    if quarter_delta >= 4:
+    long_gap = 4
+    medium_gap = 2
+    if quarter_delta >= long_gap:
         return base + 3
-    if quarter_delta >= 2:
+    if quarter_delta >= medium_gap:
         return base + 2
     if quarter_delta >= 1:
         return base + 1

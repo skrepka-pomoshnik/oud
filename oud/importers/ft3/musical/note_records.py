@@ -91,7 +91,8 @@ class _FT3NoteRun:
 def _ft3_standard_ornament(layout_flags: int) -> str | None:
     # The low 0x0a selector is the printed plus; the other bits retain its
     # source placement/layout variant.
-    return "+" if layout_flags & 0x007F == 0x000A else None
+    plus_selector = 0x000A
+    return "+" if layout_flags & 0x007F == plus_selector else None
 
 
 def _melody_event_from_ft3(
@@ -128,7 +129,9 @@ def _melody_event_from_ft3(
 def _decode_note_group(data: bytes, start: int) -> tuple[tuple[_FT3EncodedNote, ...], int] | None:
     note_count = data[start]
     end = start + 1 + note_count * 6
-    if not 1 <= note_count <= 8 or end > len(data):
+    minimum_note_count = 1
+    maximum_note_count = 8
+    if not minimum_note_count <= note_count <= maximum_note_count or end > len(data):
         return None
     notes: list[_FT3EncodedNote] = []
     pos = start + 1
@@ -213,7 +216,8 @@ def _decode_vocal_beams(events: list[MelodyEvent]) -> list[MelodyEvent]:
 
 def _structured_vocal_events(row: bytes) -> list[MelodyEvent]:
     prefix = _structured_vocal_row_prefix(row)
-    if len(prefix) < 7:
+    minimum_structured_prefix_size = 7
+    if len(prefix) < minimum_structured_prefix_size:
         return []
     row_value = _structured_pitch_row(prefix[:1])
     first_flags = int.from_bytes(prefix[1:3], "little")
@@ -260,13 +264,16 @@ def decode_ft3_vocal_events(row: bytes) -> list[MelodyEvent]:
 
 def decode_ft3_annotation_group(data: bytes) -> FT3TextRecord:
     texts: list[str] = []
-    index = 32
+    annotation_header_size = 32
+    min_annotation_size = 1
+    max_annotation_size = 64
+    index = annotation_header_size
     while index < len(data):
         size = data[index]
         end = index + 1 + size
-        if 0 < size <= 64 and end <= len(data):
+        if min_annotation_size <= size <= max_annotation_size and end <= len(data):
             raw = data[index + 1 : end]
-            if all(32 <= value <= 126 for value in raw):
+            if all(ord(" ") <= value <= ord("~") for value in raw):
                 text = raw.decode("latin1").strip()
                 if any(char.isalpha() for char in text) and text not in texts:
                     texts.append(text)

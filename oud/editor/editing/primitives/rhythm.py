@@ -4,6 +4,8 @@ from oud.editor.core.state import EditorState
 from oud.editor.navigation.motions import apply_motion_target, target_advance_next_bar_home
 from petrucci.rendering.primitives.utils import chord_slot_positions, note_type_to_denom
 
+_TIME_SIGNATURE_PARTS = 2
+
 
 def expected_beats(state: EditorState) -> float | None:
     value = state.settings.get("time", "C")
@@ -13,7 +15,7 @@ def expected_beats(state: EditorState) -> float | None:
         return 3.0
     if "/" in value:
         parts = value.split("/", 1)
-        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+        if len(parts) == _TIME_SIGNATURE_PARTS and parts[0].isdigit() and parts[1].isdigit():
             beats = int(parts[0])
             unit = int(parts[1])
             if beats > 0 and unit > 0:

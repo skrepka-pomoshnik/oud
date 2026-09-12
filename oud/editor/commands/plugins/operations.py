@@ -302,7 +302,7 @@ def _handle_plugin_search(state: EditorState, key: int) -> bool:  # noqa: C901, 
             return True
         state.message = "No match"
         return True
-    if 32 <= key <= 126:
+    if ord(" ") <= key <= ord("~"):
         plugin_search_append(state, chr(key))
         state.message = f"Search: {state.plugin_query}"
         return True

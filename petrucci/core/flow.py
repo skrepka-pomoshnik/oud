@@ -432,11 +432,19 @@ def _apply_meter_beams(
 ) -> tuple[NotationEvent, ...]:
     if policy is FlowBeamPolicy.NONE:
         return events
-    group_duration = Fraction(3 if meter.beat_unit >= 8 and meter.beats % 3 == 0 else 1, meter.beat_unit)
+    compound_beat_unit_threshold = 8
+    compound_beat_count = 3
+    group_duration = Fraction(
+        compound_beat_count
+        if meter.beat_unit >= compound_beat_unit_threshold and meter.beats % compound_beat_count == 0
+        else 1,
+        meter.beat_unit,
+    )
     replacements: dict[str, BeamKind] = {}
     for voice in sorted({event.voice for event in events}):
         for run in _beam_runs(events, voice, group_duration, split_ids | explicit_beam_ids):
-            if len(run) < 2:
+            minimum_beam_run_events = 2
+            if len(run) < minimum_beam_run_events:
                 continue
             replacements[run[0].id] = BeamKind.START
             replacements[run[-1].id] = BeamKind.END
@@ -484,7 +492,8 @@ def _continues_beam_run(
 
 def _beamable(event: NotationEvent) -> bool:
     notation = duration_notation(event.duration)
-    return event.kind is EventKind.NOTE and notation is not None and notation[0] >= 8
+    minimum_beamable_denominator = 8
+    return event.kind is EventKind.NOTE and notation is not None and notation[0] >= minimum_beamable_denominator
 
 
 def _validate_event_sequence(events: tuple[FlowEvent, ...]) -> None:
@@ -527,7 +536,9 @@ def _validate_flow_event_content(event: FlowEvent) -> None:
 def _validate_midi_pitches(event: FlowEvent) -> None:
     if len(set(event.midi_pitches)) != len(event.midi_pitches):
         _fail(f"flow event {event.id!r} contains a duplicate MIDI pitch")
-    if any(not isinstance(midi, int) or not 0 <= midi <= 127 for midi in event.midi_pitches):
+    midi_min = 0
+    midi_max = 127
+    if any(not isinstance(midi, int) or not midi_min <= midi <= midi_max for midi in event.midi_pitches):
         _fail("flow event MIDI pitches must be integers between 0 and 127")
 
 

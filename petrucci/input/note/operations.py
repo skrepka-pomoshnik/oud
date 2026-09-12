@@ -461,9 +461,13 @@ def resolve_input_pitch(value: InputPitch | WrittenPitch, *, anchor: WrittenPitc
         pitch = WrittenPitch(value.step, value.octave, value.alter, value.accidental)
     else:
         candidates = [WrittenPitch(value.step, octave, value.alter, value.accidental) for octave in range(-1, 10)]
-        in_range = [candidate for candidate in candidates if 0 <= candidate.midi <= 127]
+        midi_min = 0
+        midi_max = 127
+        in_range = [candidate for candidate in candidates if midi_min <= candidate.midi <= midi_max]
         pitch = min(in_range, key=lambda candidate: (abs(candidate.midi - anchor.midi), candidate.midi < anchor.midi))
-    if not 0 <= pitch.midi <= 127:
+    midi_min = 0
+    midi_max = 127
+    if not midi_min <= pitch.midi <= midi_max:
         raise NoteInputError("pitch-out-of-range", f"written pitch resolves outside MIDI range: {pitch!r}")
     return pitch
 

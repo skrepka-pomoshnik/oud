@@ -271,13 +271,17 @@ def _set_enum(state: EditorState, key: str, value: str) -> bool:
     return True
 
 
+_MIN_STRINGS = 4
+_MAX_STRINGS = 13
+
+
 def _set_strings(state: EditorState, value: str) -> bool:
     try:
         count = int(value)
     except ValueError:
         state.message = "Invalid strings value"
         return False
-    if count < 4 or count > 13:
+    if count < _MIN_STRINGS or count > _MAX_STRINGS:
         state.message = "Strings must be 4-13"
         return False
     state.piece.strings = count

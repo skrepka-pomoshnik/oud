@@ -9,6 +9,39 @@ from oud.importers.ft3.musical.note_records import (
 from oud.importers.ft3.text.types import FT3TextRecord, empty_text_record
 from petrucci.core.model import ImportedTextRow, LyricEvent
 
+_FT3_HEADER_SIZE = 32
+_FT3_CARRIAGE_RETURN = 13
+_FT3_LINE_FEED = 10
+_FT3_CONTROL_BYTE_MIN = 1
+_FT3_CONTROL_BYTE_MAX = 31
+_FT3_ASCII_PRINTABLE_MIN = 32
+_FT3_ASCII_PRINTABLE_MAX = 126
+_FT3_ASCII_UPPER_MIN = 0x41
+_FT3_ASCII_UPPER_MAX = 0x5A
+_FT3_ASCII_LOWER_MIN = 0x61
+_FT3_ASCII_LOWER_MAX = 0x7A
+_FT3_MIN_LOGICAL_ROWS = 2
+_FT3_MIN_LETTERS = 6
+_FT3_MIN_TEXT_LENGTH = 3
+_FT3_MIN_MELODY_FEATURES = 2
+_FT3_MIN_DIGIT_OR_SYMBOL = 3
+_FT3_MIN_PROBE_LENGTH = 1
+_FT3_MAX_PROBE_LENGTH = 3
+_FT3_MIN_ROW_TOKENS = 2
+_FT3_MAX_NON_LYRIC_TOKENS = 2
+_FT3_MIN_CLUSTER_ROWS = 2
+_FT3_MIN_POSITIONED_ROWS = 4
+_FT3_MAX_LANE_ROWS_BEFORE_CLUSTER = 3
+_FT3_MAX_FRAGMENT_VERSE_ROWS = 2
+_FT3_MAX_FRAGMENT_EVENTS = 1
+_FT3_MIN_MELODY_EVENTS = 1
+_FT3_MIN_LYRIC_ROWS = 3
+_FT3_MIN_TOKENS = 3
+_FT3_MIN_LONG_TOKEN_LENGTH = 4
+_FT3_MIN_PROSE_LETTERS = 10
+_FT3_MIN_LONG_TOKENS = 2
+_FT3_MIN_PROSE_TOKENS = 4
+
 
 def _empty_text_record() -> FT3TextRecord:
     return empty_text_record()
@@ -42,20 +75,24 @@ LYRIC_SCORE_RULES: tuple[tuple[str, int], ...] = (
 
 
 def is_ft3_text_record(chunk: bytes) -> bool:
-    tail = chunk[32:] if len(chunk) > 32 else chunk
+    tail = chunk[_FT3_HEADER_SIZE:] if len(chunk) > _FT3_HEADER_SIZE else chunk
     if not tail:
         return False
     newline_count = tail.count(b"\r") + tail.count(b"\n")
-    if newline_count < 2:
+    if newline_count < _FT3_MIN_LOGICAL_ROWS:
         return False
-    letter_count = sum(1 for b in tail if (0x41 <= b <= 0x5A) or (0x61 <= b <= 0x7A))
-    return letter_count >= 6
+    letter_count = sum(
+        1
+        for b in tail
+        if (_FT3_ASCII_UPPER_MIN <= b <= _FT3_ASCII_UPPER_MAX) or (_FT3_ASCII_LOWER_MIN <= b <= _FT3_ASCII_LOWER_MAX)
+    )
+    return letter_count >= _FT3_MIN_LETTERS
 
 
 def _asciiish_lines(data: bytes) -> list[str]:
     chars: list[str] = []
     for b in data:
-        if b in (9, 10, 13) or 32 <= b <= 126:
+        if b in (9, 10, 13) or _FT3_ASCII_PRINTABLE_MIN <= b <= _FT3_ASCII_PRINTABLE_MAX:
             chars.append(chr(b))
         else:
             chars.append(" ")
@@ -70,13 +107,13 @@ def looks_like_melody_grid(line: str) -> bool:
 
 
 def _features_look_like_melody(features: _LineFeatures) -> bool:
-    if not features.has_text or len(features.stripped) < 3:
+    if not features.has_text or len(features.stripped) < _FT3_MIN_TEXT_LENGTH:
         return False
     digit_or_symbol = features.digits + features.symbols + features.placeholders + features.alpha
     enough_symbols = digit_or_symbol >= max(3, features.length // 3)
     low_alpha = features.alpha <= max(4, features.length // 5)
-    has_melody_tokens = features.digits > 0 or (features.symbols + features.placeholders) >= 2
-    return has_melody_tokens and enough_symbols and (digit_or_symbol >= 3 or low_alpha)
+    has_melody_tokens = features.digits > 0 or (features.symbols + features.placeholders) >= _FT3_MIN_MELODY_FEATURES
+    return has_melody_tokens and enough_symbols and (digit_or_symbol >= _FT3_MIN_DIGIT_OR_SYMBOL or low_alpha)
 
 
 def _looks_like_lyric_text(line: str) -> bool:
@@ -253,13 +290,15 @@ def _split_record_rows(data: bytes) -> list[bytes]:
     idx = 0
     while idx < len(data):
         b = data[idx]
-        if b == 13:  # CR ends a logical row in FT3 text records.
+        if b == _FT3_CARRIAGE_RETURN:  # CR ends a logical row in FT3 text records.
             row = bytes(current).rstrip(b"\x00")
             if row.strip(b"\x00 "):
                 rows.append(row)
             current.clear()
-            if idx + 1 < len(data) and data[idx + 1] == 10:
+            if idx + 1 < len(data) and data[idx + 1] == _FT3_LINE_FEED:
                 idx += 1
+            else:
+                current.append(b)
         else:
             current.append(b)
         idx += 1
@@ -286,14 +325,14 @@ def _tokenize_control_row(row: bytes) -> list[tuple[int, str]]:  # noqa: C901
         buf = []
 
     for b in row:
-        if 32 <= b <= 126:
+        if _FT3_ASCII_PRINTABLE_MIN <= b <= _FT3_ASCII_PRINTABLE_MAX:
             if not buf:
                 start_col = col
             buf.append(chr(b))
             col += 1
             continue
         flush()
-        if 1 <= b <= 31:
+        if _FT3_CONTROL_BYTE_MIN <= b <= _FT3_CONTROL_BYTE_MAX:
             # FT3 lyric records use control bytes as horizontal anchors.
             col = int(b)
     flush()
@@ -305,7 +344,7 @@ def _likely_non_lyric_token(token: str) -> bool:
         return True
     probe = token.rstrip(".,;:!?")
     lower = probe.lower()
-    if probe.isupper() and 1 < len(probe) <= 3:
+    if probe.isupper() and _FT3_MIN_PROBE_LENGTH < len(probe) <= _FT3_MAX_PROBE_LENGTH:
         return True
     if all(ch.isdigit() or ch == "." for ch in lower):
         return True
@@ -354,9 +393,9 @@ def _raw_control_tokens_from_row(row: bytes) -> list[str]:
 def _structured_row_text(row: bytes) -> str:
     chars: list[str] = []
     for b in row:
-        if 32 <= b <= 126:
+        if _FT3_ASCII_PRINTABLE_MIN <= b <= _FT3_ASCII_PRINTABLE_MAX:
             chars.append(chr(b))
-        elif b in (9, 10, 13) or 1 <= b <= 31:
+        elif b in (9, 10, 13) or _FT3_CONTROL_BYTE_MIN <= b <= _FT3_CONTROL_BYTE_MAX:
             chars.append(" ")
     return re.sub(r"\s+", " ", "".join(chars)).strip()
 
@@ -496,7 +535,7 @@ def _append_structured_lyric_tokens(
     row_index: int,
 ) -> None:
     row_tokens = tokens_by_row[row_index]
-    if len(row_tokens) >= 2:
+    if len(row_tokens) >= _FT3_MIN_ROW_TOKENS:
         secondary.append(row_tokens[0])
         primary.append(row_tokens[-1])
         return
@@ -534,9 +573,9 @@ def _interleaved_two_verse_rows(
     secondary: list[str] = []
     next_primary = not primary
     for kind, tokens in trailing:
-        if kind != "lyrics" or len(tokens) > 2:
+        if kind != "lyrics" or len(tokens) > _FT3_MAX_NON_LYRIC_TOKENS:
             return None
-        if len(tokens) == 2:
+        if len(tokens) == _FT3_MAX_NON_LYRIC_TOKENS:
             secondary.append(tokens[0])
             primary.append(tokens[1])
             next_primary = False
@@ -587,9 +626,13 @@ def _structured_lyric_rows_from_positioned_rows(
         positioned_rows,
         tolerance=6 if prefer_cluster else 3,
     )
-    if prefer_cluster and len(lane_rows) >= 2:
+    if prefer_cluster and len(lane_rows) >= _FT3_MIN_CLUSTER_ROWS:
         return lane_rows
-    if len(positioned_rows) >= 4 and mostly_singletons and (not prefer_cluster or len(lane_rows) < 3):
+    if (
+        len(positioned_rows) >= _FT3_MIN_POSITIONED_ROWS
+        and mostly_singletons
+        and (not prefer_cluster or len(lane_rows) < _FT3_MAX_LANE_ROWS_BEFORE_CLUSTER)
+    ):
         return [[tok for _pos, tok in row] for row in positioned_rows if row]
     if lane_rows:
         return lane_rows
@@ -673,14 +716,14 @@ def _coalesce_raw_multi_verse_rows(  # noqa: C901
     *,
     melody_event_count: int,
 ) -> list[list[str]]:
-    if len(verse_rows) <= 2 or melody_event_count <= 1:
+    if len(verse_rows) <= _FT3_MAX_FRAGMENT_VERSE_ROWS or melody_event_count <= _FT3_MAX_FRAGMENT_EVENTS:
         return verse_rows
     lead_rows = 0
     for row in verse_rows:
         if len(row) != 1 or lead_rows >= melody_event_count:
             break
         lead_rows += 1
-    if lead_rows < 2:
+    if lead_rows < _FT3_MIN_CLUSTER_ROWS:
         return verse_rows
     primary: list[str] = []
     for row in verse_rows[:lead_rows]:
@@ -699,10 +742,16 @@ def _reconstruct_three_verse_raw_rows(
     *,
     melody_event_count: int,
 ) -> list[list[str]] | None:
-    if melody_event_count < 1 or len(positioned_rows) < 3 or not positioned_rows[0]:
+    if (
+        melody_event_count < _FT3_MIN_MELODY_EVENTS
+        or len(positioned_rows) < _FT3_MIN_LYRIC_ROWS
+        or not positioned_rows[0]
+    ):
         return None
     lyric_tokens = [tok for row in positioned_rows[1:] for _pos, tok in row]
-    invalid_shape = len(lyric_tokens) < 2 or any(len(row) > 2 for row in positioned_rows[1:])
+    invalid_shape = len(lyric_tokens) < _FT3_MAX_NON_LYRIC_TOKENS or any(
+        len(row) > _FT3_MAX_NON_LYRIC_TOKENS for row in positioned_rows[1:]
+    )
     if invalid_shape:
         return None
     primary = [tok for _pos, tok in positioned_rows[0]]
@@ -717,7 +766,7 @@ def _reconstruct_three_verse_raw_rows(
             cycle[cycle_index].append(tok)
             cycle_index = (cycle_index + 1) % len(cycle)
     rows = [primary, verse_two, verse_three]
-    return rows if sum(1 for row in rows if row) >= 3 else None
+    return rows if sum(1 for row in rows if row) >= _FT3_MIN_LYRIC_ROWS else None
 
 
 def _collapse_consecutive_duplicate_tokens(tokens: list[str]) -> list[str]:
@@ -730,11 +779,16 @@ def _collapse_consecutive_duplicate_tokens(tokens: list[str]) -> list[str]:
 
 
 def _looks_like_editorial_tokens(tokens: list[str]) -> bool:
-    if len(tokens) < 3:
+    if len(tokens) < _FT3_MIN_TOKENS:
         return False
     joined = " ".join(tokens)
     alpha = sum(ch.isalpha() for ch in joined)
-    long_tokens = sum(len(tok) >= 4 for tok in tokens)
+    long_tokens = sum(len(tok) >= _FT3_MIN_LONG_TOKEN_LENGTH for tok in tokens)
     pitch_like = sum(bool(re.fullmatch(r"[a-gh](?:[#b]|[',])*", tok.lower())) for tok in tokens)
     has_prose_punct = any(ch in joined for ch in ":;(),./")
-    return alpha >= 10 and long_tokens >= 2 and pitch_like == 0 and (has_prose_punct or len(tokens) >= 4)
+    return (
+        alpha >= _FT3_MIN_PROSE_LETTERS
+        and long_tokens >= _FT3_MIN_LONG_TOKENS
+        and pitch_like == 0
+        and (has_prose_punct or len(tokens) >= _FT3_MIN_PROSE_TOKENS)
+    )

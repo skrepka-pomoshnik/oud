@@ -71,6 +71,11 @@ def fret_to_french(fret: int) -> str | None:
     return None
 
 
+_MIN_FRET = 0
+_MAX_SINGLE_DIGIT_FRET = 9
+_ITALIAN_X_FRET = 10
+
+
 def italian_to_fret(ch: str) -> int | None:
     if ch.isdigit():
         return int(ch)
@@ -80,8 +85,8 @@ def italian_to_fret(ch: str) -> int | None:
 
 
 def fret_to_italian(fret: int) -> str | None:
-    if 0 <= fret <= 9:
+    if _MIN_FRET <= fret <= _MAX_SINGLE_DIGIT_FRET:
         return str(fret)
-    if fret == 10:
+    if fret == _ITALIAN_X_FRET:
         return "x"
     return None

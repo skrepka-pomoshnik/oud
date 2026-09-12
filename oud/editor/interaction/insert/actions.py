@@ -305,7 +305,7 @@ def _continue_bass_slash(state: EditorState, key: int) -> bool:
     if key == ord("/"):
         state.insert_prefix += "/"
         return True
-    if not 32 <= key <= 126:
+    if not ord(" ") <= key <= ord("~"):
         clear_insert_transient(state)
         return False
     ch = chr(key).lower()
@@ -361,7 +361,9 @@ def _handle_insert_italian_multifret(
     if style != "italian" or state.settings.get("italianmultifret", "on") != "on":
         clear_insert_transient(state)
         return False
-    if key < 0 or key > 255:
+    min_input_byte = 0
+    max_input_byte = 255
+    if key < min_input_byte or key > max_input_byte:
         clear_insert_transient(state)
         return False
     ch = chr(key)
@@ -370,7 +372,8 @@ def _handle_insert_italian_multifret(
         return False
     state.insert_prefix += ch
     digits = state.insert_prefix[1:]
-    if len(digits) >= 2:
+    min_multifret_digits = 2
+    if len(digits) >= min_multifret_digits:
         fret = int(digits)
         if _handle_insert_fret_value(state, fret):
             _advance_after_insert(state)
@@ -381,7 +384,7 @@ def _handle_insert_italian_multifret(
 def _handle_insert_char(state: EditorState, key: int, style: str) -> bool:
     if key == ord("r"):
         return _handle_insert_rest(state)
-    if 32 <= key <= 126:
+    if ord(" ") <= key <= ord("~"):
         ch = chr(key).lower()
         valid = is_french_fret(ch) if style == "french" else is_italian_fret(ch)
         if valid:
@@ -516,7 +519,7 @@ def _dispatch_insert_content(state: EditorState, key: int) -> None:
 
 
 def handle_insert(state: EditorState, key: int) -> bool:
-    if key == 27:
+    if key == ord("\x1b"):
         exit_insert_mode(state)
         return True
     handled = _dispatch_insert_binding(state, key)

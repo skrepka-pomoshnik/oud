@@ -63,7 +63,7 @@ def safe_addstr(stdscr: Screen, y: int, x: int, text: str, attr: int = 0) -> Non
 
 
 def clean_text(text: str) -> str:
-    return "".join(ch if 32 <= ord(ch) <= 126 else " " for ch in text)
+    return "".join(ch if ord(" ") <= ord(ch) <= ord("~") else " " for ch in text)
 
 
 def pad_row(row: list[str], width: int, pad: int, *, pad_char: str = " ") -> list[str]:
@@ -314,13 +314,19 @@ def flag_symbols(style: str, flaglean: str = "right") -> tuple[str, str]:
 
 
 def _override_bass_strings(overrides: dict[tuple[int, int, int], str]) -> set[int]:
-    return {string for _bar, string, _column in overrides if string >= 6}
+    bass_course_start = 6
+    return {string for _bar, string, _column in overrides if string >= bass_course_start}
 
 
 def _piece_bass_strings(piece: Piece) -> set[int]:
-    direct = {note.string - 1 for bar in piece.bars for note in bar.notes if note.string - 1 >= 6}
+    bass_course_start = 6
+    direct = {note.string - 1 for bar in piece.bars for note in bar.notes if note.string - 1 >= bass_course_start}
     chordal = {
-        note.string - 1 for bar in piece.bars for chord in bar.chords for note in chord.notes if note.string - 1 >= 6
+        note.string - 1
+        for bar in piece.bars
+        for chord in bar.chords
+        for note in chord.notes
+        if note.string - 1 >= bass_course_start
     }
     return direct | chordal
 

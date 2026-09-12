@@ -360,7 +360,8 @@ def _without_partial_staffs(
     focused_staff_id: str | None,
 ) -> SemanticFrame:
     system = layout.systems[system_offset]
-    if len(system.staff_rows) < 2:
+    minimum_staff_rows = 2
+    if len(system.staff_rows) < minimum_staff_rows:
         return frame
     viewport_top = system.rect.y + y_offset
     viewport_bottom = viewport_top + len(frame.lines) - 1

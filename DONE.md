@@ -1,5 +1,14 @@
 # DONE
 
+- 2026-09-12: Fixed MusicXML round-trip ordering and rest-only measures, and
+  updated the first-write regression for prefilled Save As. Added the complete
+  `oud(1)` manual source, generated roff page, reproducible build, and
+  user-local installation scripts. Refactored CLI dispatch to remove its
+  active C901/PLR0911 findings, then retired all 236 repository PLR2004
+  findings with domain-local constants and repaired the affected FT3/MIDI
+  parser control flow. Validation: full Ruff, Ruff format, and Ty pass; full
+  pytest passed with 1,631 tests, 11 skips, and 95.18% Petrucci coverage.
+
 - 2026-08-10: Reduced corpus-wide companion-MIDI discrepancies with source-provenance tuning profiles, diatonic extended basses, independent notation-only playback, corrected repeat-section advancement, and bar-duration registration for completely mapped note staffs. Mixed voices retain their internal rhythm instead of snapping to lute attacks; *Can she excuse my wrongs?* improves from 0.674 to 0.913 normalized comparison score. Optional companion tests now reject stale MIDI revisions and compare pitch evidence without treating PPQ or absolute timing as semantics. The cached, non-redistributed 514-score audit reports 224 exact, 420 at or above 0.90, 11 best-fit transpositions, 99 weak cases, 22 below 0.50, and no silent exports. Validation: Ruff, Ruff format, Ty, and 1,626 tests pass with 11 platform/tool/evidence skips under an 8 GB memory cap; Petrucci coverage is 95.15%.
 
 - 2026-08-09: Added a non-redistributing companion-MIDI audit for every fixed FT3 manifest. It derives authoritative Gerbode MIDI URLs, caches payloads and 404 evidence under ignored `downloads/`, preserves unique source paths, parses multi-track running-status MIDI, and compares onset chords independently of PPQ, tracks, patches, and absolute timing. All 514 unique corpus scores now have downloaded companions and comparison records: 194 exact, 359 at or above 0.90 onset similarity, and 155 below it. Danyel's *Leaves Be Green* now uses its documented nine-course sounding scordatura with explicit provenance and source tuning takes precedence over the editor default; its comparison improves to zero transposition, 0.960 onset similarity, and 0.932 pitch overlap. Validation: Ruff, Ruff format, Ty, and 1,619 tests pass with 10 platform/tool skips and 95.14% Petrucci coverage.

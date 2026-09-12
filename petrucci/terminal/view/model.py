@@ -61,7 +61,8 @@ def _parse_time_signature(value: str) -> tuple[int, int, str]:
         return 3, 4, "O"
     if "/" in text:
         parts = text.split("/", 1)
-        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+        time_signature_parts = 2
+        if len(parts) == time_signature_parts and parts[0].isdigit() and parts[1].isdigit():
             beats = int(parts[0])
             unit = int(parts[1])
             return max(1, beats), max(1, unit), f"{beats}/{unit}"

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 MAX_KEY_COUNT = 999
 _COUNT_LIMIT_MESSAGE = f"Count limited to {MAX_KEY_COUNT}"
+_BASS_STRING_INDEX = 6
 
 
 def allow_arrows(state: EditorState) -> bool:
@@ -21,17 +22,17 @@ def is_casual(state: EditorState) -> bool:
 def _bass_strings_used(state: EditorState) -> set[int]:  # noqa: C901
     used: set[int] = set()
     for bar, string, _col in state.overrides:
-        if bar < len(state.piece.bars) and string >= 6:
+        if bar < len(state.piece.bars) and string >= _BASS_STRING_INDEX:
             used.add(string)
     for bar in state.piece.bars:
         for note in bar.notes:
             idx = note.string - 1
-            if idx >= 6:
+            if idx >= _BASS_STRING_INDEX:
                 used.add(idx)
         for chord in bar.chords:
             for note in chord.notes:
                 idx = note.string - 1
-                if idx >= 6:
+                if idx >= _BASS_STRING_INDEX:
                     used.add(idx)
     return used
 

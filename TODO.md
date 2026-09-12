@@ -220,11 +220,10 @@ in `docs/architecture/debt.json`; rationale, counts, and ownership targets are i
 - [ ] Replace the 28 narrowly suppressed production `PLR0917` surfaces with
   typed render, layout, playback, and export request records as their owning
   modules are split; do not add per-file ignores or forwarding wrappers.
-
 ## P3: Secondary release work
 
 - [ ] Confirm GitHub Actions green on macOS.
-- [ ] Ship a real `oud(1)` manual page that works with `man oud`.
+- [x] Ship a real `oud(1)` manual page that works with `man oud`.
   - Maintain `man/oud.1.scd` as the readable source and commit generated
     `man/oud.1` roff output.
   - Cover synopsis, options/subcommands, files, environment, exit status,
@@ -232,7 +231,7 @@ in `docs/architecture/debt.json`; rationale, counts, and ownership targets are i
   - Add reproducible build and user-local installation under
     `~/.local/share/man/man1` without requiring sudo.
   - Validate with `mandoc -T lint man/oud.1` and `man -l man/oud.1` when
-    available.
+    available. The repository build uses `scdoc`; `mandoc` is optional.
   - Keep README as the quick-start page and the man page as the exhaustive
     command reference.
 ## Source-faithful notation architecture
@@ -272,3 +271,10 @@ These items refine the existing FT3, terminal-viewer, and publication work. They
 
 - [ ] Decide whether a dedicated mensural input DSL is needed only after the diplomatic model and round trips expose concrete limitations in FT3/TAB entry. Do not design syntax before that evidence exists.
 - [ ] Treat neumes, `gabc`, chant editing, facsimile overlays, and terminal image protocols as separate future scopes, not extensions implied by mensural or tablature support.
+
+## P0 - Static audit findings (review before fixing)
+
+Review the syntax state first, then re-run the audit before addressing secondary findings. Do not mass-suppress Ruff or Vulture findings; rerun the project quality gate after accepted fixes.
+
+- [ ] Re-run Vulture now that the parser sources are syntactically valid; the
+  initial run produced parser errors rather than a trustworthy dead-code list.

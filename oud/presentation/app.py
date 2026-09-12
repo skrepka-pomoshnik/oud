@@ -257,34 +257,42 @@ def _normalize_args(argv: list[str]) -> list[str]:
     return out
 
 
+def _run_tui(parsed: argparse.Namespace) -> int:
+    read_only = bool(
+        getattr(parsed, "readonly_global", False) or getattr(parsed, "readonly_tui", False),
+    )
+    try:
+        return curses.wrapper(_main, parsed.path, parsed.config, read_only)
+    except KeyboardInterrupt:
+        return EXIT_INTERRUPTED
+
+
+def _run_ascii_command(parsed: argparse.Namespace) -> int:
+    try:
+        bars = parsed.bars
+        if bars is None and parsed.bars_expr:
+            if parsed.bars_expr.startswith("bars="):
+                bars = parsed.bars_expr.split("=", 1)[1]
+            else:
+                print(
+                    "Invalid ascii argument; use --bars N or --bars START:END",
+                    file=sys.stderr,
+                )
+                return 2
+        return _cmd_ascii(parsed.path, parsed.config, parsed.output, bars, overwrite=parsed.force)
+    except ValueError as exc:
+        print(f"Invalid --bars: {exc}", file=sys.stderr)
+        return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     raw_args = list(sys.argv[1:] if argv is None else argv)
     args = _normalize_args(raw_args)
     parsed = _build_parser().parse_args(args)
     if parsed.command == "tui":
-        read_only = bool(
-            getattr(parsed, "readonly_global", False) or getattr(parsed, "readonly_tui", False),
-        )
-        try:
-            return curses.wrapper(_main, parsed.path, parsed.config, read_only)
-        except KeyboardInterrupt:
-            return EXIT_INTERRUPTED
+        return _run_tui(parsed)
     if parsed.command == "ascii":
-        try:
-            bars = parsed.bars
-            if bars is None and parsed.bars_expr:
-                if parsed.bars_expr.startswith("bars="):
-                    bars = parsed.bars_expr.split("=", 1)[1]
-                else:
-                    print(
-                        "Invalid ascii argument; use --bars N or --bars START:END",
-                        file=sys.stderr,
-                    )
-                    return 2
-            return _cmd_ascii(parsed.path, parsed.config, parsed.output, bars, overwrite=parsed.force)
-        except ValueError as exc:
-            print(f"Invalid --bars: {exc}", file=sys.stderr)
-            return 2
+        return _run_ascii_command(parsed)
     if parsed.command == "convert":
         options = ConvertOptions(parsed.force, parsed.input_format, parsed.format)
         return _cmd_convert(parsed.input, parsed.output, parsed.config, options)

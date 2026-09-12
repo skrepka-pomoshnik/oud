@@ -112,7 +112,8 @@ def _verse_hyphen_elements(
         if lyric.syllabic not in {Syllabic.BEGIN, Syllabic.MIDDLE}:
             continue
         right = x + display_width(lyric.text)
-        if next_x - right < 2:
+        minimum_hyphen_gap = 2
+        if next_x - right < minimum_hyphen_gap:
             continue
         hyphen_x = right + ((next_x - right) // 2)
         elements.append(

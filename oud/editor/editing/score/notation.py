@@ -134,7 +134,9 @@ def cmd_tuplet(state: EditorState, value: str) -> None:
     if normalized == "clear":
         set_tuplet(state, "clear")
         return
-    if normalized.isdigit() and 2 <= int(normalized) <= 9:
+    min_tuplet = 2
+    max_tuplet = 9
+    if normalized.isdigit() and min_tuplet <= int(normalized) <= max_tuplet:
         set_tuplet(state, normalized)
         return
     state.message = "Tuplet must be 2-9 or clear"

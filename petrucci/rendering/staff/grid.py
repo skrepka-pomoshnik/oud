@@ -158,7 +158,8 @@ def _staff_row_cells(
 ) -> tuple[list[str], str]:
     source_cells = cells[actual]
     fill_char = "-"
-    if actual >= 6:
+    bass_course_start = 6
+    if actual >= bass_course_start:
         source_cells = _inline_bass_row(source_cells)
         fill_char = " "
     row_cells = source_cells

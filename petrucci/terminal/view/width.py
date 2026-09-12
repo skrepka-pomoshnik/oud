@@ -90,11 +90,16 @@ def _bar_compact_width(  # noqa: PLR0917 - legacy grid projection pending typed 
 def _time_signature_for_duration(total: Fraction, *, max_denom: int) -> str | None:
     if total <= 0:
         return None
-    if total == Fraction(3, 8) and max_denom <= 8:
+    compound_duration = Fraction(3, 8)
+    maximum_compound_denominator = 8
+    if total == compound_duration and max_denom <= maximum_compound_denominator:
         return "3/4"
+    integer_denominator = 1
+    minimum_time_beats = 1
+    maximum_time_beats = 12
     for unit in (4, 8, 2, 1):
         beats = total * unit
-        if beats.denominator == 1 and 1 <= beats.numerator <= 12:
+        if beats.denominator == integer_denominator and minimum_time_beats <= beats.numerator <= maximum_time_beats:
             return f"{beats.numerator}/{unit}"
     return None
 

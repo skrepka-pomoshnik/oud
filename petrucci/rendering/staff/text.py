@@ -637,7 +637,8 @@ def _stem_glyph_rows(*, last_stem_row: int) -> dict[int, str]:
 
 
 def _melody_notehead_glyph(note_type: int) -> str:
-    if note_type >= 4:
+    filled_notehead_threshold = 4
+    if note_type >= filled_notehead_threshold:
         return MELODY_FILLED_NOTEHEAD_GLYPH
     return MELODY_NOTEHEAD_GLYPH
 

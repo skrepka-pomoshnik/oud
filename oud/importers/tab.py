@@ -131,11 +131,12 @@ def _fret_from_char(ch: str, prefer_alt_c: bool) -> int | None:
 
 
 def _parse_time_signature(sig: str) -> str | None:
+    minimum_time_signature_length = 2
     if sig == "Sc":
         return "C"
     if sig == "Sc|":
         return "C|"
-    if sig.startswith("S") and len(sig) >= 2:
+    if sig.startswith("S") and len(sig) >= minimum_time_signature_length:
         return sig[1:]
     return None
 

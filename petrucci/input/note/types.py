@@ -72,7 +72,9 @@ class NotatedDuration:
                 "invalid-duration",
                 "duration denominator must be one of 1, 2, 4, 8, 16, 32, 64, or 128",
             )
-        if not 0 <= self.dots <= 4:
+        minimum_dots = 0
+        maximum_dots = 4
+        if not minimum_dots <= self.dots <= maximum_dots:
             _reject("invalid-duration", "duration dots must be between 0 and 4")
         values = (self.tuplet_actual, self.tuplet_normal)
         if (values[0] is None) != (values[1] is None):
@@ -97,7 +99,8 @@ class NotatedDuration:
     def halved(self) -> NotatedDuration:
         """Return the next shorter base duration, preserving dots and tuplet ratio."""
 
-        if self.denominator == 128:
+        maximum_duration_denominator = 128
+        if self.denominator == maximum_duration_denominator:
             _reject("duration-boundary", "128th duration cannot be halved")
         return replace(self, denominator=self.denominator * 2)
 
@@ -121,9 +124,13 @@ class InputPitch:
     def __post_init__(self) -> None:
         if not isinstance(self.step, PitchStep):
             _reject("invalid-pitch", "pitch step must be a PitchStep")
-        if self.octave is not None and not -1 <= self.octave <= 9:
+        minimum_pitch_octave = -1
+        maximum_pitch_octave = 9
+        if self.octave is not None and not minimum_pitch_octave <= self.octave <= maximum_pitch_octave:
             _reject("invalid-pitch", "pitch octave must be between -1 and 9")
-        if not -2 <= self.alter <= 2:
+        minimum_pitch_alter = -2
+        maximum_pitch_alter = 2
+        if not minimum_pitch_alter <= self.alter <= maximum_pitch_alter:
             _reject("invalid-pitch", "pitch alteration must be between -2 and 2")
         if not isinstance(self.accidental, AccidentalDisplay):
             _reject("invalid-pitch", "accidental display must be an AccidentalDisplay")

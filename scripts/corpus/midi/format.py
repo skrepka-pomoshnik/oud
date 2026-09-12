@@ -4,6 +4,13 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
+_MIDI_DATA_BYTE_LIMIT = 0x80
+_MIDI_STATUS_BYTE_LIMIT = 0xF0
+_MIDI_META_STATUS = 0xFF
+_MIDI_NOTE_ON_STATUS = 0x90
+_TWO_BYTE_MESSAGE_SIZE = 2
+_MIDI_HEADER_SIZE = 14
+
 ERR_CHANNEL = "truncated MIDI channel event"
 ERR_EVENT = "truncated MIDI event"
 ERR_HEADER = "missing MIDI header"
@@ -38,7 +45,7 @@ def _read_vlq(data: bytes, offset: int) -> tuple[int, int]:
         byte = data[offset]
         offset += 1
         value = (value << 7) | (byte & 0x7F)
-        if byte < 0x80:
+        if byte < _MIDI_DATA_BYTE_LIMIT:
             return value, offset
     raise MidiFormatError(ERR_VLQ)
 
@@ -54,15 +61,15 @@ def _track_notes(track: bytes, ppq: int) -> list[MidiNote]:  # noqa: C901
         if offset >= len(track):
             raise MidiFormatError(ERR_EVENT)
         status = track[offset]
-        if status >= 0x80:
+        if status >= _MIDI_DATA_BYTE_LIMIT:
             offset += 1
-            if status < 0xF0:
+            if status < _MIDI_STATUS_BYTE_LIMIT:
                 running_status = status
         elif running_status is not None:
             status = running_status
         else:
             raise MidiFormatError(ERR_RUNNING)
-        if status == 0xFF:
+        if status == _MIDI_META_STATUS:
             if offset >= len(track):
                 raise MidiFormatError(ERR_META)
             offset += 1
@@ -78,16 +85,16 @@ def _track_notes(track: bytes, ppq: int) -> list[MidiNote]:  # noqa: C901
         if offset + size > len(track):
             raise MidiFormatError(ERR_CHANNEL)
         first = track[offset]
-        second = track[offset + 1] if size == 2 else 0
+        second = track[offset + 1] if size == _TWO_BYTE_MESSAGE_SIZE else 0
         offset += size
-        if kind == 0x90 and second:
+        if kind == _MIDI_NOTE_ON_STATUS and second:
             notes.append(MidiNote(Fraction(tick, ppq), status & 0x0F, first))
     return notes
 
 
 def read_midi_notes(path: Path) -> MidiNotes:
     data = path.read_bytes()
-    if len(data) < 14 or data[:4] != b"MThd":
+    if len(data) < _MIDI_HEADER_SIZE or data[:4] != b"MThd":
         raise MidiFormatError(ERR_HEADER)
     header_size = int.from_bytes(data[4:8], "big")
     track_count = int.from_bytes(data[10:12], "big")

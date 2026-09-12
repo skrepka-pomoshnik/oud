@@ -191,7 +191,7 @@ def _group_timed_notes(notes: list[_TimedTabNote], measure_end: int, divisions: 
     onsets = sorted(grouped)
     events: list[Chord] = []
     for index, onset in enumerate(onsets):
-        timed = sorted(grouped[onset].values(), key=lambda note: (note.string, note.fret))
+        timed = list(grouped[onset].values())
         event_end = onsets[index + 1] if index + 1 < len(onsets) else measure_end
         duration = event_end - onset
         if duration <= 0:
@@ -208,20 +208,31 @@ def _group_timed_notes(notes: list[_TimedTabNote], measure_end: int, divisions: 
     return events
 
 
+def _rest_chord(measure: ET.Element) -> Chord | None:
+    for note_node in _children(measure, "note"):
+        if _child(note_node, "rest") is None:
+            continue
+        note_type, dotted = _note_type(note_node)
+        return Chord(note_type=note_type, dotted=dotted, grid=None, notes=[])
+    return None
+
+
 def _parse_measure(measure: ET.Element, divisions: int) -> tuple[Bar, int]:
     bar = Bar()
     bar.time_sig = _measure_time(measure)
     bar.repeat = _measure_repeat(measure)
     notes, measure_end = _timed_notes(measure)
     bar.chords = _group_timed_notes(notes, measure_end, divisions)
+    if not bar.chords:
+        rest = _rest_chord(measure)
+        if rest is not None:
+            bar.chords.append(rest)
     return bar, max((note.string for note in notes), default=0)
 
 
 def _technical_count(part: ET.Element) -> int:
     return sum(
-        _technical(note) is not None
-        for measure in _children(part, "measure")
-        for note in _children(measure, "note")
+        _technical(note) is not None for measure in _children(part, "measure") for note in _children(measure, "note")
     )
 
 

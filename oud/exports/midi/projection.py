@@ -87,7 +87,8 @@ def _append_note_messages(
     ornament_symbol: str | None,
 ) -> None:
     grace_len = 0
-    if ornament_symbol and note_len >= 3:
+    minimum_ornament_note_length = 3
+    if ornament_symbol and note_len >= minimum_ornament_note_length:
         delta = _ornament_pitch_delta(ornament_symbol)
         grace_pitch = max(0, min(127, pitch + delta))
         if grace_pitch != pitch:
@@ -110,6 +111,8 @@ def _duration_ticks(denom: int, dotted: bool) -> int:
 
 def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
     pitches: list[int] = []
+    midi_min = 0
+    midi_max = 127
     idx = 0
     text = tuning.strip()
     while idx < len(text):
@@ -135,7 +138,7 @@ def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
             elif accidental in ("-", "b"):
                 semis -= 1
             midi = (octave_num + 1) * 12 + semis
-            if 0 <= midi <= 127:
+            if midi_min <= midi <= midi_max:
                 pitches.append(midi)
         else:
             idx += 1
@@ -660,7 +663,8 @@ def _scale_timed_vocal_events(
 
 
 def _vocal_channel(base_channel: int, voice: int) -> int:
-    channels = tuple(channel for channel in range(1, 16) if channel != 9)
+    midi_drum_channel = 9
+    channels = tuple(channel for channel in range(1, 16) if channel != midi_drum_channel)
     try:
         base_index = channels.index(base_channel)
     except ValueError:

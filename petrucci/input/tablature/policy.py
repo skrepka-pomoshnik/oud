@@ -67,10 +67,11 @@ def fret_label(
     label_mode: str = "auto",
 ) -> str:
     mode = (label_mode or "auto").strip().lower()
+    italian_x_fret = 10
     if mode == "numeric":
         return str(fret)
     if style == "italian" and mode != "letters":
-        if fret == 10:
+        if fret == italian_x_fret:
             return "x"
         return str(fret)
     letters = [
@@ -202,13 +203,18 @@ def string_label(
     basslabels: str,
     width: int = 2,
 ) -> str:
-    if actual >= 6 and basslabels != "tuning":
+    bass_course_start = 6
+    if actual >= bass_course_start and basslabels != "tuning":
         label_value = bass_fallback_label(actual, basslabels)
     elif actual < len(tuning_labels):
-        fallback = bass_fallback_label(actual, basslabels) if actual >= 6 else str(total_strings - actual)
+        fallback = (
+            bass_fallback_label(actual, basslabels) if actual >= bass_course_start else str(total_strings - actual)
+        )
         label_value = tuning_labels[actual] or fallback
     else:
-        label_value = bass_fallback_label(actual, basslabels) if actual >= 6 else str(total_strings - actual)
+        label_value = (
+            bass_fallback_label(actual, basslabels) if actual >= bass_course_start else str(total_strings - actual)
+        )
     if len(label_value) > width:
         label_value = label_value[:width]
     return f"{label_value:>{width}}"

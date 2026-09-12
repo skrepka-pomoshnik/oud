@@ -18,12 +18,38 @@ from petrucci.core.model import (
     Note,
 )
 
+_FT3_FRET_BYTE_MIN = 0x30
+_FT3_FRET_BYTE_MAX = 0x3E
+_FT3_STANDARD_ROW_MAX = 0x35
+_FT3_DIAPASON_BYTE_MIN = 0x61
+_FT3_DIAPASON_BYTE_MAX = 0x7A
+_FT3_STRING_BYTE_MIN = 0x02
+_FT3_STRING_BYTE_MAX = 0x08
+_FT3_NO_NOTE_FLAG = 0x00
+_FT3_DIGIT_FRET_FLAG = 0x20
+_FT3_SPECIAL_FRET_FLAG = 0x48
+_ASCII_DIGIT_BYTE_MAX = 0x39
+_ASCII_UPPER_MIN = 0x41
+_ASCII_UPPER_MAX = 0x5A
+_ASCII_LOWER_MIN = 0x61
+_ASCII_LOWER_MAX = 0x7A
+_FT3_HEADER_SIZE = 32
+_MIN_STANDARD_RECORD_COUNT = 1
+_MAX_STANDARD_RECORD_COUNT = 8
+_MIN_EMBEDDED_SCORE_LETTERS = 24
+_MIN_FONT_OBJECT_LETTERS = 6
+_MIN_LEADING_TEXT_RECORD_SIZE = 44
+_MAX_TAB_OBJECT_COUNT = 128
+_FT3_OBJECT_COUNT_END = 30
+_ITEM_COUNT_PREFIX_SIZE = 2
+_MIN_BAR_MARKER_SIZE = 2
+
 
 def at_next_note(s: int, f: int) -> bool:
-    on_fret = 0x30 <= f <= 0x3E
+    on_fret = _FT3_FRET_BYTE_MIN <= f <= _FT3_FRET_BYTE_MAX
     # French tab frets are letter-coded across a wider alphabet range, not just a..f.
-    on_diapason = 0x61 <= f <= 0x7A
-    on_string = 0x02 <= s <= 0x08
+    on_diapason = _FT3_DIAPASON_BYTE_MIN <= f <= _FT3_DIAPASON_BYTE_MAX
+    on_string = _FT3_STRING_BYTE_MIN <= s <= _FT3_STRING_BYTE_MAX
     return on_string and (on_fret or on_diapason)
 
 
@@ -32,18 +58,24 @@ def _decode_ft3_note_position(
     fret_byte: int,
     note_flag: int,
 ) -> tuple[int, int] | None:
-    if string_byte < 8:
-        fret = fret_byte - 0x61 if 0x61 <= fret_byte <= 0x7A else fret_byte - 0x30
+    if string_byte < _FT3_STRING_BYTE_MAX:
+        fret = (
+            fret_byte - _FT3_DIAPASON_BYTE_MIN
+            if _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX
+            else fret_byte - _FT3_FRET_BYTE_MIN
+        )
         return string_byte - 1, fret
 
-    if string_byte != 0x08:
+    if string_byte != _FT3_STRING_BYTE_MAX:
         return None
 
-    if note_flag == 0x00 and 0x61 <= fret_byte <= 0x7A:
-        return 7, fret_byte - 0x61
-    if (note_flag & 0x20) and 0x30 <= fret_byte <= 0x39:
-        return fret_byte - 0x30 + 7, 0
-    if (note_flag & 0x48) == 0x48 and 0x61 <= fret_byte <= 0x7A:
+    if note_flag == _FT3_NO_NOTE_FLAG and _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX:
+        return 7, fret_byte - _FT3_DIAPASON_BYTE_MIN
+    if (note_flag & _FT3_DIGIT_FRET_FLAG) and _FT3_FRET_BYTE_MIN <= fret_byte <= _ASCII_DIGIT_BYTE_MAX:
+        return fret_byte - _FT3_FRET_BYTE_MIN + 7, 0
+    if (
+        note_flag & _FT3_SPECIAL_FRET_FLAG
+    ) == _FT3_SPECIAL_FRET_FLAG and _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX:
         return 8, fret_byte - 0x61
     return None
 
@@ -55,19 +87,34 @@ def _is_standard_staff_record(data: bytes) -> bool:
     # Byte 30 is the number of simultaneous standard-note records. Older
     # files commonly use one, while polyphonic and mensural records use up to
     # eight before the row marker in byte 31.
-    return len(data) >= 32 and 1 <= data[30] <= 8 and 0x30 <= data[31] <= 0x35
+    return (
+        len(data) >= _FT3_HEADER_SIZE
+        and _MIN_STANDARD_RECORD_COUNT <= data[30] <= _MAX_STANDARD_RECORD_COUNT
+        and _FT3_FRET_BYTE_MIN <= data[31] <= _FT3_STANDARD_ROW_MAX
+    )
 
 
 def _is_embedded_score_text_record(data: bytes) -> bool:
-    if len(data) < 32 or (data[30:32] != b"\x90\x01" and data[:2] != b"\x90\x01"):
+    if len(data) < _FT3_HEADER_SIZE or (data[30:_FT3_HEADER_SIZE] != b"\x90\x01" and data[:2] != b"\x90\x01"):
         return False
-    alpha = sum((0x41 <= value <= 0x5A) or (0x61 <= value <= 0x7A) for value in data[32:])
+    alpha = sum(
+        (_ASCII_UPPER_MIN <= value <= _ASCII_UPPER_MAX) or (_ASCII_LOWER_MIN <= value <= _ASCII_LOWER_MAX)
+        for value in data[_FT3_HEADER_SIZE:]
+    )
     has_font_object = data[32:38] == b"\x01\x00\x00\x00\x01\x00"
-    return is_ft3_text_record(data) or alpha >= 24 or (has_font_object and alpha >= 6)
+    return (
+        is_ft3_text_record(data)
+        or alpha >= _MIN_EMBEDDED_SCORE_LETTERS
+        or (has_font_object and alpha >= _MIN_FONT_OBJECT_LETTERS)
+    )
 
 
 def _leading_tab_text_object(data: bytes) -> tuple[str, int] | None:
-    if len(data) < 44 or data[30:32] != b"\x00\x00" or data[32:36] != b"\x01\x00\x00\x00":
+    if (
+        len(data) < _MIN_LEADING_TEXT_RECORD_SIZE
+        or data[30:_FT3_HEADER_SIZE] != b"\x00\x00"
+        or data[_FT3_HEADER_SIZE:36] != b"\x01\x00\x00\x00"
+    ):
         return None
     text_size = data[41]
     end = 44 + text_size
@@ -85,8 +132,8 @@ def _prepare_tab_body(data: bytes, bar: Bar) -> tuple[int, int] | None:
     # stream follows the font/text payload and must still be scanned.
     if data[:2] == b"\x90\x01" and _is_embedded_score_text_record(data):
         return None
-    object_count = int.from_bytes(data[28:30], "little") + 1 if len(data) >= 30 else 0
-    if object_count > 128:
+    object_count = int.from_bytes(data[28:30], "little") + 1 if len(data) >= _FT3_OBJECT_COUNT_END else 0
+    if object_count > _MAX_TAB_OBJECT_COUNT:
         return None
     ptr = 32
     text_object = _leading_tab_text_object(data)
@@ -156,9 +203,13 @@ def _parse_tab_chords(bar_data: bytes, bar: Bar, ptr: int, object_count: int) ->
             continue
         flags = bar_data[ptr + 1]
         chord = Chord(note_type=note_type, dotted=bool(flags & 0x10), grid=_grid_kind(flags))
-        item_count = int.from_bytes(bar_data[ptr - 2 : ptr], "little") if ptr >= 2 else 0
+        item_count = (
+            int.from_bytes(bar_data[ptr - _ITEM_COUNT_PREFIX_SIZE : ptr], "little")
+            if ptr >= _ITEM_COUNT_PREFIX_SIZE
+            else 0
+        )
         # Minimal hand-built fixtures predate the decoded item-count field.
-        note_count = max(0, item_count - 1) if item_count else 128
+        note_count = max(0, item_count - 1) if item_count else _MAX_TAB_OBJECT_COUNT
         ptr += 4
 
         while note_count and ptr + 5 <= len(bar_data) and at_next_note(bar_data[ptr], bar_data[ptr + 1]):
@@ -196,7 +247,7 @@ def _apply_embedded_sections(chunks: list[bytes], bars: list[Bar]) -> None:
 
 
 def _parse_bar_markers(bar_data: bytes, bar: Bar) -> None:
-    if len(bar_data) < 2:
+    if len(bar_data) < _MIN_BAR_MARKER_SIZE:
         return
     b0 = bar_data[0]
     b1 = bar_data[1]

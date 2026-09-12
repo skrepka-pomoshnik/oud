@@ -37,7 +37,8 @@ from oud.exports.midi.projection import (
 from petrucci.core.imported import project_imported_staff
 from petrucci.core.model import Bar, MelodyEvent, Note, Piece
 
-_VOCAL_CHANNELS = tuple(channel for channel in range(1, 16) if channel != 9)
+_MIDI_DRUM_CHANNEL = 9
+_VOCAL_CHANNELS = tuple(channel for channel in range(1, 16) if channel != _MIDI_DRUM_CHANNEL)
 
 
 def _repeated_midi_note_events(

@@ -140,10 +140,11 @@ def _cmd_play_range(
     if bar_range.is_empty:
         state.message = "No range to play"
         return
-    loops = 2
+    default_loops = 2
+    loops = default_loops
     tempo: str | None = None
     for token in parts[1:]:
-        if token.isdigit() and loops == 2:
+        if token.isdigit() and loops == default_loops:
             loops = max(1, int(token))
         elif token.isdigit():
             tempo = token

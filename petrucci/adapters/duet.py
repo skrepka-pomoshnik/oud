@@ -23,7 +23,8 @@ def is_duet_score_piece(piece: Piece) -> bool:
     if part != "score":
         return False
     labels = _ensemble_duet_labels(piece.ensemble)
-    return labels is not None and len(piece.bars) >= 2
+    minimum_duet_bars = 2
+    return labels is not None and len(piece.bars) >= minimum_duet_bars
 
 
 def duet_storage_mode(piece: Piece) -> DuetStorageMode:
@@ -50,7 +51,8 @@ def _ensemble_duet_labels(ensemble: str | None) -> tuple[str, str] | None:
         label = part.split(":", 1)[0].strip()
         if label:
             labels.append(label)
-    if len(labels) < 2:
+    minimum_duet_labels = 2
+    if len(labels) < minimum_duet_labels:
         return None
     if not all("lute" in label.lower() for label in labels[:2]):
         return None

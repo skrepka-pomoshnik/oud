@@ -45,7 +45,9 @@ def _parse_tuning(tuning: str) -> list[int]:  # noqa: C901
         elif accidental in ("-", "b"):
             semitones -= 1
         midi = (octave + 1) * 12 + semitones
-        if 0 <= midi <= 127:
+        midi_min = 0
+        midi_max = 127
+        if midi_min <= midi <= midi_max:
             pitches.append(midi)
     pitches.reverse()
     return pitches

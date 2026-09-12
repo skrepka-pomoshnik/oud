@@ -98,11 +98,15 @@ class WrittenPitch:
     accidental: AccidentalDisplay = AccidentalDisplay.AUTO
 
     def __post_init__(self) -> None:
+        minimum_pitch_octave = -1
+        maximum_pitch_octave = 9
+        minimum_pitch_alter = -2
+        maximum_pitch_alter = 2
         if not isinstance(self.step, PitchStep):
             _fail("pitch step must be a PitchStep")
-        if not -1 <= self.octave <= 9:
+        if not minimum_pitch_octave <= self.octave <= maximum_pitch_octave:
             _fail("pitch octave must be between -1 and 9")
-        if not -2 <= self.alter <= 2:
+        if not minimum_pitch_alter <= self.alter <= maximum_pitch_alter:
             _fail("pitch alteration must be between -2 and 2")
         if not isinstance(self.accidental, AccidentalDisplay):
             _fail("pitch accidental display must be an AccidentalDisplay")
@@ -142,7 +146,9 @@ class KeySignature:
     fifths: int = 0
 
     def __post_init__(self) -> None:
-        if not -7 <= self.fifths <= 7:
+        minimum_key_fifths = -7
+        maximum_key_fifths = 7
+        if not minimum_key_fifths <= self.fifths <= maximum_key_fifths:
             _fail("key-signature fifths must be between -7 and 7")
 
 
@@ -392,7 +398,9 @@ def duration_notation(duration: Fraction) -> tuple[int, int] | None:
 def pitch_from_midi(midi: int, *, prefer_sharps: bool = True) -> WrittenPitch:
     """Create a deterministic written pitch when a consumer only has MIDI."""
 
-    if not 0 <= midi <= 127:
+    midi_min = 0
+    midi_max = 127
+    if not midi_min <= midi <= midi_max:
         _fail("MIDI pitch must be between 0 and 127")
     sharp_spellings = (
         (PitchStep.C, 0),

@@ -70,15 +70,20 @@ def cmd_col(state: EditorState, args: str) -> None:
     state.message = f"Col {state.cursor_col + 1}"
 
 
+_MAX_CURSOR_PARTS = 3
+_STRING_PART_INDEX = 2
+_COLUMN_PART_INDEX = 3
+
+
 def cmd_cursor(state: EditorState, args: str) -> None:
     tokens = [part for part in args.replace(",", " ").split() if part]
-    if not tokens or len(tokens) > 3 or any(not part.isdigit() for part in tokens):
+    if not tokens or len(tokens) > _MAX_CURSOR_PARTS or any(not part.isdigit() for part in tokens):
         state.message = "Usage: cursor <bar> [string] [col]"
         return
     state.cursor_bar = max(0, int(tokens[0]) - 1)
-    if len(tokens) >= 2:
+    if len(tokens) >= _STRING_PART_INDEX:
         state.cursor_string = max(0, int(tokens[1]) - 1)
-    if len(tokens) >= 3:
+    if len(tokens) >= _COLUMN_PART_INDEX:
         state.cursor_col = max(0, int(tokens[2]) - 1)
     state.clamp()
     state.message = f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{state.cursor_col + 1}"

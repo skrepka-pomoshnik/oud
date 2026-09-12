@@ -75,7 +75,12 @@ def _parse_entry(value: object, index: int) -> CorpusEntry:
     digest = value.get("sha256")
     if not isinstance(url, str) or urlparse(url).scheme != "https" or urlparse(url).hostname not in ALLOWED_HOSTS:
         raise _manifest_error(ERR_ENTRY_URL, index)
-    if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+    sha256_hex_length = 64
+    if (
+        not isinstance(digest, str)
+        or len(digest) != sha256_hex_length
+        or any(char not in "0123456789abcdef" for char in digest)
+    ):
         raise _manifest_error(ERR_ENTRY_DIGEST, index)
     return CorpusEntry(path=path, url=url, sha256=digest)
 

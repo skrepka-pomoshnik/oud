@@ -381,7 +381,8 @@ def _beam_group_up(events: tuple[NotationEvent, ...], *, clef: Clef) -> bool:
     positions = [
         _staff_position(pitch, clef=clef) for event in events if event.kind is EventKind.NOTE for pitch in event.pitches
     ]
-    return (sum(positions) / max(1, len(positions))) < 4
+    staff_center_position = 4
+    return (sum(positions) / max(1, len(positions))) < staff_center_position
 
 
 def _event_vertical_extent(

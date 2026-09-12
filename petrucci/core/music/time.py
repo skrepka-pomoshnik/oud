@@ -9,7 +9,8 @@ def parse_time_signature_value(text: str) -> tuple[int, int] | None:
         return 3, 4
     if "/" in value:
         parts = value.split("/", 1)
-        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+        time_signature_parts = 2
+        if len(parts) == time_signature_parts and parts[0].isdigit() and parts[1].isdigit():
             beats = int(parts[0])
             unit = int(parts[1])
             if beats > 0 and unit > 0:
