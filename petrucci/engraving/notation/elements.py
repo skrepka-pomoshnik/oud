@@ -8,12 +8,13 @@ from petrucci.core.score import (
     AccidentalDisplay,
     BeamKind,
     Clef,
+    DurationSpelling,
     EventKind,
     LyricSyllable,
     NotationEvent,
     StemDirection,
     WrittenPitch,
-    duration_notation,
+    spell_duration,
 )
 from petrucci.engraving.layout.engine import (
     ElementKey,
@@ -68,9 +69,10 @@ def _event_elements(
     policy: NotationLayoutPolicy,
     stem_up_override: bool | None,
 ) -> tuple[tuple[LayoutElement, ...], bool]:
-    denominator, dots = _event_notation(event)
+    notation = _event_notation(event)
+    denominator = notation.denominator or 1
     if event.kind is EventKind.REST:
-        elements = _rest_elements(event, x=x, rows=rows, denominator=denominator, dots=dots)
+        elements = _rest_elements(event, x=x, rows=rows, notation=notation)
         clipped = False
     else:
         elements, clipped = _note_elements(
@@ -79,7 +81,8 @@ def _event_elements(
             rows=rows,
             clef=clef,
             denominator=denominator,
-            dots=dots,
+            dots=notation.dots,
+            notehead_value=notation.base.value,
             accidental_pitches=accidental_pitches,
             show_stems=policy.show_stems,
             stem_up_override=stem_up_override,
@@ -222,15 +225,20 @@ def _rest_elements(
     *,
     x: int,
     rows: StaffRows,
-    denominator: int,
-    dots: int,
+    notation: DurationSpelling,
 ) -> tuple[LayoutElement, ...]:
     middle = rows.line_rows[2]
     elements = [
-        LayoutElement(ElementKey(event.id, ElementRole.REST), Rect(x, middle), str(denominator)),
+        LayoutElement(ElementKey(event.id, ElementRole.REST), Rect(x, middle), notation.base.value),
     ]
-    if dots:
-        elements.append(LayoutElement(ElementKey(event.id, ElementRole.DOT), Rect(x + 1, middle, dots), str(dots)))
+    if notation.dots:
+        elements.append(
+            LayoutElement(
+                ElementKey(event.id, ElementRole.DOT),
+                Rect(x + 1, middle, notation.dots),
+                str(notation.dots),
+            ),
+        )
     return tuple(elements)
 
 
@@ -242,6 +250,7 @@ def _note_elements(
     clef: Clef,
     denominator: int,
     dots: int,
+    notehead_value: str,
     accidental_pitches: frozenset[WrittenPitch],
     show_stems: bool,
     stem_up_override: bool | None,
@@ -275,7 +284,7 @@ def _note_elements(
                 y=y,
                 position=position,
                 rows=rows,
-                denominator=denominator,
+                notehead_value=notehead_value,
                 dots=dots,
                 dot_x=dot_x,
                 show_accidental=show_accidental,
@@ -327,7 +336,7 @@ def _pitch_elements(
     y: int,
     position: int,
     rows: StaffRows,
-    denominator: int,
+    notehead_value: str,
     dots: int,
     dot_x: int,
     show_accidental: bool,
@@ -337,7 +346,7 @@ def _pitch_elements(
         LayoutElement(
             ElementKey(event.id, ElementRole.NOTEHEAD, pitch_index),
             Rect(head_x, y),
-            str(denominator),
+            notehead_value,
         ),
     ]
     if editorial_brackets:
@@ -655,15 +664,16 @@ def _voice_tuplet_groups(events: tuple[NotationEvent, ...]) -> tuple[tuple[Notat
 
 
 def _flag_count_for_event(event: NotationEvent) -> int:
-    denominator, _dots = _event_notation(event)
-    return _flag_count(denominator)
+    denominator = _event_notation(event).denominator
+    beamable_denominator = 8
+    return 0 if denominator is None or denominator < beamable_denominator else _flag_count(denominator)
 
 
-def _event_notation(event: NotationEvent) -> tuple[int, int]:
+def _event_notation(event: NotationEvent) -> DurationSpelling:
     written_duration = event.duration
     if event.tuplet is not None:
         written_duration *= Fraction(event.tuplet.actual, event.tuplet.normal)
-    notation = duration_notation(written_duration)
+    notation = spell_duration(written_duration)
     if notation is None:
         _layout_fail(f"event {event.id!r} has an unsupported written duration {written_duration}")
     return notation

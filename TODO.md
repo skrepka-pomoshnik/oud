@@ -20,7 +20,7 @@ This backlog comes from the 2026-09-12 Petrucci/Voce handoff. Petrucci remains
 source-neutral and owns notation, geometry, clipping, and semantic identity;
 Voce owns assessment, interaction, audio transport, and lesson policy.
 
-**Foundation gate:** do not start or polish any lower-priority Petrucci, FT3,
+**Foundation gate (closed 2026-09-13):** do not start or polish any lower-priority Petrucci, FT3,
 viewer, transposition, or LilyPond item while this section has an unchecked
 item. Fixing presentation symptoms before these contracts are complete creates
 backend-specific geometry and is not an acceptable substitute.
@@ -35,24 +35,25 @@ backend-specific geometry and is not an acceptable substitute.
   - `DurationSpelling` covers breve through 128th values and four augmentation dots.
 - [x] Preindex effective staff state and semantic frame cells with object-owned lifetimes.
   - Do not add global unbounded caches or repeated full-frame identity scans.
-- [ ] Expose a public proportional timeline projection with explicit origin and scale.
+- [x] Expose a public proportional timeline projection with explicit origin and scale.
   - Return exact event/segment positions, measure boundaries, viewport clipping, and collision diagnostics.
   - [x] Publish exact `TimelineProjectionRequest` and identity-preserving measure/event/span projection records.
   - [x] Keep requested scale fixed and report distinct onsets that round into one visible staff cell.
-  - [ ] Make the notation engraver consume these anchors for notes, beams, ties, slurs, ledger lines, and accidentals before painting.
+  - [x] Make the notation engraver consume these anchors for notes, beams, ties, slurs, ledger lines, and accidentals before painting.
 - [x] Expose public written-pitch and continuous-pitch staff projection against the same geometry contract.
   - Cover treble/bass clefs, clef changes, accidentals, timeline positions, and viewport offsets.
-- [ ] Migrate engraving duration decisions to `DurationSpelling` and render breve/dotted-breve notes and rests.
+- [x] Migrate engraving duration decisions to `DurationSpelling` and render breve/dotted-breve notes and rests.
   - Add irregular-measure, semantic-cell, terminal-clipping, and no-tied-whole-note regressions.
-- [ ] Add bounded performance regressions for repeated layout, scrolling, resizing, batched lookup, and score replacement.
+- [x] Add bounded performance regressions for repeated layout, scrolling, resizing, batched lookup, and score replacement.
   - Record workload size and ceilings; performance claims without measurements do not close this gate.
 
 - [x] Add display-only meter visibility for 3/4, 6/8, 4/2, and mid-score meter changes.
   - Preserve meter, validation, beaming, event timing, and reserved preamble/change spacing.
 ### Deferred: reusable accompaniment data
 
-- [ ] Assess an optional pure canonical-score performance projection with stable part/voice/source IDs.
+- [x] Assess an optional pure canonical-score performance projection with stable part/voice/source IDs.
   - Keep MIDI serialization, TiMidity processes, transport, latency, and lesson policy outside Petrucci.
+  - Assessment and prerequisite model gaps are recorded in `docs/petrucci-voce-handoff.md`; implementation is deferred.
 
 ## P1.1: Publication-grade FT3 viewer
 

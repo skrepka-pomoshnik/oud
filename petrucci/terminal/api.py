@@ -97,8 +97,10 @@ class _GlyphInventory:
     natural: str
     filled_notehead: str
     open_notehead: str
+    breve_notehead: str
     dot: str
     whole_rest: str
+    breve_rest: str
     half_rest: str
     quarter_rest: str
     eighth_rest: str
@@ -141,8 +143,10 @@ _PRETTY = _GlyphInventory(
     natural="♮",
     filled_notehead="●",
     open_notehead="○",
+    breve_notehead="□",
     dot="·",
     whole_rest="𝄻",
+    breve_rest="▰",
     half_rest="𝄼",
     quarter_rest="𝄽",
     eighth_rest="𝄾",
@@ -185,8 +189,10 @@ _SAFE = _GlyphInventory(
     natural="n",
     filled_notehead="o",
     open_notehead="O",
+    breve_notehead="B",
     dot=".",
     whole_rest="R",
+    breve_rest="B",
     half_rest="r",
     quarter_rest="r",
     eighth_rest="e",
@@ -486,7 +492,9 @@ def _valued_staff_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str
     if role is ElementRole.KEY_SIGNATURE:
         return _key_signature_text(element.value, glyphs)
     if role is ElementRole.NOTEHEAD:
-        return glyphs.open_notehead if element.value in {"1", "2"} else glyphs.filled_notehead
+        if element.value == "breve":
+            return glyphs.breve_notehead
+        return glyphs.open_notehead if element.value in {"whole", "half"} else glyphs.filled_notehead
     return None
 
 
@@ -535,7 +543,19 @@ def _key_signature_text(value: str, glyphs: _GlyphInventory) -> str:
 
 
 def _rest_text(value: str, glyphs: _GlyphInventory) -> str:
-    denominator = int(value or "4")
+    if value == "breve":
+        return glyphs.breve_rest
+    denominators = {
+        "whole": 1,
+        "half": 2,
+        "quarter": 4,
+        "eighth": 8,
+        "sixteenth": 16,
+        "thirty-second": 32,
+        "sixty-fourth": 64,
+        "one-hundred-twenty-eighth": 128,
+    }
+    denominator = denominators.get(value, int(value or "4") if value.isdigit() else 4)
     if denominator <= 1:
         return glyphs.whole_rest
     return {

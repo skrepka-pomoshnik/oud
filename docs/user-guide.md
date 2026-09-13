@@ -366,7 +366,7 @@ Petrucci has two entry paths:
 - `apply_note_input(...)` applies an atomic, source-independent note transaction.
 
 The canonical score result contains text, `ScoreLayout`, structural roles,
-source IDs, and `cells_for(id)`. Consumers own selection, playback, grading,
+source IDs, `cells_for(id)`, and indexed `cells_for_many(ids)`. Consumers own selection, playback, grading,
 colors, and terminal attributes; Petrucci does not expose result-state enums or
 interpret caller state.
 
@@ -435,8 +435,19 @@ frame = typeset_layout(layout, options=options)
 remain available without parsing glyph text. Pretty and safe modes preserve the
 same identities and roles.
 
-The canonical path supports notes, chords, rests, ledger lines, whole through
-64th durations, dots, stems, flags/beams, key-aware accidentals, signatures and
+Use `layout_score_proportional(score, request)` when horizontal positions must
+follow an exact whole-note origin and columns-per-whole scale. It preserves the
+requested scale, reports timeline and engraved-box collisions, and retains
+logical continuation geometry outside the viewport. Use
+`project_written_pitch(...)` or `project_continuous_pitch(...)` for the matching
+vertical coordinate. The two bounded layout caches own immutable layouts only;
+painted frames and transient pitch samples are not cached. Call
+`clear_layout_cache()` after replacing a score set when deterministic release is
+required. See `docs/petrucci-voce-handoff.md` for signatures and a measured
+lifecycle workload.
+
+The canonical path supports notes, chords, rests, ledger lines, breve through
+128th durations, dots, stems, flags/beams, key-aware accidentals, signatures and
 changes, repeats and endings, tuplets, grace notes, ties/slurs, fermatas,
 dynamics, ornaments, pitch labels, lyrics, measured wrapping, and viewport
 translation.

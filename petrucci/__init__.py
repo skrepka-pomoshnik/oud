@@ -96,6 +96,7 @@ from petrucci.engraving.layout.engine import (
     clear_layout_cache,
     layout_collisions,
     layout_score,
+    layout_score_proportional,
 )
 from petrucci.input.note.operations import apply_note_input, resolve_input_pitch
 from petrucci.input.note.types import (
@@ -273,6 +274,7 @@ __all__ = [
     "editor_fret_at",
     "layout_collisions",
     "layout_score",
+    "layout_score_proportional",
     "notation_score_from_piece",
     "paint_pitch_cues",
     "paint_score",

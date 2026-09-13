@@ -8,6 +8,7 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import NoReturn
 
+from petrucci.core.music.projection import ProjectionCollision, TimelineProjectionRequest
 from petrucci.core.music.timeline import MeasureBoundary
 from petrucci.core.score import NotationScore
 from petrucci.engraving.layout.fitting import BoxSystem, MeasuredBox, PlacedBox, fit_measured_boxes
@@ -275,6 +276,7 @@ class ScoreLayout:
     systems: tuple[ScoreSystem, ...]
     onsets: tuple[OnsetPosition, ...]
     measure_boundaries: tuple[MeasureBoundary, ...] = ()
+    timeline_collisions: tuple[ProjectionCollision, ...] = ()
 
     def __post_init__(self) -> None:
         _validate_layout_references(self)
@@ -345,10 +347,28 @@ def layout_score(
     )
 
 
+def layout_score_proportional(
+    score: NotationScore,
+    request: TimelineProjectionRequest,
+    *,
+    metrics: LayoutMetrics | None = None,
+    policy: NotationLayoutPolicy | None = None,
+) -> ScoreLayout:
+    """Lay out one fixed-scale timeline viewport without rhythmic respacing."""
+
+    return _cached_proportional_layout_score(
+        score,
+        request,
+        metrics or LayoutMetrics(),
+        policy or NotationLayoutPolicy(),
+    )
+
+
 def clear_layout_cache() -> None:
     """Clear immutable score layouts, primarily for bounded host lifecycle use."""
 
     _cached_layout_score.cache_clear()
+    _cached_proportional_layout_score.cache_clear()
 
 
 @dataclass(slots=True)
@@ -400,6 +420,24 @@ def _cached_layout_score(
         viewport=viewport,
         metrics=metrics,
         policy=policy,
+    )
+
+
+@lru_cache(maxsize=64)
+def _cached_proportional_layout_score(
+    score: NotationScore,
+    request: TimelineProjectionRequest,
+    metrics: LayoutMetrics,
+    policy: NotationLayoutPolicy,
+) -> ScoreLayout:
+    from petrucci.engraving.notation.layout import build_score_layout  # noqa: PLC0415
+
+    return build_score_layout(
+        score,
+        viewport=LayoutViewport(width=request.width, height=1),
+        metrics=metrics,
+        policy=policy,
+        projection_request=request,
     )
 
 

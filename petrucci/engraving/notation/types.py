@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 
+from petrucci.core.music.projection import TimelineProjection
 from petrucci.core.score import Clef, KeySignature, LyricSyllable, NotationEvent, TimeSignature, WrittenPitch
 from petrucci.engraving.layout.engine import LayoutElement, NotationLayoutPolicy, OnsetPosition, StaffRows
 from petrucci.engraving.layout.fitting import BoxSystem
@@ -54,9 +55,11 @@ class _MeasureEventContext:
     clef: Clef
     visible_accidentals: dict[str, frozenset[WrittenPitch]]
     lyrics: dict[str, tuple[LyricSyllable, ...]]
+    content_left: int
     content_right: int
     policy: NotationLayoutPolicy
     beam_lanes: dict[str, tuple[bool, int]]
+    preserve_anchor: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +78,7 @@ class _HorizontalPlan:
     available_width: int
     systems: tuple[BoxSystem, ...]
     measure_geometries: tuple[_SharedMeasureGeometry, ...]
+    projection: TimelineProjection | None = None
 
 
 @dataclass(frozen=True, slots=True)

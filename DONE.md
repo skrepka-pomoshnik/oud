@@ -1,5 +1,24 @@
 # DONE
 
+- 2026-09-13: Closed the Petrucci/Voce notation handoff with bounded lifecycle
+  regressions, reproducible benchmark thresholds, proportional-overlay and
+  hidden-meter examples, cache ownership documentation, and a consumer migration
+  map. Assessed canonical accompaniment extraction and deferred implementation
+  until explicit tempo and bounded-repeat contracts exist. The 96-event,
+  66-replacement reference workload retained 3.742 KiB of traced Python heap
+  after cache clearing; detailed frame measurements are in the handoff report.
+  Validation: Ruff lint and format, Ty, and 1,656 tests pass with 11 skips and
+  95.07% coverage.
+
+- 2026-09-13: Integrated exact proportional timeline anchors into the notation
+  engraver through the public `layout_score_proportional` API. Fixed-scale
+  layouts preserve logical off-screen span endpoints, expose clipping and
+  quantization collisions, and keep the ordinary respaced layout isolated.
+  Added canonical breve and dotted-breve note/rest engraving with distinct
+  semantics, correct augmentation dots, and no synthetic stems, flags, or ties.
+  Validation: Ruff lint and format, Ty, and 1,654 tests pass with 11 skips and
+  95.04% coverage.
+
 - 2026-09-13: Added exact source-neutral timeline and pitch projection APIs.
   `project_timeline` preserves measure, event, split-segment, and span identity
   at a caller-selected `Fraction` origin/scale, reports viewport clipping and

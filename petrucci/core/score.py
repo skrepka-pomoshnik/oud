@@ -446,6 +446,22 @@ class DurationSpelling:
     base: DurationBase
     dots: int = 0
 
+    @property
+    def denominator(self) -> int | None:
+        """Return the legacy denominator, or ``None`` for breve."""
+
+        return {
+            DurationBase.BREVE: None,
+            DurationBase.WHOLE: 1,
+            DurationBase.HALF: 2,
+            DurationBase.QUARTER: 4,
+            DurationBase.EIGHTH: 8,
+            DurationBase.SIXTEENTH: 16,
+            DurationBase.THIRTY_SECOND: 32,
+            DurationBase.SIXTY_FOURTH: 64,
+            DurationBase.ONE_HUNDRED_TWENTY_EIGHTH: 128,
+        }[self.base]
+
 
 _DURATION_BASES = (
     (DurationBase.BREVE, Fraction(2)),

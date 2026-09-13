@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from typing import NoReturn
 
+from petrucci.core.music.projection import ProjectedInterval, TimelineProjectionRequest, project_timeline
 from petrucci.core.score import (
     BeamKind,
     Clef,
@@ -14,7 +16,7 @@ from petrucci.core.score import (
     WrittenPitch,
 )
 from petrucci.engraving.layout.engine import LayoutError, LayoutMetrics, LayoutViewport, NotationLayoutPolicy
-from petrucci.engraving.layout.fitting import BoxFitOptions, MeasuredBox, fit_measured_boxes
+from petrucci.engraving.layout.fitting import BoxFitOptions, BoxSystem, MeasuredBox, PlacedBox, fit_measured_boxes
 from petrucci.engraving.notation.annotations import _lyric_lines_by_measure, _lyrics_by_event
 from petrucci.engraving.notation.elements import (
     _accidental_width,
@@ -46,6 +48,7 @@ def _horizontal_plan(
     viewport: LayoutViewport,
     metrics: LayoutMetrics,
     policy: NotationLayoutPolicy,
+    projection_request: TimelineProjectionRequest | None = None,
 ) -> _HorizontalPlan:
     labels = [display_width(staff.label or "") for staff in score.staffs]
     label_width = min(12, max(labels, default=0))
@@ -53,6 +56,17 @@ def _horizontal_plan(
         label_width += 1
     staff_x = metrics.left_padding + label_width
     prefix_width = max(metrics.system_prefix_width, 8 + _maximum_key_signature_width(score))
+    if projection_request is not None:
+        return _proportional_horizontal_plan(
+            score,
+            viewport=viewport,
+            metrics=metrics,
+            policy=policy,
+            projection_request=projection_request,
+            label_width=label_width,
+            staff_x=staff_x,
+            minimum_preamble=staff_x + prefix_width,
+        )
     measure_x = staff_x + prefix_width
     available = viewport.width - measure_x - metrics.right_padding
     if available < metrics.min_measure_width:
@@ -74,6 +88,61 @@ def _horizontal_plan(
         ),
     )
     return _HorizontalPlan(label_width, staff_x, measure_x, available, systems, geometries)
+
+
+def _proportional_horizontal_plan(
+    score: NotationScore,
+    *,
+    viewport: LayoutViewport,
+    metrics: LayoutMetrics,
+    policy: NotationLayoutPolicy,
+    projection_request: TimelineProjectionRequest,
+    label_width: int,
+    staff_x: int,
+    minimum_preamble: int,
+) -> _HorizontalPlan:
+    if projection_request.width != viewport.width:
+        _projection_fail("projection request width must match the layout viewport")
+    if projection_request.preamble_width < minimum_preamble:
+        _projection_fail(f"projection preamble must be at least {minimum_preamble} columns")
+    projection = project_timeline(score, projection_request)
+    measure_x = projection_request.preamble_width
+    right = viewport.width - metrics.right_padding - 1
+    boxes = tuple(
+        _projected_measure_box(index, measure, measure_x=measure_x, right=right)
+        for index, measure in enumerate(projection.measures)
+        if measure.column_end >= measure_x and measure.column_start <= right
+    )
+    if not boxes:
+        _projection_fail("projection viewport does not intersect the score timeline")
+    width = max(box.x + box.width for box in boxes)
+    geometries = _shared_measure_geometries(score, metrics=metrics, policy=policy)
+    return _HorizontalPlan(
+        label_width,
+        staff_x,
+        measure_x,
+        viewport.width - measure_x - metrics.right_padding,
+        (BoxSystem(boxes, width, False),),
+        geometries,
+        projection,
+    )
+
+
+def _projected_measure_box(index: int, measure: ProjectedInterval, *, measure_x: int, right: int) -> PlacedBox:
+    column_start = measure.column_start
+    column_end = measure.column_end
+    left = max(measure_x, column_start)
+    visible_right = min(right, column_end)
+    return PlacedBox(
+        _slot_id(index),
+        left - measure_x,
+        max(1, visible_right - left + 1),
+        column_start < measure_x or column_end > right,
+    )
+
+
+def _projection_fail(message: str) -> NoReturn:
+    raise LayoutError(message)
 
 
 def _measure_boxes(
@@ -288,8 +357,10 @@ def _events_have_colliding_stems(
     left_positions: list[int],
     right_positions: list[int],
 ) -> bool:
-    left_denominator, _left_dots = _event_notation(left)
-    right_denominator, _right_dots = _event_notation(right)
+    left_denominator = _event_notation(left).denominator
+    right_denominator = _event_notation(right).denominator
+    if left_denominator is None or right_denominator is None:
+        return False
     if left_denominator <= 1 or right_denominator <= 1:
         return False
     return _stem_up(left, left_positions) == _stem_up(right, right_positions)
@@ -301,7 +372,7 @@ def _event_width(
     accidental_pitches: frozenset[WrittenPitch],
     show_pitch_labels: bool,
 ) -> int:
-    _denominator, dots = _event_notation(event)
+    dots = _event_notation(event).dots
     if event.kind is EventKind.REST:
         notation_width = 1 + dots
     else:
@@ -323,7 +394,9 @@ def _event_lane_width(event: NotationEvent, width: int, *, show_stems: bool) -> 
     width = max(width, 2)
     if not show_stems:
         return width
-    denominator, _dots = _event_notation(event)
+    denominator = _event_notation(event).denominator
+    if denominator is None:
+        return width
     if denominator <= 1:
         return width
     beam_denominator_threshold = 8

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from petrucci.core.music.projection import ProjectedInterval, TimelineProjection, TimelineProjectionRequest
 from petrucci.core.music.timeline import score_measure_boundaries
 from petrucci.core.score import (
     Clef,
@@ -82,8 +83,15 @@ def build_score_layout(
     viewport: LayoutViewport,
     metrics: LayoutMetrics,
     policy: NotationLayoutPolicy,
+    projection_request: TimelineProjectionRequest | None = None,
 ) -> ScoreLayout:
-    horizontal = _horizontal_plan(score, viewport=viewport, metrics=metrics, policy=policy)
+    horizontal = _horizontal_plan(
+        score,
+        viewport=viewport,
+        metrics=metrics,
+        policy=policy,
+        projection_request=projection_request,
+    )
     systems: list[ScoreSystem] = []
     onsets: list[OnsetPosition] = []
     y = 0
@@ -126,6 +134,14 @@ def build_score_layout(
         )
         onsets.extend(system_onsets)
         y += height + metrics.system_gap
+    if horizontal.projection is not None:
+        onsets = list(_complete_projected_onsets(score, tuple(onsets), horizontal.projection))
+        clipped = _projected_clipped_ids(horizontal.projection)
+        systems[0] = replace(
+            systems[0],
+            clipped=systems[0].clipped or bool(clipped),
+            clipped_event_ids=tuple(sorted({*systems[0].clipped_event_ids, *clipped})),
+        )
     systems = list(_with_score_spans(score, tuple(systems), tuple(onsets)))
     document_height = max(1, y - metrics.system_gap if systems else 1)
     return ScoreLayout(
@@ -133,24 +149,68 @@ def build_score_layout(
         width=viewport.width,
         document_height=document_height,
         event_ids=tuple(event.id for event in iter_score_events(score)),
-        event_locations=_event_locations(score, tuple(systems)),
+        event_locations=_event_locations(score, tuple(systems), fallback_system=0 if horizontal.projection else None),
         systems=tuple(systems),
         onsets=tuple(onsets),
         measure_boundaries=score_measure_boundaries(score),
+        timeline_collisions=horizontal.projection.collisions if horizontal.projection is not None else (),
     )
 
 
-def _event_locations(score: NotationScore, systems: tuple[ScoreSystem, ...]) -> tuple[EventLocation, ...]:
+def _event_locations(
+    score: NotationScore,
+    systems: tuple[ScoreSystem, ...],
+    *,
+    fallback_system: int | None = None,
+) -> tuple[EventLocation, ...]:
     system_by_measure = {
         measure_index: system.index
         for system in systems
         for measure_index in range(system.measure_start, system.measure_end)
     }
     return tuple(
-        EventLocation(event.id, staff.id, measure.id, system_by_measure[measure_index])
+        EventLocation(
+            event.id,
+            staff.id,
+            measure.id,
+            _event_system_index(system_by_measure, measure_index, fallback_system),
+        )
         for staff in score.staffs
         for measure_index, measure in enumerate(staff.measures)
         for event in measure.events
+    )
+
+
+def _event_system_index(system_by_measure: dict[int, int], measure_index: int, fallback: int | None) -> int:
+    system_index = system_by_measure.get(measure_index, fallback)
+    if system_index is None:
+        _layout_fail(f"measure slot {measure_index} is missing from score systems")
+    return system_index
+
+
+def _complete_projected_onsets(
+    score: NotationScore,
+    onsets: tuple[OnsetPosition, ...],
+    projection: TimelineProjection,
+) -> tuple[OnsetPosition, ...]:
+    known = {onset.event_id for onset in onsets}
+    projected = {event.source_id: event for event in projection.events}
+    extra = tuple(
+        OnsetPosition(event.id, staff.id, measure.id, 0, projected[event.id].column_start)
+        for staff in score.staffs
+        for measure in staff.measures
+        for event in measure.events
+        if event.id not in known
+    )
+    return (*onsets, *extra)
+
+
+def _projected_clipped_ids(projection: TimelineProjection) -> tuple[str, ...]:
+    request = projection.request
+    return tuple(
+        event.source_id
+        for event in projection.events
+        if not request.preamble_width <= event.column_start < request.width
     )
 
 
@@ -403,8 +463,8 @@ def _event_vertical_extent(
     points = [line_bottom - position for position in positions]
     upper = min(points)
     lower = max(points)
-    denominator, _dots = _event_notation(event)
-    if show_stems and denominator > 1:
+    denominator = _event_notation(event).denominator
+    if show_stems and denominator is not None and denominator > 1:
         if _stem_up(event, positions):
             upper -= 3
         else:
@@ -469,6 +529,7 @@ def _system_elements(
                 lyric_lines=lyric_lines.get(measure.id, ()),
                 metrics=metrics,
                 policy=policy,
+                projection=horizontal.projection,
             )
             elements.extend(measure_elements)
             onsets.extend(measure_onsets)
@@ -557,6 +618,7 @@ def _layout_measure(
     lyric_lines: tuple[LyricLine, ...],
     metrics: LayoutMetrics,
     policy: NotationLayoutPolicy,
+    projection: TimelineProjection | None,
 ) -> tuple[tuple[LayoutElement, ...], tuple[OnsetPosition, ...], tuple[str, ...]]:
     geometry = _measure_geometry(staff, measure_index, metrics=metrics, policy=policy)
     active_clef = _state_at(staff, measure_index).clef
@@ -571,14 +633,14 @@ def _layout_measure(
         show_time_signature=policy.show_time_signature,
     )
     event_left = x + 1 + shared_geometry.change_width
-    shared_xs, horizontally_clipped = _group_positions(
-        shared_geometry.groups,
+    group_xs, horizontally_clipped = _measure_group_positions(
+        geometry.groups,
+        shared_geometry,
+        projection=projection,
         left=event_left,
         right=x + width - 2,
         base_gap=metrics.event_gap,
     )
-    shared_by_onset = dict(zip((group.onset for group in shared_geometry.groups), shared_xs, strict=True))
-    group_xs = tuple(shared_by_onset[group.onset] for group in geometry.groups)
     elements = list(change_elements)
     if measure.ending_numbers:
         if rows.ending_row is None:
@@ -603,9 +665,11 @@ def _layout_measure(
             clef=active_clef,
             visible_accidentals=visible_accidentals,
             lyrics=lyrics,
+            content_left=x if projection is not None else event_left,
             content_right=content_right,
             policy=policy,
             beam_lanes=beam_lanes,
+            preserve_anchor=projection is not None,
         ),
     )
     elements.extend(positioned.elements)
@@ -668,7 +732,21 @@ def _position_measure_events(
             continue
         group_x = group_xs[group_index]
         for event, event_offset in zip(group.events, group.event_offsets, strict=True):
-            event_x = group_x + event_offset
+            event_x = group_x if context.preserve_anchor else group_x + event_offset
+            if event_x < context.content_left:
+                onsets.append(
+                    OnsetPosition(event.id, context.staff_id, context.measure_id, context.system_index, group_x),
+                )
+                event_xs[event.id] = context.content_left
+                clipped_event_ids.add(event.id)
+                elements.append(
+                    LayoutElement(
+                        ElementKey(event.id, ElementRole.CLIP_MARKER, 1024),
+                        Rect(context.content_left, _event_marker_y(event, rows=context.rows)),
+                        "left",
+                    ),
+                )
+                continue
             event_elements, event_clipped = _event_elements(
                 event,
                 x=event_x,
@@ -707,6 +785,30 @@ def _position_measure_events(
         event_xs,
         frozenset(clipped_event_ids),
     )
+
+
+def _measure_group_positions(
+    groups: tuple[_OnsetGroup, ...],
+    shared_geometry: _SharedMeasureGeometry,
+    *,
+    projection: TimelineProjection | None,
+    left: int,
+    right: int,
+    base_gap: int,
+) -> tuple[tuple[int, ...], bool]:
+    if projection is not None:
+        positions = tuple(_projected_event(projection, group.events[0].id).column_start for group in groups)
+        return positions, any(position < left or position > right for position in positions)
+    shared_xs, clipped = _group_positions(shared_geometry.groups, left=left, right=right, base_gap=base_gap)
+    shared_by_onset = dict(zip((group.onset for group in shared_geometry.groups), shared_xs, strict=True))
+    return tuple(shared_by_onset[group.onset] for group in groups), clipped
+
+
+def _projected_event(projection: TimelineProjection, event_id: str) -> ProjectedInterval:
+    event = projection.event_for(event_id)
+    if event is None:
+        _layout_fail(f"projection is missing canonical event {event_id!r}")
+    return event
 
 
 def _change_elements(
