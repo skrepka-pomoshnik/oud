@@ -224,8 +224,10 @@ algorithm that preserves sounding pitch and produces playable tablature.
 - [ ] Translate the remaining applicable LilyPond 2.24.4 and MuseScore 4.6.0
   regressions into small legal fixtures that record provenance and the borrowed
   invariant rather than upstream output bytes.
-- [ ] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
+- [x] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
   internal representation.
+  - Verified 2026-09-13: no LilyPond importer exists under `oud/importers/`; `.ly`
+    is produced at the export boundary and is not a Petrucci model input.
 - [ ] Expand dual-engine PDF comparisons from the curated FT3 corpus to every
   shared engraving-matrix microcase; 2.26 is authoritative and 2.24 differences
   must be documented as compatibility limitations.

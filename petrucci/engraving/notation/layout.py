@@ -45,6 +45,7 @@ from petrucci.engraving.notation.annotations import (
     _with_score_spans,
 )
 from petrucci.engraving.notation.elements import (
+    _accidental_width,
     _beam_elements,
     _beam_groups,
     _event_elements,
@@ -495,6 +496,8 @@ def _system_elements(
     clipped_event_ids: set[str] = set()
     measure_start, _measure_end = _system_measure_range(box_system)
     system_right = horizontal.measure_x + box_system.width
+    if horizontal.projection is not None:
+        system_right = horizontal.projection.request.width - metrics.right_padding
     for staff_index, staff in enumerate(score.staffs):
         staff_rows = rows[staff_index]
         elements.extend(
@@ -652,7 +655,8 @@ def _layout_measure(
                 ",".join(str(number) for number in measure.ending_numbers),
             ),
         )
-    content_right = x + width - 2
+    clipped_boundary = projection is not None and projection.measures[measure_index].column_end > x + width - 1
+    content_right = x + width - (1 if clipped_boundary else 2)
     beam_lanes = _beam_lane_map(measure.events, clef=active_clef) if policy.show_stems else {}
     positioned = _position_measure_events(
         geometry.groups,
@@ -689,7 +693,7 @@ def _layout_measure(
         elements.extend(_lyric_line_elements(lyric_lines, x=event_left, right=content_right, rows=rows))
         elements.extend(_lyric_connector_elements(lyrics, event_xs=positioned.event_xs, rows=rows))
     bar_x = x + width - 1
-    if policy.show_barlines:
+    if policy.show_barlines and not clipped_boundary:
         elements.append(
             LayoutElement(
                 ElementKey(measure.id, ElementRole.BARLINE),
@@ -749,7 +753,7 @@ def _position_measure_events(
                 continue
             event_elements, event_clipped = _event_elements(
                 event,
-                x=event_x,
+                x=event_x - _proportional_leading_width(event, context),
                 rows=context.rows,
                 clef=context.clef,
                 accidental_pitches=context.visible_accidentals.get(event.id, frozenset()),
@@ -785,6 +789,15 @@ def _position_measure_events(
         event_xs,
         frozenset(clipped_event_ids),
     )
+
+
+def _proportional_leading_width(event: NotationEvent, context: _MeasureEventContext) -> int:
+    """Anchor the first written notehead, not its accidental, at musical time."""
+    if not context.preserve_anchor or not event.pitches:
+        return 0
+    pitch = min(event.pitches, key=lambda value: _staff_position(value, clef=context.clef))
+    accidental = pitch in context.visible_accidentals.get(event.id, frozenset())
+    return (_accidental_width(pitch) if accidental else 0) + int(event.editorial_brackets)
 
 
 def _measure_group_positions(

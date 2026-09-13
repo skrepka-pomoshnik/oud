@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from itertools import pairwise
 
 import pytest
 
@@ -19,6 +20,7 @@ from petrucci import (
     TimelineProjectionRequest,
     WrittenPitch,
     continuous_staff_position,
+    pitch_from_midi,
     project_continuous_pitch,
     project_timeline,
     project_written_pitch,
@@ -120,6 +122,21 @@ def test_written_and_continuous_pitch_projection_tracks_active_clef_and_viewport
     assert measured.clef is Clef.BASS
     assert measured.staff_position == Fraction(-1, 2)
     assert measured.row == Fraction(25, 2)
+
+
+@pytest.mark.parametrize("clef", [Clef.TREBLE, Clef.BASS])
+def test_continuous_projection_preserves_exact_natural_intervals(clef: Clef) -> None:
+    natural_classes = (0, 2, 4, 5, 7, 9, 11, 12)
+    for octave in range(9):
+        for lower, upper in pairwise(natural_classes):
+            midi = (octave + 1) * 12 + lower
+            written = written_staff_position(pitch_from_midi(midi), clef)
+            for fraction in (Fraction(), Fraction(1, 7), Fraction(1, 2), Fraction(6, 7), Fraction(1)):
+                assert (
+                    continuous_staff_position(Fraction(midi) + fraction * (upper - lower), clef) == written + fraction
+                )
+    with pytest.raises(ProjectionError, match="outside the supported projection range"):
+        continuous_staff_position(Fraction(1000), clef)
 
 
 def test_pitch_projection_rejects_unknown_staff_and_out_of_range_time() -> None:

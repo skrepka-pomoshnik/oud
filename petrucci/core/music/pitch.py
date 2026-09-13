@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass
 from fractions import Fraction
-from itertools import pairwise
 from typing import NoReturn
 
 from petrucci.core.music.projection import ProjectionError, ProjectionRounding, round_projection
@@ -13,6 +13,7 @@ from petrucci.core.score import Clef, NotationScore, NotationStaff, PitchStep, W
 
 _STEP_SEMITONES = (0, 2, 4, 5, 7, 9, 11)
 _STEP_INDEX = {step: index for index, step in enumerate(PitchStep)}
+_MAX_PROJECTED_STAFF_POSITION = 128
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,11 +40,16 @@ def continuous_staff_position(midi: Fraction, clef: Clef) -> Fraction:
 
     if not isinstance(midi, Fraction):
         _fail("measured MIDI pitch must be a Fraction")
-    points = tuple((position, Fraction(_natural_midi(position, clef))) for position in range(-128, 129))
-    for (lower_position, lower), (_upper_position, upper) in pairwise(points):
-        if lower <= midi <= upper:
-            return Fraction(lower_position) + ((midi - lower) / (upper - lower))
-    return _fail("measured MIDI pitch is outside the supported projection range")
+    octave = int(midi // 12) - 1
+    pitch_class = midi % 12
+    step = bisect_right(_STEP_SEMITONES, pitch_class) - 1
+    lower = _STEP_SEMITONES[step]
+    upper = _STEP_SEMITONES[step + 1] if step + 1 < len(_STEP_SEMITONES) else 12
+    bottom = WrittenPitch(PitchStep.E, 4) if clef is Clef.TREBLE else WrittenPitch(PitchStep.G, 2)
+    position = Fraction(octave * 7 + step - _diatonic_number(bottom)) + (pitch_class - lower) / (upper - lower)
+    if not -_MAX_PROJECTED_STAFF_POSITION <= position <= _MAX_PROJECTED_STAFF_POSITION:
+        return _fail("measured MIDI pitch is outside the supported projection range")
+    return position
 
 
 def project_written_pitch(
@@ -136,12 +142,6 @@ def _staff_and_boundary(
     if boundary is None:
         _fail("pitch projection time is outside the score timeline")
     return staff, boundary
-
-
-def _natural_midi(position: int, clef: Clef) -> int:
-    bottom = WrittenPitch(PitchStep.E, 4) if clef is Clef.TREBLE else WrittenPitch(PitchStep.G, 2)
-    octave, step_index = divmod(_diatonic_number(bottom) + position, 7)
-    return ((octave + 1) * 12) + _STEP_SEMITONES[step_index]
 
 
 def _diatonic_number(pitch: WrittenPitch) -> int:

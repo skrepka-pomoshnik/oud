@@ -1,5 +1,20 @@
 # DONE
 
+- 2026-09-13: Fixed consumer integration regressions in proportional engraving:
+  accidentals/editorial prefixes no longer move the onset notehead, and staff
+  lines fill the viewport after short measures. Clipped measures no longer
+  invent an edge barline or prematurely hide the last visible notehead.
+  Replaced per-sample 257-point pitch tables with exact octave-local
+  interpolation. Added nine public-API regressions across these changes.
+  Validation: Ruff lint/format and Ty pass; 1,665 tests pass with 11 skips,
+  95.08% coverage. Voce's exact-pitch/accidental overlay and original smooth
+  scrolling regressions also pass.
+
+- 2026-09-13: Verified the LilyPond boundary remains export-only. The importer
+  tree contains no LilyPond parser, and `.ly` is used only at the export,
+  validation, documentation, and test boundaries. Corrected the stale backlog
+  item in `TODO.md`.
+
 - 2026-09-13: Closed the Petrucci/Voce notation handoff with bounded lifecycle
   regressions, reproducible benchmark thresholds, proportional-overlay and
   hidden-meter examples, cache ownership documentation, and a consumer migration

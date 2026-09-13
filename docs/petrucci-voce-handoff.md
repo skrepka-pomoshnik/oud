@@ -50,6 +50,17 @@ clear_layout_cache() -> None
 
 `TimelineProjectionRequest.origin` and `columns_per_whole` are exact musical
 whole-note units. `preamble_width` reserves terminal columns before the timeline.
+The integration correction anchors the first written notehead at its onset,
+placing accidental/editorial prefixes before it. Proportional staff lines extend
+through the viewport even when the last visible measure ends earlier.
+Clipped right edges do not create musical barlines or reserve their spacing.
+Continuous pitch projection uses exact octave-local interpolation without
+allocating a 257-point table per sample. A Voce 96-note/100-sample, 100×18 local
+probe improved from roughly 894–1,043 ms/frame to 32 ms for a repeated viewport
+and 90–123 ms for changed/cold layouts; these are workload measurements, not
+universal frame-time guarantees. Final integration validation: Ruff lint/format,
+Ty and 1,665 tests pass, with 11 skips and 95.08% coverage.
+
 The scale is never changed to resolve collisions: `ScoreLayout.timeline_collisions`
 reports onset quantization and `layout_collisions(layout)` reports engraved-box
 collisions. Measure boundaries, source IDs, split-segment IDs, clipped endpoints,
