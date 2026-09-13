@@ -32,10 +32,60 @@
       ]
     }
   ],
+  "upstream_microcases": [
+    {
+      "id": "partial-grace-beams",
+      "test": "test_upstream_partial_beamlets_and_grace_stay_inside_repeat_measure",
+      "sources": [
+        "LilyPond 2.24.4 input/regression/auto-beam-partial-grace.ly",
+        "LilyPond 2.24.4 input/regression/beam-beamlet-break.ly",
+        "MuseScore 4.6.0 src/engraving/tests/beam_data"
+      ],
+      "invariant": "partial and grace beamlets stay registered inside repeat measures"
+    },
+    {
+      "id": "grouped-tuplets",
+      "test": "test_upstream_tuplet_group_gets_one_bracket_without_losing_beam",
+      "sources": [
+        "LilyPond 2.24.4 tuplet and auto-beam regression family",
+        "MuseScore 4.6.0 compat114_data/tuplets*.mscx"
+      ],
+      "invariant": "one tuplet bracket and one beam group share the same event span"
+    },
+    {
+      "id": "broken-spans-volta",
+      "test": "test_upstream_broken_spans_coexist_with_volta_and_repeat_barlines",
+      "sources": [
+        "LilyPond 2.24.4 input/regression/tie-broken.ly",
+        "LilyPond 2.24.4 input/regression/bar-line-allow-volta-hook.ly",
+        "MuseScore 4.6.0 partialtie_data/repeat_barlines.mscx"
+      ],
+      "invariant": "broken ties and slurs retain continuation endpoints beside volta and repeat barlines"
+    },
+    {
+      "id": "registered-annotation-lanes",
+      "test": "test_measure_spans_dynamics_and_lyrics_have_distinct_reserved_lanes",
+      "sources": [
+        "LilyPond 2.24.4 annotation, lyric, and dynamic regression families",
+        "MuseScore 4.6.0 lyrics and annotation test families"
+      ],
+      "invariant": "annotations reserve distinct lanes without changing note onset registration"
+    }
+  ],
   "cases": [
     {
       "id": "tab-registration-and-rhythm",
+      "fixture": "tab-registration-and-rhythm",
       "features": ["tablature", "rhythm-flags", "barlines", "partial-beams"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\new TabStaff", "\\tabFullNotation"]
+      },
       "petrucci_contract": ["one onset column per chord", "rhythm marks register with chord onsets"],
       "lilypond_contract": ["TabStaff", "tabFullNotation", "stable thin/thick line hierarchy"],
       "upstream": [
@@ -55,7 +105,17 @@
     },
     {
       "id": "voice-lute-lyrics",
+      "fixture": "voice-lute-lyrics",
       "features": ["polyphony", "tablature", "lyrics", "staff-group"],
+      "proof": {
+        "min_events": 4,
+        "min_staffs": 2,
+        "required_roles": ["staff", "notehead", "lyric"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\new StaffGroup <<", "\\new Lyrics", "\\new TabStaff"]
+      },
       "petrucci_contract": ["voice and lute remain vertically registered", "lyrics reserve only required rows"],
       "lilypond_contract": ["StaffGroup", "Lyrics", "voice and tablature share bar geometry"],
       "upstream": [
@@ -69,7 +129,17 @@
     },
     {
       "id": "polyphonic-collisions",
+      "fixture": "polyphonic-collisions",
       "features": ["seconds", "unisons", "dots", "accidentals", "opposed-stems"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "accidental"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\new TabStaff"]
+      },
       "petrucci_contract": ["colliding heads remain distinguishable", "dots and accidentals retain deterministic lanes"],
       "lilypond_contract": ["independent voices", "no collision warnings"],
       "upstream": [
@@ -83,7 +153,17 @@
     },
     {
       "id": "broken-spans",
+      "fixture": "broken-spans",
       "features": ["ties", "slurs", "system-breaks"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "tie", "slur"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["~", "(", ")"]
+      },
       "petrucci_contract": ["continuation cues survive viewport and system boundaries"],
       "lilypond_contract": ["ties and slurs survive explicit line breaks", "no orphan span fragments"],
       "upstream": [
@@ -97,7 +177,17 @@
     },
     {
       "id": "repeat-and-volta-registration",
+      "fixture": "repeat-and-volta-registration",
       "features": ["repeats", "voltas", "barline-hooks"],
+      "proof": {
+        "min_events": 1,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "barline", "ending", "fermata", "ornament"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\bar \":|:\""]
+      },
       "petrucci_contract": ["repeat signs consume explicit columns", "volta labels do not collide with music"],
       "lilypond_contract": ["repeat barlines and volta hooks compile without warnings"],
       "upstream": [
@@ -111,7 +201,17 @@
     },
     {
       "id": "gerbode-multiverse-registration",
+      "fixture": "gerbode-multiverse-registration",
       "features": ["mixed-score", "twelve-stanza-lyrics", "editorial-coda", "system-registration"],
+      "proof": {
+        "min_events": 4,
+        "min_staffs": 2,
+        "required_roles": ["staff", "notehead", "lyric"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\new StaffGroup <<", "\\new Lyrics", "\\new TabStaff"]
+      },
       "petrucci_contract": [
         "all syllables survive structured FT3 rows",
         "the final-only coda remains attached to the final stanza"

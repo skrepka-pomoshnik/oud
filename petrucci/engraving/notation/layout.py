@@ -48,6 +48,7 @@ from petrucci.engraving.notation.elements import (
     _accidental_width,
     _beam_elements,
     _beam_groups,
+    _compact_beam_candidate,
     _event_elements,
     _event_marker_y,
     _event_notation,
@@ -240,6 +241,7 @@ def _allocate_system_rows(
             metrics=metrics,
             show_stems=policy.show_stems,
             show_pitch_labels=policy.show_pitch_labels,
+            compact_beams=policy.compact_beams,
         )
         allocated = _staff_rows(
             staff.id,
@@ -329,6 +331,7 @@ def _system_staff_needs(
     metrics: LayoutMetrics,
     show_stems: bool,
     show_pitch_labels: bool,
+    compact_beams: bool,
 ) -> _StaffVerticalNeeds:
     line_bottom = 4 * (metrics.staff_line_gap + 1)
     upper = 0
@@ -345,7 +348,7 @@ def _system_staff_needs(
             upper = min(upper, event_upper)
             lower = max(lower, event_lower)
     beam_depths = [
-        _beam_depths(measure.events, clef=_state_at(staff, measure_index).clef)
+        _beam_depths(measure.events, clef=_state_at(staff, measure_index).clef, compact=compact_beams)
         for measure_index, measure in enumerate(
             staff.measures[measure_start:measure_end],
             start=measure_start,
@@ -417,7 +420,9 @@ def _system_span_lane_count(
     )
 
 
-def _beam_depths(events: tuple[NotationEvent, ...], *, clef: Clef) -> tuple[int, int]:
+def _beam_depths(events: tuple[NotationEvent, ...], *, clef: Clef, compact: bool = False) -> tuple[int, int]:
+    if compact and _compact_beam_candidate(events):
+        return 0, 0
     lanes = _beam_lane_map(events, clef=clef)
     upper = {lane for up, lane in lanes.values() if up}
     lower = {lane for up, lane in lanes.values() if not up}
@@ -636,12 +641,13 @@ def _layout_measure(
         show_time_signature=policy.show_time_signature,
     )
     event_left = x + 1 + shared_geometry.change_width
+    barline_gap = metrics.barline_gap if policy.show_barlines and projection is None else 0
     group_xs, horizontally_clipped = _measure_group_positions(
         geometry.groups,
         shared_geometry,
         projection=projection,
         left=event_left,
-        right=x + width - 2,
+        right=x + width - 2 - barline_gap,
         base_gap=metrics.event_gap,
     )
     elements = list(change_elements)
@@ -686,6 +692,7 @@ def _layout_measure(
                 rows=rows,
                 left=event_left,
                 right=content_right,
+                compact=policy.compact_beams,
             ),
         )
     elements.extend(_tuplet_elements(measure.events, positioned.event_xs, rows=rows, right=content_right))

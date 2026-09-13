@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from petrucci.core.model import Piece
 from petrucci.terminal.canvas.screen import CursesError, Screen
-from petrucci.terminal.help import help_lines
+from petrucci.terminal.text.help import help_lines
 
 try:
     _PACKAGE_VERSION = version("oud")

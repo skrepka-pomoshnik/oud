@@ -1,5 +1,86 @@
 # DONE
 
+## Experimental compact notation spacing
+
+- Added opt-in minimum-gap spacing to the shared score layout, retaining
+  collision reservations and leaving proportional timeline positions alone.
+- Added `--spacing compact` to the standalone preview: no justification,
+  tighter prefix/padding and no redundant single-voice label. Symbol sizes
+  and staff spacing are unchanged. Defaults are preserved.
+- Full gate covers the preset and collision invariants: 1,724 tests passed,
+  11 skipped, and 95.19% Petrucci coverage.
+
+## Experimental semantic-colour previews
+
+- Kept the braille experiment and added opt-in ink/paper ANSI palettes using
+  semantic roles: subdued staff rules, contrasting notes, amber accidentals
+  and teal spans. Event selection is explicit and does not imply playback.
+- Restored plain ASCII as the standalone preview default. Colour serialization
+  leaves frame geometry, identities and plain-text output unchanged.
+- This colour layer is standalone, not an editor-theme integration. Tests have
+  now cover palette routing, active IDs, malformed RGB input, and ANSI
+  sanitization; optical editor-theme review remains in TODO.
+
+## Experimental solid-block terminal notation
+
+- Added opt-in `GlyphMode.BLOCK`, using one square-pixel half-block surface
+  for musical shapes rather than braille dots. Shared masks, span anchors,
+  semantic ownership and clipping are reused.
+- Adapted horizontal layout fitting and pitch-cue projection for the larger
+  cells. Added a standalone block preview command at 96 columns; library
+  defaults, ASCII and braille rendering remain unchanged.
+- Full gate covers block-cell output, terminal-width mapping, symbol variants,
+  and fallback behaviour. Cross-terminal visual acceptance remains
+  experimental.
+
+## Unified experimental braille notation
+
+- Replaced mixed musical font glyphs and box-drawing substitutions with a
+  shared dot lattice, hand-drawn music masks, and dot-level staff knockouts.
+- Added compact vertical projection with full-height text lanes and matching
+  pitch-cue coordinates. ASCII mode is unchanged.
+- Preserved source event endpoints on span layout elements so simple complete
+  ties can attach to their notes instead of the remote ASCII tie lane.
+- Validation: 79 focused renderer, ASCII, clipping, and layout tests pass.
+  Replaced obsolete mixed-glyph/coordinate assertions and added dot-mask,
+  staff-knockout, source-endpoint, nearby-tie, and projected pitch-cue checks.
+  Updated tests pass Ruff lint and were formatted. Full-suite coverage and
+  project-wide static checks have not been rerun.
+- Captured the standalone synthetic phrase as a text regression snapshot and
+  inspected a braille-font preview. It is compact but still visibly dot-matrix;
+  clef/beam optical quality remains unfinished, not certified by the tests.
+  Full gate now passes with 1,724 tests, 11 skips, and 95.19% coverage.
+
+## Experimental advanced terminal notation
+
+- Named the existing safe inventory `GlyphMode.ASCII`, retaining `SAFE`, and
+  added opt-in Unicode/braille rendering with viewport-bounded geometry and
+  semantic cell ownership. Existing default rendering is unchanged.
+- Added opt-in compact beams for simple single-voice groups and a standalone
+  `scripts.notation_preview` example with no external score dependency.
+- Focused renderer, clipping, and layout suite expanded to cover the
+  experimental paths. Ruff lint/format, Ty, and the full suite pass.
+- Advanced mode remains experimental; optical follow-ups are tracked in TODO.
+
+- 2026-09-13: Refined the standalone ASCII score example with distinct filled
+  and open noteheads, tighter event spacing, and no pitch-label row. Added the
+  optional `LayoutMetrics.barline_gap` to separate final stems from barlines
+  without increasing staff height or shifting proportional timeline anchors.
+  Four example regressions cover ASCII output, note/rest identity, rhythmic
+  glyphs, single-system fitting, and stem clearance at compact widths.
+  Validation: Ruff lint/format and Ty pass; 1,671 tests pass with 11 skips and
+  95.08% Petrucci coverage.
+
+- 2026-09-13: Made the shared engraving-quality matrix executable. Six
+  source-independent fixtures now drive both Petrucci proof-role/collision
+  assertions and LilyPond export-token assertions; four existing
+  LilyPond/MuseScore regression families are registered with provenance.
+  Added a 2.26 baseline compile smoke over every available path in the fixed
+  external FT3 regression manifest, preserving each source score's declared
+  tuning and keeping FT3 payloads out of the repository.
+  Validation: Ruff lint/format, Ty, and 1,667 tests pass with 11 skips and
+  95.08% coverage.
+
 - 2026-09-13: Fixed consumer integration regressions in proportional engraving:
   accidentals/editorial prefixes no longer move the onset notehead, and staff
   lines fill the viewport after short measures. Clipped measures no longer

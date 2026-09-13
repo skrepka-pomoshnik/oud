@@ -11,7 +11,7 @@ from oud.editor.core.feedback.messages import MISSING_LESS
 from oud.editor.core.state import EditorState
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import tuning_preset
-from petrucci.terminal.help import help_lines
+from petrucci.terminal.text.help import help_lines
 
 
 def row_first_note_col(state: EditorState) -> int:

@@ -12,6 +12,7 @@ from petrucci.engraving.notation.state import _staff_position, _state_at
 from petrucci.terminal.api import GlyphMode, SemanticFrame
 from petrucci.terminal.canvas.framebuffer import overlay_frame
 from petrucci.terminal.canvas.screen import A_DIM
+from petrucci.terminal.rendering.raster_grid import RasterGrid
 
 
 class PitchCueError(ValueError):
@@ -57,8 +58,13 @@ def paint_pitch_cues(
     _validate_cue_request(score, layout, cues)
     if not cues or not layout.systems:
         return semantic_frame
-    cells = _visible_cue_cells(score, layout, cues, viewport)
-    glyph = "x" if glyph_mode is GlyphMode.SAFE else "◇"
+    grid = (
+        RasterGrid(layout, viewport, blocks=glyph_mode is GlyphMode.BLOCK)
+        if glyph_mode in {GlyphMode.ADVANCED, GlyphMode.BLOCK}
+        else None
+    )
+    cells = _visible_cue_cells(score, layout, cues, viewport, grid=grid)
+    glyph = "x" if glyph_mode in {GlyphMode.SAFE, GlyphMode.ASCII} else "◇"
     frame = overlay_frame(semantic_frame.frame, [(y, x, glyph, A_DIM) for _cue, y, x in cells])
     roles = [list(row) for row in semantic_frame.roles]
     element_ids = [list(row) for row in semantic_frame.element_ids]
@@ -89,6 +95,8 @@ def _visible_cue_cells(
     layout: ScoreLayout,
     cues: tuple[PitchCue, ...],
     viewport: LayoutViewport,
+    *,
+    grid: RasterGrid | None = None,
 ) -> list[tuple[PitchCue, int, int]]:
     scroll_y = layout.systems[viewport.system_offset].rect.y + viewport.y_offset
     cells: list[tuple[PitchCue, int, int]] = []
@@ -96,8 +104,9 @@ def _visible_cue_cells(
         staff, measure_index, anchor = _resolve_anchor(cue, score, layout)
         rows = _staff_rows(layout.systems[anchor.system_index].staff_rows, staff.id)
         clef = _state_at(staff, measure_index).clef
-        y = rows.line_rows[-1] - _staff_position(cue.pitch, clef=clef) - scroll_y
-        x = anchor.x - viewport.x_offset
+        logical_y = rows.line_rows[-1] - _staff_position(cue.pitch, clef=clef)
+        y = grid.y(logical_y) // grid.rows_per_cell if grid is not None else logical_y - scroll_y
+        x = grid.x(anchor.x) // grid.columns_per_cell if grid is not None else anchor.x - viewport.x_offset
         if 0 <= y < viewport.height and 0 <= x < viewport.width:
             cells.append((cue, y, x))
     return cells

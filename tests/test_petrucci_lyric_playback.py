@@ -1,4 +1,4 @@
-from petrucci.terminal.lyrics import lyric_display
+from petrucci.terminal.text.lyrics import lyric_display
 
 
 def test_lyric_display_current_prefers_active_playback_verse() -> None:

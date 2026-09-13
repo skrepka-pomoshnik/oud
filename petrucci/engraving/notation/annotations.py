@@ -198,6 +198,7 @@ def _span_segments(
                     Rect(segment_left, y, segment_right - segment_left + 1),
                     segment_value,
                     continuation=start.system_index != end.system_index or raw_left < left or raw_right > right,
+                    anchor_ids=(start.event_id, end.event_id),
                 ),
             ),
         )

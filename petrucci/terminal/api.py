@@ -8,12 +8,18 @@ from enum import StrEnum
 from typing import NoReturn
 
 from petrucci.engraving.layout.engine import ElementRole, LayoutElement, LayoutViewport, ScoreLayout
+from petrucci.terminal.canvas.dots import DotCanvas
 from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.terminal.canvas.screen import A_DIM
 from petrucci.terminal.display import clip_display, display_width, split_display_clusters
+from petrucci.terminal.rendering.raster import paint_geometry
+from petrucci.terminal.rendering.raster_grid import TOP_CLEARANCE, RasterGrid
 
 
 class GlyphMode(StrEnum):
+    ASCII = "ascii"
+    ADVANCED = "advanced"
+    BLOCK = "block"
     PRETTY = "pretty"
     SAFE = "safe"
 
@@ -207,10 +213,13 @@ _SAFE = _GlyphInventory(
 
 
 class _SemanticCanvas:
-    def __init__(self, height: int, width: int, *, x_offset: int = 0) -> None:
+    def __init__(
+        self, height: int, width: int, *, x_offset: int = 0, advanced: bool = False, blocks: bool = False
+    ) -> None:
         self.height = height
         self.width = width
         self.x_offset = x_offset
+        self.dots = DotCanvas(height, width, blocks=blocks) if advanced else None
         self.chars = [[" " for _ in range(width)] for _ in range(height)]
         self.roles: list[list[ElementRole | None]] = [[None for _ in range(width)] for _ in range(height)]
         self.ids: list[list[str | None]] = [[None for _ in range(width)] for _ in range(height)]
@@ -271,6 +280,16 @@ class _SemanticCanvas:
         return next_cursor
 
     def snapshot(self) -> SemanticFrame:
+        if self.dots is not None:
+            for cell in self.dots.cells():
+                self.write(
+                    cell.row,
+                    cell.column + self.x_offset,
+                    cell.glyph,
+                    role=cell.element.key.role,
+                    source_id=cell.element.key.source_id,
+                    priority=cell.priority,
+                )
         lines = ["".join(row) for row in self.chars]
         attrs = [tuple(_role_attr(role) for role in row) for row in self.roles]
         return SemanticFrame(
@@ -289,7 +308,8 @@ def paint_score(
 ) -> SemanticFrame:
     """Paint a semantic layout into a fixed terminal frame."""
 
-    active_viewport = viewport or LayoutViewport(width=layout.width)
+    columns = layout.width * (2 if glyph_mode is GlyphMode.BLOCK else 1)
+    active_viewport = viewport or LayoutViewport(width=columns)
     glyphs = _glyph_inventory(glyph_mode, noteheads)
     if active_viewport.system_offset >= len(layout.systems) and layout.systems:
         _fail("paint system offset is outside the score layout")
@@ -297,20 +317,32 @@ def paint_score(
         active_viewport.height,
         active_viewport.width,
         x_offset=active_viewport.x_offset,
+        advanced=glyph_mode in {GlyphMode.ADVANCED, GlyphMode.BLOCK},
+        blocks=glyph_mode is GlyphMode.BLOCK,
     )
     if not layout.systems:
         return canvas.snapshot()
+    grid = (
+        RasterGrid(layout, active_viewport, blocks=glyph_mode is GlyphMode.BLOCK) if canvas.dots is not None else None
+    )
     scroll_y = layout.systems[active_viewport.system_offset].rect.y + active_viewport.y_offset
     for system in layout.systems[active_viewport.system_offset :]:
-        if system.rect.y - scroll_y >= active_viewport.height:
+        top = (
+            (grid.y(system.rect.y) - TOP_CLEARANCE) // grid.rows_per_cell
+            if grid is not None
+            else system.rect.y - scroll_y
+        )
+        if top >= active_viewport.height:
             break
         for element in sorted(system.elements, key=lambda item: _priority(item.key.role)):
-            _paint_element(canvas, element, y_offset=scroll_y, glyphs=glyphs)
+            _paint_element(
+                canvas, element, y_offset=scroll_y, glyphs=glyphs, grid=grid, custom_heads=noteheads is not None
+            )
     return canvas.snapshot()
 
 
 def _glyph_inventory(glyph_mode: GlyphMode, noteheads: TerminalNoteheads | None) -> _GlyphInventory:
-    glyphs = _PRETTY if glyph_mode is GlyphMode.PRETTY else _SAFE
+    glyphs = _PRETTY if glyph_mode in {GlyphMode.PRETTY, GlyphMode.ADVANCED, GlyphMode.BLOCK} else _SAFE
     if noteheads is None:
         return glyphs
     return replace(glyphs, filled_notehead=noteheads.filled, open_notehead=noteheads.open)
@@ -347,9 +379,27 @@ def _paint_element(
     *,
     y_offset: int,
     glyphs: _GlyphInventory,
+    grid: RasterGrid | None = None,
+    custom_heads: bool = False,
 ) -> None:
+    raster_head = not (custom_heads and element.key.role is ElementRole.NOTEHEAD)
+    if (
+        canvas.dots is not None
+        and raster_head
+        and paint_geometry(
+            canvas.dots,
+            element,
+            x_offset=canvas.x_offset,
+            y_offset=y_offset,
+            priority=_priority(element.key.role),
+            grid=grid,
+        )
+    ):
+        return
     role = element.key.role
-    y = element.rect.y - y_offset
+    y = grid.y(element.rect.y) // grid.rows_per_cell if grid is not None else element.rect.y - y_offset
+    if grid is not None and grid.columns_per_cell == 1:
+        element = replace(element, rect=replace(element.rect, x=element.rect.x * 2, width=element.rect.width * 2))
     if _paint_special_element(canvas, element, y=y, glyphs=glyphs):
         return
     text = _element_text(element, glyphs)

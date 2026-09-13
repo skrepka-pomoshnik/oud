@@ -101,6 +101,8 @@ class LayoutElement:
     rect: Rect
     value: str = ""
     continuation: bool = False
+    # Source event endpoints, independent of a backend's span-lane geometry.
+    anchor_ids: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +228,8 @@ class LayoutMetrics:
     staff_gap: int = 2
     system_gap: int = 1
     lyric_gap: int = 1
+    # Optical clearance before barlines in respaced layout; proportional time stays fixed.
+    barline_gap: int = 0
 
     def __post_init__(self) -> None:
         positive = (
@@ -244,6 +248,7 @@ class LayoutMetrics:
             self.staff_gap,
             self.system_gap,
             self.lyric_gap,
+            self.barline_gap,
         )
         if any(value <= 0 for value in positive):
             _fail("positive layout metrics must be greater than zero")
@@ -264,6 +269,9 @@ class NotationLayoutPolicy:
     show_barlines: bool = True
     show_pitch_labels: bool = False
     show_time_signature: bool = True
+    compact_beams: bool = False
+    # Use collision-reserved minimum gaps instead of duration-expanded gaps.
+    compact_spacing: bool = False
 
 
 @dataclass(frozen=True, slots=True)

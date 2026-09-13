@@ -483,6 +483,7 @@ def _beam_elements(
     rows: StaffRows,
     left: int,
     right: int,
+    compact: bool = False,
 ) -> tuple[LayoutElement, ...]:
     stems = {element.key.source_id: element for element in elements if element.key.role is ElementRole.STEM}
     beams: list[LayoutElement] = []
@@ -494,6 +495,8 @@ def _beam_elements(
         beam_y = (
             rows.notation_top + (lane * _BEAM_LANE_HEIGHT) if up else rows.notation_bottom - (lane * _BEAM_LANE_HEIGHT)
         )
+        if compact and _compact_beam_candidate(events):
+            beam_y = min(stem.rect.y for stem in group_stems) if up else max(stem.rect.bottom for stem in group_stems)
         beams.extend(_beam_stem_extensions(group_stems, up=up, beam_y=beam_y))
         minimum_beam_stems = 2
         if len(group_stems) >= minimum_beam_stems:
@@ -503,6 +506,17 @@ def _beam_elements(
                 _partial_beam_elements(group[0], group_stems[0], up=up, beam_y=beam_y, left=left, right=right),
             )
     return tuple(beams)
+
+
+def _compact_beam_candidate(events: tuple[NotationEvent, ...]) -> bool:
+    """Simple monophonic groups need no separate outer collision lane."""
+
+    maximum_compact_denominator = 16
+    return len({event.voice for event in events}) <= 1 and all(
+        (_event_notation(event).denominator or 1) <= maximum_compact_denominator
+        for event in events
+        if event.beam is not BeamKind.NONE
+    )
 
 
 def _beam_stem_extensions(

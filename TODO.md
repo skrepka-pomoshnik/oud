@@ -216,14 +216,29 @@ algorithm that preserves sounding pitch and produces playable tablature.
 
 ## P1.4: Linked Petrucci and LilyPond engraving (next after transposition)
 
+- [ ] Refine advanced terminal engraving against compact notation references:
+  assess dark/light semantic colour palettes, mixed-role cell readability,
+  ANSI output and colour-independent duration recognition.
+  validate solid-block projection, narrow viewports, note/rest identity and
+  Alacritty output; compare it directly with the braille and ASCII modes.
+  review the unified braille clef/rest masks and curve continuity; cover
+  chord/broken-tie anchoring, compact polyphonic beams and slopes with small,
+  redistributable fixtures. Improve the crude clef and beam silhouettes without
+  reintroducing mixed-grid geometry.
+  Compare ASCII and advanced previews at several terminal fonts and sizes;
+  preserve event identities, clipping, and readable duration distinctions.
+
 - [ ] Expand `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` until every supported
   notation feature has one source-independent microcase and at least one real
-  FT3 case.
-- [ ] Drive Petrucci proof assertions and LilyPond export assertions from the
+  FT3 case. The initial executable inventory covers six shared feature families
+  and registers the Felice real-score benchmark; add a real FT3 entry whenever
+  another family is promoted from partial support.
+- [x] Drive Petrucci proof assertions and LilyPond export assertions from the
   same matrix instead of maintaining backend-specific fixture inventories.
-- [ ] Translate the remaining applicable LilyPond 2.24.4 and MuseScore 4.6.0
+- [x] Translate the remaining applicable LilyPond 2.24.4 and MuseScore 4.6.0
   regressions into small legal fixtures that record provenance and the borrowed
-  invariant rather than upstream output bytes.
+  invariant rather than upstream output bytes. Existing translated invariants
+  are registered in `upstream_microcases` and exercised by the layout tests.
 - [x] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
   internal representation.
   - Verified 2026-09-13: no LilyPond importer exists under `oud/importers/`; `.ly`
@@ -238,8 +253,10 @@ algorithm that preserves sounding pitch and produces playable tablature.
     page/system breaks, title/credits, instrument names, and page numbering.
   - Preserve staff order, lyrics, repeats/endings, meter/key/clef changes,
     bass courses, rhythms, beams, fingerings, ornaments, and section/page data.
-- [ ] Require generated `.ly` files to compile with the supported LilyPond
-  version without errors or undocumented warnings.
+- [x] Require generated `.ly` files to compile with the supported LilyPond
+  version without errors or undocumented warnings. The fixed external
+  `ft3-regression.json` manifest is exported and compiled with 2.26 when
+  available; 2.24 remains a separate compatibility smoke target.
 - [ ] Build a rendered-PDF acceptance matrix for solo, mixed, four-part, duet,
   long multi-page, and dense scores.
   - Check page count, system count, staff order, clipping, collisions, orphaned

@@ -56,7 +56,10 @@ class ScoreTypesetOptions:
 
     @property
     def layout_viewport(self) -> LayoutViewport:
-        return LayoutViewport(width=self.resolved_layout_width, height=self.height)
+        width = self.resolved_layout_width
+        if self.glyph_mode is GlyphMode.BLOCK:
+            width = max(1, width // 2)
+        return LayoutViewport(width=width, height=self.height)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +109,8 @@ def typeset_layout(
     """Paint an existing layout, allowing a host to select a system without relayout."""
 
     active = options or ScoreTypesetOptions(width=layout.width)
-    if active.x_offset >= layout.width:
+    painted_width = layout.width * (2 if active.glyph_mode is GlyphMode.BLOCK else 1)
+    if active.x_offset >= painted_width:
         _type_fail("score horizontal offset must stay inside the existing layout")
     semantic_frame = paint_score(
         layout,

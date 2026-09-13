@@ -16,7 +16,7 @@ from petrucci.rendering.primitives.helpers import safe_addstr as _safe_addstr
 from petrucci.rendering.system.status import build_status_lines, status_attr_for_message
 from petrucci.terminal.canvas.framebuffer import draw_frame_rows
 from petrucci.terminal.canvas.screen import A_REVERSE, Screen
-from petrucci.terminal.lyrics import piece_for_lyric_display
+from petrucci.terminal.text.lyrics import piece_for_lyric_display
 
 
 def _bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:

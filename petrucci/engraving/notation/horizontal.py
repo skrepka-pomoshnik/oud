@@ -197,10 +197,12 @@ def _shared_measure_geometry(
     token_width = sum(group.width for group in groups)
     min_gaps = metrics.event_gap * max(0, len(groups) - 1)
     natural_gaps = sum(
-        _natural_onset_gap(groups[pos].onset, groups[pos + 1].onset, metrics.event_gap)
+        metrics.event_gap
+        if policy.compact_spacing
+        else _natural_onset_gap(groups[pos].onset, groups[pos + 1].onset, metrics.event_gap)
         for pos in range(max(0, len(groups) - 1))
     )
-    fixed = 2 + change_width
+    fixed = 2 + change_width + (metrics.barline_gap if policy.show_barlines else 0)
     local_minimum = max(geometry.min_width + change_width - geometry.change_width for geometry in geometries)
     local_natural = max(geometry.natural_width + change_width - geometry.change_width for geometry in geometries)
     return _SharedMeasureGeometry(
@@ -232,11 +234,13 @@ def _measure_geometry(
     change_width = _measure_change_width(staff, index)
     token_width = sum(group.width for group in groups)
     natural_gaps = sum(
-        _natural_onset_gap(groups[pos].onset, groups[pos + 1].onset, metrics.event_gap)
+        metrics.event_gap
+        if policy.compact_spacing
+        else _natural_onset_gap(groups[pos].onset, groups[pos + 1].onset, metrics.event_gap)
         for pos in range(max(0, len(groups) - 1))
     )
     min_gaps = metrics.event_gap * max(0, len(groups) - 1)
-    fixed = 2 + change_width
+    fixed = 2 + change_width + (metrics.barline_gap if policy.show_barlines else 0)
     min_width = max(metrics.min_measure_width, fixed + token_width + min_gaps)
     line_width = max((display_width(line.text) for line in lyric_lines.get(measure.id, ())), default=0)
     min_width = max(min_width, fixed + line_width)
