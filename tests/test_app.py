@@ -13,7 +13,7 @@ from oud.presentation.tui.controller import handle_key
 from oud.presentation.tui.input import handle_command as handle_command_input
 from oud.presentation.tui.input import handle_search as handle_search_input
 from oud.presentation.tui.input import history_next, history_prev, parse_search
-from oud.presentation.tui.loop import _read_input_batch, run_loop
+from oud.presentation.tui.loop import InterruptLatch, _read_input_batch, run_loop
 from petrucci.core.model import Bar, ImportedScore, Piece
 from petrucci.terminal.canvas.framebuffer import Frame
 
@@ -46,6 +46,7 @@ def _state() -> EditorState:
 def _patch_curses_smoke(monkeypatch, *, backspace: bool = False) -> None:
     values = {
         "curs_set": lambda *_args: None,
+        "set_escdelay": lambda *_args: None,
         "napms": lambda *_args: None,
         "A_REVERSE": 0,
         "A_BOLD": 0,
@@ -295,7 +296,7 @@ def test_read_input_batch_drains_queued_repeat_keys_before_render() -> None:
             return self.keys.pop(0)
 
     window = _QueuedWindow()
-    keys = _read_input_batch(cast(curses.window, window), 50)
+    keys = _read_input_batch(cast(curses.window, window), 50, InterruptLatch())
 
     assert keys == (ord("h"), ord("h"), ord("h"))
     assert window.timeouts == [50, 0]
@@ -376,6 +377,7 @@ def _playback_scroll_state() -> EditorState:
 
 def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monkeypatch) -> None:
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "set_escdelay", lambda *_args: None)
     state = _playback_scroll_state()
     render_bar_offsets: list[int] = []
 
@@ -409,6 +411,7 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
 
 def test_run_loop_follows_playback_advanced_during_full_render(monkeypatch) -> None:
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "set_escdelay", lambda *_args: None)
     state = _playback_scroll_state()
     state.bar_offset = 0
     state.playback_bar = 0
@@ -458,9 +461,15 @@ def test_run_loop_follows_playback_advanced_during_full_render(monkeypatch) -> N
 
 def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "set_escdelay", lambda *_args: None)
     state = _playback_scroll_state()
     state.settings["playbackscroll"] = "off"
-    state.midi_proc = cast(subprocess.Popen[bytes], object())
+
+    class _FinishedPlayer:
+        def poll(self) -> int:
+            return 0
+
+    state.midi_proc = cast(subprocess.Popen[bytes], _FinishedPlayer())
     updates = 0
     rendered_markers: list[object] = []
 
@@ -507,6 +516,7 @@ def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
 
 def test_run_loop_passes_playback_position_to_imported_score_renderer(monkeypatch) -> None:
     monkeypatch.setattr(curses, "curs_set", lambda *_args: None)
+    monkeypatch.setattr(curses, "set_escdelay", lambda *_args: None)
     state = _playback_scroll_state()
     state.piece.imported_score = ImportedScore("ft3")
     rendered_positions: list[tuple[object, object, object]] = []

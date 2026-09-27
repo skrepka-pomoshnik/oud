@@ -50,7 +50,7 @@ atomically and preserves it when compilation fails.
 - `normal`: navigation + editor commands.
 - `insert`: write frets/rests/durations.
 - `:` command prompt: ex-like commands.
-- `/` search prompt: search command history style.
+- `/` go-to-bar prompt: type a 1-based bar number and press Enter.
 - `help`/`info` modes: docs/status pages.
 - `plugin` mode: remote/source browsing plugins.
 
@@ -73,10 +73,11 @@ Set with:
 - Replace once: `r`
 - Delete note: `x` (`[count]x` supported)
 - Undo/redo: `u` / `Ctrl-r`
-- Bar add/remove: `o O` and `+ -`
-- Help: `?`
+- Bar add/remove: `o O` and `+ -`; copy `yy`, paste after/before `p` / `P`
+- Add a configured bass course: `gb` (undoable)
+- Help: `F1` / `gh` (page) or `?` (in less); both show the same text, generated for the active key profile
 - Command: `:`
-- Search: `/`
+- Go to bar: `/` then a bar number
 - Read-only score viewport: `K` / `J` move one system and `[` / `]` jump to the previous/next section or source page without moving the logical cursor. `PgUp` / `PgDn` scroll whole viewport pages.
 
 Normal-mode numeric prefixes are limited to 999 with a visible notice. Counted
@@ -98,7 +99,7 @@ creates a new bar.
 - Bar edge: `Home` / `End`; viewport scroll: `PgUp` / `PgDn`
 - Insert/delete bar: `Insert` / `Delete`
 - Undo/redo: `Ctrl-Z` / `Ctrl-Y` (`u` / `Ctrl-R` remain available)
-- Char-find repeat: `]` forward / `[` reverse in editable scores; these keys jump sections/pages in read-only scores
+- Char-find repeat: `;` forward. Reverse repeat is vim-only (`,`), like `dd`; in casual keys `,`/`.` step bars and `[`/`]` jump sections/pages in read-only scores
 - Help: `F1`
 
 ## 5) Entering Notes
@@ -107,7 +108,12 @@ creates a new bar.
 
 - Frets by letters (`a..`), with historical mapping rules.
 - Bass shorthand in insert mode: `/a`, `//a`, `///a` (configured bass availability applies).
-- Rest in insert mode: `r`.
+- Rest in insert mode: `z` (both styles). Every letter `a`..`t` except `j` is a French fret, including `q` and `r`.
+- Only `Ctrl-C` quits from insert mode; `Esc` returns to normal mode.
+
+`Ctrl-C` follows `q` everywhere: with unsaved changes it asks once and quits on
+the second press. It cancels the command, go-to-bar and plugin-search prompts
+and closes help, info, notes and plugin pages. Every exit stops playback.
 
 ## 5.2 Italian tablature
 
@@ -127,7 +133,7 @@ French insert-mode digit mapping:
 - `6 -> 32`
 - `7 -> 64`
 
-Italian mode keeps numeric fret entry and supports duration with `Ctrl+1..7` or `;1..7`.
+Italian mode keeps numeric fret entry; type `;` then `1`..`7` to set a duration.
 
 Durations are tracked per onset column and rendered according to current flag style/redundancy settings.
 
@@ -188,12 +194,30 @@ Durations are tracked per onset column and rendered according to current flag st
 `key=value` tokens can be chained in one command:
 
 ```text
-:set style=french spacingmode=auto spacingfill=compact
+:set style=french layout=auto justify=compact
 ```
+
+### Persistence and read-only scores
+
+Preference keys are saved to `$XDG_CONFIG_HOME/oud/config.toml` (default
+`~/.config/oud/config.toml`). A `config.toml` in the working directory is used
+instead only when it already contains a `[settings]` table. Only keys changed by
+the command are written, and the file is replaced atomically. Oud refuses to
+rewrite a config file containing other tables and reports "Settings applied but
+not saved".
+
+Document properties (`style`, `strings`, `tuning`, `time`, `key`, `tempo`,
+`bassstrings`) change the open score for this session only. Edit them in the
+config file to change new-document defaults. Exports and `:play` never write
+settings.
+
+Read-only scores accept display settings (`scoreview`, `showlyrics`,
+`lyricmode`, `theme`, …). Document properties, metadata keys and the
+`lute`/`guitar` presets are refused with a read-only diagnostic.
 
 ### Commonly used keys
 
-- Layout: `spacing`, `spacingmode`, `spacingfill`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
+- Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
 - Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
@@ -239,10 +263,10 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - In plugin view:
   - `j/k` move selection
   - `l` or `Enter` open
-  - `h` back
-  - `d` download
-  - `/` filter/search
-  - `gg` / `G` top/end
+  - `h` back, `q` / `b` / `Esc` / `Ctrl-C` close (or go up a level)
+  - `d` download, `D` download a folder recursively
+  - `/` search; `Enter` jumps to the match, `Esc` / `Ctrl-C` cancel
+  - `gg` / `G` top/end, `?` plugin help
 
 ## 9) Typical Workflows
 
@@ -259,7 +283,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 
 1. Open file
 2. Run `:tool comments`
-3. Adjust wrap/settings with `:set spacingmode=auto ...`
+3. Adjust wrap/settings with `:set layout=auto ...`
 4. Reflow stave breaks via `:tool reflow`
 5. Save `:w`
 

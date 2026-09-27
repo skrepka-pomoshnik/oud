@@ -6,12 +6,12 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from oud.editor.commands.help import help_lines
 from oud.editor.core.coordinates import string_index
 from oud.editor.core.feedback.messages import MISSING_LESS
 from oud.editor.core.state import EditorState
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import tuning_preset
-from petrucci.terminal.text.help import help_lines
 
 
 def row_first_note_col(state: EditorState) -> int:
@@ -41,7 +41,7 @@ def show_help(
     if not viewer:
         state.message = MISSING_LESS
         return
-    content = "\n".join(help_lines()) + "\n"
+    content = "\n".join(help_lines(state)) + "\n"
     if state.mode == "plugin" and state.plugin_name:
         root = Path(__file__).resolve().parents[1]
         plugin_help = root / "plugins" / f"{state.plugin_name}.txt"

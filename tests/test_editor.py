@@ -1,6 +1,7 @@
 import pytest
 
 from oud.editor.commands import dispatch as cmd_ops
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives import edits as edit_ops
 from oud.editor.editing.primitives import tablature as ops
@@ -8,6 +9,7 @@ from oud.editor.editing.primitives import undo as undo_ops
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
 from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.rendering.api import render_piece
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
 
@@ -113,7 +115,7 @@ def test_insert_duration_updates_chord_note_type() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
     state.piece.bars[0].chords = [chord]
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
     assert state.piece.bars[0].chords == []
     assert state.durations[(0, 0, 0)] == 8
@@ -121,7 +123,7 @@ def test_insert_duration_updates_chord_note_type() -> None:
 
 def test_insert_duration_digits_map_in_french() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("1"))
     assert state.current_duration == 1
     actions.handle_insert(state, ord("2"))
@@ -141,18 +143,10 @@ def test_insert_duration_digits_map_in_french() -> None:
 def test_insert_french_duration_alias_letters_insert_frets() -> None:
     for ch in "ehst":
         state = _state()
-        state.mode = "insert"
+        state.mode = Mode.INSERT
         actions.handle_insert(state, ord(ch))
         assert state.overrides[(0, 0, 0)] == ch
         assert state.current_duration == 4
-
-
-def test_insert_q_quits_unmodified_buffer() -> None:
-    state = _state()
-    state.mode = "insert"
-    assert _press(state, ord("q")) is False
-    assert state.message != "Duration 4"
-    assert state.current_duration == 4
 
 
 def test_insert_fret_snaps_to_chord_slot_when_cursor_in_gap() -> None:
@@ -160,7 +154,7 @@ def test_insert_fret_snaps_to_chord_slot_when_cursor_in_gap() -> None:
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
     state.piece.bars[0].chords = [chord]
     state.cursor_col = 1
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     assert state.overrides[(0, 0, 0)] == "a"
     assert (0, 0, 1) not in state.overrides
@@ -170,7 +164,7 @@ def test_insert_flattens_chords_to_grid() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
     state.piece.bars[0].chords = [chord]
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     assert state.piece.bars[0].chords == []
     assert state.overrides[(0, 0, 0)] == "a"
@@ -178,7 +172,7 @@ def test_insert_flattens_chords_to_grid() -> None:
 
 def test_insert_note_records_single_grouped_undo() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     assert len(state.undo_stack) == 1
     assert state.undo_stack[-1].kind == "group"
@@ -192,7 +186,7 @@ def test_insert_flattened_chord_bar_undo_restores_structured_chords() -> None:
     chord = Chord(note_type=4, dotted=True, grid=None, notes=[Note(1, 0, 0)])
     state.piece.bars[0].chords = [chord]
     state.piece.bars[0].notes = [Note(1, 0, 0)]
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("b"))
     assert state.piece.bars[0].chords == []
     assert state.overrides
@@ -214,7 +208,7 @@ def test_insert_note_snaps_to_nearest_chord_slot_left_tie() -> None:
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
     ]
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.cursor_col = 2
     actions.handle_insert(state, ord("b"))
     assert state.overrides[(0, 0, 0)] == "b"
@@ -227,7 +221,7 @@ def test_insert_duration_snaps_to_existing_chord_slot() -> None:
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
     ]
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.cursor_col = 2
     actions.handle_insert(state, ord("6"))
     assert state.durations[(0, 0, 0)] == 32
@@ -261,7 +255,7 @@ def test_confirm_quit_when_modified() -> None:
 
 def test_insert_duration_does_not_advance_cursor() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.cursor_col = 0
     actions.handle_insert(state, ord("4"))
     assert state.cursor_col == 0
@@ -269,7 +263,7 @@ def test_insert_duration_does_not_advance_cursor() -> None:
 
 def test_insert_dot_toggles_dotted() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.cursor_col = 2
     actions.handle_insert(state, ord("."))
     assert (0, 2) in state.dotted
@@ -329,26 +323,17 @@ def test_italian_fret_validation() -> None:
 def test_insert_italian_digit_sets_fret_not_duration() -> None:
     state = _state()
     state.settings["style"] = "italian"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("1"))
     assert (0, 0, 0) in state.overrides
     assert state.overrides[(0, 0, 0)] == "1"
     assert state.durations[(0, 0, 0)] == state.current_duration
 
 
-def test_insert_italian_ctrl_duration_sets_duration() -> None:
-    state = _state()
-    state.settings["style"] = "italian"
-    state.mode = "insert"
-    actions.handle_insert(state, 4)
-    assert state.durations[(0, 0, 0)] == 8
-    assert (0, 0, 0) not in state.overrides
-
-
 def test_insert_italian_semicolon_duration_sets_duration() -> None:
     state = _state()
     state.settings["style"] = "italian"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord(";"))
     actions.handle_insert(state, ord("4"))
     assert state.durations[(0, 0, 0)] == 8
@@ -358,7 +343,7 @@ def test_insert_italian_multifret_with_comma() -> None:
     state = _state()
     state.settings["style"] = "italian"
     state.settings["italianmultifret"] = "on"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord(","))
     actions.handle_insert(state, ord("1"))
     actions.handle_insert(state, ord("2"))
@@ -368,17 +353,17 @@ def test_insert_italian_multifret_with_comma() -> None:
 
 def test_insert_rest_sets_override_and_duration() -> None:
     state = _state()
-    state.mode = "insert"
-    actions.handle_insert(state, ord("r"))
-    assert state.overrides[(0, 0, 0)] == "r"
+    state.mode = Mode.INSERT
+    actions.handle_insert(state, ord("z"))
+    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
     assert state.durations[(0, 0, 0)] == state.current_duration
 
 
 def test_insert_rest_finishes_replace_once_mode() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.replace_once = True
-    actions.handle_insert(state, ord("r"))
+    actions.handle_insert(state, ord("z"))
     assert state.mode == "normal"
     assert state.replace_once is False
 
@@ -389,10 +374,10 @@ def test_insert_rest_snaps_to_chord_slot_when_cursor_in_gap() -> None:
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
     ]
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.cursor_col = 1
-    actions.handle_insert(state, ord("r"))
-    assert state.overrides[(0, 0, 0)] == "r"
+    actions.handle_insert(state, ord("z"))
+    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
     assert (0, 0, 1) not in state.overrides
 
 
@@ -409,7 +394,7 @@ def test_insert_french_bass_slash_shorthand_targets_extra_courses(
     expected_string_index: int,
 ) -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.piece.strings = 9
     state.settings["strings"] = "9"
     for _ in range(prefix_count):
@@ -422,7 +407,7 @@ def test_insert_french_bass_slash_shorthand_targets_extra_courses(
 
 def test_insert_french_bass_slash_shorthand_rejects_missing_course() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.piece.strings = 7
     state.settings["strings"] = "7"
     actions.handle_insert(state, ord("/"))
@@ -434,7 +419,7 @@ def test_insert_french_bass_slash_shorthand_rejects_missing_course() -> None:
 
 def test_row_overflow_advances_to_next_bar() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     for _ in range(4):
         actions.handle_insert(state, ord("a"))
     state.cursor_string = 1
@@ -445,7 +430,7 @@ def test_row_overflow_advances_to_next_bar() -> None:
 def test_insert_french_digit_sets_duration() -> None:
     state = _state()
     state.settings["style"] = "french"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("3"))
     assert (0, 0, 0) in state.durations
     assert state.durations[(0, 0, 0)] == 4
@@ -454,7 +439,7 @@ def test_insert_french_digit_sets_duration() -> None:
 def test_insert_french_duration_keys() -> None:
     state = _state()
     state.settings["style"] = "french"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
     assert state.durations[(0, 0, 0)] == 8
     state.cursor_col = 1
@@ -468,7 +453,7 @@ def test_insert_french_duration_keys() -> None:
 def test_insert_duration_then_note_uses_same_col() -> None:
     state = _state()
     state.settings["style"] = "french"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("6"))
     assert state.cursor_col == 0
     actions.handle_insert(state, ord("a"))
@@ -479,7 +464,7 @@ def test_insert_duration_then_note_uses_same_col() -> None:
 def test_insert_duration_on_other_string_snaps_to_same_time_slot() -> None:
     state = _state()
     state.settings["style"] = "french"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("3"))
     actions.handle_insert(state, ord("a"))
     assert state.cursor_col == 1
@@ -495,7 +480,7 @@ def test_insert_duration_on_other_string_snaps_to_same_time_slot() -> None:
 def test_duration_persists_for_new_notes() -> None:
     state = _state()
     state.settings["style"] = "french"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
     assert state.current_duration == 8
     actions.handle_insert(state, ord("a"))
@@ -506,7 +491,7 @@ def test_duration_persists_for_new_notes() -> None:
 
 def test_insert_note_uses_selected_duration_for_overflow_not_other_row_column_duration() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.bar_width = 40
     state.piece.bars.append(Bar())
     # Another row/same column stores a quarter duration.
@@ -530,7 +515,7 @@ def test_insert_note_uses_selected_duration_for_overflow_not_other_row_column_du
 
 def test_insert_note_on_existing_column_does_not_rewrite_duration() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.overrides[(0, 0, 0)] = "a"
     state.durations[(0, 0, 0)] = 4
     state.current_duration = 8
@@ -551,7 +536,7 @@ def test_insert_note_on_existing_column_does_not_rewrite_duration() -> None:
 
 def test_repeated_add_remove_undo_keeps_column_duration_stable() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.overrides[(0, 0, 0)] = "a"
     state.durations[(0, 0, 0)] = 4
 
@@ -585,7 +570,7 @@ def test_repeated_add_remove_undo_keeps_column_duration_stable() -> None:
 def test_invalid_key_does_not_set_duration() -> None:
     state = _state()
     state.settings["style"] = "french"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("!"))
     assert state.durations == {}
 
@@ -593,7 +578,7 @@ def test_invalid_key_does_not_set_duration() -> None:
 def test_grid_mode_advances_two_cells() -> None:
     state = _state()
     state.settings["grid"] = "on"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     assert state.cursor_col == 2
 

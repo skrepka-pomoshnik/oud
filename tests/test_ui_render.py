@@ -1,5 +1,6 @@
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.core.music.tuning import default_bass_strings
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.rendering.api import _apply_overrides, _bass_strings_used
 from petrucci.rendering.primitives.geometry import _scale_chord_row
 from petrucci.rendering.primitives.spacing import (
@@ -113,7 +114,7 @@ def test_bass_strings_used_tracks_overrides_and_chords() -> None:
 
 def test_apply_overrides_renders_rest_marker() -> None:
     cells = [["-"] * 4 for _ in range(6)]
-    overrides = {(0, 0, 1): "r"}
+    overrides = {(0, 0, 1): REST_OVERRIDE}
     _apply_overrides(cells, overrides, 0, 6, 4)
     assert cells[0][1] == "_"
     assert cells[0][2] == "."

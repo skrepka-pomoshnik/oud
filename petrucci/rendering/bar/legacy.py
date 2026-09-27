@@ -9,7 +9,7 @@ from petrucci.core.model import Piece
 from petrucci.core.music.tuning import default_bass_strings, parse_bass_strings, tuning_count
 from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height
 from petrucci.input.tablature.style import resolve_tab_style_policy
-from petrucci.rendering.primitives.helpers import bass_strings_used, clean_text, render_help, safe_addstr
+from petrucci.rendering.primitives.helpers import bass_strings_used, clean_text, safe_addstr
 from petrucci.rendering.staff.playback import PlaybackOverlayCache
 from petrucci.rendering.staff.vocal import melody_row_count
 from petrucci.rendering.system.duet import (
@@ -309,9 +309,6 @@ class _LegacyRenderer:
                 clean_text(status_text),
                 request.status_attr,
             )
-        if request.mode == "help":
-            self.screen.erase()
-            render_help(self.screen, status_text, request.status_attr, request.help_offset)
         self.screen.refresh()
 
     def _duet_request(

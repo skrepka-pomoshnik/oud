@@ -113,7 +113,8 @@ def test_cmd_set_and_convert(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert state.settings["grid"] == "on"
     assert state.settings["showdur"] == "on"
     assert state.settings["frenchc"] == "alt"
-    assert saved["strings"] == "7"
+    # Document properties stay in the session; only preferences persist.
+    assert saved == {"grid": "on", "showdur": "on", "frenchc": "alt"}
     state.overrides[(0, 0, 0)] = "0"
     cmd.cmd_convert(state, "french", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "french"

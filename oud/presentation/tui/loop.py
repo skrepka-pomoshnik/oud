@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import curses
+import os
+import signal
+from types import FrameType
 
+from oud.editor.commands.help import help_lines
 from oud.editor.core.feedback.transient import decay_transient_message
+from oud.editor.core.input.modes import Mode
 from oud.editor.navigation.view.focus import current_view_staff
 from oud.editor.navigation.view.state import view_commit_frame, view_merge_dirty, view_resize
 from oud.editor.navigation.viewport import ensure_cursor_visible
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.media.jobs import drain_background_messages
+from oud.editor.services.media.midi import stop_midi
 from oud.editor.services.media.playback import update_playback_animation
 from oud.editor.services.status import status_line
 from oud.exports.export_tab import export_ascii
@@ -27,13 +33,35 @@ from petrucci.terminal.canvas.framebuffer import (
 )
 
 _MAX_INPUT_BATCH = 64
+CTRL_C = 3
 
 
-def _read_input_batch(stdscr: curses.window, timeout_ms: int) -> tuple[int, ...]:
+class InterruptLatch:
+    """SIGINT handler that records Ctrl-C instead of raising mid-edit or mid-render.
+
+    The key loop turns a latched interrupt into the Ctrl-C key, so it follows the
+    editor's quit, cancel and unsaved-changes rules.
+    """
+
+    def __init__(self) -> None:
+        self.pending = False
+
+    def __call__(self, _signum: int, _frame: FrameType | None) -> None:
+        self.pending = True
+
+    def take(self) -> bool:
+        pending = self.pending
+        self.pending = False
+        return pending
+
+
+def _read_input_batch(stdscr: curses.window, timeout_ms: int, interrupts: InterruptLatch) -> tuple[int, ...]:
+    if interrupts.take():
+        return (CTRL_C,)
     stdscr.timeout(timeout_ms)
     first = stdscr.getch()
     if first == -1:
-        return ()
+        return (CTRL_C,) if interrupts.take() else ()
     keys = [first]
     stdscr.timeout(0)
     for _ in range(_MAX_INPUT_BATCH - 1):
@@ -41,6 +69,8 @@ def _read_input_batch(stdscr: curses.window, timeout_ms: int) -> tuple[int, ...]
         if key == -1:
             break
         keys.append(key)
+    if interrupts.take():
+        keys.append(CTRL_C)
     return tuple(keys)
 
 
@@ -52,9 +82,10 @@ def _handle_input_batch(
     handle_normal,
     apply_command,
     needs_render: bool,
+    interrupts: InterruptLatch,
 ) -> tuple[bool, bool]:
     running = True
-    keys = _read_input_batch(stdscr, 10 if state.midi_proc is not None else 50)
+    keys = _read_input_batch(stdscr, 10 if state.midi_proc is not None else 50, interrupts)
     for key in keys:
         running = handle_key_impl(
             state,
@@ -166,6 +197,7 @@ def _render_full_frame(state, *, height: int, width: int, screen) -> bool:
             focused_staff.source_index if not focused_staff.key.startswith("duet-") else None
         ),
         playback_verse=state.playback.verse,
+        help_lines=help_lines(state) if state.mode == Mode.HELP else (),
     )
     base_frame = frame_buffer.snapshot()
     state.last_base_frame = base_frame
@@ -228,6 +260,19 @@ def _render_iteration(stdscr: curses.window, state, needs_render: bool) -> bool:
     return _render_full_frame(state, height=height, width=width, screen=screen)
 
 
+# ncurses waits 1 s by default to tell Esc from an escape sequence, which makes
+# leaving insert mode feel broken. An explicit ESCDELAY in the environment wins.
+ESCAPE_DELAY_MS = 25
+
+
+def configure_terminal(stdscr: curses.window) -> None:
+    curses.curs_set(0)
+    if "ESCDELAY" not in os.environ:
+        curses.set_escdelay(ESCAPE_DELAY_MS)
+    stdscr.keypad(True)
+    stdscr.timeout(50)
+
+
 def run_loop(
     stdscr: curses.window,
     path: str | None,
@@ -238,9 +283,7 @@ def run_loop(
     apply_command,
     read_only: bool = False,
 ) -> int:
-    curses.curs_set(0)
-    stdscr.keypad(True)
-    stdscr.timeout(50)
+    configure_terminal(stdscr)
 
     state = init_state(path, config_path=config_path, read_only=read_only)
     state.keycodes = keycodes_from_curses()
@@ -258,15 +301,22 @@ def run_loop(
 
     needs_render = True
     running = True
-    while running:
-        needs_render = _render_iteration(stdscr, state, needs_render)
-        running, needs_render = _handle_input_batch(
-            stdscr,
-            state,
-            handle_insert=handle_insert,
-            handle_normal=handle_normal,
-            apply_command=apply_command,
-            needs_render=needs_render,
-        )
-
+    interrupts = InterruptLatch()
+    previous_handler = signal.signal(signal.SIGINT, interrupts)
+    try:
+        while running:
+            needs_render = _render_iteration(stdscr, state, needs_render)
+            running, needs_render = _handle_input_batch(
+                stdscr,
+                state,
+                handle_insert=handle_insert,
+                handle_normal=handle_normal,
+                apply_command=apply_command,
+                needs_render=needs_render,
+                interrupts=interrupts,
+            )
+    finally:
+        signal.signal(signal.SIGINT, previous_handler)
+        # `:q` exits through SystemExit and other failures raise; never leave a player running.
+        stop_midi(state)
     return 0

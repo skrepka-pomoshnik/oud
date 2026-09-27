@@ -14,6 +14,14 @@ Priority order (hard dependency order):
 No open P0 items. Publication readiness still depends on the P1 FT3 support and
 acceptance claims below.
 
+## P0: Editor UI consistency
+
+Evidence and acceptance criteria live in `docs/ui-fix-plan.md`; tick items there.
+
+- [ ] Phase 3: move editor chrome (status, prompt, overlays, help) out of Petrucci.
+- [ ] Phase 4: edit on exact onsets through the canonical tablature transaction path.
+- [ ] Phase 5: one command registry; split preferences, document properties and runtime state.
+
 ## P0: Petrucci reusable notation library
 
 This backlog comes from the 2026-09-12 Petrucci/Voce handoff. Petrucci remains

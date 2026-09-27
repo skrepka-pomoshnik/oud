@@ -172,7 +172,7 @@ def _beamified_chord_flag_positions(
 ) -> list[tuple[int, int, bool]]:
     if not positions:
         return []
-    chords = [chord for chord in (bar.chords or []) if chord.notes]
+    chords = list(bar.chords or [])
     if not chords or len(chords) != len(positions):
         return _fallback_redundant_positions(
             positions,

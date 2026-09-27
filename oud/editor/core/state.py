@@ -12,10 +12,12 @@ from oud.editor.core.document import DocumentMode
 from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
 from oud.editor.core.feedback.transient import DEFAULT_MESSAGE_TTL_TICKS
 from oud.editor.core.input.keycodes import DEFAULT_KEYCODES, KeyCodes
+from oud.editor.core.input.modes import Mode
 from oud.services.playback.timeline import PlaybackCursor
 from petrucci.core.model import Bar, Chord, Piece
 
 if TYPE_CHECKING:
+    from oud.editor.core.input.keymap import Action
     from oud.importers.tab import TabData
     from oud.services.plugins.model import RemoteTab
     from petrucci.terminal.canvas.framebuffer import Frame
@@ -36,7 +38,7 @@ class EditorState:
         self.cursor_col = 0
         self.bar_offset = 0
         self.bar_width = 12
-        self.mode = "normal"
+        self.mode: Mode = Mode.NORMAL
         self.overrides: dict[tuple[int, int, int], str] = {}
         self.durations: dict[tuple[int, int, int], int] = {}
         self.current_duration = 4
@@ -91,12 +93,12 @@ class EditorState:
         self.background_messages: SimpleQueue[tuple[str, str]] = SimpleQueue()
         self.playback = PlaybackState()
         self.count_prefix = ""
-        self.pending_key = ""
-        self.pending_find = ""
+        # Keys of an unfinished sequence (`g`, `d`) and an action awaiting its char (`f{c}`).
+        self.pending_keys: tuple[int, ...] = ()
+        self.pending_action: Action | None = None
         self.last_find: tuple[str, str] | None = None
         self.last_word_search: tuple[str, int] | None = None
         self.marks: dict[str, tuple[int, int, int]] = {}
-        self.pending_mark = ""
         self.pending_quit = False
         self.read_only = False
         self.visual_anchor: tuple[int, int, int] | None = None

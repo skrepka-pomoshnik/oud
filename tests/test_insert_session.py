@@ -1,3 +1,4 @@
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import enter_insert_mode, enter_replace_mode, set_mode
 from oud.editor.core.state import EditorState
 from petrucci.core.model import Bar, Piece
@@ -9,7 +10,7 @@ def _state() -> EditorState:
 
 def test_set_mode_clears_insert_session_when_leaving_insert_context() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.insert_prefix = "/"
     state.replace_once = True
     set_mode(state, "command")
@@ -20,7 +21,7 @@ def test_set_mode_clears_insert_session_when_leaving_insert_context() -> None:
 
 def test_set_mode_clears_visual_anchor_when_leaving_visual_context() -> None:
     state = _state()
-    state.mode = "visual"
+    state.mode = Mode.VISUAL
     state.visual_anchor = (0, 1, 2)
     set_mode(state, "normal")
     assert state.mode == "normal"

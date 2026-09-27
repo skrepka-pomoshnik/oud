@@ -149,9 +149,9 @@ def cmd_convert(state: EditorState, args: str, config_path: str) -> None:
     if target not in ("french", "italian"):
         state.message = "Convert target must be french or italian"
         return
+    _ = config_path  # style is a document property; it is not persisted
     convert_overrides(state, target)
     state.settings["style"] = target
-    save_settings(config_path, state.settings)
     state.message = f"Converted to {target}"
 
 
@@ -165,28 +165,18 @@ def cmd_ascii(state: EditorState, args: str) -> None:
 
 
 def cmd_midi(state: EditorState, args: str, config_path: str) -> None:
-    _cmd_midi(state, args, config_path, export_midi_fn=export_midi, save_fn=save_settings)
+    _ = config_path  # exports never persist settings
+    _cmd_midi(state, args, export_midi_fn=export_midi)
 
 
 def cmd_lilypond(state: EditorState, args: str, config_path: str) -> None:
-    _cmd_lilypond(
-        state,
-        args,
-        config_path,
-        export_lilypond_fn=export_lilypond,
-        save_fn=save_settings,
-    )
+    _ = config_path  # exports never persist settings
+    _cmd_lilypond(state, args, export_lilypond_fn=export_lilypond)
 
 
 def cmd_musicxml(state: EditorState, args: str, config_path: str) -> None:
-    _cmd_musicxml(
-        state,
-        args,
-        config_path,
-        export_musicxml_fn=export_musicxml,
-        export_mxl_fn=export_mxl,
-        save_fn=save_settings,
-    )
+    _ = config_path  # exports never persist settings
+    _cmd_musicxml(state, args, export_musicxml_fn=export_musicxml, export_mxl_fn=export_mxl)
 
 
 def cmd_pdf(state: EditorState, args: str, config_path: str) -> None:
@@ -202,13 +192,8 @@ def cmd_pdf(state: EditorState, args: str, config_path: str) -> None:
 def cmd_play(state: EditorState, args: str, config_path: str) -> None:
     from oud.editor.services.media.midi import start_midi  # noqa: PLC0415
 
-    _cmd_play(
-        state,
-        args,
-        config_path,
-        start_midi_fn=start_midi,
-        save_fn=save_settings,
-    )
+    _ = config_path  # playback tempo belongs to the document session
+    _cmd_play(state, args, start_midi_fn=start_midi)
 
 
 def cmd_pause(state: EditorState) -> None:

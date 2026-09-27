@@ -7,6 +7,7 @@ import pytest
 from oud.editor.editing.primitives.undo import redo, undo
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.rendering.primitives.utils import note_type_to_denom
 from tests.helpers_keyscript import keyscript_state, press_keys
 
@@ -22,12 +23,12 @@ def test_french_typing_contract_is_identical_across_key_profiles(key_profile: st
     right = state.keycodes.right
     down = state.keycodes.down
 
-    press_keys(state, ["i", "4", "a", left, down, "c", left, ".", right, "r", "/", "a", 27])
+    press_keys(state, ["i", "4", "a", left, down, "c", left, ".", right, "z", "/", "a", 27])
 
     assert state.overrides == {
         (0, 0, 0): "a",
         (0, 1, 0): "c",
-        (0, 1, 1): "r",
+        (0, 1, 1): REST_OVERRIDE,
         (0, 6, 2): "a",
     }
     assert state.durations == {
@@ -98,8 +99,8 @@ def test_tab_save_rejects_unrepresentable_italian_fret_without_writing(tmp_path:
 def test_note_rest_note_typing_keeps_each_edit_atomic() -> None:
     state = keyscript_state(style="french")
 
-    press_keys(state, ["i", "a", 27, "h", "R", "r", 27])
-    assert state.overrides[(0, 0, 0)] == "r"
+    press_keys(state, ["i", "a", 27, "h", "R", "z", 27])
+    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
     assert state.durations[(0, 0, 0)] == 4
 
     undo(state, config_path="config.toml")
@@ -110,5 +111,5 @@ def test_note_rest_note_typing_keeps_each_edit_atomic() -> None:
 
     redo(state, config_path="config.toml")
     redo(state, config_path="config.toml")
-    assert state.overrides[(0, 0, 0)] == "r"
+    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
     assert state.durations[(0, 0, 0)] == 4

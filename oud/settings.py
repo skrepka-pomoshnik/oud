@@ -1,20 +1,60 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
+
+SETTINGS_TABLE = "settings"
+_APP_CONFIG_DIR = "oud"
+
+
+class SettingsFileError(OSError):
+    """The settings file cannot be read or safely rewritten."""
+
+    def __init__(self, path: Path, reason: str) -> None:
+        super().__init__(f"{path}: {reason}")
+
+
+def config_home() -> Path:
+    """Return the user configuration directory for Oud (XDG base directory)."""
+
+    base = os.environ.get("XDG_CONFIG_HOME")
+    root = Path(base) if base else Path.home() / ".config"
+    return root / _APP_CONFIG_DIR
 
 
 def _resolve_config_path(path: str) -> Path:
+    """Resolve a config name without ever claiming an unrelated working-directory file.
+
+    Absolute paths are used as given. A relative name is a project-local config
+    only when that file already carries an Oud ``[settings]`` table; otherwise it
+    lives under the user configuration directory.
+    """
+
     candidate = Path(path)
     if candidate.is_absolute():
         return candidate
-    cwd_path = Path.cwd() / path
-    if cwd_path.exists():
+    cwd_path = Path.cwd() / candidate
+    if cwd_path.is_file() and _has_settings_table(cwd_path):
         return cwd_path
-    config_home = Path.home() / ".config" / "oud" / path
-    if config_home.exists():
-        return config_home
-    return cwd_path
+    return config_home() / candidate
+
+
+def _load_toml(file_path: Path) -> dict[str, object]:
+    try:
+        with file_path.open("rb") as f:
+            return tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise SettingsFileError(file_path, f"cannot read: {exc}") from exc
+
+
+def _has_settings_table(file_path: Path) -> bool:
+    try:
+        return isinstance(_load_toml(file_path).get(SETTINGS_TABLE), dict)
+    except SettingsFileError:
+        return False
 
 
 DEFAULT_SETTINGS: dict[str, str] = {
@@ -110,19 +150,35 @@ DEFAULT_SETTINGS: dict[str, str] = {
 }
 
 
+# Properties of the open document. The config file may seed new documents with
+# them, but session changes to these keys never persist.
+DOCUMENT_SETTING_KEYS = frozenset({"style", "strings", "tuning", "time", "key", "tempo", "bassstrings"})
+
+
+def is_preference_key(key: str) -> bool:
+    return key in DEFAULT_SETTINGS and key not in DOCUMENT_SETTING_KEYS
+
+
+def preference_changes(before: Mapping[str, str], after: Mapping[str, str]) -> dict[str, str]:
+    """Return preference keys whose value changed; document and runtime keys are excluded."""
+
+    return {key: value for key, value in after.items() if is_preference_key(key) and before.get(key) != value}
+
+
 def _read_settings_file(file_path: Path) -> dict[str, object] | None:
     if not file_path.exists():
         return None
     try:
-        with file_path.open("rb") as f:
-            raw = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
+        raw = _load_toml(file_path)
+    except SettingsFileError:
         return None
-    settings = raw.get("settings", {})
-    return settings if isinstance(settings, dict) else None
+    settings = raw.get(SETTINGS_TABLE, {})
+    if not isinstance(settings, dict):
+        return None
+    return {str(key): value for key, value in settings.items()}
 
 
-def _merge_settings(data: dict[str, str], settings: dict[str, object]) -> None:
+def _merge_settings(data: dict[str, str], settings: Mapping[str, object]) -> None:
     for key, value in settings.items():
         if key not in data:
             continue
@@ -145,21 +201,52 @@ def load_settings(path: str) -> dict[str, str]:
     return data
 
 
-def save_settings(path: str, settings: dict[str, str]) -> None:
+def _stored_settings(file_path: Path) -> dict[str, str]:
+    """Return the existing ``[settings]`` values, refusing files Oud does not own."""
+
+    if not file_path.exists():
+        return {}
+    raw = _load_toml(file_path)
+    foreign = sorted(key for key in raw if key != SETTINGS_TABLE)
+    if foreign:
+        raise SettingsFileError(file_path, f"contains non-Oud tables or keys: {', '.join(foreign)}")
+    table = raw.get(SETTINGS_TABLE, {})
+    if not isinstance(table, dict):
+        raise SettingsFileError(file_path, f"[{SETTINGS_TABLE}] is not a table")
+    # Unknown keys are preserved; only scalar values can be written back.
+    return {str(key): _scalar_text(value) for key, value in table.items() if isinstance(value, (str, int))}
+
+
+def _scalar_text(value: str | int) -> str:
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value)
+
+
+def _toml_line(key: str, value: str) -> str:
+    if value.isdigit():
+        return f"{key} = {value}"
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'{key} = "{escaped}"'
+
+
+def save_settings(path: str, settings: Mapping[str, str]) -> None:
+    """Merge ``settings`` into the ``[settings]`` table and replace the file atomically.
+
+    An empty value removes the key so the built-in default applies again.
+    """
+
     file_path = _resolve_config_path(path)
-    merged = load_settings(path)
+    merged = _stored_settings(file_path)
     merged.update(settings)
-    if file_path.parent:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["[settings]"]
-    for key in sorted(merged.keys()):
-        value = merged[key]
-        if value == "":
-            continue
-        if value.isdigit():
-            lines.append(f"{key} = {value}")
-        else:
-            escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-            lines.append(f'{key} = "{escaped}"')
-    content = "\n".join(lines) + "\n"
-    file_path.write_text(content, encoding="utf-8")
+    lines = [f"[{SETTINGS_TABLE}]"]
+    lines.extend(_toml_line(key, value) for key, value in sorted(merged.items()) if value != "")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{file_path.name}.", dir=file_path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+        Path(temp_name).replace(file_path)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise

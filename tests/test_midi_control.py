@@ -26,6 +26,10 @@ class _Proc:
     def terminate(self) -> None:
         self._terminated = True
 
+    def wait(self, timeout: float | None = None) -> int:
+        _ = timeout
+        return 0
+
 
 def _state() -> EditorState:
     piece = Piece(title="T", bars=[Bar()], strings=6)

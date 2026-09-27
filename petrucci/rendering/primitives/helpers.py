@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Sequence
 from importlib.metadata import PackageNotFoundError, version
 
 from petrucci.core.model import Piece
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.terminal.canvas.screen import CursesError, Screen
-from petrucci.terminal.text.help import help_lines
 
 try:
     _PACKAGE_VERSION = version("oud")
@@ -227,9 +228,10 @@ def render_help(
     status: str,
     status_attr: int,
     help_offset: int,
+    lines: Sequence[str],
 ) -> None:
+    """Paint caller-owned help text as a scrollable page."""
     height, _width = stdscr.getmaxyx()
-    lines = help_lines()
     max_lines = max(0, height - 1)
     max_offset = max(0, len(lines) - max_lines)
     offset = min(max(0, help_offset), max_offset)
@@ -350,7 +352,7 @@ def apply_overrides(
             if key not in overrides:
                 continue
             value = overrides[key]
-            if value == "r":
+            if value == REST_OVERRIDE:
                 cells[s_idx][col] = "_"
                 next_col = col + 1
                 if (

@@ -28,7 +28,7 @@ from petrucci.core.music.tuning import (
     parse_bass_strings,
     tuning_count,
 )
-from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
+from petrucci.input.tablature.input import editor_event_columns, editor_fret_at, editor_rest_at
 
 
 def _note_type_to_denom(note_type: int) -> int | None:
@@ -195,12 +195,14 @@ def _collect_manual_chords(
     current_time = 0
     for col in columns:
         notes = _manual_notes_at_column(bar_index, col, strings, overrides, durations, style=style)
-        if not notes:
+        is_rest = not notes and editor_rest_at(overrides, bar_index=bar_index, column=col)
+        if not (notes or is_rest):
             continue
         denom = _manual_duration_at_column(bar_index, col, strings, durations, default_duration)
         is_dotted = dotted is not None and (bar_index, col) in dotted
         duration = _duration_ticks(denom, is_dotted)
-        events.append((current_time, duration, col, notes))
+        if notes:
+            events.append((current_time, duration, col, notes))
         current_time += duration
     return events
 

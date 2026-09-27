@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from petrucci.adapters.piece_view import typeset_piece_score_view
@@ -9,6 +10,7 @@ from petrucci.rendering.bar.legacy import LegacyRenderRequest, render_legacy_pie
 from petrucci.rendering.primitives.helpers import apply_overrides as _apply_overrides_impl
 from petrucci.rendering.primitives.helpers import bass_strings_used as _bass_strings_used_impl
 from petrucci.rendering.primitives.helpers import clean_text as _clean_text
+from petrucci.rendering.primitives.helpers import render_help as _render_help
 from petrucci.rendering.primitives.helpers import render_info as _render_info
 from petrucci.rendering.primitives.helpers import render_notes as _render_notes
 from petrucci.rendering.primitives.helpers import render_plugin as _render_plugin
@@ -69,6 +71,7 @@ class _AuxiliaryRequest:
     ascii_lines: list[str] | None
     settings: dict[str, str]
     show_status: bool
+    help_lines: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -99,7 +102,17 @@ def _render_auxiliary(
     height: int,
     request: _AuxiliaryRequest,
 ) -> bool:
-    if request.mode == "info":
+    if request.mode == "help":
+        status = build_status_lines(
+            mode=request.mode,
+            cmdline="",
+            searchline="",
+            message=request.message,
+            status_line=request.status_line,
+            dur_text=None,
+        )
+        _render_help(screen, _clean_text(status), request.status_attr, request.help_offset, request.help_lines)
+    elif request.mode == "info":
         _render_info(
             screen,
             request.status_line,
@@ -141,8 +154,6 @@ def _render_canonical(
     piece: Piece,
     request: _CanonicalRequest,
 ) -> bool:
-    if request.mode == "help":
-        return False
     content_height = max(1, request.height - int(request.show_status))
     canonical = typeset_piece_score_view(
         piece,
@@ -216,6 +227,7 @@ def render_piece(
     message_level: str = "info",
     focused_imported_staff_index: int | None = None,
     playback_verse: int | None = None,
+    help_lines: Sequence[str] = (),
 ) -> None:
     piece = project_imported_staff(piece, focused_imported_staff_index)
     piece = piece_for_lyric_display(piece, settings, active_verse_index=playback_verse)
@@ -243,6 +255,7 @@ def render_piece(
         ascii_lines,
         settings,
         show_status,
+        help_lines,
     )
     if _render_auxiliary(stdscr, piece, width, height, auxiliary):
         return

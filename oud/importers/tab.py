@@ -84,7 +84,8 @@ class _BarAccumulator:
 
     def add_chord(self, line: str, line_no: int) -> bool:
         chord, self.last_note_type = _parse_chord_line(line, self.strings, self.last_note_type)
-        if chord is None or not chord.notes:
+        # A flag over an empty column is a rest; keep it so later onsets keep their time.
+        if chord is None:
             return False
         self.current_bar.chords.append(chord)
         self.current_bar.notes.extend(chord.notes)
@@ -108,7 +109,10 @@ class _BarAccumulator:
         self.span_end = line_no
 
     def _finalize_current_bar(self) -> None:
-        if not self.current_bar.chords and not self.current_bar.notes:
+        # A bar is a measure when it has chords or an explicit line such as `Sc`
+        # (Oud writes one per bar, so empty measures round-trip). Bare `b` lines
+        # alone are barline layout and create no bar.
+        if self.span_start is None:
             return
         self.bars.append(self.current_bar)
         if self.span_start is not None and self.span_end is not None:

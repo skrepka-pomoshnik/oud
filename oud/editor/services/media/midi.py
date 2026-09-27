@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import subprocess
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -17,6 +18,9 @@ from oud.services.playback.timeline import PlaybackCursor
 from petrucci.core.model import Piece
 
 T = TypeVar("T")
+
+# Bounded wait for a terminated player before it is killed and reaped.
+PLAYER_STOP_TIMEOUT_S = 1.0
 
 
 def midi_output_path(state: EditorState) -> str:
@@ -35,6 +39,11 @@ def stop_midi(state: EditorState) -> None:
     reset_playback_animation(state)
     if proc.poll() is None:
         proc.terminate()
+        try:
+            proc.wait(timeout=PLAYER_STOP_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=PLAYER_STOP_TIMEOUT_S)
     state.message = "MIDI stopped"
 
 

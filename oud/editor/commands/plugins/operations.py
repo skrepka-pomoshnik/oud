@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 
 from oud.editor.commands.dispatch import cmd_open
 from oud.editor.commands.plugins.state import (
@@ -19,7 +21,7 @@ from oud.editor.commands.plugins.state import (
     plugin_search_finish,
     plugin_search_start,
 )
-from oud.editor.core.input.keymap import plugin_bindings
+from oud.editor.core.input.keymap import Action, ResolvedKeymap, keymap_for
 from oud.editor.core.input.menu import (
     MenuNavBindings,
     MenuNavState,
@@ -28,6 +30,7 @@ from oud.editor.core.input.menu import (
     menu_reduce_nav,
     menu_sync_offset,
 )
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.services import plugins as plugin_package
@@ -289,58 +292,40 @@ def _finish_plugin_search(state: EditorState) -> bool:
 
 
 def _handle_plugin_search(state: EditorState, key: int) -> bool:
-    bindings = plugin_bindings(state)
-    handled = True
-    if key in bindings.search:
+    if not state.plugin_query_active:
+        if keymap_for(state, Mode.PLUGIN).lookup((key,)) is not Action.PLUGIN_FILTER:
+            return False
         plugin_search_start(state)
         state.message = "Search: "
-    elif not state.plugin_query_active:
-        handled = False
-    elif key in bindings.escape:
+        return True
+    # While filtering, the browser edits a query line with the prompt keys.
+    action = keymap_for(state, Mode.SEARCH).lookup((key,))
+    if action is Action.PROMPT_CANCEL:
         plugin_search_cancel(state)
         state.message = ""
-    elif key in bindings.backspace:
+    elif action is Action.PROMPT_BACKSPACE:
         plugin_search_backspace(state)
         state.message = f"Search: {state.plugin_query}"
-    elif key in bindings.enter:
-        handled = _finish_plugin_search(state)
+    elif action is Action.PROMPT_SUBMIT:
+        return _finish_plugin_search(state)
     elif ord(" ") <= key <= ord("~"):
         plugin_search_append(state, chr(key))
         state.message = f"Search: {state.plugin_query}"
-    return handled
-
-
-def _plugin_action(state: EditorState, key: int) -> str | None:
-    bindings = plugin_bindings(state)
-    actions = {
-        "exit": bindings.exit,
-        "back": bindings.back,
-        "top": bindings.prefix,
-        "bottom": bindings.bottom,
-        "up": bindings.up,
-        "down": bindings.down,
-        "open": bindings.open,
-        "download": bindings.download,
-        "download_tree": bindings.download_tree,
-    }
-    for name, keys in actions.items():
-        if key in keys:
-            return name
-    return None
+    return True
 
 
 def _leave_plugin_mode(state: EditorState) -> None:
     _clear_plugin_confirm(state)
     if not _pop_stack(state):
-        set_mode(state, "normal")
+        set_mode(state, Mode.NORMAL)
 
 
-def _handle_plugin_navigation(state: EditorState, key: int, bindings) -> bool:
+def _handle_plugin_navigation(state: EditorState, key: int, keymap: ResolvedKeymap) -> bool:
     nav_bindings = MenuNavBindings(
-        up=bindings.up,
-        down=bindings.down,
-        top_prefix=bindings.prefix,
-        bottom=bindings.bottom,
+        up=keymap.keys_for(Action.PLUGIN_UP),
+        down=keymap.keys_for(Action.PLUGIN_DOWN),
+        top_prefix=keymap.first_keys_for(Action.PLUGIN_TOP),
+        bottom=keymap.keys_for(Action.PLUGIN_BOTTOM),
     )
     page_size = menu_page_size(state.screen_height)
     nav = MenuNavState(
@@ -361,33 +346,41 @@ def _handle_plugin_navigation(state: EditorState, key: int, bindings) -> bool:
     return handled
 
 
-def _handle_plugin_command_action(state: EditorState, action: str | None) -> None:
-    if action == "open":
-        open_plugin_item(state)
-    elif action == "download":
-        download_plugin_item(state)
-    elif action == "download_tree":
-        download_plugin_folder_recursive(state)
-    else:
-        _clear_plugin_confirm(state)
+_PLUGIN_COMMANDS: Mapping[Action, Callable[[EditorState], object]] = MappingProxyType(
+    {
+        Action.PLUGIN_OPEN: open_plugin_item,
+        Action.PLUGIN_DOWNLOAD: download_plugin_item,
+        Action.PLUGIN_DOWNLOAD_TREE: download_plugin_folder_recursive,
+    },
+)
+# Navigation actions are reduced by the shared menu helper.
+PLUGIN_NAVIGATION = frozenset({Action.PLUGIN_UP, Action.PLUGIN_DOWN, Action.PLUGIN_TOP, Action.PLUGIN_BOTTOM})
+_PLUGIN_EXITS = frozenset({Action.PLUGIN_CLOSE, Action.PLUGIN_BACK})
+PLUGIN_HANDLED_ACTIONS = frozenset(
+    {*_PLUGIN_COMMANDS, *PLUGIN_NAVIGATION, *_PLUGIN_EXITS, Action.PLUGIN_FILTER, Action.PLUGIN_HELP},
+)
 
 
 def handle_plugin_key(state: EditorState, key: int) -> bool:
-    if key == ord("?"):
+    keymap = keymap_for(state, Mode.PLUGIN)
+    action = keymap.lookup((key,))
+    if action is Action.PLUGIN_HELP and not state.plugin_query_active:
         from oud.editor.commands.dispatch import show_help  # noqa: PLC0415
 
         show_help(state)
         return True
-    if not state.plugin_items:
-        return True
     if _handle_plugin_search(state, key):
         return True
-    bindings = plugin_bindings(state)
-    action = _plugin_action(state, key)
-    if action in {"exit", "back"}:
+    if action in _PLUGIN_EXITS:
         _leave_plugin_mode(state)
         return True
-    if _handle_plugin_navigation(state, key, bindings):
+    if not state.plugin_items:
         return True
-    _handle_plugin_command_action(state, action)
+    if _handle_plugin_navigation(state, key, keymap):
+        return True
+    command = _PLUGIN_COMMANDS.get(action) if action is not None else None
+    if command is None:
+        _clear_plugin_confirm(state)
+    else:
+        command(state)
     return True

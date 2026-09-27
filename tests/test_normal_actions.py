@@ -1,10 +1,9 @@
-from dataclasses import fields
-
 import pytest
 
 from oud.editor.core.coordinates import MAX_KEY_COUNT
 from oud.editor.core.input.keycodes import DEFAULT_KEYCODES
-from oud.editor.core.input.keymap import insert_bindings, normal_action_bindings, normal_bindings
+from oud.editor.core.input.keymap import Action, KeyProfile, KeyStyle, active_bindings, keymap_for
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.undo import undo
 from oud.editor.interaction.normal.actions import handle_normal
@@ -30,17 +29,16 @@ def _state() -> EditorState:
     return state
 
 
-def test_casual_profile_has_every_vim_normal_and_insert_action() -> None:
-    vim = _state()
-    casual = _state()
-    casual.settings["keys"] = "casual"
+@pytest.mark.parametrize("mode", [Mode.NORMAL, Mode.VISUAL, Mode.INSERT])
+@pytest.mark.parametrize("read_only", [False, True])
+def test_casual_profile_has_every_vim_action(mode: Mode, read_only: bool) -> None:
+    def actions(style: KeyStyle) -> set[Action]:
+        return {binding.action for binding in active_bindings(KeyProfile(style, False, read_only), mode)}
 
-    for binding_factory in (normal_bindings, normal_action_bindings, insert_bindings):
-        vim_bindings = binding_factory(vim)
-        casual_bindings = binding_factory(casual)
-        for field in fields(vim_bindings):
-            if getattr(vim_bindings, field.name):
-                assert getattr(casual_bindings, field.name), field.name
+    missing = actions(KeyStyle.VIM) - actions(KeyStyle.CASUAL)
+    # dd and `,` (reverse find) are vim grammar; casual keeps `,`/`.` for bar steps
+    # and `[`/`]` for sections, so it has no reverse find (docs/ui-fix-plan.md).
+    assert missing <= {Action.DELETE_BARS, Action.FIND_REPEAT_REVERSE}
 
 
 def test_casual_movement_and_bar_step_keys_are_not_shadowed_by_vim_actions() -> None:
@@ -50,7 +48,7 @@ def test_casual_movement_and_bar_step_keys_are_not_shadowed_by_vim_actions() -> 
 
     handle_normal(state, ord("d"))
     assert state.cursor_col == 1
-    assert state.pending_key == ""
+    assert state.pending_keys == ()
 
     handle_normal(state, ord(","))
     assert state.cursor_bar == 0
@@ -71,7 +69,7 @@ def test_casual_shift_ws_jump_rendered_rows() -> None:
 def test_casual_visual_d_moves_instead_of_deleting_selection() -> None:
     state = _state()
     state.settings["keys"] = "casual"
-    state.mode = "visual"
+    state.mode = Mode.VISUAL
     state.visual_anchor = (0, 0, 0)
 
     handle_normal(state, ord("d"))
@@ -83,10 +81,10 @@ def test_casual_visual_d_moves_instead_of_deleting_selection() -> None:
 def test_casual_bindings_add_standard_undo_redo_aliases() -> None:
     state = _state()
     state.settings["keys"] = "casual"
-    bindings = normal_bindings(state)
+    keymap = keymap_for(state, Mode.NORMAL)
 
-    assert 26 in bindings.undo  # Ctrl-Z
-    assert 25 in bindings.redo  # Ctrl-Y
+    assert 26 in keymap.keys_for(Action.UNDO)  # Ctrl-Z
+    assert 25 in keymap.keys_for(Action.REDO)  # Ctrl-Y
 
 
 def test_upper_jumps_to_same_offset_in_next_system() -> None:
@@ -267,11 +265,11 @@ def test_jk_clamp_to_visible_string_bounds() -> None:
 
 def test_gi_opens_info_mode() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.insert_prefix = "/"
     state.replace_once = True
     handle_normal(state, ord("g"))
-    assert state.pending_key == "g"
+    assert state.pending_keys == (ord("g"),)
     handle_normal(state, ord("i"))
     assert state.mode == "info"
     assert state.insert_prefix == ""
@@ -280,7 +278,7 @@ def test_gi_opens_info_mode() -> None:
 
 def test_gh_opens_help_mode() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.insert_prefix = ","
     state.replace_once = True
     handle_normal(state, ord("g"))

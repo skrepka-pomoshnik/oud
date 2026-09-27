@@ -6,6 +6,7 @@ from pathlib import Path
 
 from oud.editor.core.document import default_write_path, set_write_target
 from oud.editor.core.feedback.messages import MISSING_LESS, NO_SOURCE_PATH, MessageLevel
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.exports.export_tab import TabExportError, export_ascii, export_tab_to_file
@@ -33,7 +34,7 @@ def _confirm_new_target(state: EditorState, path: str) -> bool:
 
 
 def request_save_as(state: EditorState, command: str = "w") -> None:
-    set_mode(state, "command")
+    set_mode(state, Mode.COMMAND)
     state.cmdline = f"{command} {default_write_path(state)}"
     state.message = "Confirm or edit the .tab destination"
 

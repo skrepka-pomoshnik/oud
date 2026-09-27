@@ -12,6 +12,7 @@ from petrucci.adapters.duet import (
     split_duet_piece_staff,
 )
 from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.rendering.api import _apply_overrides, render_piece
 from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from petrucci.rendering.staff.vocal import melody_row_count
@@ -170,7 +171,7 @@ def _strip_combining(text: str) -> str:
 
 def test_apply_overrides_wrapper() -> None:
     cells = [list("----") for _ in range(6)]
-    _apply_overrides(cells, {(0, 0, 1): "r", (0, 1, 2): "a"}, 0, 6, 4)
+    _apply_overrides(cells, {(0, 0, 1): REST_OVERRIDE, (0, 1, 2): "a"}, 0, 6, 4)
     assert cells[0][1] == "_"
     assert cells[1][2] == "a"
 
@@ -189,10 +190,11 @@ def test_render_piece_modes_and_help() -> None:
     kwargs["ascii_lines"] = ["abc", "def"]
     render_piece(**kwargs)
     assert kwargs["stdscr"].refreshes == 1
-    # help mode triggers second erase
+    # help mode paints the caller-owned lines as a page
     kwargs = _args("help")
+    kwargs["help_lines"] = ["HELP", "generated line"]
     render_piece(**kwargs)
-    assert kwargs["stdscr"].erases >= 2
+    assert kwargs["stdscr"].refreshes == 1
 
 
 def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from oud.editor.core.input.keymap import command_bindings, search_bindings
+from oud.editor.core.input.keymap import Action, keymap_for
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.prompt.state import (
@@ -15,14 +16,16 @@ from oud.presentation.tui.input.completion import complete_command_text
 from oud.presentation.tui.prompt import PromptBindings, update_prompt
 
 
-def _prompt_bindings(bindings) -> PromptBindings:
+def prompt_bindings(state: EditorState, mode: Mode) -> PromptBindings:
+    """Line-editing keys for a prompt, taken from the key table."""
+    keymap = keymap_for(state, mode)
     return PromptBindings(
-        escape=bindings.escape,
-        backspace=bindings.backspace,
-        enter=bindings.enter,
-        tab=getattr(bindings, "tab", ()),
-        history_up=getattr(bindings, "history_up", ()),
-        history_down=getattr(bindings, "history_down", ()),
+        escape=keymap.keys_for(Action.PROMPT_CANCEL),
+        backspace=keymap.keys_for(Action.PROMPT_BACKSPACE),
+        enter=keymap.keys_for(Action.PROMPT_SUBMIT),
+        tab=keymap.keys_for(Action.PROMPT_COMPLETE),
+        history_up=keymap.keys_for(Action.PROMPT_HISTORY_PREV),
+        history_down=keymap.keys_for(Action.PROMPT_HISTORY_NEXT),
     )
 
 
@@ -41,8 +44,7 @@ def complete_command(state: EditorState) -> bool:
 
 
 def handle_command(state: EditorState, key: int, apply_command) -> bool:
-    bindings = command_bindings(state)
-    prompt_bindings = _prompt_bindings(bindings)
+    bindings = prompt_bindings(state, Mode.COMMAND)
 
     def _complete(text: str) -> tuple[str, str | None]:
         return complete_command_text(state, text)
@@ -50,7 +52,7 @@ def handle_command(state: EditorState, key: int, apply_command) -> bool:
     result = update_prompt(
         state.cmdline,
         key,
-        prompt_bindings,
+        bindings,
         history=state.command_history,
         history_index=state.command_history_index,
         on_complete=_complete if key in bindings.tab else None,
@@ -62,7 +64,7 @@ def handle_command(state: EditorState, key: int, apply_command) -> bool:
     state.cmdline = result.text
     state.command_history_index = result.history_index
     if result.cancel:
-        set_mode(state, "normal")
+        set_mode(state, Mode.NORMAL)
         state.cmdline = ""
         state.message = ""
         command_history_reset_nav(state)
@@ -70,7 +72,7 @@ def handle_command(state: EditorState, key: int, apply_command) -> bool:
     if result.submit:
         cmd = state.cmdline
         state.cmdline = ""
-        set_mode(state, "normal")
+        set_mode(state, Mode.NORMAL)
         command_history_commit(state, cmd)
         apply_command(state, cmd)
         return True
@@ -86,19 +88,18 @@ def parse_search(text: str) -> int | None:
 
 
 def handle_search(state: EditorState, key: int) -> bool:
-    bindings = search_bindings(state)
-    prompt_bindings = _prompt_bindings(bindings)
+    bindings = prompt_bindings(state, Mode.SEARCH)
     result = update_prompt(
         state.searchline,
         key,
-        prompt_bindings,
+        bindings,
         history=state.search_history,
         history_index=state.search_history_index,
     )
     state.searchline = result.text
     state.search_history_index = result.history_index
     if result.cancel:
-        set_mode(state, "normal")
+        set_mode(state, Mode.NORMAL)
         state.searchline = ""
         search_history_reset_nav(state)
         return True
@@ -106,7 +107,7 @@ def handle_search(state: EditorState, key: int) -> bool:
         search_text = state.searchline
         target = parse_search(search_text)
         state.searchline = ""
-        set_mode(state, "normal")
+        set_mode(state, Mode.NORMAL)
         search_history_commit(state, search_text)
         if target is None:
             state.message = "Invalid bar"

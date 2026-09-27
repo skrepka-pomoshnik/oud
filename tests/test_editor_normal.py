@@ -1,3 +1,4 @@
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
@@ -269,21 +270,6 @@ def test_normal_marks_set_and_jump() -> None:
     assert (state.cursor_bar, state.cursor_col) == (0, 2)
 
 
-def test_keymap_remap_hook_for_movement() -> None:
-    state = _state()
-    state.settings["remap_move_left"] = "a"
-    state.cursor_col = 3
-    dispatch_key(
-        state,
-        ord("a"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 2
-
-
 def test_normal_mode_x_clears_cell() -> None:
     state = _state()
     state.overrides[(0, 0, 0)] = "a"
@@ -317,28 +303,28 @@ def test_normal_mode_caret_moves_to_first_note() -> None:
 def test_insert_mode_space_clears_cell() -> None:
     state = _state()
     state.overrides[(0, 0, 0)] = "a"
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord(" "))
     assert (0, 0, 0) not in state.overrides
 
 
 def test_insert_mode_barline_sets_barline() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("|"))
     assert state.piece.bars[0].barline == "|"
 
 
 def test_insert_mode_duration_does_not_advance() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
     assert state.cursor_col == 0
 
 
 def test_insert_overflow_moves_to_next_bar() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     for col in range(4):
         state.durations[(0, 0, col)] = 4
         state.overrides[(0, 0, col)] = "a"
@@ -350,7 +336,7 @@ def test_insert_overflow_moves_to_next_bar() -> None:
 
 def test_insert_mode_notes_insert_and_arrows_move() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     for idx, ch in enumerate("abcdnf"):
         actions.handle_insert(state, ord(ch))
         if idx < 4:
@@ -371,7 +357,7 @@ def test_insert_mode_notes_insert_and_arrows_move() -> None:
 
 def test_insert_mode_arrow_movement_clears_bass_slash_prefix() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.piece.strings = 8
     actions.handle_insert(state, ord("/"))
     assert state.insert_prefix == "/"
@@ -384,7 +370,7 @@ def test_insert_mode_arrow_movement_clears_bass_slash_prefix() -> None:
 
 def test_insert_mode_arrow_movement_clears_italian_multifret_prefix() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     state.settings["style"] = "italian"
     state.settings["italianmultifret"] = "on"
     actions.handle_insert(state, ord(","))
@@ -395,7 +381,7 @@ def test_insert_mode_arrow_movement_clears_italian_multifret_prefix() -> None:
 
 def test_insert_mode_backspace_clears_note() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     actions.handle_insert(state, ord("b"))
     assert (0, 0, 0) in state.overrides
@@ -408,7 +394,7 @@ def test_insert_mode_backspace_clears_note() -> None:
 
 def test_insert_mode_delete_clears_forward() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     actions.handle_insert(state, ord("b"))
     state.cursor_col = 0
@@ -419,7 +405,7 @@ def test_insert_mode_delete_clears_forward() -> None:
 
 def test_insert_duration_after_other_row_duration() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
     actions.handle_insert(state, ord("a"))
     state.cursor_string = 1
@@ -431,7 +417,7 @@ def test_insert_duration_after_other_row_duration() -> None:
 
 def test_insert_after_row_full_advances_and_allows_next_bar() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     for ch in "abcd":
         actions.handle_insert(state, ord(ch))
     actions.handle_insert(state, state.keycodes.down)
@@ -445,7 +431,7 @@ def test_insert_after_row_full_advances_and_allows_next_bar() -> None:
 
 def test_insert_other_row_when_first_full_stays_in_bar() -> None:
     state = _state()
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     for ch in "abcd":
         actions.handle_insert(state, ord(ch))
     actions.handle_insert(state, state.keycodes.down)
@@ -478,7 +464,7 @@ def test_normal_mode_counts_move_right() -> None:
     assert state.cursor_col == 3
 
 
-def test_gj_adds_bass_string() -> None:
+def test_gb_adds_bass_string() -> None:
     state = _state()
     start_strings = state.piece.strings
     state.settings["bassstrings"] = "d2"
@@ -492,7 +478,7 @@ def test_gj_adds_bass_string() -> None:
     )
     dispatch_key(
         state,
-        ord("j"),
+        ord("b"),
         handle_insert=actions.handle_insert,
         handle_normal=actions.handle_normal,
         handle_command=lambda _state, _key: True,
@@ -502,7 +488,7 @@ def test_gj_adds_bass_string() -> None:
     assert state.cursor_string == state.piece.strings - 1
 
 
-def test_gj_requires_bass_strings_setting() -> None:
+def test_gb_requires_bass_strings_setting() -> None:
     state = _state()
     state.settings["bassstrings"] = ""
     dispatch_key(
@@ -515,7 +501,7 @@ def test_gj_requires_bass_strings_setting() -> None:
     )
     dispatch_key(
         state,
-        ord("j"),
+        ord("b"),
         handle_insert=actions.handle_insert,
         handle_normal=actions.handle_normal,
         handle_command=lambda _state, _key: True,
@@ -528,7 +514,7 @@ def test_insert_bass_slash_shorthand() -> None:
     state = _state()
     state.settings["style"] = "french"
     state.piece.strings = 7
-    state.mode = "insert"
+    state.mode = Mode.INSERT
     actions.handle_insert(state, ord("/"))
     actions.handle_insert(state, ord("a"))
     assert state.overrides[(0, 6, 0)] == "a"

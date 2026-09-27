@@ -32,7 +32,8 @@ when LilyPond is unavailable or fails.
 
 **--config** *PATH*
 
-: Read settings from *PATH*. The default is **config.toml**.
+: Read settings from *PATH*. The default is **config.toml**, resolved as
+described under *FILES*.
 
 **--readonly**
 
@@ -60,7 +61,9 @@ is **-**, specify the other format explicitly with **--input-format** or
 
 The TUI uses Vim-like normal, insert, and command modes. **h/j/k/l** or the
 arrow keys move; **i** enters insert mode; **Esc** returns to normal mode; and
-**Ctrl-C** exits immediately and quietly.
+**Ctrl-C** quits like **q**: with unsaved changes it asks once and quits on the
+second press. It also cancels prompts and closes pages. In insert mode letters
+and digits are frets and **z** enters a rest.
 
 **:w** [*PATH*]
 
@@ -102,7 +105,12 @@ fuzzy path ranking; **playbackscroll=off** disables score following.
 
 **config.toml**
 
-: Default settings file in the current directory.
+: Settings file. A relative name is read from the current directory only when
+that file already has a **[settings]** table; otherwise it lives in
+*$XDG_CONFIG_HOME/oud/* (default *~/.config/oud/*). **:set** writes only the
+preference keys it changed. Document properties (style, strings, tuning, time,
+key, tempo, bassstrings) apply to the open score only. A config file containing
+other tables is never rewritten.
 
 **build/lilypond/**
 
@@ -124,6 +132,15 @@ is not created until a PDF build is requested.
 : Used to locate the configured LilyPond executable, and optional **fzf**,
 **fluidsynth**, and **timidity** playback programs.
 
+**XDG_CONFIG_HOME**
+
+: Base directory for the user settings file; defaults to *~/.config*.
+
+**ESCDELAY**
+
+: Milliseconds curses waits to distinguish **Esc** from escape sequences. Oud
+uses 25 ms unless this variable is set.
+
 # EXIT STATUS
 
 0
@@ -144,7 +161,7 @@ is not created until a PDF build is requested.
 
 130
 
-: Interrupted with **Ctrl-C**.
+: A non-interactive command was interrupted with **Ctrl-C**.
 
 # DIAGNOSTICS
 

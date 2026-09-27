@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from oud.editor.core.coordinates import string_index
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.edits import clear_cell_note, undo_group
@@ -11,13 +12,12 @@ from petrucci.rendering.primitives.utils import bar_cells, bar_cells_from_chords
 def enter_visual_mode(state: EditorState, *, linewise: bool = False) -> None:
     if state.visual_anchor is None:
         state.visual_anchor = (state.cursor_bar, state.cursor_string, state.cursor_col)
-    state.mode = "visual_line" if linewise else "visual"
-    state.message = "VISUAL LINE" if linewise else "VISUAL"
+    state.mode = Mode.VISUAL_LINE if linewise else Mode.VISUAL
 
 
 def clear_visual_mode(state: EditorState) -> None:
     state.visual_anchor = None
-    set_mode(state, "normal")
+    set_mode(state, Mode.NORMAL)
 
 
 def yank_visual_rows(state: EditorState) -> int:
@@ -48,7 +48,7 @@ def delete_visual_rows(state: EditorState, *, change: bool = False) -> int:
         state.cursor_string = first_string
         state.cursor_col = first_col
     if change:
-        set_mode(state, "insert")
+        set_mode(state, Mode.INSERT)
         state.message = f"Rows changed: {count}"
     else:
         state.message = f"Rows deleted: {count}"
@@ -154,6 +154,5 @@ def _bar_rows_with_overrides(state: EditorState, bar_index: int) -> list[list[st
             key = (bar_index, s_idx, col)
             if key not in state.overrides:
                 continue
-            value = state.overrides[key]
-            rows[s_idx][col] = "_" if value == "r" else value
+            rows[s_idx][col] = state.overrides[key]
     return rows

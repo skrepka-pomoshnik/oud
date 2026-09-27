@@ -96,7 +96,7 @@ def chord_positions(
     bar_width: int,
     default_duration: int,
 ) -> list[tuple[int, int, bool]]:
-    chords = [chord for chord in (bar.chords or []) if chord.notes]
+    chords = list(bar.chords or [])
     denoms: list[int] = []
     dotted: list[bool] = []
     for chord in chords:
@@ -157,7 +157,7 @@ def bar_cells_from_chords(
     positions = chord_positions(bar, bar_width, default_duration)
     if not positions:
         return cells
-    chords = [chord for chord in (bar.chords or []) if chord.notes]
+    chords = list(bar.chords or [])
     for chord, (col, _denom, _dot) in zip(chords, positions, strict=False):
         for note in chord.notes:
             s_idx = note.string - 1

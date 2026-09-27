@@ -1,3 +1,4 @@
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.presentation.tui.controller import handle_key
 from oud.services.plugins.model import RemoteTab
@@ -31,7 +32,7 @@ def _state() -> EditorState:
 
 def test_help_mode_scroll_and_exit() -> None:
     state = _state()
-    state.mode = "help"
+    state.mode = Mode.HELP
     handle_key(state, ord("j"), handle_insert=None, handle_normal=None, handle_command=None, handle_search=None)
     assert state.help_offset == 1
     handle_key(state, ord("k"), handle_insert=None, handle_normal=None, handle_command=None, handle_search=None)
@@ -42,7 +43,7 @@ def test_help_mode_scroll_and_exit() -> None:
 
 def test_info_mode_scroll_and_exit() -> None:
     state = _state()
-    state.mode = "info"
+    state.mode = Mode.INFO
     handle_key(state, ord("j"), handle_insert=None, handle_normal=None, handle_command=None, handle_search=None)
     assert state.info_offset == 1
     handle_key(state, ord("k"), handle_insert=None, handle_normal=None, handle_command=None, handle_search=None)
@@ -53,7 +54,7 @@ def test_info_mode_scroll_and_exit() -> None:
 
 def test_plugin_mode_navigation_and_exit() -> None:
     state = _state()
-    state.mode = "plugin"
+    state.mode = Mode.PLUGIN
     state.plugin_items = [
         RemoteTab(title="One", url="https://example.com/one.tab"),
         RemoteTab(title="Two", url="https://example.com/two.tab"),

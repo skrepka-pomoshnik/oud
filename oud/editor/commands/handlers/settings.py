@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from oud.editor.core.feedback.messages import READ_ONLY_VIEWER
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.edits import apply_override
 from oud.editor.editing.primitives.tablature import (
@@ -10,7 +11,7 @@ from oud.editor.editing.primitives.tablature import (
     fret_to_italian,
     italian_to_fret,
 )
-from oud.settings import DEFAULT_SETTINGS, save_settings
+from oud.settings import DEFAULT_SETTINGS, DOCUMENT_SETTING_KEYS, preference_changes, save_settings
 from petrucci.core.music.tuning import tuning_preset
 from petrucci.input.tablature.policy import apply_tabnotation_preset
 
@@ -546,6 +547,18 @@ def _apply_set_token(state: EditorState, token: str) -> None:
     _apply_set_value(state, key, value)
 
 
+# `:set` keys that change the open document rather than how it is displayed.
+_DOCUMENT_SET_KEYS = DOCUMENT_SETTING_KEYS | {"staff", "timesig", "title", "author", "composer"}
+
+
+def _document_key_of(token: str) -> str | None:
+    if "=" not in token:
+        return token if token in META_PRESETS else None
+    key = token.split("=", 1)[0]
+    key = _DEPRECATED_SET_ALIASES.get(key, key)
+    return key if key in _DOCUMENT_SET_KEYS else None
+
+
 def apply_set_command(
     state: EditorState,
     args: str,
@@ -553,12 +566,24 @@ def apply_set_command(
     *,
     save_fn: Callable[[str, dict[str, str]], None] = save_settings,
 ) -> None:
+    """Apply `:set` tokens and persist only the preference keys they changed."""
     if not args:
         state.message = "No set args"
         return
+    before = dict(state.settings)
     for token in args.split():
+        document_key = _document_key_of(token) if state.read_only else None
+        if document_key is not None:
+            state.message = f"{READ_ONLY_VIEWER}: {document_key} changes the document"
+            continue
         _apply_set_token(state, token)
-    save_fn(config_path, state.settings)
+    changes = preference_changes(before, state.settings)
+    if not changes:
+        return
+    try:
+        save_fn(config_path, changes)
+    except OSError as exc:
+        state.message = f"Settings applied but not saved: {exc}"
 
 
 def _toggle_bool_key(state: EditorState, key: str) -> bool:

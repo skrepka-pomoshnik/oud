@@ -30,11 +30,9 @@ def test_duration_value_does_not_map_french_fret_letters() -> None:
         assert duration_value(ord(ch), "french") is None
 
 
-def test_duration_value_italian_ctrl_keys() -> None:
-    assert duration_value(1, "italian") == 1
-    assert duration_value(4, "italian") == 8
-    assert duration_value(6, "italian") == 32
-    assert duration_value(9, "italian") is None
+def test_duration_value_italian_digits_are_frets_not_durations() -> None:
+    for key in (1, 4, 6, ord("1"), ord("4")):
+        assert duration_value(key, "italian") is None
 
 
 def test_denom_to_note_type() -> None:

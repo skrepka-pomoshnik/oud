@@ -5,12 +5,23 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 CellKey = tuple[int, int, int]
+# Grid marker for an entered rest. It must never be a French or Italian fret glyph.
+REST_OVERRIDE = "_"
 
 
 def editor_event_columns(overrides: Mapping[CellKey, str], *, bar_index: int) -> tuple[int, ...]:
     """Return columns containing editor events or multi-cell continuations."""
 
     return tuple(sorted({col for bar, _string, col in overrides if bar == bar_index}))
+
+
+def editor_rest_at(overrides: Mapping[CellKey, str], *, bar_index: int, column: int) -> bool:
+    """Return whether an editor column holds an entered rest."""
+
+    return any(
+        value == REST_OVERRIDE and bar == bar_index and col == column
+        for (bar, _string, col), value in overrides.items()
+    )
 
 
 def editor_fret_at(
@@ -71,4 +82,4 @@ def _is_italian_continuation(
     return bool(text and text.isdigit() and previous and previous.isdigit() and previous_key in durations)
 
 
-__all__ = ["CellKey", "editor_event_columns", "editor_fret_at"]
+__all__ = ["REST_OVERRIDE", "CellKey", "editor_event_columns", "editor_fret_at", "editor_rest_at"]

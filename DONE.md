@@ -1,5 +1,70 @@
 # DONE
 
+## Editor UI: rests, Ctrl-C and the full key table (2026-09-27)
+
+- Empty bars round-trip. A chord-less bar with an explicit line such as `Sc`
+  (Oud writes one per bar) is a measure. Bare `b` lines still create no bar;
+  bar counts of every repo TAB file are unchanged.
+- TAB rests round-trip:
+  - Flag-only lines import as rest chords instead of being dropped.
+  - Layout helpers no longer filter out note-less chords, so later onsets keep
+    their time.
+  - A rest's flag is always drawn over an empty column.
+  - Saved rests reopen as rests.
+  - Existing files such as `examples/si_par_souffrir.tab` and
+    `Sarabande_de_gautier.tab` now show their rests.
+- Ctrl-C:
+  - SIGINT is latched while the TUI runs and delivered as the Ctrl-C key.
+    Before, the interrupt could fire mid-render or mid-edit and exit with 130,
+    discarding edits.
+  - It follows `q` (asks once with unsaved changes), cancels prompts and
+    closes pages and the plugin browser.
+  - Every loop exit, `:q` included, stops playback, and stopping reaps the
+    player with a bounded wait before killing it.
+- Key table: the command and go-to-bar prompts, help/info/notes pages and the
+  plugin browser read their keys from the same table, and help lists every
+  mode. The plugin browser can now be closed even when its list is empty.
+- Collisions resolved:
+  - `P` pastes bars before (PDF only via `:pdf`).
+  - `gb` adds a bass course (was `gj`).
+  - `[`/`]` only jump sections; casual find repeat is `;`.
+  - The remaining deliberate exceptions are documented in
+    `docs/ui-fix-plan.md`.
+- Validation: new regression tests for rest import, render, save/reopen and
+  playback, SIGINT at an arbitrary point, prompt/page cancel, player reaping
+  and the key-table contracts for all seven table modes. `scripts/quality.sh`
+  passes: 1,860 passed, 11 skipped, 95.09% Petrucci coverage.
+
+## Editor UI audit: phase 1 fixes and one key table (2026-09-27)
+
+- Audited the editing UI live (tmux at 80x24, 100x30 and 120x40) and recorded
+  every finding with acceptance criteria in `docs/ui-fix-plan.md`.
+- Fixed:
+  - Insert-mode `q` quitting; `q`/`r` are now French frets.
+  - The rest key is `z`. Rests use a non-fret marker, so TAB export no longer
+    writes them as fret `r` and MIDI no longer plays them as fret 16.
+  - Replace mode no longer uses fret letters to move.
+  - Removed the raw Ctrl-A..G Italian durations.
+  - `:set` works in read-only viewers for display settings.
+  - `gj` is undoable.
+  - No-op deletes no longer mark the buffer modified.
+  - The status name follows a Save As target.
+  - Visual mode is reported once.
+  - Esc delay is 25 ms (`ESCDELAY` wins).
+- Settings persistence: only changed preference keys are written, atomically,
+  to `$XDG_CONFIG_HOME/oud/config.toml`. Document keys stay in the session.
+  Exports and playback write nothing. A foreign or multi-table `config.toml`
+  is never read or rewritten.
+- Replaced ten binding records, dead `remap_*` plumbing and the
+  `pending_key/find/mark` special cases with one declarative key table:
+  - Actions carry help, group, `mutates` and char-argument metadata.
+  - Modes are a `Mode` enum.
+  - One dispatcher enforces read-only for keys.
+  - Help and the `:help` pager are generated from the table per profile, and
+    Petrucci's editor help text was deleted.
+- Validation: 80 new regression and table-contract test cases (the read-only gate is
+  exercised for every mutating key). `scripts/quality.sh` passes: 1,805 passed, 11 skipped, 95.19% Petrucci coverage.
+
 ## Experimental compact notation spacing
 
 - Added opt-in minimum-gap spacing to the shared score layout, retaining

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from fractions import Fraction
+from types import MappingProxyType
 
 from oud.editor.core.coordinates import cursor_key, string_index
-from oud.editor.core.feedback.messages import UNSAVED_QUIT
-from oud.editor.core.input.keymap import insert_bindings, italian_duration_digits, movement_keys
+from oud.editor.core.input.keymap import Action, keymap_for
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import (
     clear_insert_transient,
     exit_insert_mode,
@@ -29,6 +30,7 @@ from oud.editor.editing.primitives.tablature import (
     is_french_fret,
     is_italian_fret,
 )
+from oud.editor.interaction.normal.commands import quit_editor
 from oud.editor.navigation.motions import (
     apply_motion_target,
     target_snap_previous_time_slot_if_needed,
@@ -36,13 +38,15 @@ from oud.editor.navigation.motions import (
     target_step_display_row,
 )
 from oud.editor.navigation.steps import move_left, move_right
-from oud.editor.services.media.midi import stop_midi
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.input.tablature.mutation import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
 from petrucci.rendering.primitives.utils import (
     chord_slot_positions,
     format_fret,
     note_type_to_denom,
 )
+
+_ITALIAN_DURATION_DIGITS = frozenset(ord(digit) for digit in "1234567")
 
 
 def _column_has_event(state: EditorState, bar_index: int, col: int) -> bool:
@@ -213,6 +217,7 @@ def _handle_insert_dot(state: EditorState) -> bool:
 
 
 def _handle_insert_rest(state: EditorState) -> bool:
+    _commit_pending_insert_edit(state)
     if not _ensure_replace_target(state):
         return True
     with undo_group(state, label="insert-rest"):
@@ -224,7 +229,7 @@ def _handle_insert_rest(state: EditorState) -> bool:
         _snap_cursor_to_chord_slot(state)
         if 0 <= state.cursor_bar < len(state.piece.bars):
             _flatten_chords_to_grid(state, state.cursor_bar)
-        apply_override(state, cursor_key(state), "r")
+        apply_override(state, cursor_key(state), REST_OVERRIDE)
         if not cell_has_duration(
             state,
             state.cursor_bar,
@@ -339,7 +344,7 @@ def _handle_insert_bass_slash(
 def _handle_insert_duration_key(state: EditorState, key: int, style: str) -> bool:
     if state.insert_prefix == ";":
         state.insert_prefix = ""
-        if key in italian_duration_digits() and style == "italian":
+        if key in _ITALIAN_DURATION_DIGITS and style == "italian":
             digit = int(chr(key))
             dur = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 6: 32, 7: 64}.get(digit)
             if dur is not None:
@@ -382,8 +387,6 @@ def _handle_insert_italian_multifret(
 
 
 def _handle_insert_char(state: EditorState, key: int, style: str) -> bool:
-    if key == ord("r"):
-        return _handle_insert_rest(state)
     if ord(" ") <= key <= ord("~"):
         ch = chr(key).lower()
         valid = is_french_fret(ch) if style == "french" else is_italian_fret(ch)
@@ -394,13 +397,6 @@ def _handle_insert_char(state: EditorState, key: int, style: str) -> bool:
             state.message = "Invalid fret for current style"
         return True
     return False
-
-
-def _dispatch_actions(key: int, actions: list[tuple[tuple[int, ...], Callable[[], bool]]]) -> bool | None:
-    for keys, handler in actions:
-        if key in keys:
-            return handler()
-    return None
 
 
 def _prepare_insert_delete(state: EditorState) -> None:
@@ -441,16 +437,6 @@ def _handle_insert_escape(state: EditorState) -> bool:
     return True
 
 
-def _handle_insert_quit(state: EditorState) -> bool:
-    _commit_pending_insert_edit(state)
-    if state.modified and not state.pending_quit:
-        state.pending_quit = True
-        state.message = UNSAVED_QUIT
-        return True
-    stop_midi(state)
-    return False
-
-
 def _handle_insert_horizontal(state: EditorState, motion: Callable[[EditorState], None]) -> bool:
     _commit_pending_insert_edit(state)
     motion(state)
@@ -471,41 +457,6 @@ def _handle_insert_prefix(state: EditorState, key: int) -> bool:
     return True
 
 
-def _dispatch_insert_binding(state: EditorState, key: int) -> bool | None:
-    bindings = insert_bindings(state)
-    keycodes = state.keycodes
-    return _dispatch_actions(
-        key,
-        [
-            (bindings.clear, lambda: _handle_insert_clear(state)),
-            ((keycodes.backspace, 127, 8), lambda: _handle_insert_backspace(state)),
-            ((keycodes.dc,), lambda: _handle_insert_delete(state)),
-            (bindings.barline, lambda: _handle_insert_barline(state)),
-            (bindings.dot, lambda: _handle_insert_dot(state)),
-            (bindings.escape, lambda: _handle_insert_escape(state)),
-            (bindings.quit, lambda: _handle_insert_quit(state)),
-            ((keycodes.left,), lambda: _handle_insert_horizontal(state, move_left)),
-            ((keycodes.right,), lambda: _handle_insert_horizontal(state, move_right)),
-            ((keycodes.up,), lambda: _handle_insert_vertical(state, -1)),
-            ((keycodes.down,), lambda: _handle_insert_vertical(state, 1)),
-            (bindings.prefix, lambda: _handle_insert_prefix(state, key)),
-        ],
-    )
-
-
-def _dispatch_replace_movement(state: EditorState, key: int) -> bool | None:
-    move = movement_keys(state, include_arrows=False)
-    return _dispatch_actions(
-        key,
-        [
-            (move.left, lambda: _handle_insert_horizontal(state, move_left)),
-            (move.right, lambda: _handle_insert_horizontal(state, move_right)),
-            (move.up, lambda: _handle_insert_vertical(state, -1)),
-            (move.down, lambda: _handle_insert_vertical(state, 1)),
-        ],
-    )
-
-
 def _dispatch_insert_content(state: EditorState, key: int) -> None:
     style = state.settings.get("style", "french")
     for handler in (
@@ -518,16 +469,30 @@ def _dispatch_insert_content(state: EditorState, key: int) -> None:
             return
 
 
+InsertHandler = Callable[[EditorState, int], bool]
+_INSERT_HANDLERS: Mapping[Action, InsertHandler] = MappingProxyType(
+    {
+        Action.QUIT: lambda state, _key: quit_editor(state),
+        Action.INSERT_EXIT: lambda state, _key: _handle_insert_escape(state),
+        Action.INSERT_REST: lambda state, _key: _handle_insert_rest(state),
+        Action.INSERT_CLEAR: lambda state, _key: _handle_insert_clear(state),
+        Action.INSERT_BACKSPACE: lambda state, _key: _handle_insert_backspace(state),
+        Action.INSERT_DELETE: lambda state, _key: _handle_insert_delete(state),
+        Action.INSERT_BARLINE: lambda state, _key: _handle_insert_barline(state),
+        Action.INSERT_DOT: lambda state, _key: _handle_insert_dot(state),
+        Action.INSERT_PREFIX: _handle_insert_prefix,
+        Action.INSERT_LEFT: lambda state, _key: _handle_insert_horizontal(state, move_left),
+        Action.INSERT_RIGHT: lambda state, _key: _handle_insert_horizontal(state, move_right),
+        Action.INSERT_UP: lambda state, _key: _handle_insert_vertical(state, -1),
+        Action.INSERT_DOWN: lambda state, _key: _handle_insert_vertical(state, 1),
+    },
+)
+
+
 def handle_insert(state: EditorState, key: int) -> bool:
-    if key == ord("\x1b"):
-        exit_insert_mode(state)
-        return True
-    handled = _dispatch_insert_binding(state, key)
-    if handled is not None:
-        return handled
-    if _replace_mode_active(state):
-        handled = _dispatch_replace_movement(state, key)
-        if handled is not None:
-            return handled
+    """Dispatch table keys first; every other key is fret, duration or prefix content."""
+    action = keymap_for(state, Mode.INSERT).lookup((key,))
+    if action is not None:
+        return _INSERT_HANDLERS[action](state, key)
     _dispatch_insert_content(state, key)
     return True

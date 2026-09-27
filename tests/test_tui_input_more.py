@@ -1,6 +1,7 @@
 import os
 import subprocess
 
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.presentation.tui.input import (
     complete_command,
@@ -229,14 +230,14 @@ def test_handle_command_paths() -> None:
     def _apply(_state: EditorState, cmdline: str) -> None:
         calls.append(cmdline)
 
-    state.mode = "command"
+    state.mode = Mode.COMMAND
     state.message = "Matches: old.tab"
     handle_command(state, 27, _apply)
     assert state.mode == "normal"
     assert state.message == ""
     assert state.insert_prefix == ""
     assert state.replace_once is False
-    state.mode = "command"
+    state.mode = Mode.COMMAND
     state.cmdline = "w"
     state.insert_prefix = "/"
     state.replace_once = True
@@ -245,7 +246,7 @@ def test_handle_command_paths() -> None:
     assert state.command_history == ["w"]
     assert state.insert_prefix == ""
     assert state.replace_once is False
-    state.mode = "command"
+    state.mode = Mode.COMMAND
     state.cmdline = "wa"
     handle_command(state, 127, _apply)
     assert state.cmdline == "w"
@@ -254,7 +255,7 @@ def test_handle_command_paths() -> None:
     assert state.cmdline == "two"
     handle_command(state, 258, _apply)  # curses.KEY_DOWN
     assert state.cmdline in ("two", "")
-    state.mode = "command"
+    state.mode = Mode.COMMAND
     handle_command(state, ord("a"), _apply)
     assert state.cmdline.endswith("a")
 
@@ -264,7 +265,7 @@ def test_parse_search_and_handle_search() -> None:
     assert parse_search("") is None
     assert parse_search("0") is None
     assert parse_search("3") == 2
-    state.mode = "search"
+    state.mode = Mode.SEARCH
     state.searchline = "2"
     state.insert_prefix = ",1"
     state.replace_once = True
@@ -272,11 +273,11 @@ def test_parse_search_and_handle_search() -> None:
     assert state.cursor_bar == 1
     assert state.insert_prefix == ""
     assert state.replace_once is False
-    state.mode = "search"
+    state.mode = Mode.SEARCH
     state.searchline = "bad"
     handle_search(state, 10)
     assert state.message == "Invalid bar"
-    state.mode = "search"
+    state.mode = Mode.SEARCH
     state.searchline = "12"
     state.insert_prefix = "/"
     state.replace_once = True
@@ -284,7 +285,7 @@ def test_parse_search_and_handle_search() -> None:
     assert state.mode == "normal"
     assert state.insert_prefix == ""
     assert state.replace_once is False
-    state.mode = "search"
+    state.mode = Mode.SEARCH
     state.searchline = "12"
     handle_search(state, 127)
     assert state.searchline == "1"
@@ -296,7 +297,7 @@ def test_parse_search_and_handle_search() -> None:
 def test_search_prompt_uses_history() -> None:
     state = _state()
     state.search_history = ["2", "7"]
-    state.mode = "search"
+    state.mode = Mode.SEARCH
     handle_search(state, 259)  # KEY_UP
     assert state.searchline == "7"
     handle_search(state, 259)  # KEY_UP

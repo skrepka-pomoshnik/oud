@@ -91,10 +91,12 @@ Vim-like:
 - `h/j/k/l` move one cell/row
 - `J/K` jump to next/previous rendered row (same bar offset)
 - `i` insert mode, `esc` normal mode
-- `r` replace one cell (normal), `r` rest (insert)
+- `r` replace one cell (normal); in insert mode `z` enters a rest and letters/digits are frets
 - `:` command mode, `?` help
 - `x` delete note (normal mode), space clears in insert mode
 - `o/O` add bar after/before, `+/-` delete bar
+- `yy` copy bars, `p/P` paste after/before, `gb` add a configured bass course
+- `:pdf` builds a PDF (no single-key shortcut)
 
 
 Casual: 
@@ -105,7 +107,7 @@ Casual:
 - `Home/End` move to the bar edges; `PgUp/PgDn` scroll
 - `Insert` add bar, `Delete` delete bar
 - `Ctrl-Z/Ctrl-Y` undo/redo
-- `Ctrl-C` exit immediately and quietly
+- `Ctrl-C` quit like `q` (press again to discard unsaved edits); cancels prompts and closes pages
 - `F1` help
 
 ## COMMANDS
@@ -127,7 +129,7 @@ Casual:
 :set measures=system   number each displayed system
 :set measures=every measuresstep=10
 :set barsperline=0   auto bars/row
-:set spacingmode=packed|spread|auto spacingfill=stretch|center|compact|smart
+:set layout=packed|spread|auto justify=stretch|center|compact|smart|edge
 :set completion=fzf  use system fzf for fuzzy path ranking (default: prefix)
 :dark / :light  force dark/light color theme (:set theme=auto follows terminal)
 ```
@@ -136,6 +138,14 @@ Command and search prompts own the complete bottom row. In commands that take
 a path, such as `:e examples/`, Tab completes a unique path or displays every
 matching file and directory. `completion=fzf` uses non-interactive system
 `fzf --filter`; if `fzf` is unavailable, Oud reports it and uses prefix matching.
+
+`:set` changes apply immediately. Preference keys (theme, keys, layout, flags, …)
+are saved to `$XDG_CONFIG_HOME/oud/config.toml` (default `~/.config/oud/`), or to
+a `config.toml` in the working directory when that file already has a
+`[settings]` table. Document properties (`style`, `strings`, `tuning`, `time`,
+`key`, `tempo`, `bassstrings`) apply to the open score only; their new-document
+defaults can be edited in the config file. Oud refuses to rewrite a config file
+that contains anything other than its `[settings]` table.
 
 ## ARCHITECTURE
 

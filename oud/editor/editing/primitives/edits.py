@@ -123,13 +123,11 @@ def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -
 def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:
     with undo_group(state, label="clear-cell"):
         _record_tab_mutation(state, clear_tab_cell(_editable_tablature(state), (bar, string, col)))
-        state.modified = True
 
 
 def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:
     with undo_group(state, label="clear-cell-note"):
         _record_tab_mutation(state, clear_tab_note(_editable_tablature(state), (bar, string, col)))
-        state.modified = True
 
 
 def _editable_tablature(state: EditorState) -> EditableTablature:

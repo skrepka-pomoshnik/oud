@@ -8,7 +8,7 @@ from typing import TypeVar, cast
 
 from oud.editor.core.state import BarSnapshot, EditorState, UndoAction
 from oud.editor.editing.primitives.bars import clear_bar_contents, delete_bar, insert_bar, restore_bar_snapshot
-from oud.settings import save_settings
+from oud.settings import is_preference_key, save_settings
 from petrucci.core.model import Piece
 
 _K = TypeVar("_K")
@@ -219,8 +219,14 @@ def _apply_setting(context: _ApplyContext) -> None:
     if not isinstance(key, str):
         return
     value = context.selected()
-    _set_optional(context.state.settings, key, None if value is None else str(value))
-    save_settings(context.config_path, context.state.settings)
+    text = None if value is None else str(value)
+    _set_optional(context.state.settings, key, text)
+    if not is_preference_key(key):
+        return
+    try:
+        save_settings(context.config_path, {key: text or ""})
+    except OSError as exc:
+        context.state.message = f"Settings not saved: {exc}"
 
 
 def _apply_score_transform(context: _ApplyContext) -> None:
@@ -237,6 +243,14 @@ def _apply_score_transform(context: _ApplyContext) -> None:
 
 def _set_optional_setting(state: EditorState, key: str, value: object) -> None:
     _set_optional(state.settings, key, None if value is None else str(value))
+
+
+def _apply_courses(context: _ApplyContext) -> None:
+    snapshot = cast(dict[str, object], context.selected())
+    context.state.piece.strings = cast(int, snapshot["strings"])
+    _set_optional_setting(context.state, "strings", snapshot["settings_strings"])
+    _set_optional_setting(context.state, "tuning", snapshot["tuning"])
+    context.state.clamp()
 
 
 _ActionHandler = Callable[[_ApplyContext], None]
@@ -266,6 +280,7 @@ _ACTION_HANDLERS: Mapping[str, _ActionHandler] = MappingProxyType(
         "stave-breaks": _apply_stave_breaks,
         "setting": _apply_setting,
         "score-transform": _apply_score_transform,
+        "courses": _apply_courses,
     },
 )
 

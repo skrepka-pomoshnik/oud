@@ -105,5 +105,10 @@ def default_write_path(state: EditorState) -> str:
 
 
 def display_path(state: EditorState) -> str:
-    path = state.path or state.write_path
+    # Native documents follow their established write target after Save As;
+    # imported documents keep naming their source.
+    if state.document_mode is DocumentMode.NATIVE:
+        path = state.write_path or state.path
+    else:
+        path = state.path or state.write_path
     return Path(path).name if path else "[No Name]"

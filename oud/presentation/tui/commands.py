@@ -92,7 +92,6 @@ READ_ONLY_BLOCKED_COMMANDS = frozenset(
     {
         "w",
         "write",
-        "set",
         "convert",
         "time",
         "title",

@@ -11,15 +11,7 @@ __all__ = ["chord_index_at_col", "delete_chord", "insert_chord", "set_chord_note
 
 
 def duration_value(key: int, style: str) -> int | None:
-    ctrl_map = {
-        1: 1,
-        2: 2,
-        3: 4,
-        4: 8,
-        5: 16,
-        6: 32,
-        7: 64,
-    }
+    """Map a French duration digit; Italian digits are frets and use the `;` prefix."""
     french_map = {
         ord("1"): 1,
         ord("2"): 2,
@@ -30,7 +22,7 @@ def duration_value(key: int, style: str) -> int | None:
         ord("7"): 64,
     }
     if style == "italian":
-        return ctrl_map.get(key)
+        return None
     return french_map.get(key)
 
 

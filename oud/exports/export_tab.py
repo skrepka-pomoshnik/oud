@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from petrucci.core.model import Bar, Piece
-from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
+from petrucci.input.tablature.input import editor_event_columns, editor_fret_at, editor_rest_at
 from petrucci.rendering.primitives.utils import (
     bar_cells,
     bar_cells_from_chords,
@@ -129,7 +129,8 @@ def _edited_chords(
         if column >= context.bar_width:
             continue
         notes = _chord_notes_for_column(context, bar_index, column)
-        if notes:
+        # A rest is a rhythm flag over an empty column.
+        if notes or editor_rest_at(context.overrides, bar_index=bar_index, column=column):
             chords.append(
                 (
                     _denom_for_column(context, bar_index, column),

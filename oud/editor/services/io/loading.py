@@ -4,6 +4,7 @@ from pathlib import Path
 
 from oud.editor.core.document import configure_document
 from oud.editor.core.feedback.messages import MessageLevel
+from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.importers.ft3 import load_ft3
@@ -127,9 +128,8 @@ def reset_loaded_file_state(state: EditorState) -> None:
     state._hold_start = None
     state.stave_breaks.clear()
     state.marks.clear()
-    state.pending_mark = ""
-    state.pending_key = ""
-    state.pending_find = ""
+    state.pending_keys = ()
+    state.pending_action = None
     state.count_prefix = ""
     state.visual_anchor = None
     state.modified = False
@@ -162,7 +162,7 @@ def _commit_opened_piece(
     state.cursor_string = 0
     state.cursor_col = 0
     state.bar_offset = 0
-    set_mode(state, "normal")
+    set_mode(state, Mode.NORMAL)
     if not state.durations and build_durations_fn is not None:
         state.durations = build_durations_fn(state.piece)
     state.message = f"Opened {path}"

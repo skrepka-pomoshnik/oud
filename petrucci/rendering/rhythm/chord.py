@@ -24,7 +24,9 @@ from petrucci.terminal.view.model import _beamified_chord_flag_positions, _scale
 
 
 def render_chord_rhythm(context: RhythmRenderContext) -> RhythmRenderResult:
+    rests = _rest_positions(context)
     visible_cols = set(_note_event_columns(context.cells, context.total_strings, context.grid_width))
+    visible_cols.update(col for col, _denom, _dot in rests)
     positions = [item for item in context.chord_positions_all if item[0] in visible_cols]
     flags = _beamified_chord_flag_positions(
         context.bar,
@@ -32,6 +34,8 @@ def render_chord_rhythm(context: RhythmRenderContext) -> RhythmRenderResult:
         hide_redundant=context.hide_redundant,
         default_duration=context.default_duration,
     )
+    # A rest is only a flag over an empty column, so its flag is never redundant.
+    flags = sorted({*flags, *rests}, key=lambda item: item[0])
     ordered_flags = sorted(flags, key=lambda item: item[0])
     plan = _chord_flag_plan(context, positions, ordered_flags, flags)
     content_width = max(1, context.display_width - context.draw_pad * 2)
@@ -60,6 +64,14 @@ def render_chord_rhythm(context: RhythmRenderContext) -> RhythmRenderResult:
         duration_padded=duration_padded,
     )
     return RhythmRenderResult(positions, plan.src_to_dest, grid_map, text_onsets)
+
+
+def _rest_positions(context: RhythmRenderContext) -> list[tuple[int, int, bool]]:
+    return [
+        position
+        for chord, position in zip(context.bar.chords, context.chord_positions_all, strict=False)
+        if not chord.notes
+    ]
 
 
 def _chord_flag_plan(

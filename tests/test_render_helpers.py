@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from oud.presentation.ui.adapter import CursesError, Screen
 from petrucci.core.model import Bar, Chord, ImportedBarContent, ImportedScore, ImportedStaff, Note, Piece
+from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.rendering.primitives.helpers import (
     apply_overrides,
     bass_strings_used,
@@ -139,7 +140,7 @@ def test_info_help_plugin_and_info_render() -> None:
     assert any("Sarge Gerbode" in line for line in notes)
     assert "[1] Source comment" in notes
     s = _Screen(h=6, w=30)
-    render_help(s, "help", 1, 0)
+    render_help(s, "help", 1, 0, ["HELP", "line"])
     render_plugin(s, "plugin", 1, "Plugins", ["a", "b"], index=1, offset=0, message="msg")
     render_info(
         s,
@@ -168,7 +169,7 @@ def test_bass_strings_used_and_apply_overrides() -> None:
     assert 6 in used
     assert 7 in used
     cells = [list("----") for _ in range(8)]
-    apply_overrides(cells, {(0, 0, 1): "r", (0, 1, 2): "c"}, 0, 8, 4)
+    apply_overrides(cells, {(0, 0, 1): REST_OVERRIDE, (0, 1, 2): "c"}, 0, 8, 4)
     assert cells[0][1] == "_"
     assert cells[1][2] == "c"
 

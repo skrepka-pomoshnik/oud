@@ -8,7 +8,6 @@ from oud.editor.editing.primitives.ranges import BarRange
 from oud.editor.editing.visual import visual_bar_range
 from oud.editor.services.media.jobs import pdf_job_running, start_pdf_job
 
-SaveFn = Callable[[str, dict[str, str]], None]
 ExportMidiFn = Callable[..., str]
 ExportLyFn = Callable[..., str]
 ExportMusicXmlFn = Callable[..., str]
@@ -21,10 +20,8 @@ WhichFn = Callable[[str], str | None]
 def cmd_midi(
     state: EditorState,
     args: str,
-    config_path: str,
     *,
     export_midi_fn: ExportMidiFn,
-    save_fn: SaveFn,
 ) -> None:
     target = args.strip()
     if target:
@@ -42,16 +39,13 @@ def cmd_midi(
         dotted=state.dotted,
         ornaments=state.ornaments,
     )
-    save_fn(config_path, state.settings)
 
 
 def cmd_lilypond(
     state: EditorState,
     args: str,
-    config_path: str,
     *,
     export_lilypond_fn: ExportLyFn,
-    save_fn: SaveFn,
 ) -> None:
     target = args.strip()
     if target:
@@ -67,17 +61,14 @@ def cmd_lilypond(
         state.bar_width,
         settings=state.settings,
     )
-    save_fn(config_path, state.settings)
 
 
 def cmd_musicxml(
     state: EditorState,
     args: str,
-    config_path: str,
     *,
     export_musicxml_fn: ExportMusicXmlFn,
     export_mxl_fn: ExportMxlFn,
-    save_fn: SaveFn,
 ) -> None:
     target = args.strip()
     if target:
@@ -105,36 +96,30 @@ def cmd_musicxml(
             settings=state.settings,
             dotted=state.dotted,
         )
-    save_fn(config_path, state.settings)
 
 
 def cmd_play(
     state: EditorState,
     args: str,
-    config_path: str,
     *,
     start_midi_fn: StartMidiFn,
-    save_fn: SaveFn,
 ) -> None:
     parts = args.split()
     if parts and parts[0] in {"loop", "range", "selection"}:
-        _cmd_play_range(state, parts, config_path, start_midi_fn=start_midi_fn, save_fn=save_fn)
+        _cmd_play_range(state, parts, start_midi_fn=start_midi_fn)
         return
     start = int(parts[0]) - 1 if parts and parts[0].isdigit() else None
     tempo = parts[1] if len(parts) > 1 else None
     if tempo:
         state.settings["tempo"] = tempo
     start_midi_fn(state, start_bar=start)
-    save_fn(config_path, state.settings)
 
 
 def _cmd_play_range(
     state: EditorState,
     parts: list[str],
-    config_path: str,
     *,
     start_midi_fn: StartMidiFn,
-    save_fn: SaveFn,
 ) -> None:
     bar_range = _playback_bar_range(state)
     if bar_range.is_empty:
@@ -156,7 +141,6 @@ def _cmd_play_range(
         end_bar=bar_range.end - 1,
         loop_count=loops,
     )
-    save_fn(config_path, state.settings)
 
 
 def _playback_bar_range(state: EditorState) -> BarRange:

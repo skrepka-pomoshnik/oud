@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from oud.editor.commands.help import help_lines
 from oud.editor.core.document import DocumentMode
 from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
 from oud.editor.services.bootstrap import init_state
@@ -189,8 +190,10 @@ def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: P
 
 
 def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None:
+    config = str(tmp_path / "config.toml")
+    state = init_state(None, config_path=config)
     screen = FrameBuffer(24, 80)
-    render_help(screen, "help  j/k scroll  q close", 0, 0)
+    render_help(screen, "help  j/k scroll  q close", 0, 0, help_lines(state))
     visible_help = "\n".join(line.rstrip() for line in screen.snapshot().lines[:-1])
 
     assert "Open/create  oud [FILE] / oud" in visible_help
@@ -201,9 +204,7 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
     assert "Quit         :q" in visible_help
     assert "Discard    :q!" in visible_help
 
-    config = str(tmp_path / "config.toml")
     target = tmp_path / "first-score.tab"
-    state = init_state(None, config_path=config)
     press_keys(state, ["i", "a", 27])
     assert state.overrides == {(0, 0, 0): "a"}
     press_keys(state, ["u"])

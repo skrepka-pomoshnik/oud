@@ -5,7 +5,7 @@
 .nh
 .ad l
 .\" Begin generated content:
-.TH "oudterminallutetablatureeditorandviewer" "1" "2026\-09\-12"
+.TH "oudterminallutetablatureeditorandviewer" "1" "2026\-09\-27"
 .PP
 .SH NAME
 .PP
@@ -39,7 +39,8 @@ when LilyPond is unavailable or fails.\&
 .PP
 \fB\fR\-\-config\fB\fR \fBPATH\fR
 .PP
-: Read settings from \fBPATH\fR.\& The default is \fB\fRconfig.\&toml\fB\fR.\&
+: Read settings from \fBPATH\fR.\& The default is \fB\fRconfig.\&toml\fB\fR, resolved as
+described under \fBFILES\fR.\&
 .PP
 \fB\fR\-\-readonly\fB\fR
 .PP
@@ -67,7 +68,9 @@ is \fB\fR\-\fB\fR, specify the other format explicitly with \fB\fR\-\-input\-for
 .PP
 The TUI uses Vim\-like normal, insert, and command modes.\& \fB\fRh/j/k/l\fB\fR or the
 arrow keys move; \fB\fRi\fB\fR enters insert mode; \fB\fREsc\fB\fR returns to normal mode; and
-\fB\fRCtrl\-C\fB\fR exits immediately and quietly.\&
+\fB\fRCtrl\-C\fB\fR quits like \fB\fRq\fB\fR: with unsaved changes it asks once and quits on the
+second press.\& It also cancels prompts and closes pages.\& In insert mode letters
+and digits are frets and \fB\fRz\fB\fR enters a rest.\&
 .PP
 \fB\fR:w\fB\fR [\fBPATH\fR]
 .PP
@@ -109,7 +112,12 @@ fuzzy path ranking; \fB\fRplaybackscroll=off\fB\fR disables score following.\&
 .PP
 \fB\fRconfig.\&toml\fB\fR
 .PP
-: Default settings file in the current directory.\&
+: Settings file.\& A relative name is read from the current directory only when
+that file already has a \fB\fR[settings]\fB\fR table; otherwise it lives in
+\fB$XDG_CONFIG_HOME/oud/\fR (default \fB\(ti/.\&config/oud/\fR).\& \fB\fR:set\fB\fR writes only the
+preference keys it changed.\& Document properties (style, strings, tuning, time,
+key, tempo, bassstrings) apply to the open score only.\& A config file containing
+other tables is never rewritten.\&
 .PP
 \fB\fRbuild/lilypond/\fB\fR
 .PP
@@ -131,6 +139,15 @@ is not created until a PDF build is requested.\&
 : Used to locate the configured LilyPond executable, and optional \fB\fRfzf\fB\fR,
 \fB\fRfluidsynth\fB\fR, and \fB\fRtimidity\fB\fR playback programs.\&
 .PP
+\fB\fRXDG_CONFIG_HOME\fB\fR
+.PP
+: Base directory for the user settings file; defaults to \fB\(ti/.\&config\fR.\&
+.PP
+\fB\fRESCDELAY\fB\fR
+.PP
+: Milliseconds curses waits to distinguish \fB\fREsc\fB\fR from escape sequences.\& Oud
+uses 25 ms unless this variable is set.\&
+.PP
 .SH EXIT STATUS
 .PP
 0
@@ -151,7 +168,7 @@ is not created until a PDF build is requested.\&
 .PP
 130
 .PP
-: Interrupted with \fB\fRCtrl\-C\fB\fR.\&
+: A non\-interactive command was interrupted with \fB\fRCtrl\-C\fB\fR.\&
 .PP
 .SH DIAGNOSTICS
 .PP
