@@ -92,6 +92,7 @@ def _pitch_counts(note_ons: Counter[tuple[Fraction, int]]) -> Counter[int]:
     return result
 
 
+@pytest.mark.ft3_corpus
 @pytest.mark.parametrize(
     ("stem", "source", "_reference_count", "generated_count", "_minimum_exact_overlap"),
     MIDI_PARITY_CASES,
@@ -139,6 +140,7 @@ def test_ft3_export_tracks_optional_companion_midi_evidence(
     assert sum((_pitch_counts(reference) & _pitch_counts(generated)).values()) >= minimum_pitch_overlap
 
 
+@pytest.mark.ft3_corpus
 def test_folle_export_has_stable_note_count(tmp_path: Path) -> None:
     piece = load_ft3("tests/fixtures/ft3/corpus/random-75-v2/051/Folle_cor.ft3")
     generated_path = tmp_path / "Folle_cor.mid"

@@ -1,5 +1,25 @@
 # DONE
 
+## Gate passes without the local FT3 corpus (S1, 2026-09-29)
+
+- Added the `ft3_corpus` pytest marker (registered in `pyproject.toml`) and a
+  `tests/conftest.py` hook that skips marked tests when
+  `tests/fixtures/ft3/corpus` holds no `.ft3` file. Marked the 51 test functions
+  (71 cases) that failed on a fresh clone. With the corpus present they run as
+  before. The existing manifest-based skips were left in place because they
+  check the exact manifest payloads.
+- Restored coverage without the corpus instead of lowering the floor:
+  - `tests/test_petrucci_note_input_rejections.py` covers every note-input
+    rejection code (unknown staff/measure/event/span/lyric, invalid and
+    duplicate IDs, chord targets, duplicate pitches, pitch index, position
+    mismatch, invalid ties and slurs, wrong span kind, lyric collision, invalid
+    lyric), plus duration keeping on chord stacking, styled replacement, and
+    onset-ordered insertion. Each rejection leaves the score unchanged.
+  - `tests/test_tab_policy.py` covers out-of-range French fret labels, string
+    label fallbacks, time-signature cue rows per style, and meter-change cues.
+- Validation: `./scripts/quality.sh` passes on a clean checkout without FT3
+  payloads: 1,780 passed, 119 skipped, 95.22% Petrucci coverage.
+
 ## Backlog split into complex and simple work (2026-09-29)
 
 - Rewrote `TODO.md` as open work only, split into complex tasks (`C1`–`C14`,

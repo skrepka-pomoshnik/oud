@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import pytest
+
 from oud.editor.services.io.loading import load_piece_data
 from oud.exports.musicxml import export_musicxml
 from petrucci.core.model import Piece
@@ -61,6 +63,7 @@ def test_musicxml_export_matches_local_tab_golden(tmp_path: Path) -> None:
     assert actual == expected
 
 
+@pytest.mark.ft3_corpus
 def test_musicxml_export_matches_local_ft3_golden(tmp_path: Path) -> None:
     actual = _export_piece_subset_to_musicxml_text(
         "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",

@@ -184,3 +184,48 @@ def test_tabnotation_presets_cover_explicit_visibility_and_span_style_bundle() -
     assert settings["slurcuestyle"] == "paren"
     assert settings["holdcuestyle"] == "angle"
     assert settings["glisscuestyle"] == "slash"
+
+
+def test_fret_label_marks_frets_without_a_french_letter() -> None:
+    assert fret_label("french", 16) == "r"
+    assert fret_label("french", 99) == "?"
+    assert fret_label("french", -1) == "?"
+    assert fret_label("french", 12, label_mode="numeric") == "12"
+    assert fret_label("italian", 3, label_mode="letters") == "d"
+
+
+def test_string_label_falls_back_when_tuning_labels_are_missing_or_blank() -> None:
+    def label(actual: int, tuning: list[str], basslabels: str = "number", width: int = 2) -> str:
+        return string_label(
+            actual=actual,
+            total_strings=10,
+            tuning_labels=tuning,
+            basslabels=basslabels,
+            width=width,
+        )
+
+    assert label(0, ["", "d"]) == "10"
+    assert label(3, ["g", "d"]) == " 7"
+    assert label(6, ["g"] * 6 + [""], basslabels="tuning") == " 7"
+    assert label(7, ["g"] * 6, basslabels="tuning") == " 8"
+    assert label(0, ["abc"], width=2) == "ab"
+
+
+def test_time_sig_rows_fall_back_to_the_label_for_each_style() -> None:
+    assert time_sig_inline_rows("", "C", style_mode="numeric") == [" 4"]
+    assert time_sig_inline_rows("", "C|", style_mode="fraction") == [" 2", " /", " 2"]
+    assert time_sig_inline_rows("", "O", style_mode="symbol") == [" ", "O", " "]
+    assert time_sig_inline_rows("", "C|", style_mode="symbol") == [" ", "C|", " "]
+    assert time_sig_inline_rows("", "6/8", style_mode="symbol") == [" 6", " /", " 8"]
+    assert time_sig_inline_rows("", "X", style_mode="symbol") == [" X", "  ", "  "]
+    assert time_sig_inline_rows("", "", style_mode="symbol") == []
+    assert time_sig_inline_rows("7/8", "", style_mode="numeric") == [" 7"]
+    assert time_sig_inline_rows("/8", "C", style_mode="numeric") == [" 4"]
+
+
+def test_time_cue_shows_on_first_bar_and_meter_changes_only() -> None:
+    assert show_time_cue_for_bar(bar_index=0, current_time_value="3/4", sig_label="3/4") is True
+    assert show_time_cue_for_bar(bar_index=2, current_time_value="3/4", sig_label="3/4") is False
+    assert show_time_cue_for_bar(bar_index=2, current_time_value="3/4", sig_label="3/4", prev_time_value="4/4") is True
+    assert show_time_cue_for_bar(bar_index=2, current_time_value="3/4", sig_label="3/4", prev_time_value="3/4") is False
+    assert show_time_cue_for_bar(bar_index=0, current_time_value="3/4", sig_label="") is False

@@ -20,12 +20,11 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 
 ## Order of work
 
-1. `S1` (blocker: the gate must pass on a fresh clone before any other change).
-2. Editor rebuild for typing: `C1` → `C2` → `C3` → `C4` → `C5` → `C6`.
-3. Note typing: `C7`.
-4. Transposition: `C8`.
-5. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
-6. Publication and source model: `C12`, `C13`, `C14`.
+1. Editor rebuild for typing: `C1` → `C2` → `C3` → `C4` → `C5` → `C6`.
+2. Note typing: `C7`.
+3. Transposition: `C8`.
+4. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
+5. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C1`–`C6` and
@@ -81,7 +80,6 @@ position rather than a musical time.
 - Acceptance: no `CellKey`, `bar_width`, `durations`, or `dotted` in the
   mutation contract; property tests for insert/delete/replace round trips; the
   existing P1.2 operation-sequence fixtures pass unchanged.
-- Depends on: `S1`.
 
 ### C3. Onset cursor and one edit path (UI plan phase 4, editor)
 
@@ -342,31 +340,6 @@ Why complex: a new import/export format; experimental, lowest priority.
 ---
 
 ## Not complex tasks (open to any contributor)
-
-### S1. Make the gate pass on a fresh clone (blocker)
-
-A fresh clone fails pytest with 71 tests that need gitignored Gerbode FT3
-payloads, and coverage falls to 94.83% (floor 95%). Some tests already skip
-(`tests/test_alpha_viewer.py:27`, `tests/test_ft3_corpus_manifest.py`); others
-fail with `FileNotFoundError`, or `init_state` silently creates a new piece and
-an assertion fails.
-
-- Failing files: `test_ft3.py` (20), `test_ui_command_render_effects.py` (10),
-  `test_document_workflow.py` (8), `test_alpha_viewer.py` (8),
-  `test_ft3_midi_parity.py` (7), `test_ft3_felice.py` (5),
-  `test_view_focus.py` (3), `test_lilypond_can_she_excuse.py` (3),
-  `test_lilypond_vocal.py` (2), `test_editor_init.py` (2),
-  `test_musicxml_goldens.py` (1), `test_layout_spacing.py` (1),
-  `test_ft3_audit.py` (1).
-- Steps:
-  1. Add one shared helper or marker in `tests/conftest.py` (for example
-     `requires_ft3("corpus/foo.ft3")`) that skips with the fetch command when a
-     payload is missing. Replace the ad-hoc `pytest.skip` calls with it.
-  2. Register the marker in `pyproject.toml` so it can be selected or excluded.
-  3. Restore 95% Petrucci coverage without the corpus by adding small synthetic
-     tests for the lines only corpus tests reached. Do not lower the floor.
-- Acceptance: `./scripts/quality.sh` passes on a clean clone with no FT3
-  payloads; with the corpus present, the same tests run and pass.
 
 ### S2. Scroll the command prompt horizontally (UI plan phase 3)
 

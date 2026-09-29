@@ -41,6 +41,9 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "--cov=petrucci"
 pythonpath = ["."]
+markers = [
+  "ft3_corpus: needs the local Gerbode FT3 corpus; skipped when it is missing",
+]
 
 [tool.coverage.run]
 branch = false
