@@ -1,5 +1,26 @@
 # DONE
 
+## TAB saves in the original program's syntax (C15 step, S6) (2026-09-29)
+
+- `oud/exports/export_tab.py` writes what the `tab` program reads: spaces for
+  empty courses instead of `-` (drawn as bars by the program), no forced `-C`,
+  `R` rest lines, bass courses in position 7, `Nxx` high frets, Italian digits
+  lowest course first with `!x` and `$numstyle=italian`, `-tuning` in the
+  program's notation, and `SC`/`Sc`/`S34`/`S12-8` meters. Systems open with
+  `b`, bars end with `b`, and blank lines follow the piece's system breaks (every
+  4 bars by default); the reader turns blank lines in the program's files into
+  system breaks. Tempo, and a tuning without an exact `-tuning` spelling, go
+  into comments that the program ignores and Oud reads back.
+- S6: meter lines only on the first bar, on changes, and on empty bars, so
+  saving is idempotent.
+- Italian frets 11–30 are now saved (`Nxx`) instead of refusing the save.
+- Validation: `tests/test_tab_export_original.py` (chord lines, rests, bass,
+  high and Italian frets, meters, tuning, refusal, read-back identity in both
+  styles, systems, meter lines, idempotent save of every repo TAB file). The
+  `tab_program` integration test passes with the program built from
+  github.com/mandovinnie/Lute-Tab; `examples/triste.tab` renders in it without
+  errors, four bars per system. Gate: 1,830 passed, 126 skipped.
+
 ## TAB files from the original program open without data loss (2026-09-29)
 
 - Chord lines follow the `tab` program's reader (new

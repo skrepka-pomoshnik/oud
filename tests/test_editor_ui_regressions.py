@@ -83,9 +83,8 @@ def test_french_rest_is_written_as_flag_only_tab_line() -> None:
     text = export_tab(state.piece, state.overrides, state.durations, state.bar_width, settings=state.settings)
 
     lines = text.splitlines()
-    assert "0------" in lines
-    assert "0a-----" in lines
-    assert "0r-----" not in lines
+    assert "R0" in lines
+    assert "0a" in lines
 
 
 def test_french_rest_advances_playback_time() -> None:
@@ -396,7 +395,7 @@ def test_tab_rest_round_trips_through_save_and_reopen(tmp_path: Path) -> None:
         reopened.piece, reopened.overrides, reopened.durations, reopened.bar_width, settings=reopened.settings
     )
     for text in (target.read_text(encoding="utf-8"), resaved):
-        assert "\nb\nSc\n0------\n0a-----\n" in text
+        assert "\nb\nSC\nR0\n0a\n" in text
 
 
 def test_imported_tab_rest_delays_following_notes_in_playback(tmp_path: Path) -> None:

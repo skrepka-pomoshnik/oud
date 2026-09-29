@@ -32,7 +32,7 @@ def test_tab_roundtrip_basic(tmp_path) -> None:
     exported = export_tab(piece, {}, {}, bar_width=8, settings={"style": "french"})
     assert "b" in exported
     assert "e" in exported
-    assert "-tuning g2c3f3a3d4g4" in exported
+    assert "-tuning g4c3f3a2d2g2" in exported
     assert "{Test Piece/Composer}" in exported
 
     out_path = tmp_path / "roundtrip.tab"

@@ -25,7 +25,7 @@ TREBLE_POSITIONS = 6
 BASS_POSITION = 7
 
 # Characters that may follow the flag without being the first course.
-_FLAG_MODIFIERS = frozenset("!-#*|.tWQ@B&")
+FLAG_MODIFIERS = frozenset("!-#*|.tWQ@B&")
 _DOTTING_MODIFIERS = frozenset(".@*")
 # Symbols printed before the next note; they take no position.
 _PREFIX_SYMBOLS = frozenset("x`Q#$,='^@_*%")
@@ -100,7 +100,7 @@ def split_flag(payload: str, syntax: TabSyntax) -> FlagModifier:
         dotted = text.startswith(".")
         text = text.removeprefix(".")
         return FlagModifier(text.removeprefix("#"), dotted, text.startswith("#"))
-    if not payload or payload[0] not in _FLAG_MODIFIERS:
+    if not payload or payload[0] not in FLAG_MODIFIERS:
         return FlagModifier(payload)
     modifier = payload[0]
     text = payload[2:] if modifier == "&" else payload[1:]
@@ -288,3 +288,49 @@ def tuning_to_scientific(text: str) -> str:
 
 
 _PROGRAM_DEFAULT_OCTAVE = 3
+_SCIENTIFIC_DEFAULT_OCTAVE = 3
+_PROGRAM_OCTAVES = range(5)  # the program reads octave digits 0-4 only
+_SHARPS = "+#"
+_FLATS = "-b"
+
+
+def scientific_to_tuning(text: str) -> str | None:
+    """Scientific pitch (bass first) in the program's `-tuning` notation; ``None`` if it has no such spelling."""
+
+    parts: list[str] = []
+    index = 0
+    while index < len(text):
+        letter = text[index].lower()
+        index += 1
+        if not "a" <= letter <= "g":
+            continue
+        accidental = ""
+        if index < len(text) and text[index] in _SHARPS + _FLATS:
+            accidental = "+" if text[index] in _SHARPS else "-"
+            index += 1
+        digits = ""
+        while index < len(text) and text[index].isdigit():
+            digits += text[index]
+            index += 1
+        octave = (5 if letter in "ab" else 6) - (int(digits) if digits else _SCIENTIFIC_DEFAULT_OCTAVE)
+        if octave not in _PROGRAM_OCTAVES:
+            return None
+        parts.append(f"{letter}{accidental}{octave}")
+    return "".join(parts) or None
+
+
+def read_time_signature(line: str, syntax: TabSyntax) -> str | None:
+    """Meter of an `S` line: `SC` is C, `Sc` cut C, `S34` and `S12-8` are fractions."""
+
+    text = line.strip()[1:]
+    if not text:
+        return None
+    if syntax.dialect is TabDialect.OUD_LEGACY:
+        return {"c": "C", "c|": "C|"}.get(text, text)
+    if text in ("C", "c"):
+        return "C" if text == "C" else "C|"
+    if "-" in text:
+        return text.replace("-", "/", 1)
+    if len(text) == 2 and text.isdigit():  # noqa: PLR2004 - one numerator and one denominator digit
+        return f"{text[0]}/{text[1]}"
+    return text

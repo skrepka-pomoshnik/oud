@@ -11,6 +11,7 @@ from oud.importers.tab_syntax import (
     detect_syntax,
     position_notes,
     read_positions,
+    read_time_signature,
     read_tuning,
     split_flag,
 )
@@ -94,8 +95,8 @@ class _BarAccumulator:
         if self.current_bar.time_sig is None and value:
             self.current_bar.time_sig = value
 
-    def set_time_signature(self, value: str | None, line_no: int) -> None:
-        self.current_bar.time_sig = value
+    def set_time_signature(self, line: str, line_no: int) -> None:
+        self.current_bar.time_sig = read_time_signature(line, self.syntax)
         self._include_line(line_no)
 
     def add_chord(self, line: str, line_no: int) -> bool:
@@ -120,6 +121,12 @@ class _BarAccumulator:
 
     def finish(self) -> None:
         self._finalize_current_bar()
+
+    def mark_system_break(self) -> None:
+        if self.span_start is not None:
+            self.current_bar.system_break = True
+        elif self.bars:
+            self.bars[-1].system_break = True
 
     def _include_line(self, line_no: int) -> None:
         if self.span_start is None:
@@ -367,7 +374,7 @@ def _segment_bar(accumulator: _BarAccumulator, _line: str, _line_no: int) -> boo
 
 
 def _segment_time(accumulator: _BarAccumulator, line: str, line_no: int) -> bool:
-    accumulator.set_time_signature(_parse_time_signature(line.strip()), line_no)
+    accumulator.set_time_signature(line, line_no)
     return True
 
 
@@ -428,6 +435,7 @@ class _TabLinesParser:
             self._consume_hash_header,
             self._consume_dollar_header,
             self._consume_tuning,
+            self._consume_comment_metadata,
             self._consume_ignored,
             self._consume_bar,
             self._consume_time_signature,
@@ -444,10 +452,7 @@ class _TabLinesParser:
         self.piece.strings = max([self.piece.strings, *courses])
         if self.accumulator.triplets:
             self.piece.import_warnings.append(TAB_TRIPLET_WARNING.format(count=self.accumulator.triplets))
-        if self.saw_letters:
-            self.piece.style = "french"
-        elif self.saw_digits:
-            self.piece.style = "italian"
+        self.piece.style = self._style() or self.piece.style
         has_identity = any((self.piece.title, self.piece.author, self.piece.composer))
         if not self.piece.bars and not has_identity:
             return None
@@ -465,9 +470,18 @@ class _TabLinesParser:
             source_lines=list(source_lines),
         )
 
-    @staticmethod
-    def _consume_blank(_line_no: int, line: str) -> bool:
-        return not line
+    def _style(self) -> str | None:
+        if self.syntax.italian or (self.saw_digits and not self.saw_letters):
+            return "italian"
+        return "french" if self.saw_letters else None
+
+    def _consume_blank(self, _line_no: int, line: str) -> bool:
+        if line.strip():
+            return False
+        # In the program a blank line ends a system; Oud's earlier files used one after every bar.
+        if self.syntax.dialect is TabDialect.ORIGINAL:
+            self.accumulator.mark_system_break()
+        return True
 
     def _consume_title(self, _line_no: int, line: str) -> bool:
         if not line.startswith("{") or not line.endswith("}"):
@@ -513,6 +527,15 @@ class _TabLinesParser:
         self.piece.tuning = tuning if self.syntax.dialect is TabDialect.OUD_LEGACY else read_tuning(tuning)
         return True
 
+    def _consume_comment_metadata(self, _line_no: int, line: str) -> bool:
+        # Oud keeps what the format has no line for (tempo, a tuning below the
+        # program's range) in comments, which the program ignores.
+        key, colon, value = line.removeprefix("%").partition(":")
+        if not line.startswith("%") or not colon or key.strip() not in ("tempo", "tuning"):
+            return False
+        self._apply_hash_header(f"{key.strip()}:{value}")
+        return True
+
     @staticmethod
     def _consume_ignored(_line_no: int, line: str) -> bool:
         return line.startswith(("-", "%"))
@@ -526,7 +549,7 @@ class _TabLinesParser:
     def _consume_time_signature(self, line_no: int, line: str) -> bool:
         if not line.startswith("S"):
             return False
-        self.accumulator.set_time_signature(_parse_time_signature(line.strip()), line_no)
+        self.accumulator.set_time_signature(line, line_no)
         return True
 
     def _consume_end(self, _line_no: int, line: str) -> bool:

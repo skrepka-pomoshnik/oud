@@ -183,8 +183,10 @@ passes.
   the grid maps remain for readers until `C4`.
 - [ ] Replace untyped `UndoAction(kind: str, data: dict)` with typed
   transaction records.
-- [ ] Make TAB save idempotent against its source: unchanged bars must not gain
-  a repeated `S6/4` per system.
+- [x] Make TAB save idempotent against its source: unchanged bars must not gain
+  a repeated `S6/4` per system. Meter lines are written on the first bar, on a
+  change, and on empty bars; every repo TAB file saves byte-identically after
+  the first save.
 
 ## Phase 5: commands and state
 

@@ -67,14 +67,15 @@ def test_two_digit_italian_ten_round_trips_as_one_typed_note(tmp_path: Path) -> 
     assert [(note.string, note.fret) for note in chord.notes] == [(1, 10)]
 
 
-def test_tab_save_rejects_unrepresentable_italian_fret_without_writing(tmp_path: Path) -> None:
+def test_tab_save_keeps_a_two_digit_italian_fret(tmp_path: Path) -> None:
     state = keyscript_state(style="italian", settings_override={"italianmultifret": "on"})
     press_keys(state, ["i", ",", "1", "2", 27])
     path = tmp_path / "italian-12.tab"
 
-    assert cmd_write(state, str(path)) is False
-    assert state.message == "Write failed: TAB cannot preserve Italian fret 12; export LilyPond, MIDI, or MusicXML"
-    assert not path.exists()
+    assert cmd_write(state, str(path)) is True
+    assert "N12" in path.read_text(encoding="utf-8")
+    reopened = init_state(str(path), config_path=str(tmp_path / "config.toml"))
+    assert [(n.string, n.fret) for n in reopened.piece.bars[0].chords[0].notes] == [(1, 12)]
 
 
 def test_note_rest_note_typing_keeps_each_edit_atomic() -> None:
