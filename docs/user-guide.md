@@ -296,7 +296,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 ## 9.1 Edit a TAB or tab-only FT3 projection, export PDF
 
 1. Open: `:e file.ft3`
-2. Check the persistent document label. `FT3 EDIT:name.musicxml` is an editable projection with its suggested save target; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
+2. Check the persistent document label. `FT3 EDIT:name.musicxml` is an editable projection with its suggested save target. FT3 scores with notation staffs (voices, lyrics) are editable too: you edit the tablature, bar inserts and deletes keep the other staffs aligned, and `:w name.musicxml` saves the tablature and the notation staffs (pitch, rhythm, rests, ties, lyrics; FT3 comment and layout rows stay in the source). Saving such a score to `.tab` is refused until `C15` adds a sidecar. `FT3 VIEW` (read-only) remains for duet scores, which keep two lute parts in one bar list, and for scores without tablature.
 3. Edit in `insert` mode (`i`).
 4. Check bar rhythm: `:verify`.
 5. Save with `:w`; imported files prompt for a destination (MusicXML by default, or `.tab`) and leave the FT3 source unchanged.

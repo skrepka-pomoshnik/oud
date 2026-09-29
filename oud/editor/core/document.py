@@ -36,6 +36,12 @@ def _has_non_tab_score_content(piece: Piece) -> bool:
     return bool(imported and imported.staffs) or is_duet_score_piece(piece)
 
 
+def _view_only_score(piece: Piece) -> bool:
+    # A duet keeps two lute parts in one bar list, and a score without
+    # tablature has nothing to edit; both stay view-only.
+    return is_duet_score_piece(piece) or not any(bar.chords or bar.notes for bar in piece.bars)
+
+
 MUSICXML_SUFFIX = ".musicxml"
 NEW_DOCUMENT_PATH = "untitled.musicxml"
 # Suffix for an edited copy of MusicXML that Oud did not write: Oud keeps only
@@ -47,7 +53,7 @@ def classify_document(path: str | None, piece: Piece, *, oud_musicxml: bool = Fa
     fmt = source_format(path)
     if fmt in {"new", "tab"} or (fmt == "musicxml" and oud_musicxml):
         return DocumentMode.NATIVE
-    if fmt == "ft3" and _has_non_tab_score_content(piece):
+    if fmt == "ft3" and _has_non_tab_score_content(piece) and _view_only_score(piece):
         return DocumentMode.IMPORTED_READ_ONLY
     return DocumentMode.IMPORTED_PROJECTION
 

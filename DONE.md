@@ -1,5 +1,26 @@
 # DONE
 
+## FT3 scores with notation staffs are editable (C16) (2026-09-29)
+
+- FT3 scores with tablature and notation staffs (voices, lyrics) open as
+  editable projections instead of read-only views. Duet scores and scores
+  without tablature stay view-only.
+- Bar inserts and deletes renumber the notation staffs' `source_bar_index`, so
+  staffs stay aligned with the tablature; undo restores the deleted staff
+  content.
+- MusicXML save writes each note staff as its own part (new
+  `oud/exports/musicxml_staffs.py`): pitch, rhythm with dots and tuplets,
+  rests, ties, and lyrics with syllabic and extenders. MusicXML that Oud wrote
+  reads those parts back (`oud/importers/musicxml_staffs.py`), so reopening and
+  re-saving keeps them. The save message names how many staffs were written.
+- Saving such a score to `.tab` is refused with a message instead of dropping
+  the staffs (the `C15` sidecar will replace the refusal).
+- Validation: `tests/test_layered_scores.py` (classification, MusicXML save and
+  native reopen of staffs and lyrics, TAB refusal, bar insert/delete alignment
+  and undo). The corpus workflow tests now expect mixed FT3 to be editable and
+  use the duet score for view-only behaviour (they skip without the corpus
+  here). Gate: 1,847 passed, 126 skipped.
+
 ## C16 steps 2–3: MusicXML is the default save format (trial) (2026-09-29)
 
 - `:w` picks the format from the extension: `.musicxml`/`.xml` or `.tab`;

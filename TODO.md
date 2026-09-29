@@ -344,9 +344,13 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
      moves them into the model (the rest of the round trip is lossless, see
      `DONE.md`).
   2. Trial feedback: decide whether MusicXML stays the default after use
-     (`:w`, new documents, projections), and whether FT3 scores with layers
-     that TAB cannot hold (today read-only) become editable now that they can
-     be saved as MusicXML. `oud convert` still needs an explicit output path.
+     (`:w`, new documents, projections). `oud convert` still needs an explicit
+     output path.
+  3. Duet FT3 scores stay view-only: they keep two lute parts in one bar list.
+     Editing them needs a second tablature part in the model.
+  4. Notation-staff details MusicXML could carry but Oud does not write yet:
+     ornaments, fingerings, slurs, fermatas, beams, clefs and key signatures of
+     imported staffs (`oud/exports/musicxml_staffs.py`).
 - Acceptance: ornaments, fingerings and text survive the round trip like the
   rest (default save, native reopen and the lossless core are done, see
   `DONE.md`).
