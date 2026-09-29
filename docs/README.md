@@ -4,6 +4,7 @@
 - [Petrucci score-rendering plan](petrucci-score-plan.md)
 - [Architecture debt and retirement gates](architecture/debt.md)
 - [FT3 reverse-engineered specification](ft3-format.md)
+- [TAB format and Oud support table](tab-format.md)
 - [External score and fixture provenance](external-scores.md)
 - [Editor UI fix plan](ui-fix-plan.md)
 - [Release procedure](releasing.md)
