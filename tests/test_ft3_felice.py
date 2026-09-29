@@ -1,3 +1,5 @@
+import pytest
+
 from oud.importers.ft3 import load_ft3
 from petrucci.adapters.vocal import infer_vocal_events
 from petrucci.terminal.text.lyrics import piece_for_lyric_display
@@ -5,6 +7,7 @@ from petrucci.terminal.text.lyrics import piece_for_lyric_display
 FELICE = "tests/fixtures/ft3/corpus/01_felice_fu_quel_anon.ft3"
 
 
+@pytest.mark.ft3_corpus
 def test_felice_positioned_lyrics_transpose_into_twelve_verses() -> None:
     piece = load_ft3(FELICE)
     assert piece.imported_score is not None
@@ -29,6 +32,7 @@ def test_felice_positioned_lyrics_transpose_into_twelve_verses() -> None:
     ]
 
 
+@pytest.mark.ft3_corpus
 def test_felice_coda_keeps_all_syllables_on_the_final_stanza() -> None:
     piece = load_ft3(FELICE)
     assert piece.imported_score is not None
@@ -54,6 +58,7 @@ def test_felice_coda_keeps_all_syllables_on_the_final_stanza() -> None:
     assert next(bar for bar in comments.bars if bar.source_bar_index == 12).editorial_text == ["Coda at end only."]
 
 
+@pytest.mark.ft3_corpus
 def test_felice_high_letter_frets_are_not_dropped() -> None:
     piece = load_ft3(FELICE)
 
@@ -61,6 +66,7 @@ def test_felice_high_letter_frets_are_not_dropped() -> None:
         assert piece.bars[bar_index].chords, bar_index + 1
 
 
+@pytest.mark.ft3_corpus
 def test_felice_compact_lyric_display_selects_one_stanza_before_layout() -> None:
     piece = load_ft3(FELICE)
     first = piece_for_lyric_display(piece, {"showlyrics": "on", "lyricmode": "first"})
@@ -77,6 +83,7 @@ def test_felice_compact_lyric_display_selects_one_stanza_before_layout() -> None
     assert all(len(bar.lyric_event_rows) <= 1 for bar in first_lyrics.bars)
 
 
+@pytest.mark.ft3_corpus
 def test_felice_third_tactus_keeps_f_minor_flat_pitches() -> None:
     piece = load_ft3(FELICE)
     events = infer_vocal_events(piece.bars[2], tuning_pitches=[])

@@ -1,10 +1,13 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.corpus import audit as ft3_audit
 from scripts.corpus.audit import audit_file
 
 
+@pytest.mark.ft3_corpus
 def test_ft3_audit_reports_typed_source_records_without_unresolved_values() -> None:
     can_she_excuse = audit_file(Path("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse.ft3"))
     assert can_she_excuse["note_extra_residuals"] == {}

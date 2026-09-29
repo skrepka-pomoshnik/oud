@@ -101,6 +101,7 @@ def test_local_ft3_corpus_exports_to_lilypond(
         assert len(text) > 100, source
 
 
+@pytest.mark.ft3_corpus
 @pytest.mark.parametrize("path", VIEWER_CASES)
 def test_release_viewer_cases_render_visible_score_content(path: str) -> None:
     piece, result = _typeset(path)
@@ -111,6 +112,7 @@ def test_release_viewer_cases_render_visible_score_content(path: str) -> None:
         assert all(staff.kind != "unknown" for staff in piece.imported_score.staffs)
 
 
+@pytest.mark.ft3_corpus
 def test_felice_narrow_view_keeps_voice_verses_and_aligned_tablature() -> None:
     _piece, result = _typeset("01_felice_fu_quel_anon.ft3")
     assert "Fe" in result.text
@@ -120,6 +122,7 @@ def test_felice_narrow_view_keeps_voice_verses_and_aligned_tablature() -> None:
     assert "Fe- Fe- Fe-" not in result.text
 
 
+@pytest.mark.ft3_corpus
 @pytest.mark.parametrize(
     "path",
     (

@@ -32,6 +32,7 @@ def _submit_command_path(state, path: Path, config_path: str) -> None:
     handle_command(state, 10, apply)
 
 
+@pytest.mark.ft3_corpus
 def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
 
@@ -62,6 +63,7 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert tab.write_path == TAB_FILE
 
 
+@pytest.mark.ft3_corpus
 def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     source = tmp_path / "source.ft3"
@@ -81,6 +83,7 @@ def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
     assert source.with_suffix(".tab").exists()
 
 
+@pytest.mark.ft3_corpus
 def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     target = tmp_path / "projection.tab"
@@ -109,6 +112,7 @@ def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -
     assert state.write_path == str(target)
 
 
+@pytest.mark.ft3_corpus
 @pytest.mark.parametrize("command", ["wq", "x"])
 def test_write_quit_prefills_sibling_destination_before_write(
     tmp_path: Path,
@@ -148,6 +152,7 @@ def test_new_target_requires_overwrite_confirmation(tmp_path: Path) -> None:
     assert state.write_path == str(target)
 
 
+@pytest.mark.ft3_corpus
 def test_mixed_ft3_blocks_editing_but_allows_ascii_export(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     output = tmp_path / "view.txt"
@@ -172,6 +177,7 @@ def test_ascii_export_does_not_mark_score_saved(tmp_path: Path) -> None:
     assert state.message.startswith("Exported ASCII")
 
 
+@pytest.mark.ft3_corpus
 def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: Path) -> None:
     state = init_state(PURE_FT3, config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80
@@ -218,6 +224,7 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
         apply_command(state, "q", config)
 
 
+@pytest.mark.ft3_corpus
 def test_read_only_focus_uses_status_without_redundant_notice(tmp_path: Path) -> None:
     state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80

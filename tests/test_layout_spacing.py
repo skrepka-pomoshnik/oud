@@ -1,3 +1,5 @@
+import pytest
+
 from oud.importers.ft3 import build_durations, load_ft3
 from petrucci.core.model import Bar, Chord, Note
 from petrucci.terminal.view.model import _bar_compact_width, _bar_display_width, _bars_fit
@@ -109,6 +111,7 @@ def test_bars_fit_respects_chord_wrap_threshold() -> None:
     assert count == 1
 
 
+@pytest.mark.ft3_corpus
 def test_compact_width_for_frog_galliard_bars_stays_tight() -> None:
     piece = load_ft3("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3")
     durations = build_durations(piece)

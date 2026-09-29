@@ -150,6 +150,7 @@ def test_playback_render_updates_for_different_columns() -> None:
     assert second
 
 
+@pytest.mark.ft3_corpus
 def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
     piece = load_ft3("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     bar = piece.bars[9]
@@ -182,6 +183,7 @@ def test_forlorne_bar10_playback_marker_does_not_teleport_back() -> None:
     assert cols == sorted(cols)
 
 
+@pytest.mark.ft3_corpus
 @pytest.mark.parametrize("justify", ["smart", "stretch", "compact"])
 @pytest.mark.parametrize(
     ("path", "bar_index"),

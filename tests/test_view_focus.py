@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from oud.editor.navigation.view.focus import current_view_staff, visible_view_staffs
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.status import status_line
@@ -12,6 +14,7 @@ MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
 DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
 
 
+@pytest.mark.ft3_corpus
 def test_mixed_view_staff_focus_cycles_visible_lanes(tmp_path: Path) -> None:
     state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
     labels = [staff.label for staff in visible_view_staffs(state.piece)]
@@ -26,6 +29,7 @@ def test_mixed_view_staff_focus_cycles_visible_lanes(tmp_path: Path) -> None:
     assert current_view_staff(state).label == "Tab"
 
 
+@pytest.mark.ft3_corpus
 def test_duet_view_staff_focus_moves_cursor_to_matching_raw_staff(tmp_path: Path) -> None:
     state = init_state(DUET_FT3, config_path=str(tmp_path / "config.toml"))
     initial_staff, initial_logical = duet_bar_mapping(state.cursor_bar, piece=state.piece)
@@ -53,6 +57,7 @@ def test_forced_single_staff_view_keeps_string_navigation(tmp_path: Path) -> Non
     assert state.cursor_string == 1
 
 
+@pytest.mark.ft3_corpus
 def test_polyphonic_ft3_focus_projects_the_selected_voice_without_mutating_piece() -> None:
     piece = load_ft3("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse_4_part.ft3")
     staffs = visible_view_staffs(piece)
