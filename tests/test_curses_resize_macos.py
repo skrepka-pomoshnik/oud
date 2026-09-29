@@ -18,7 +18,7 @@ import pytest
 
 from oud.editor.core.document import display_path
 from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.loop import run_loop
 

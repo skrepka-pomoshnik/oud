@@ -34,19 +34,8 @@ def _render_state_lines(state, *, height: int = 24) -> list[str]:
         slurs=state.slurs,
         ties=state.ties,
         holds=state.holds,
-        mode="normal",
-        cmdline="",
-        message="",
-        status_line="",
-        searchline="",
         settings=state.settings,
-        ascii_lines=None,
         stave_breaks=state.stave_breaks,
-        plugin_title="Plugins",
-        plugin_items=[],
-        plugin_index=0,
-        plugin_offset=0,
-        help_offset=0,
         playback_bar=None,
         playback_col=None,
         glisses=getattr(state, "glisses", None),
@@ -448,16 +437,18 @@ def test_tab_snippet_spans_and_ornament_markers_keep_alignment_dense() -> None:
     )
     state = regression_state(piece, width=110, bar_width=12, justify="smart")
     apply_tabnotation_preset(state.settings, "full")
-    state.ornaments = {(0, 1): "*", (0, 2): "o"}  # harmonic/ornament-style markers analogue
+    # Harmonic/ornament-style markers on the second and third chords (grid columns 3 and 5).
+    state.ornaments = {(0, 3): "*", (0, 5): "o"}
     state.slurs = [(0, 0, 3)]
     state.holds = [(0, 1, 3)]
     state.ties = [(0, 1, 3)]
     state.settings["tienoteheads"] = "parenthesize"
     lines = _render_state_lines(state, height=22)
-    assert any("*" in line or "o" in line for line in lines)
     assert any("(" in line or ")" in line for line in lines)
     staff_rows = [line for line in lines if line.count("|") >= 2 and "-" in line]
     assert staff_rows
+    assert any("b*" in row for row in staff_rows)
+    assert any("co" in row for row in staff_rows)
     _assert_aligned_staff_systems(lines, state.screen_width)
 
 

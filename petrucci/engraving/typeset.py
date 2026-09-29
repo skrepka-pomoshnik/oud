@@ -38,7 +38,6 @@ class TypesetOptions:
     bar_width: int = 12
     bar_offset: int = 0
     cursor: tuple[int, int, int] = (0, 0, 0)
-    include_status: bool = False
     settings: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -97,13 +96,12 @@ def typeset_piece(
         playback=playback,
         settings=settings,
     )
-    if canonical is not None and not opts.include_status:
+    if canonical is not None:
         return TypesetResult(
             frame=canonical.result.frame,
             cursor_display_maps=canonical.cursor_display_maps,
         )
-    render_height = content_height if opts.include_status else content_height + 1
-    screen = FrameBuffer(render_height, width)
+    screen = FrameBuffer(content_height, width)
     cursor_display_maps: dict[int, list[int]] = {}
     playback_bar = playback[0] if playback is not None else None
     playback_col = playback[1] if playback is not None else None
@@ -124,27 +122,14 @@ def typeset_piece(
         slurs=list(slurs or []),
         ties=list(ties or []),
         holds=list(holds or []),
-        mode="normal",
-        cmdline="",
-        message="",
-        status_line="",
-        searchline="",
         settings=settings,
-        ascii_lines=None,
         stave_breaks=set(stave_breaks or set()),
-        plugin_title="",
-        plugin_items=[],
-        plugin_index=0,
-        plugin_offset=0,
         playback_bar=playback_bar,
         playback_col=playback_col,
         glisses=list(glisses or []),
         cursor_display_maps=cursor_display_maps,
     )
-    frame = screen.snapshot()
-    if not opts.include_status:
-        frame = Frame(lines=frame.lines[:-1], attrs=frame.attrs[:-1])
-    return TypesetResult(frame=frame, cursor_display_maps=cursor_display_maps)
+    return TypesetResult(frame=screen.snapshot(), cursor_display_maps=cursor_display_maps)
 
 
 def typeset_text(piece: Piece, **kwargs) -> str:

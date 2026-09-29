@@ -4,7 +4,7 @@ import pytest
 
 from oud.editor.navigation.view.focus import current_view_staff, visible_view_staffs
 from oud.editor.services.bootstrap import init_state
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.status import status_line
 from oud.importers.ft3 import load_ft3
 from petrucci.adapters.duet import duet_bar_mapping
 from petrucci.core.imported import project_imported_staff

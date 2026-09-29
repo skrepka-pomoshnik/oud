@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor.commands.help import help_lines
 from oud.editor.core.document import DocumentMode
 from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
+from oud.editor.core.input.help import help_lines
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write_ascii
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.pages import paint_page
+from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.input import handle_command
-from petrucci.rendering.primitives.helpers import render_help
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
 from tests.helpers_keyscript import press_keys
 
@@ -199,7 +199,7 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
     config = str(tmp_path / "config.toml")
     state = init_state(None, config_path=config)
     screen = FrameBuffer(24, 80)
-    render_help(screen, "help  j/k scroll  q close", 0, 0, help_lines(state))
+    paint_page(screen, help_lines(state), offset=0, status="help  j/k scroll  q close", status_attr=0)
     visible_help = "\n".join(line.rstrip() for line in screen.snapshot().lines[:-1])
 
     assert "Open/create  oud [FILE] / oud" in visible_help

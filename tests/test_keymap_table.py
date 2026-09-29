@@ -10,9 +10,9 @@ import pytest
 from helpers_keyscript import keyscript_state, press_keys
 
 from oud.editor.commands.handlers.misc import show_help
-from oud.editor.commands.help import help_lines
 from oud.editor.commands.plugins.operations import PLUGIN_HANDLED_ACTIONS
 from oud.editor.core.feedback.messages import READ_ONLY_VIEWER
+from oud.editor.core.input.help import help_lines
 from oud.editor.core.input.keycodes import DEFAULT_KEYCODES
 from oud.editor.core.input.keymap import (
     ACTION_SPECS,
