@@ -83,3 +83,37 @@ def test_repo_tab_files_survive_musicxml(path: Path) -> None:
     assert _events(back) == _events(piece)
     assert _metadata(back)[:2] == _metadata(piece)[:2]
     assert (back.tuning, back.tempo, back.style) == (piece.tuning, piece.tempo, piece.style or "french")
+
+
+def _repeats(piece: Piece) -> list[str | None]:
+    return [bar.repeat for bar in piece.bars]
+
+
+@pytest.mark.parametrize("marker", [".:", ":.", ":|:"])
+def test_a_repeat_marker_stays_on_its_bar_through_repeated_saves(marker: str) -> None:
+    bars = [Bar(chords=[_chord(4, (1, 0))]) for _ in range(4)]
+    bars[1].repeat = marker
+    piece = Piece(title="T", bars=bars, strings=6, style="french")
+    expected = [None, marker, None, None]
+
+    for _ in range(3):
+        _text, piece = _round_trip(piece)
+        assert _repeats(piece) == expected
+
+
+def _has_forward_repeat_at_left(measure: ET.Element) -> bool:
+    for barline in measure.findall("barline"):
+        repeat = barline.find("repeat")
+        if barline.get("location") == "left" and repeat is not None and repeat.get("direction") == "forward":
+            return True
+    return False
+
+
+def test_a_start_repeat_is_written_at_the_left_of_its_own_measure() -> None:
+    bars = [Bar(chords=[_chord(4, (1, 0))]) for _ in range(3)]
+    bars[1].repeat = ".:"
+    text, _piece = _round_trip(Piece(title="T", bars=bars, strings=6, style="french"))
+    part = ET.fromstring(text).find("part")  # noqa: S314 - text Oud just wrote
+    assert part is not None
+
+    assert [_has_forward_repeat_at_left(measure) for measure in part.findall("measure")] == [False, True, False]

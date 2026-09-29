@@ -121,16 +121,17 @@ def _measure_time(measure: ET.Element) -> str | None:
 
 
 def _measure_repeat(measure: ET.Element) -> str | None:
-    for barline in _children(measure, "barline"):
-        repeat = _child(barline, "repeat")
-        if repeat is None:
-            continue
-        direction = (repeat.get("direction") or "").strip().lower()
-        if direction == "forward":
-            return ".:"
-        if direction == "backward":
-            return ":."
-    return None
+    """`.:` for a forward repeat, `:.` for a backward one, `:|:` for both, as on one FT3 bar."""
+
+    directions = {
+        (repeat.get("direction") or "").strip().lower()
+        for barline in _children(measure, "barline")
+        if (repeat := _child(barline, "repeat")) is not None
+    }
+    start, end = "forward" in directions, "backward" in directions
+    if start and end:
+        return ":|:"
+    return ".:" if start else ":." if end else None
 
 
 def _duration_units(node: ET.Element) -> int:
