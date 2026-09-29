@@ -9,6 +9,7 @@ from oud.editor.core.feedback.messages import MISSING_LESS, NO_SOURCE_PATH, Mess
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
+from oud.editor.services.io.dropped import dropped_marks_text
 from oud.editor.services.screen.compose import compose_editor_frame
 from oud.exports.export_tab import TabExportError, export_ascii, export_tab_to_file
 from oud.exports.musicxml import export_musicxml
@@ -71,10 +72,16 @@ def cmd_write(state: EditorState, path: str) -> bool:
     state.modified = False
     state.clean_undo_depth = len(state.undo_stack)
     state.pending_quit = False
-    state.message = f"Wrote {'TAB' if suffix == TAB_SUFFIX else 'MusicXML'} {target}"
-    if staff_count:
-        state.message += f" (tablature and {_staff_text(staff_count)})"
+    state.message = _written_message(state, target, tab=suffix == TAB_SUFFIX, staff_count=staff_count)
     return True
+
+
+def _written_message(state: EditorState, target: str, *, tab: bool, staff_count: int) -> str:
+    message = f"Wrote {'TAB' if tab else 'MusicXML'} {target}"
+    if staff_count:
+        message += f" (tablature and {_staff_text(staff_count)})"
+    dropped = dropped_marks_text(state)
+    return f"{message} (not saved: {dropped})" if dropped else message
 
 
 def _staff_text(count: int) -> str:
