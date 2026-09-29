@@ -42,9 +42,10 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert projection.write_path is None
     assert projection.visible_message == ""
 
+    # Tablature with notation staffs is editable and saves to MusicXML with those staffs.
     mixed = init_state(MIXED_FT3, config_path=config)
-    assert mixed.document_mode is DocumentMode.IMPORTED_READ_ONLY
-    assert mixed.read_only is True
+    assert mixed.document_mode is DocumentMode.IMPORTED_PROJECTION
+    assert mixed.read_only is False
     assert mixed.visible_message == ""
     assert mixed.visible_message_level is MessageLevel.INFO
 
@@ -153,10 +154,10 @@ def test_new_target_requires_overwrite_confirmation(tmp_path: Path) -> None:
 
 
 @pytest.mark.ft3_corpus
-def test_mixed_ft3_blocks_editing_but_allows_ascii_export(tmp_path: Path) -> None:
+def test_duet_ft3_blocks_editing_but_allows_ascii_export(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     output = tmp_path / "view.txt"
-    state = init_state(MIXED_FT3, config_path=config)
+    state = init_state(DUET_FT3, config_path=config)
 
     press_keys(state, ["i", "a", 27])
     assert state.modified is False
@@ -226,7 +227,7 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
 
 @pytest.mark.ft3_corpus
 def test_read_only_focus_uses_status_without_redundant_notice(tmp_path: Path) -> None:
-    state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
+    state = init_state(DUET_FT3, config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80
 
     assert state.persistent_notice == ""

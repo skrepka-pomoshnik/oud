@@ -12,6 +12,7 @@ from oud.editor.core.state import EditorState
 from oud.editor.services.screen.compose import compose_editor_frame
 from oud.exports.export_tab import TabExportError, export_ascii, export_tab_to_file
 from oud.exports.musicxml import export_musicxml
+from oud.exports.musicxml_staffs import notation_parts
 
 TAB_SUFFIX = ".tab"
 MUSICXML_SUFFIXES = (".musicxml", ".xml")
@@ -54,6 +55,11 @@ def cmd_write(state: EditorState, path: str) -> bool:
     if suffix != TAB_SUFFIX and suffix not in MUSICXML_SUFFIXES:
         state.notify(SAVE_SUFFIX_ERROR, MessageLevel.ERROR)
         return False
+    staff_count = len(notation_parts(state.piece))
+    if suffix == TAB_SUFFIX and staff_count:
+        # C15 will write these to a sidecar; until then refuse rather than drop them.
+        state.message = f"Write failed: TAB cannot hold {_staff_text(staff_count)}; save as .musicxml"
+        return False
     if not _confirm_new_target(state, target):
         return False
     try:
@@ -66,7 +72,13 @@ def cmd_write(state: EditorState, path: str) -> bool:
     state.clean_undo_depth = len(state.undo_stack)
     state.pending_quit = False
     state.message = f"Wrote {'TAB' if suffix == TAB_SUFFIX else 'MusicXML'} {target}"
+    if staff_count:
+        state.message += f" (tablature and {_staff_text(staff_count)})"
     return True
+
+
+def _staff_text(count: int) -> str:
+    return f"{count} notation staff" + ("s" if count != 1 else "")
 
 
 def _write_document(state: EditorState, target: str, *, tab: bool) -> None:

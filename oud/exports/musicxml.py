@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from oud.exports.musicxml_staffs import append_notation_parts
 from petrucci.core.model import Bar, Piece
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import default_tuning_pitches
@@ -781,6 +782,13 @@ def _musicxml_text(
             carry_repeat_forward=carry_repeat_forward,
         )
 
+    append_notation_parts(
+        root,
+        part_list,
+        piece,
+        divisions=DIVISIONS,
+        append_time=lambda attributes, bar: _append_time(attributes, bar, settings_map),
+    )
     xml_bytes = tostring(root, encoding="utf-8")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + MUSICXML_DOCTYPE + "\n" + xml_bytes.decode("utf-8") + "\n"
 

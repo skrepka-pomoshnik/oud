@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from queue import SimpleQueue
 from threading import Thread
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from oud.editor.core.coordinates import clamp_cursor, stop_at_column, stop_column
 from oud.editor.core.document import DocumentMode
@@ -15,7 +15,7 @@ from oud.editor.core.feedback.transient import DEFAULT_MESSAGE_TTL_TICKS
 from oud.editor.core.input.keycodes import DEFAULT_KEYCODES, KeyCodes
 from oud.editor.core.input.modes import Mode
 from oud.services.playback.timeline import PlaybackCursor
-from petrucci.core.model import Bar, Chord, Piece
+from petrucci.core.model import Bar, Chord, ImportedBarContent, Piece
 
 if TYPE_CHECKING:
     from oud.editor.core.input.keymap import Action
@@ -351,6 +351,8 @@ class BarSnapshot(TypedDict):
     holds: list[tuple[int, int, int]]
     glisses: list[tuple[int, int, int]]
     marks: dict[str, tuple[int, int, int]]
+    # Notation-staff content of the bar (staff index, content), for scores with other staffs.
+    imported: NotRequired[list[tuple[int, ImportedBarContent]]]
 
 
 @dataclass

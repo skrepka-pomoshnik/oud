@@ -6,6 +6,7 @@ from fractions import Fraction
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from oud.importers.musicxml_staffs import read_notation_score
 from petrucci.core.model import Bar, Chord, Note, Piece
 
 
@@ -372,6 +373,9 @@ def _parse_piece(root: ET.Element) -> Piece:
     piece.tuning = own_tuning if written_by_oud(root) else own_tuning or _staff_tuning(details)
     piece.tempo = _tempo(part)
     piece.style = _tab_style(details, fields)
+    if written_by_oud(root):
+        # Oud writes an imported score's notation staffs as further parts.
+        piece.imported_score = read_notation_score(root, part)
     return piece
 
 
