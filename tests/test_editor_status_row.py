@@ -208,3 +208,22 @@ def test_a_long_search_keeps_its_end_visible_and_a_short_command_is_unchanged(st
     state.mode = Mode.COMMAND
     state.cmdline = "w short"
     assert status_row_text(state) == ":w short"
+
+
+def test_position_shows_the_beat_of_a_cut_time_bar(state: EditorState) -> None:
+    state.settings["time"] = "C|"
+    state.piece = Piece(title="T", bars=[_quarters(4)], strings=6)
+    state.cursor_onset = Fraction(1, 2)
+
+    assert "beat:2/2" in status_row_text(state, width=80)
+
+
+def test_an_unparseable_meter_shows_the_event_number_not_a_column(state: EditorState) -> None:
+    state.settings["time"] = "3"
+    state.piece = Piece(title="T", bars=[_quarters(3)], strings=6)
+    state.cursor_onset = Fraction(1, 4)
+
+    row = status_row_text(state, width=80)
+
+    assert "ev:2/4" in row
+    assert "col:" not in row

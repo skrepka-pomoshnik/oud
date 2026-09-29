@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from oud.editor.core.coordinates import effective_time_signature
+from oud.editor.core.coordinates import bar_stops, effective_time_signature
 from oud.editor.core.document import display_path, document_status_label
 from oud.editor.core.feedback.messages import MessageLevel
 from oud.editor.core.input.modes import INSERT_MODES, Mode
@@ -189,12 +189,21 @@ def _identity(state: EditorState) -> str:
     return f"{name}{modified} [{document_status_label(state)}]"
 
 
+def _event_number(state: EditorState) -> str:
+    """Cursor stop among the bar's stops, for a meter with no beat structure."""
+
+    stops = bar_stops(state, state.cursor_bar)
+    number = stops.index(state.cursor_onset) + 1 if state.cursor_onset in stops else 1
+    return f"ev:{number}/{len(stops)}"
+
+
 def _position(state: EditorState) -> str:
     if state.read_only:
         return _read_only_position(state)
-    beat_text = f"col:{state.cursor_col + 1}"
     parsed = parse_time_signature_value(effective_time_signature(state, state.cursor_bar))
-    if parsed is not None:
+    if parsed is None:
+        beat_text = _event_number(state)
+    else:
         beats, unit = parsed
         beat_index = min(beats, int(state.cursor_onset * unit) + 1)
         beat_text = f"beat:{beat_index}/{beats}"

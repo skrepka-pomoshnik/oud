@@ -374,19 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S5. No `col:` in the status row
-
-- Where: `_position` in `oud/editor/services/screen/status.py:184` falls back
-  to `col:N` when `parse_time_signature_value`
-  (`petrucci/core/music/time.py:4`) cannot parse the meter. It returns `None`
-  for `C|` and single numbers such as `3`.
-- Do: (1) parse `C|` and `C/` as 2/2 in `parse_time_signature_value`, with a
-  test in `tests/test_petrucci_time.py` (create it if missing); (2) when the
-  meter still does not parse, show `ev:<k>/<n>`, the cursor's stop number
-  among `bar_stops(state, bar)` (`oud/editor/core/coordinates.py:123`).
-- Acceptance: tests for a 3/4 bar (`beat:`), a `C|` bar (`beat:k/2`), and a
-  bar with meter `3` (`ev:`); `grep -rn '"col:' oud` finds nothing.
-
 ### S7. The staff label overwrites the tablature
 
 - Where: `petrucci/adapters/piece_view.py:253` paints `lute` five columns left

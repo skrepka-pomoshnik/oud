@@ -1,5 +1,10 @@
 # DONE
 
+## S5: no col: in the status row (2026-09-29)
+
+- `parse_time_signature_value` reads cut time (`C|`, `c|`, `C/`) as 2/2, so a cut-time bar shows `beat:k/2` (it used to fall back to 4/4 in exports as well). A meter with no beat structure (`3`) shows `ev:<k>/<n>`, the cursor's stop among the bar's stops, instead of `col:`.
+- Validation: `tests/test_petrucci_time.py`; `tests/test_editor_status_row.py` (cut time, unparseable meter). Gate: 1,874 passed.
+
 ## S4: the status row names a bar's length problem (2026-09-29)
 
 - `bar_meter_marker` returns `meter:<length> of <meter>` (length in whole notes, meter as written) instead of `M`: `meter:1/2 of 3/4` is a 3/4 bar holding two quarters, `meter:1/1 of 3/4` an overfull one. Full and empty bars, and unknown meters, show nothing.
