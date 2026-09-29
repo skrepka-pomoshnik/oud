@@ -4,16 +4,20 @@ import copy
 from contextlib import contextmanager
 
 from oud.editor.core.state import EditorState, UndoAction, UndoGroupFrame
-from petrucci.input.tablature.mutation import (
+from petrucci.input.tablature.grid import (
     EditableTablature,
-    TabEditTransaction,
     TabMutation,
-    TabMutationResult,
-    apply_tab_mutation,
     clear_tab_cell,
     clear_tab_note,
+    enter_grid_fret,
     set_tab_cell,
     set_tab_duration,
+)
+from petrucci.input.tablature.mutation import (
+    TabDocument,
+    TabEditTransaction,
+    TabMutationResult,
+    apply_tab_mutation,
 )
 
 
@@ -113,11 +117,33 @@ def apply_duration(state: EditorState, key: tuple[int, int, int], dur: int) -> N
 
 
 def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -> TabMutationResult:
+    """Apply an onset transaction to the bar chords as one undo step."""
+
+    document = TabDocument(
+        state.piece.bars,
+        state.piece.strings,
+        state.settings.get("style") or state.piece.style or "french",
+        default_meter=state.settings.get("time"),
+    )
+    result = apply_tab_mutation(document, transaction)
     with undo_group(state, label="tab-transaction"):
-        result = apply_tab_mutation(_editable_tablature(state), transaction)
-        for mutation in result.changes:
-            _record_tab_mutation(state, mutation)
+        for delta in result.changes:
+            record_action(
+                state,
+                UndoAction(
+                    kind="chords",
+                    data={"bar": delta.bar_index, "prev": list(delta.before), "new": copy.deepcopy(list(delta.after))},
+                ),
+            )
     return result
+
+
+def enter_fret(state: EditorState, key: tuple[int, int, int], fret: int, *, duration: int) -> None:
+    """Write one fret into the editor grid, replacing that course's note at the column."""
+
+    with undo_group(state, label="enter-fret"):
+        for mutation in enter_grid_fret(_editable_tablature(state), key, fret, duration=duration):
+            _record_tab_mutation(state, mutation)
 
 
 def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:

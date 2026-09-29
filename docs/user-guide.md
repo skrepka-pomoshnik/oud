@@ -388,6 +388,7 @@ Petrucci has two entry paths:
 - `typeset_piece(...)` preserves Oud tablature behavior.
 - `typeset_score(...)` renders source-independent immutable notation records.
 - `apply_note_input(...)` applies an atomic, source-independent note transaction.
+- `apply_tab_mutation(...)` applies an atomic tablature transaction at exact onsets.
 
 The canonical score result contains text, `ScoreLayout`, structural roles,
 source IDs, `cells_for(id)`, and indexed `cells_for_many(ids)`. Consumers own selection, playback, grading,
