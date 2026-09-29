@@ -518,22 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S25. Say what a save cannot keep
-
-- Where: `cmd_write` in `oud/editor/services/io/files.py` (the message after a
-  successful write). Editor-side marks (`state.slurs`, `ties`, `holds`,
-  `glisses`, `ornaments`, `annotations`, `highlights`) are never written by
-  either format, and the save says nothing (`docs/musicxml-support.md`).
-- Do: after a successful write, when any of those collections is non-empty,
-  append ` (not saved: 2 slurs, 1 ornament)` to `state.message`, counting each
-  non-empty collection (`len(...)`, singular when 1). Put the counting in a
-  small function in a new module `oud/editor/services/io/dropped.py` returning
-  a `str` (empty when nothing is dropped) so `S26`/`C17` can shrink it later.
-- Acceptance: `tests/test_musicxml_default_save.py` gets tests for a document
-  with a slur and an ornament (built with `set_slur`/`set_ornament` from
-  `oud/editor/editing/score/notation.py`) saved as `.musicxml` and as `.tab`
-  (message names both), and one with no marks (message unchanged).
-
 ### S26. Read the bar marks the exporter already writes
 
 - Where: `oud/importers/musicxml.py` (`_parse_measure`); the exporter is

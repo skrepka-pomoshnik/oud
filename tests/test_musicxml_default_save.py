@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from oud.editor.core.document import DocumentMode
+from oud.editor.editing.score.notation import set_ornament, set_slur
 from oud.editor.services.bootstrap import init_state
+from oud.editor.services.io.dropped import dropped_marks_text
 from oud.editor.services.io.files import cmd_write, cmd_write_default
 from oud.editor.services.io.loading import cmd_open
-from tests.helpers_keyscript import press_keys
+from tests.helpers_keyscript import keyscript_state, press_keys
 
 FOREIGN_MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1"><work><work-title>Foreign</work-title></work>
@@ -99,3 +103,42 @@ def test_other_destinations_are_refused(tmp_path: Path) -> None:
     assert not cmd_write(state, str(target))
     assert state.message == "Save destination must end in .musicxml, .xml or .tab"
     assert not target.exists()
+
+
+def _marked_state(tmp_path: Path):
+    state = init_state(None, config_path=_config(tmp_path))
+    press_keys(state, ["i", "a", "b", 27])
+    state.cursor_bar, state.cursor_col = 0, 0
+    set_slur(state, "start")
+    state.cursor_col = 3
+    set_slur(state, "end")
+    state.cursor_col = 0
+    set_ornament(state, "+")
+    return state
+
+
+@pytest.mark.parametrize("suffix", ["musicxml", "tab"])
+def test_a_save_names_the_marks_it_cannot_keep(tmp_path: Path, suffix: str) -> None:
+    state = _marked_state(tmp_path)
+
+    assert cmd_write(state, str(tmp_path / f"marked.{suffix}"))
+
+    assert state.message.endswith("(not saved: 1 slur, 1 ornament)")
+
+
+def test_a_save_without_marks_says_nothing_extra(tmp_path: Path) -> None:
+    state = init_state(None, config_path=_config(tmp_path))
+    press_keys(state, ["i", "a", 27])
+
+    assert cmd_write(state, str(tmp_path / "plain.musicxml"))
+
+    assert "not saved" not in state.message
+
+
+def test_dropped_marks_are_counted_per_kind() -> None:
+    state = keyscript_state()
+    state.slurs = [(0, 0, 1), (0, 2, 3)]
+    state.ties = [(0, 0, 1)]
+    state.highlights = {(0, 0, 0)}
+
+    assert dropped_marks_text(state) == "2 slurs, 1 tie, 1 highlight"

@@ -1,5 +1,10 @@
 # DONE
 
+## S25: a save names the marks it cannot keep (2026-09-29)
+
+- After a successful `:w`, the message ends with `(not saved: 1 slur, 1 ornament)` when slurs, ties, holds, glissandi, ornaments, annotations or highlights exist; neither MusicXML nor TAB stores them yet (`C17`). The counting lives in `oud/editor/services/io/dropped.py`.
+- Validation: `tests/test_musicxml_default_save.py` (both formats, no marks, per-kind counts). Gate: 1,892 passed.
+
 ## MusicXML checked against the W3C schema; repeat start fixed (2026-09-29)
 
 - New `tests/test_musicxml_schema.py` validates Oud's MusicXML with
