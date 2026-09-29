@@ -14,6 +14,7 @@ from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
     EventKind,
+    KeySignature,
     LyricSyllable,
     NotationEvent,
     NotationMeasure,
@@ -72,7 +73,13 @@ def _event(
     )
 
 
-def _piece_with_tab(*, repeat: str | None = None, ending_numbers: tuple[int, ...] = ()) -> Piece:
+def _piece_with_tab(
+    *,
+    repeat: str | None = None,
+    ending_numbers: tuple[int, ...] = (),
+    fermata: bool = False,
+    time_sig: str | None = None,
+) -> Piece:
     chord = Chord(
         note_type=4,
         dotted=False,
@@ -81,7 +88,7 @@ def _piece_with_tab(*, repeat: str | None = None, ending_numbers: tuple[int, ...
     )
     return Piece(
         title="Matrix proof",
-        bars=[Bar(chords=[chord], repeat=repeat, ending_numbers=ending_numbers)],
+        bars=[Bar(chords=[chord], repeat=repeat, ending_numbers=ending_numbers, fermata=fermata, time_sig=time_sig)],
         strings=6,
     )
 
@@ -220,7 +227,46 @@ def _repeat_fixture() -> MatrixFixture:
     return MatrixFixture(score, piece, {}, {}, {}, [], [])
 
 
+def _single_measure_fixture(
+    score_id: str,
+    piece: Piece,
+    *,
+    settings: dict[str, str] | None = None,
+    **measure_options: Any,
+) -> MatrixFixture:
+    events = measure_options.pop("events", (_event(f"{score_id}-1", 0, 60), _event(f"{score_id}-2", 1, 62)))
+    measure = NotationMeasure(f"{score_id}-measure", 1, events, **measure_options)
+    score = NotationScore(
+        id=score_id, staffs=(NotationStaff(id=f"{score_id}-staff", label="Lute", measures=(measure,)),)
+    )
+    return MatrixFixture(score, piece, settings or {}, {}, {}, [], [])
+
+
+def _fermata_fixture() -> MatrixFixture:
+    events = (_event("fermata-1", 0, 60, fermata=True), _event("fermata-2", 1, 62))
+    return _single_measure_fixture(
+        "fermata", _piece_with_tab(fermata=True), events=events, time_signature=TimeSignature(2, 4)
+    )
+
+
+def _cut_time_fixture() -> MatrixFixture:
+    return _single_measure_fixture("cut-time", _piece_with_tab(time_sig="C|"), time_signature=TimeSignature(2, 2))
+
+
+def _key_signature_fixture() -> MatrixFixture:
+    return _single_measure_fixture(
+        "key-signature",
+        _piece_with_tab(),
+        settings={"key": "G"},
+        time_signature=TimeSignature(2, 4),
+        key_signature=KeySignature(1),
+    )
+
+
 _FIXTURE_BUILDERS: dict[str, Callable[[], MatrixFixture]] = {
+    "fermata": _fermata_fixture,
+    "cut-time": _cut_time_fixture,
+    "key-signature": _key_signature_fixture,
     "tab-registration-and-rhythm": _tab_fixture,
     "voice-lute-lyrics": _voice_lute_fixture,
     "polyphonic-collisions": _polyphonic_fixture,

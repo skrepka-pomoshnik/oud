@@ -9,6 +9,11 @@ pixel identity; it adopts their small, executable failure cases. The test helper
 builds one deterministic source-independent fixture per case and drives both
 proof and export assertions from that record.
 
+Cases marked `"origin": "oud"` have no upstream project behind them: they cover
+features Oud supports that the upstream regression families do not isolate
+(currently `fermata`, `cut-time`, and `key-signature`). Their contract is
+what the code emits and lays out today.
+
 LilyPond export uses the `petrucci` profile by default. This profile applies a
 restrained movable-type hierarchy to paper margins, staff rules, barlines,
 tablature noteheads, stems, and beams. `:set lyprofile=classic` selects the

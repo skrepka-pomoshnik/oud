@@ -30,6 +30,30 @@
         "voice and lute staves share one registration",
         "lyrics remain attached to the vocal staff"
       ]
+    },
+    {
+      "id": "fermata-export",
+      "case": "fermata",
+      "assertions": [
+        "a fermata sits over the note it belongs to",
+        "the export marks the bar with a fermata glyph"
+      ]
+    },
+    {
+      "id": "cut-time-export",
+      "case": "cut-time",
+      "assertions": [
+        "cut time draws a time signature in the layout",
+        "the export states 2/2"
+      ]
+    },
+    {
+      "id": "key-signature-export",
+      "case": "key-signature",
+      "assertions": [
+        "one sharp is drawn as a key signature",
+        "the export states G major"
+      ]
     }
   ],
   "upstream_microcases": [
@@ -231,6 +255,60 @@
           "borrowed_invariant": "dense strophic lyrics remain onset-aligned across four registered mixed-score systems"
         }
       ]
+    },
+    {
+      "id": "fermata",
+      "fixture": "fermata",
+      "origin": "oud",
+      "features": ["fermatas"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "fermata"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["scripts.ufermata"]
+      },
+      "petrucci_contract": ["a fermata is drawn for the marked event only"],
+      "lilypond_contract": ["a bar fermata exports as a fermata glyph mark"],
+      "upstream": []
+    },
+    {
+      "id": "cut-time",
+      "fixture": "cut-time",
+      "origin": "oud",
+      "features": ["cut-time", "time-signatures"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "time-signature"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\time 2/2"]
+      },
+      "petrucci_contract": ["cut time lays out as a 2/2 time signature"],
+      "lilypond_contract": ["a C| bar exports as 2/2"],
+      "upstream": []
+    },
+    {
+      "id": "key-signature",
+      "fixture": "key-signature",
+      "origin": "oud",
+      "features": ["key-signatures"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "key-signature"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\key g \\major"]
+      },
+      "petrucci_contract": ["one sharp lays out as a key signature"],
+      "lilypond_contract": ["the key setting exports as a \\key command"],
+      "upstream": []
     }
   ]
 }

@@ -1,5 +1,11 @@
 # DONE
 
+## S11: engraving matrix cases for fermata, cut time and key signature (2026-09-29)
+
+- The matrix has three source-independent cases (`fermata`, `cut-time`, `key-signature`, marked `"origin": "oud"`) with their builders, microcases, proof roles and LilyPond tokens (`scripts.ufermata`, `\\time 2/2`, `\\key g \\major`); the tokens were taken from real exports, and a wrong token is detected. The profile test accepts an empty `upstream` list only for such cases.
+- The planned `tuplet-triplet` case was not written: the LilyPond exporter writes no tuplets at all (it scales durations), so the tuplet row of `docs/supported-behavior.md` is now Partial and the case moved to `S32`.
+- Validation: `tests/test_lilypond_engraving_profile.py` (9 cases, 6 microcases).
+
 ## S23: fingerings and harmonics on notation staves in MusicXML (2026-09-29)
 
 - `MelodyEvent.fingering` and `harmonic` are written inside `notations/technical` (`fingering`, `harmonic`) and read back. They carry no string or fret, so `_technical_count` never takes a fingered standard staff for the tablature part; a test pins that with a standard part that has more fingerings than the tab part has notes.
