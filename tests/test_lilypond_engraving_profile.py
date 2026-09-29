@@ -31,10 +31,11 @@ def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:
     assert matrix["profiles"] == ["petrucci", "classic"]
     assert matrix["publication_engines"]["baseline"] == "2.26"
     assert matrix["publication_engines"]["compatibility"] == "2.24"
-    assert len(matrix["cases"]) >= 5
+    assert len(matrix["cases"]) >= 9
+    assert {"fermata", "cut-time", "key-signature"} <= {case["id"] for case in matrix["cases"]}
     assert "gerbode-multiverse-registration" in {case["id"] for case in matrix["cases"]}
     case_ids = {case["id"] for case in matrix["cases"]}
-    assert len(matrix["microcases"]) >= 3
+    assert len(matrix["microcases"]) >= 6
     assert len(matrix["upstream_microcases"]) >= 4
     for microcase in matrix["microcases"]:
         assert microcase["case"] in case_ids
@@ -50,7 +51,8 @@ def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:
         assert case["lilypond"]["contains"]
         assert case["petrucci_contract"]
         assert case["lilypond_contract"]
-        assert case["upstream"]
+        # Cases with no upstream project behind them say so with `"origin": "oud"`.
+        assert case["upstream"] or case.get("origin") == "oud"
 
 
 def test_quality_matrix_drives_petrucci_and_lilypond_contracts(tmp_path: Path) -> None:

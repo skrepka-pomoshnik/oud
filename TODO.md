@@ -35,7 +35,7 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 6. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow;
-S11, S20–S23 and S25–S31 need nothing outside the repository.
+S32 needs nothing outside the repository.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
@@ -414,38 +414,27 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S11. Engraving matrix: cases for features it does not cover yet
+### S32. LilyPond tuplets from melody events
 
-- Where: `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` lists six
-  `cases` (tablature rhythm, voice + lute + lyrics, polyphonic collisions,
-  broken spans, repeats and voltas, Gerbode multiverse) and their builders in
-  `tests/engraving_quality_matrix.py` (`_FIXTURE_BUILDERS`, one function per
-  case, each returns a `MatrixFixture`). `tests/test_lilypond_engraving_profile.py`
-  walks every case: it lays the proof score out and exports the piece.
-- Missing: the supported-behavior table (`docs/supported-behavior.md`, section
-  "Historical notation constructs") lists fermatas, tuplets, common/cut time and
-  key signatures as supported, but none has a matrix case of its own.
-- Do: add four cases, one per feature: `fermata`, `tuplet-triplet`,
-  `cut-time`, `key-signature`. For each: (1) a `_x_fixture()` builder next to
-  the others, small (one bar, two to three events, built with
-  `_event(...)` and `NotationScore`, plus the matching `Piece` for the export);
-  (2) an entry in `_FIXTURE_BUILDERS`; (3) a `cases` entry copying an existing
-  one's keys (`id`, `fixture` (same as `id`), `features`, `proof`,
-  `lilypond.contains`, `petrucci_contract`, `lilypond_contract`, `upstream`);
-  (4) a `microcases` entry with 1-2 assertions.
-- Pick `proof.required_roles` and `lilypond.contains` from what the code
-  really emits: export the fixture once (`export_lilypond`), read the `.ly`,
-  and use tokens that prove the feature (for example `\fermata`, `\time 2/2`,
-  `\key`, `\scaleDurations`). Do not guess tokens.
-- These cases have no upstream project behind them: allow an empty `upstream`
-  list only for cases with `"origin": "oud"`, and add that key to the four new
-  cases. Change the assertion in
-  `test_engraving_matrix_links_proof_export_and_upstream_invariants`
-  accordingly (`assert case["upstream"] or case.get("origin") == "oud"`).
-- Acceptance: `tests/test_lilypond_engraving_profile.py` passes with 10 cases;
-  `len(matrix["cases"]) >= 10`; each new case's `features` name its feature;
-  `docs/engraving-regressions.md` lists the four features under the matrix.
-- Out of scope: real FT3 entries (`S24`), collision tuning, other features.
+- Where: `oud/exports/lilypond/voices/vocal.py` (`_append_imported_events`) writes
+  each `MelodyEvent` as pitch plus written duration and never reads
+  `tuplet_actual`/`tuplet_normal`; no code under `oud/exports/lilypond` mentions
+  a tuplet. `timed_items_duration` in `oud/exports/lilypond/timing.py` adds the
+  written values, so three triplet eighths in a 2/4 bar count as 5/8 and the
+  bar is wrapped in a `\scaleDurations` fudge instead of `\tuplet`.
+- Do: group consecutive events with the same (`tuplet_actual`,
+  `tuplet_normal`) and write them inside `\tuplet A/N { ... }`; make
+  `timed_items_duration` count such an event as its written value times
+  `normal/actual`, so the bar needs no scaling. Check the syntax against
+  LilyPond 2.24 and 2.26 (`\tuplet` exists in both).
+- Then add the missing matrix case `tuplet-triplet` as in `S11`: three eighth
+  events with `tuplet=TupletRatio(3, 2)` and a quarter in 2/4
+  (`tests/engraving_quality_matrix.py`), `lilypond.contains` `["\\tuplet 3/2"]`,
+  `"origin": "oud"`; and set the tuplet row in `docs/supported-behavior.md`
+  back to Supported.
+- Acceptance: a 2/4 bar of a triplet plus a quarter exports with `\tuplet 3/2`
+  and without `\scaleDurations`; a bar without tuplets exports as before; the
+  matrix test has 10 cases.
 
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
