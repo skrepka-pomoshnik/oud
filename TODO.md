@@ -374,17 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S9. Checksums for companion MIDI files
-
-- Where: `scripts/corpus/midi/references.py` fetches and caches companion MIDI
-  files; `scripts/corpus/midi/audit.py` reports on them. Neither records a
-  checksum, so a changed or stale cached file goes unnoticed.
-- Do: add the SHA-256 of the cached file to `ReferenceFetch` and to the audit
-  report; when a report names a checksum and the cached file's differs, report
-  `stale companion MIDI: <path>` before any parity check.
-- Acceptance: tests with small files in `tmp_path` (no network): a matching
-  file passes, an altered file produces the diagnostic.
-
 ### S10. Document the supported historical-notation matrix
 
 - Add a table to `docs/supported-behavior.md` that lists each historical

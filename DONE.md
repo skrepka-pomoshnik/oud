@@ -1,5 +1,10 @@
 # DONE
 
+## S9: companion MIDI checksums (2026-09-29)
+
+- Each companion MIDI reference and audit record carries the file's SHA-256. `python -m scripts.corpus.midi --expect <earlier report>` reads the checksums of an earlier run; a reference whose checksum differs is reported `reference_stale` (`stale companion MIDI: <path>`) and is not compared.
+- Validation: `tests/test_corpus_midi.py` (cached checksum, matching checksum, altered file, checksums read from a report), all with small files in `tmp_path`. Gate: 1,884 passed.
+
 ## S19: fermatas and slurs on notation staves in MusicXML (2026-09-29)
 
 - Notation staves write `<fermata/>` and `<slur type=start|stop>` inside the note's `notations`, and the importer reads them back into `fermata`, `slur_start` and `slur_end`.
