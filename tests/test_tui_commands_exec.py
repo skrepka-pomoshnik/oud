@@ -669,7 +669,7 @@ def test_cmd_set_tuning_baroque_alias(tmp_path: Path) -> None:
     state = _state()
     cfg = str(tmp_path / "cfg.toml")
     cmd.cmd_set(state, "tuning=baroque13", cfg)
-    assert state.settings["tuning"] == "a4b-4c4d4e4f4g4a3d3f3a2d2f2"
+    assert state.settings["tuning"] == "a1b-1c2d2e2f2g2a2d3f3a3d4f4"
 
 
 def test_cmd_bar_and_chord() -> None:
