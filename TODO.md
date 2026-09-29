@@ -374,19 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S4. Say what is wrong with a bar's length
-
-- Where: `bar_meter_marker` in `oud/editor/services/screen/rhythm.py` returns
-  `M` when the cursor bar's events do not fill its meter; the status row shows
-  it as the `meter` segment.
-- Do: return `meter:<content> of <meter>` instead, where content is
-  `bar_content_length(bar)` (`petrucci/input/tablature/mutation.py:195`,
-  whole notes) written over the meter's denominator, for example
-  `meter:5/8 of 3/4` or `meter:7/8 of 3/4`. Keep `None` for a full bar, an
-  empty bar and an unknown meter. Rename `METER_MISMATCH_MARKER`.
-- Acceptance: tests in `tests/test_editor_status_row.py` for a full bar (no
-  segment), an underfull bar and an overfull bar in 3/4, and a 6/8 bar.
-
 ### S5. No `col:` in the status row
 
 - Where: `_position` in `oud/editor/services/screen/status.py:184` falls back

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from oud.editor.core.coordinates import at_append_slot, bar_meter, cursor_event
+from oud.editor.core.coordinates import at_append_slot, bar_meter, cursor_event, effective_time_signature
 from oud.editor.core.state import EditorState
+from petrucci.core.music.time import parse_time_signature_value
 from petrucci.input.tablature.mutation import TabDuration, bar_content_length
 
-METER_MISMATCH_MARKER = "M"
+METER_SEGMENT = "meter:{content} of {meter}"
 
 
 def _duration_text(duration: TabDuration) -> str:
@@ -25,7 +26,10 @@ def cursor_duration_text(state: EditorState) -> str | None:
 
 
 def bar_meter_marker(state: EditorState) -> str | None:
-    """``M`` when the cursor bar's events do not fill its meter exactly, otherwise ``None``."""
+    """``meter:<length> of <meter>`` when the cursor bar's events do not fill its meter, otherwise ``None``.
+
+    The length is in whole notes, so ``meter:1/2 of 3/4`` is a 3/4 bar holding two quarters.
+    """
 
     if not 0 <= state.cursor_bar < len(state.piece.bars):
         return None
@@ -33,4 +37,8 @@ def bar_meter_marker(state: EditorState) -> str | None:
     meter = bar_meter(state, state.cursor_bar)
     if not bar.chords or meter is None:
         return None
-    return None if bar_content_length(bar) == meter else METER_MISMATCH_MARKER
+    content = bar_content_length(bar)
+    if content == meter:
+        return None
+    beats, unit = parse_time_signature_value(effective_time_signature(state, state.cursor_bar)) or (0, 0)
+    return METER_SEGMENT.format(content=f"{content.numerator}/{content.denominator}", meter=f"{beats}/{unit}")

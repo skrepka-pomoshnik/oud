@@ -43,13 +43,35 @@ def test_cursor_duration_is_the_event_duration_or_the_typing_duration(state: Edi
     assert cursor_duration_text(state) == "16"
 
 
-def test_bar_meter_marker_flags_only_bars_that_do_not_fill_their_meter(state: EditorState) -> None:
+def _eighths(count: int) -> Bar:
+    return Bar(chords=[Chord(note_type=5, dotted=False, grid=None, notes=[Note(1, 0, 0)]) for _ in range(count)])
+
+
+def test_bar_meter_marker_names_the_length_of_bars_that_do_not_fill_their_meter(state: EditorState) -> None:
     state.settings["time"] = "C"
     state.piece = Piece(title="T", bars=[_quarters(1), _quarters(4), Bar()], strings=6)
-    assert bar_meter_marker(state) == "M"
+    assert bar_meter_marker(state) == "meter:1/4 of 4/4"
     state.cursor_bar = 1
     assert bar_meter_marker(state) is None
     state.cursor_bar = 2
+    assert bar_meter_marker(state) is None
+
+
+def test_meter_marker_tells_underfull_from_overfull_bars(state: EditorState) -> None:
+    state.settings["time"] = "3/4"
+    state.piece = Piece(title="T", bars=[_quarters(2), _quarters(3), _quarters(4)], strings=6)
+    assert [(setattr(state, "cursor_bar", i), bar_meter_marker(state))[1] for i in range(3)] == [
+        "meter:1/2 of 3/4",
+        None,
+        "meter:1/1 of 3/4",
+    ]
+
+
+def test_meter_marker_uses_the_written_meter(state: EditorState) -> None:
+    state.settings["time"] = "6/8"
+    state.piece = Piece(title="T", bars=[_eighths(5), _eighths(6)], strings=6)
+    assert bar_meter_marker(state) == "meter:5/8 of 6/8"
+    state.cursor_bar = 1
     assert bar_meter_marker(state) is None
 
 
