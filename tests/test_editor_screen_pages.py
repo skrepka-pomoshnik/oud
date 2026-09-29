@@ -99,7 +99,7 @@ def test_info_and_notes_pages_describe_the_document() -> None:
     assert "[1] Source comment" in notes
     s = _Screen(h=6, w=30)
     paint_page(s, ["HELP", "line"], offset=0, status="help", status_attr=1)
-    paint_plugin_browser(s, title="Plugins", items=["a", "b"], index=1, offset=0, message="msg", status_attr=1)
+    paint_plugin_browser(s, title="Plugins", items=["a", "b"], index=1, offset=0, status="plugin  msg", status_attr=1)
     assert (2, 0, "> b", 1) in s.calls
     assert s.calls
 

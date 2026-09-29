@@ -9,7 +9,14 @@ from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.screen.rhythm import bar_meter_marker, cursor_duration_text
-from oud.editor.services.screen.status import status_row_attr, status_row_text
+from oud.editor.services.screen.status import (
+    DROP_ORDER,
+    StatusModel,
+    render_status,
+    status_attr,
+    status_row_attr,
+    status_row_text,
+)
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLINE
 
@@ -18,6 +25,7 @@ from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE, A_UNDERLIN
 def state(tmp_path: Path) -> EditorState:
     state = init_state(None, config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80
+    state.message = ""
     state.bar_width = 8
     return state
 
@@ -64,25 +72,87 @@ def test_prompt_modes_show_only_the_prompt_and_message(state: EditorState) -> No
     assert status_row_text(state) == "/12"
 
 
-def test_status_row_shows_duration_until_a_message_replaces_it(state: EditorState) -> None:
-    quiet = status_row_text(state, duration="4")
-    assert quiet.startswith("[No Name]")
-    assert quiet.endswith("normal  len:4")
+def test_status_row_anchors_identity_left_and_mode_right(state: EditorState) -> None:
+    row = status_row_text(state, duration="4", width=80)
+    assert len(row) == 79
+    assert row.startswith("[No Name] [NEW:untitled.tab] bar:1 beat:1/4 str:1 ")
+    assert row.endswith("len:4  normal")
+
+
+def test_moving_the_cursor_does_not_move_the_right_segments(state: EditorState) -> None:
+    first = status_row_text(state, duration="4", width=80)
+    state.cursor_bar = 11
+    state.cursor_string = 5
+    moved = status_row_text(state, duration="16.", width=80)
+    assert first.index("normal") == moved.index("normal")
+
+
+def test_message_sits_between_the_groups_and_keeps_the_duration(state: EditorState) -> None:
     state.message = "msg"
-    loud = status_row_text(state, duration="4")
-    assert "len:4" not in loud
-    assert loud.endswith("normal  msg")
+    row = status_row_text(state, duration="4", width=80)
+    assert "str:1  msg " in row
+    assert row.endswith("len:4  normal")
 
 
-def test_meter_marker_follows_the_position_and_stays_apart_from_the_message(state: EditorState) -> None:
+def test_meter_marker_follows_the_position(state: EditorState) -> None:
     state.notify("warn", MessageLevel.WARNING)
-    line = status_row_text(state, meter="M")
-    assert "bar:1 beat:1/4 str:1 M  normal  warn" in line
+    assert "bar:1 beat:1/4 str:1 M  warn" in status_row_text(state, meter="M", width=80)
+
+
+def test_pending_count_and_keys_show_before_the_duration(state: EditorState) -> None:
+    state.count_prefix = "3"
+    state.pending_keys = (ord("d"),)
+    assert status_row_text(state, duration="4", width=80).endswith("3d  len:4  normal")
+
+
+def test_insert_prefix_shows_only_while_inserting(state: EditorState) -> None:
+    state.insert_prefix = "/"
+    assert not status_row_text(state, width=80).endswith("/  normal")
+    state.mode = Mode.INSERT
+    assert status_row_text(state, width=80).endswith("/  insert")
 
 
 def test_hidden_bottom_panel_leaves_only_mode_and_message(state: EditorState) -> None:
     state.settings["bottompanel"] = "off"
-    assert status_row_text(state, duration="4") == "normal  len:4"
+    assert status_row_text(state, duration="4", width=0) == "len:4  normal"
+
+
+def test_render_status_drops_whole_segments_in_priority_order() -> None:
+    model = StatusModel(
+        identity="piece.tab [TAB]",
+        position="bar:1 beat:1/4 str:1",
+        meter="M",
+        pending="3d",
+        duration="len:4",
+        mode="normal",
+    )
+    assert render_status(model, 0) == "piece.tab [TAB] bar:1 beat:1/4 str:1 M  3d  len:4  normal"
+    assert render_status(model, 60) == "piece.tab [TAB] bar:1 beat:1/4 str:1 M    3d  len:4  normal"
+    assert render_status(model, 45) == "bar:1 beat:1/4 str:1 M     3d  len:4  normal"
+    assert render_status(model, 40) == "bar:1 beat:1/4 str:1 M       3d  normal"
+    assert render_status(model, 31) == "bar:1 beat:1/4 str:1 M  normal"
+    assert render_status(model, 30) == "bar:1 beat:1/4 str:1   normal"
+    assert render_status(model, 12) == "     normal"
+    assert render_status(model, 3) == "no"
+    assert DROP_ORDER == ("identity", "duration", "pending", "meter", "position")
+
+
+def test_render_status_cuts_the_message_only_after_every_other_segment() -> None:
+    model = StatusModel(identity="piece.tab [TAB]", position="bar:1", message="x" * 100, mode="normal")
+    row = render_status(model, 40)
+    assert len(row) == 39
+    assert row == "x" * 31 + "  normal"
+
+
+def test_status_attr_marks_the_level_only_while_a_message_shows() -> None:
+    assert status_attr(StatusModel(level=MessageLevel.ERROR)) == A_REVERSE
+    assert status_attr(StatusModel(message="x", level=MessageLevel.ERROR)) == A_REVERSE | A_BOLD | A_UNDERLINE
+
+
+def test_render_status_never_writes_the_last_column() -> None:
+    model = StatusModel(identity="i", position="p", mode="normal")
+    for width in range(1, 30):
+        assert len(render_status(model, width)) <= width - 1
 
 
 def test_status_message_levels_have_distinct_portable_attributes(state: EditorState) -> None:

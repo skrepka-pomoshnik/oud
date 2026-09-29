@@ -176,7 +176,7 @@ def paint_plugin_browser(
     items: Sequence[str],
     index: int,
     offset: int,
-    message: str,
+    status: str,
     status_attr: int,
 ) -> None:
     height, width = screen.getmaxyx()
@@ -186,7 +186,6 @@ def paint_plugin_browser(
         selected = offset + row - 1 == index
         text = clean_text(f"{'>' if selected else ' '} {label}")
         safe_addstr(screen, row, 0, text[: max(0, width - 1)], status_attr if selected else 0)
-    status = f"{PLUGIN_HINT}  {message}" if message else PLUGIN_HINT
     safe_addstr(screen, height - 1, 0, clean_text(status), status_attr)
 
 

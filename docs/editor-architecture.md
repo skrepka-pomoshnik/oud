@@ -63,4 +63,10 @@ the notation or the tablature view. Everything else on screen belongs to Oud:
   ASCII-preview pages.
 
 The status row takes the last screen row unless the bottom panel is off; the
-command prompt, search prompt, and pages always show it.
+command prompt, search prompt, and pages always show it. `StatusModel` holds its
+segments. Identity and position start at the left edge; pending count and keys
+(and the insert prefix while inserting), duration, and mode end at the right
+edge, so moving the cursor does not move them; the message sits between. When
+the row is too narrow, identity, duration, pending keys, meter, and position are
+dropped in that order, then the message is cut; the mode is never dropped. The
+last column stays empty because curses reports an error when it is written.

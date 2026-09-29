@@ -48,14 +48,15 @@ def test_petrucci_render_piece_takes_no_editor_chrome() -> None:
 
 def test_tablature_status_row_shows_position_mode_and_duration(state: EditorState) -> None:
     lines = _lines(state)
-    assert lines[-1] == "triste.tab [TAB] bar:1 beat:1/6 str:1  normal  len:2"
+    assert lines[-1].startswith("triste.tab [TAB] bar:1 beat:1/6 str:1 ")
+    assert lines[-1].endswith("len:2  normal")
     assert any("|" in line and "-" in line for line in lines[:-1])
 
 
 def test_status_row_carries_the_message_severity(state: EditorState) -> None:
     state.notify("Write failed", MessageLevel.ERROR)
     composed = compose_editor_frame(state, height=24, width=80)
-    assert composed.frame.lines[-1].rstrip().endswith("normal  Write failed")
+    assert "str:1  Write failed " in composed.frame.lines[-1]
     assert composed.frame.attrs[-1][0] == A_REVERSE | A_BOLD | A_UNDERLINE
 
 
@@ -89,7 +90,8 @@ def test_info_and_notes_pages_describe_the_document(state: EditorState) -> None:
     info = _lines(state, height=60, width=100)
     assert info[0] == "INFO"
     assert "Terminal:     100x60" in info
-    assert info[-1] == "triste.tab [TAB] bar:1 beat:1/6 str:1"
+    assert info[-1].startswith("triste.tab [TAB] bar:1 beat:1/6 str:1 ")
+    assert info[-1].endswith("info")
     state.mode = Mode.NOTES
     notes = _lines(state)
     assert notes[0] == "NOTES"
@@ -101,14 +103,15 @@ def test_plugin_browser_marks_the_selected_item(state: EditorState) -> None:
     state.plugins.index = 1
     lines = _lines(state)
     assert lines[:3] == ["Plugins", "  folder/", "> piece"]
-    assert lines[-1].startswith("plugin  j/k move")
+    assert lines[-1].endswith("plugin  j/k move  h back  l/enter open  d download  q close")
 
 
 def test_ascii_preview_shows_the_export_above_the_status_row(state: EditorState) -> None:
     state.ascii_preview = True
     lines = _lines(state)
     assert lines[1].startswith(" 6|")
-    assert lines[-1] == "triste.tab [TAB] bar:1 beat:1/6 str:1  normal  ascii preview"
+    assert lines[-1].startswith("triste.tab [TAB] bar:1 beat:1/6 str:1 ")
+    assert lines[-1].endswith("normal  ascii preview")
 
 
 def test_ascii_snapshot_is_the_composed_screen(state: EditorState) -> None:
@@ -125,6 +128,6 @@ def test_tablature_playback_uses_an_overlay_cache(state: EditorState) -> None:
 
 
 def test_status_row_uses_reverse_video_without_a_message(state: EditorState) -> None:
-    assert compose_editor_frame(state, height=24, width=80).frame.attrs[-1][0] == A_REVERSE
+    assert set(compose_editor_frame(state, height=24, width=80).frame.attrs[-1][:79]) == {A_REVERSE}
     state.notify("careful", MessageLevel.WARNING)
     assert compose_editor_frame(state, height=24, width=80).frame.attrs[-1][0] == A_REVERSE | A_UNDERLINE
