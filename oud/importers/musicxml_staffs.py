@@ -107,6 +107,7 @@ def _melody_event(node: ET.Element, onset: int) -> MelodyEvent:
     normal = _text(_child(modification, "normal-notes")) if modification is not None else ""
     is_rest = _child(node, "rest") is not None
     notations = _child(node, "notations")
+    technical = _child(notations, "technical") if notations is not None else None
     slurs = {slur.get("type") for slur in _children(notations, "slur")} if notations is not None else set()
     return MelodyEvent(
         text="r" if is_rest else _pitch_text(_child(node, "pitch")),
@@ -121,6 +122,8 @@ def _melody_event(node: ET.Element, onset: int) -> MelodyEvent:
         slur_start="start" in slurs,
         slur_end="stop" in slurs,
         beam=_beam(node),
+        harmonic=technical is not None and _child(technical, "harmonic") is not None,
+        fingering=_text(_child(technical, "fingering")) or None if technical is not None else None,
     )
 
 

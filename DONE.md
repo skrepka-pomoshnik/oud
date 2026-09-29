@@ -1,5 +1,10 @@
 # DONE
 
+## S23: fingerings and harmonics on notation staves in MusicXML (2026-09-29)
+
+- `MelodyEvent.fingering` and `harmonic` are written inside `notations/technical` (`fingering`, `harmonic`) and read back. They carry no string or fret, so `_technical_count` never takes a fingered standard staff for the tablature part; a test pins that with a standard part that has more fingerings than the tab part has notes.
+- Validation: the layered-score round trip (a harmonic and a fingering) and `tests/test_musicxml_import_warnings.py`; the schema test validates the output. Gate below.
+
 ## S22: beams on notation staves in MusicXML (2026-09-29)
 
 - `MelodyEvent.beam` (`start`, `continue`, `end`) is written as `<beam number="1">begin|continue|end</beam>` (after the rhythm elements, before `notations`, as the schema orders them) and read back; other beam levels are ignored.

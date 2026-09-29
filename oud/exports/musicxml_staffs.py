@@ -182,7 +182,7 @@ def _append_beam(note: Element, event: MelodyEvent) -> None:
 
 def _append_notations(note: Element, event: MelodyEvent, ties: list[str]) -> None:
     slurs = [kind for kind, present in (("start", event.slur_start), ("stop", event.slur_end)) if present]
-    if not (ties or slurs or event.fermata):
+    if not (ties or slurs or event.fermata or event.fingering or event.harmonic):
         return
     notations = SubElement(note, "notations")
     for kind in ties:
@@ -191,6 +191,19 @@ def _append_notations(note: Element, event: MelodyEvent, ties: list[str]) -> Non
         SubElement(notations, "slur", type=kind, number="1")
     if event.fermata:
         SubElement(notations, "fermata")
+    _append_technical(notations, event)
+
+
+def _append_technical(notations: Element, event: MelodyEvent) -> None:
+    """Harmonic and fingering; they carry no string or fret, so a reader never takes them for tablature."""
+
+    if not (event.fingering or event.harmonic):
+        return
+    technical = SubElement(notations, "technical")
+    if event.harmonic:
+        SubElement(technical, "harmonic")
+    if event.fingering:
+        SubElement(technical, "fingering").text = event.fingering
 
 
 def _append_rhythm(note: Element, event: MelodyEvent) -> None:

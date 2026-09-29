@@ -447,21 +447,6 @@ the complex list with a note instead of widening it.
   `docs/engraving-regressions.md` lists the four features under the matrix.
 - Out of scope: real FT3 entries (`S24`), collision tuning, other features.
 
-### S23. Fingerings and harmonics on notation staves in MusicXML
-
-- Where: same files as `S22`. `MelodyEvent.fingering` is text (usually a
-  digit) and `MelodyEvent.harmonic` is a bool.
-- Do: write `<technical><fingering>TEXT</fingering></technical>` and
-  `<technical><harmonic/></technical>` inside the note's `notations` element
-  (extend `_append_notations`, created in `S19`), and read both back.
-- Check: `_technical_count` in `oud/importers/musicxml.py` picks the part with
-  the most notes that have `string` and `fret`; these `technical` elements
-  have neither, so notation staves must still never be taken for the tablature
-  part. Add a test for that (a notation staff with more fingerings than the
-  tablature part has notes).
-- Acceptance: extend the layered-score round trip with one fingering and one
-  harmonic; the new tab-part test passes.
-
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
 Not suitable for unattended work: each needs something the cloud environment
