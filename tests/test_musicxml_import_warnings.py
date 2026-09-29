@@ -80,3 +80,29 @@ def test_conversion_still_writes_a_score_whose_notes_were_not_read(tmp_path: Pat
     assert target.is_file()
     assert load_musicxml(str(source)).import_warnings
     assert cli_convert.is_informational_warning("MusicXML: 2 notes without tablature were not read")
+
+
+def _grace(fret: int, string: int = 2) -> str:
+    return (
+        "<note><grace/><pitch><step>B</step><octave>3</octave></pitch><type>eighth</type>"
+        f"<notations><technical><string>{string}</string><fret>{fret}</fret></technical></notations></note>"
+    )
+
+
+def _chords(xml: str) -> list[list[tuple[int, int]]]:
+    piece = _parse_piece(ET.fromstring(xml))  # noqa: S314 - inline test data
+    return [[(n.string, n.fret) for n in c.notes] for c in piece.bars[0].chords]
+
+
+def test_a_grace_note_is_not_merged_into_the_chord_it_precedes() -> None:
+    xml = _score(("P1", _grace(0) + _note(0, duration=16, typ="whole")))
+
+    assert _chords(xml) == [[(1, 0)]]
+    assert _warnings(xml) == ["MusicXML: 1 grace note was not read"]
+
+
+def test_grace_notes_are_counted() -> None:
+    xml = _score(("P1", _grace(0) + _note(0, duration=8, typ="half") + _grace(2) + _note(2, duration=8, typ="half")))
+
+    assert _chords(xml) == [[(1, 0)], [(1, 2)]]
+    assert _warnings(xml) == ["MusicXML: 2 grace notes were not read"]

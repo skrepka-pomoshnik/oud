@@ -192,6 +192,8 @@ class _Timeline:
             self._note(node)
 
     def _note(self, node: ET.Element) -> None:
+        if _child(node, "grace") is not None:
+            return  # a grace note has no length of its own and must not join the chord at its onset
         duration = _duration_units(node)
         is_chord = _child(node, "chord") is not None
         onset = self.previous_onset if is_chord else self.cursor
@@ -449,9 +451,31 @@ def _unread_note_count(root: ET.Element, tab_part: ET.Element) -> int:
     return count
 
 
+def _grace_note_count(part: ET.Element) -> int:
+    return sum(
+        1
+        for note in part.iter()
+        if _local(note.tag) == "note" and _child(note, "grace") is not None and _technical(note) is not None
+    )
+
+
+def _grace_notes_warning(count: int) -> str:
+    noun, verb = ("grace note", "was") if count == 1 else ("grace notes", "were")
+    return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} {verb} not read"
+
+
 def _dropped_notes_warning(count: int) -> str:
     noun, verb = ("note", "was") if count == 1 else ("notes", "were")
     return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} without tablature {verb} not read"
+
+
+def _dropped_content_warnings(root: ET.Element, tab_part: ET.Element) -> list[str]:
+    warnings = []
+    if unread := _unread_note_count(root, tab_part):
+        warnings.append(_dropped_notes_warning(unread))
+    if graces := _grace_note_count(tab_part):
+        warnings.append(_grace_notes_warning(graces))
+    return warnings
 
 
 def _parse_piece(root: ET.Element) -> Piece:
@@ -472,8 +496,8 @@ def _parse_piece(root: ET.Element) -> Piece:
     if written_by_oud(root):
         # Oud writes an imported score's notation staffs as further parts.
         piece.imported_score = read_notation_score(root, part)
-    elif unread := _unread_note_count(root, part):
-        piece.import_warnings.append(_dropped_notes_warning(unread))
+    else:
+        piece.import_warnings.extend(_dropped_content_warnings(root, part))
     return piece
 
 
