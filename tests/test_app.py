@@ -7,7 +7,7 @@ from oud.editor.commands.metadata import cmd_footnote, cmd_header_template, cmd_
 from oud.editor.core.document import configure_document
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command, apply_set_command
 from oud.presentation.tui.controller import handle_key
 from oud.presentation.tui.input import handle_command as handle_command_input
@@ -392,7 +392,7 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -443,7 +443,7 @@ def test_run_loop_follows_playback_advanced_during_full_render(monkeypatch) -> N
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -496,7 +496,7 @@ def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -533,7 +533,7 @@ def test_run_loop_passes_playback_position_to_imported_score_renderer(monkeypatc
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", lambda _state: False)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(

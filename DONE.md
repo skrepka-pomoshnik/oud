@@ -1,5 +1,41 @@
 # DONE
 
+## C1 (part): editor chrome moved out of Petrucci (2026-09-29)
+
+- Petrucci's `render_piece` now paints score content into every row of the
+  screen it is given and returns `PieceView.NOTATION` or `PieceView.TABLATURE`.
+  It lost 13 editor-only arguments (mode, prompts, message, status line, ASCII
+  preview, plugin browser, help page). `petrucci/rendering/system/status.py`,
+  the page painters, the info/notes page content, and Petrucci's lookup of the
+  `oud` package version are gone. `TypesetOptions.include_status` is removed.
+- New `oud/editor/services/screen`:
+  - `compose.py` builds every editor frame, for the TUI loop and the ASCII
+    screen export.
+  - `status.py` (moved from `services/status.py`) composes the status row and
+    its attributes.
+  - `rhythm.py` holds the tablature `len:` and meter `M` diagnostics.
+  - `pages.py` holds the help, info, notes, plugin, and ASCII-preview pages; one
+    page painter replaces three copies.
+- `commands/help.py` moved to `core/input/help.py`, next to the key table it
+  describes, so screen composition does not import `commands`.
+- The README screenshot script renders the real editor screen through the Oud
+  composer.
+- Behavior changes:
+  - `:w ascii` and `oud ascii` snapshots in help mode or ASCII-preview mode now
+    show what the screen shows (the old snapshot showed an empty help page and
+    ignored the preview).
+  - `test_tab_snippet_spans_and_ornament_markers_keep_alignment_dense` only
+    passed because `"o"` matched "normal" in the old status row. Its ornaments
+    sat on grid columns without chords. They now sit on chord columns and the
+    test asserts `b*` and `co` in the tablature rows.
+- Validation: a baseline script rendered 441 frames (7 documents including
+  TAB, new, melody-only, and duet; 21 modes and states; 80x24, 120x40, 40x12)
+  before and after. Text, attributes, playback overlay caches, and cursor maps
+  are identical. New tests cover composition, pages, status attributes, the
+  hidden bottom panel, the ASCII snapshot, and a boundary check that
+  `render_piece` takes no editor-only argument. `./scripts/quality.sh` passes:
+  1,795 passed, 119 skipped, 95.25% coverage.
+
 ## Opening a missing `.tab` path no longer crashes (2026-09-29)
 
 - `oud new.tab` raised `FileNotFoundError` at startup because `init_state` read

@@ -57,6 +57,8 @@ boundary.
 - Acceptance: Petrucci has no editor chrome code or arguments; the import
   boundary test still passes; rendered frames at 80x24 and 120x40 match
   before/after for normal, insert, command, help, info, notes, and plugin modes.
+- Progress: steps 2 and 3 are done (`oud/editor/services/screen`, frame-identical).
+  Step 1, the `StatusModel`, is open.
 - Unblocks: `S4`, `S5`.
 
 ### C2. Onset-based tablature transaction (UI plan phase 4, model)

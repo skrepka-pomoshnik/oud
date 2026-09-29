@@ -17,7 +17,7 @@ from oud.editor.editing.primitives.undo import redo, undo
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key
 from oud.editor.services.io.files import cmd_write
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.status import status_line
 from oud.exports.export_tab import export_tab
 from oud.exports.midi.projection import build_playback_timeline
 from oud.presentation.tui import loop

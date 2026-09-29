@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from oud.editor.services.bootstrap import init_state  # noqa: E402
-from petrucci import TypesetOptions, typeset_piece  # noqa: E402
+from oud.editor.services.screen.compose import compose_editor_frame  # noqa: E402
 
 
 def _svg(lines: list[str], *, title: str) -> str:
@@ -81,29 +81,8 @@ def main(argv: list[str] | None = None) -> int:
             "showspans": "off",
         },
     )
-    result = typeset_piece(
-        state.piece,
-        options=TypesetOptions(
-            width=state.screen_width,
-            height=state.screen_height,
-            bar_width=state.bar_width,
-            cursor=(state.cursor_bar, state.cursor_string, state.cursor_col),
-            include_status=True,
-            settings=state.settings,
-        ),
-        overrides=state.overrides,
-        durations=state.durations,
-        ornaments=state.ornaments,
-        annotations=state.annotations,
-        highlights=state.highlights,
-        dotted=state.dotted,
-        slurs=state.slurs,
-        ties=state.ties,
-        holds=state.holds,
-        glisses=state.glisses,
-        stave_breaks=state.stave_breaks,
-    )
-    lines = list(result.lines)
+    frame = compose_editor_frame(state, height=state.screen_height, width=state.screen_width).frame
+    lines = list(frame.lines)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(_svg(lines, title=Path(args.source).name), encoding="utf-8")

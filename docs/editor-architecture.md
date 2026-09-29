@@ -16,8 +16,8 @@ core <- navigation <- editing <- services <- commands <- interaction
   persistent view state. It does not mutate score content.
 - `editing` owns atomic mutations, undo, rhythm, notation, score transforms,
   tablature assignment, and visual selections.
-- `services` owns file and media boundaries, playback, validation, status, and
-  application bootstrap workflows.
+- `services` owns file and media boundaries, playback, validation, application
+  bootstrap workflows, and screen composition (`services/screen`).
 - `commands` owns command dispatch, command handlers, queries, settings, and
   plugin/tool commands.
 - `interaction` owns modal keyboard orchestration. It calls lower domains but
@@ -43,9 +43,24 @@ text, a `mutates` flag and whether it takes a character argument.
   meaning per key sequence, and no insert binding that shadows a fret.
 - The prompt line editor and the plugin browser's menu helper read their keys
   from the same table (`keys_for`, `first_keys_for` for `gg`).
-- `commands/help.py` generates the key sections of the help page and `:help`
-  pager from the same table for the active profile. Petrucci only paints the
-  lines it receives.
+- `core/input/help.py` generates the key sections of the help page and `:help`
+  pager from the same table for the active profile.
 
 `core/input/modes.py` defines the `Mode` enum; `session.set_mode` rejects
 unknown modes.
+
+## Screen composition
+
+`services/screen/compose.py` builds every editor frame, for the TUI loop and
+for the ASCII screen export alike. Petrucci's `render_piece` paints score
+content into every row of the screen it is given and returns whether it drew
+the notation or the tablature view. Everything else on screen belongs to Oud:
+
+- `services/screen/status.py` composes the status row and its attributes.
+- `services/screen/rhythm.py` computes the tablature duration and bar-meter
+  diagnostics shown in that row.
+- `services/screen/pages.py` owns the help, info, notes, plugin-browser, and
+  ASCII-preview pages.
+
+The status row takes the last screen row unless the bottom panel is off; the
+command prompt, search prompt, and pages always show it.

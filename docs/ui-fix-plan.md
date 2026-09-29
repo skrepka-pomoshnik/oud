@@ -152,9 +152,12 @@ passes.
   `col`).
 - [ ] Scroll the command prompt horizontally so a long prefilled Save As path
   stays editable at 80 columns.
-- [ ] Move status, prompt, info, notes, plugin and help rendering out of
+- [x] Move status, prompt, info, notes, plugin and help rendering out of
   `petrucci/rendering/api.py`. Petrucci returns the score frame only, and
   `render_piece` loses its editor-only arguments.
+  Done: `oud/editor/services/screen` composes every frame. All 441 frames of a
+  baseline (7 documents, 21 modes and states, 3 sizes) are identical in text,
+  attributes, playback cache, and cursor maps.
 - [ ] Choose one help surface. The in-app overlay and the `less` pager must at
   least show identical generated content.
 

@@ -62,18 +62,8 @@ def _render(fill: str) -> str:
         slurs=[],
         ties=[],
         holds=[],
-        mode="normal",
-        cmdline="",
-        message="",
-        status_line="",
-        searchline="",
         settings=settings,
-        ascii_lines=None,
         stave_breaks=set(),
-        plugin_title="Plugins",
-        plugin_items=[],
-        plugin_index=0,
-        plugin_offset=0,
     )
     frame = fb.snapshot()
     return "\n".join(frame.lines)

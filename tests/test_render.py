@@ -715,18 +715,8 @@ def test_render_auto_mode_not_forced_to_one_bar_per_row() -> None:
         slurs=[],
         ties=[],
         holds=[],
-        mode="normal",
-        cmdline="",
-        message="",
-        status_line="",
-        searchline="",
         settings=settings,
-        ascii_lines=None,
         stave_breaks=set(),
-        plugin_title="",
-        plugin_items=[],
-        plugin_index=0,
-        plugin_offset=0,
     )
     frame = fb.snapshot()
     note_line = next(line for line in frame.lines if "-a-" in line)
@@ -797,18 +787,8 @@ def test_render_shows_imported_ft3_extras_rows_by_default() -> None:
         slurs=[],
         ties=[],
         holds=[],
-        mode="normal",
-        cmdline="",
-        message="",
-        status_line="",
-        searchline="",
         settings=settings,
-        ascii_lines=None,
         stave_breaks=set(),
-        plugin_title="",
-        plugin_items=[],
-        plugin_index=0,
-        plugin_offset=0,
     )
     lines = fb.snapshot().lines
     assert any("#" in line for line in lines)
@@ -871,17 +851,7 @@ def test_render_meta_row_shows_dynamic_and_fermata_signs() -> None:
         slurs=[],
         ties=[],
         holds=[],
-        mode="normal",
-        cmdline="",
-        message="",
-        status_line="",
-        searchline="",
         settings=settings,
-        ascii_lines=None,
         stave_breaks=set(),
-        plugin_title="",
-        plugin_items=[],
-        plugin_index=0,
-        plugin_offset=0,
     )
     assert any("^ mf" in line or "mf ^" in line for line in fb.snapshot().lines)

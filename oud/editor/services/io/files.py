@@ -9,6 +9,7 @@ from oud.editor.core.feedback.messages import MISSING_LESS, NO_SOURCE_PATH, Mess
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
+from oud.editor.services.screen.compose import compose_editor_frame
 from oud.exports.export_tab import TabExportError, export_ascii, export_tab_to_file
 
 RunFn = Callable[..., subprocess.CompletedProcess[str]]
@@ -93,64 +94,23 @@ def cmd_write_ascii(state: EditorState, path: str) -> None:
 
 
 def render_ascii_snapshot(state: EditorState) -> str:
-    content = ""
-    if state.screen_width > 0 and state.screen_height > 0:
-        from oud.editor.services.status import status_line  # noqa: PLC0415
-        from petrucci.rendering.api import render_piece  # noqa: PLC0415
-        from petrucci.terminal.canvas.framebuffer import FrameBuffer  # noqa: PLC0415
+    """The editor screen as text, or the plain ASCII export when no screen size is known."""
 
-        frame = FrameBuffer(state.screen_height, state.screen_width)
-        render_piece(
-            frame,
-            state.piece,
-            state.bar_offset,
-            state.cursor_bar,
-            state.cursor_string,
-            cursor_col=state.cursor_col,
-            bar_width=state.bar_width,
-            overrides=state.overrides,
-            durations=state.durations,
-            ornaments=state.ornaments,
-            annotations=state.annotations,
-            highlights=state.highlights,
-            dotted=state.dotted,
-            slurs=state.slurs,
-            ties=state.ties,
-            holds=state.holds,
-            mode=state.mode,
-            cmdline=state.cmdline,
-            message=state.visible_message,
-            status_line=status_line(state),
-            searchline=state.searchline,
-            settings=state.settings,
-            ascii_lines=None,
-            stave_breaks=state.stave_breaks,
-            plugin_title=state.plugin_title,
-            plugin_items=[f"{item.title}{'/' if item.is_dir else ''}" for item in state.plugin_items],
-            plugin_index=state.plugin_index,
-            plugin_offset=state.plugin_offset,
-            help_offset=state.info_offset
-            if state.mode == "info"
-            else state.notes_offset
-            if state.mode == "notes"
-            else state.help_offset,
-            message_level=state.visible_message_level.value,
-        )
-        content = "\n".join(frame.snapshot().lines) + "\n"
-    else:
-        content = export_ascii(
-            state.piece,
-            state.overrides,
-            state.durations,
-            state.bar_width,
-            settings=state.settings,
-            ornaments=state.ornaments,
-            annotations=state.annotations,
-            slurs=state.slurs,
-            ties=state.ties,
-            holds=state.holds,
-        )
-    return content
+    if state.screen_width > 0 and state.screen_height > 0:
+        composed = compose_editor_frame(state, height=state.screen_height, width=state.screen_width)
+        return "\n".join(composed.frame.lines) + "\n"
+    return export_ascii(
+        state.piece,
+        state.overrides,
+        state.durations,
+        state.bar_width,
+        settings=state.settings,
+        ornaments=state.ornaments,
+        annotations=state.annotations,
+        slurs=state.slurs,
+        ties=state.ties,
+        holds=state.holds,
+    )
 
 
 def cmd_write_ascii_default(state: EditorState, args: str) -> None:

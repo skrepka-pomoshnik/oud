@@ -202,7 +202,6 @@ def test_curated_render_exports_and_tab_reopen_match_goldens(
                 bar_width=12,
                 bar_offset=render_bar,
                 cursor=(render_bar, 0, 0),
-                include_status=False,
                 settings=settings,
             ),
         ).text

@@ -18,7 +18,6 @@ from petrucci.rendering.system.duet import (
     render_duet_score_view,
 )
 from petrucci.rendering.system.render import render_systems
-from petrucci.rendering.system.status import bar_meter_integrity_marker, build_status_lines, resolve_duration_text
 from petrucci.terminal.canvas.screen import Screen
 from petrucci.terminal.view.model import _tuning_labels
 
@@ -26,8 +25,14 @@ Triplet = tuple[int, int, int]
 Pair = tuple[int, int]
 
 
+# Rows kept free below the last system.
+_BOTTOM_MARGIN = 1
+
+
 @dataclass(frozen=True)
 class LegacyRenderRequest:
+    """Tablature render request; ``height`` counts the rows available for the score."""
+
     piece: Piece
     width: int
     height: int
@@ -46,21 +51,13 @@ class LegacyRenderRequest:
     ties: list[Triplet]
     holds: list[Triplet]
     glisses: list[Triplet] | None
-    mode: str
-    cmdline: str
-    message: str
-    status_line: str
-    searchline: str
     settings: dict[str, str]
     stave_breaks: set[int]
-    help_offset: int
     playback_bar: int | None
     playback_col: int | None
     playback_cache: PlaybackOverlayCache | None
     playback_markers: list[Pair] | None
     cursor_display_maps: dict[int, list[int]] | None
-    status_attr: int
-    show_status: bool
 
 
 @dataclass(frozen=True)
@@ -250,7 +247,7 @@ def _limit_plan(
     display: _DisplayPlan,
     header_row: int,
 ) -> _LimitPlan:
-    available = max(0, request.height - 2 - (header_row + 1))
+    available = max(0, request.height - _BOTTOM_MARGIN - (header_row + 1))
     systems = _system_slots(available, display.minimum_height)
     spacing_mode = request.settings.get("layout", "packed")
     bars_per_line = 0 if spacing_mode == "auto" else max(1, width.usable_width // (request.bar_width + width.bar_gap))
@@ -266,16 +263,6 @@ def _limit_plan(
         _setting_int(request.settings, "chordwrap"),
         bars_per_line,
     )
-
-
-def _actual_cursor_string(request: LegacyRenderRequest, display: _DisplayPlan) -> int:
-    count = len(display.display_indices)
-    if count <= 0:
-        return request.cursor_string
-    cursor_index = min(request.cursor_string, count - 1)
-    if display.reverse_strings:
-        return display.display_indices[count - 1 - cursor_index]
-    return display.display_indices[cursor_index]
 
 
 class _LegacyRenderer:
@@ -300,16 +287,6 @@ class _LegacyRenderer:
         rendered_duet = render_duet_score_view(self.screen, duet_request)
         if not rendered_duet:
             self._render_systems(width, display, limits, header_row)
-        status_text = self._render_status(display)
-        if request.show_status:
-            safe_addstr(
-                self.screen,
-                request.height - 1,
-                0,
-                clean_text(status_text),
-                request.status_attr,
-            )
-        self.screen.refresh()
 
     def _duet_request(
         self,
@@ -429,37 +406,6 @@ class _LegacyRenderer:
             chord_wrap_limit=limits.chord_wrap_limit,
             playback_cache=request.playback_cache,
             cursor_display_maps=request.cursor_display_maps,
-        )
-
-    def _render_status(self, display: _DisplayPlan) -> str:
-        request = self.request
-        duration = resolve_duration_text(
-            piece=request.piece,
-            durations=request.durations,
-            dotted=request.dotted,
-            cursor_bar=request.cursor_bar,
-            cursor_col=request.cursor_col,
-            actual_cursor_string=_actual_cursor_string(request, display),
-            bar_width=request.bar_width,
-            default_duration=4,
-        )
-        return build_status_lines(
-            mode=request.mode,
-            cmdline=request.cmdline,
-            searchline=request.searchline,
-            message=request.message,
-            status_line=request.status_line,
-            dur_text=duration,
-            integrity_marker=bar_meter_integrity_marker(
-                piece=request.piece,
-                overrides=request.overrides,
-                durations=request.durations,
-                dotted=request.dotted,
-                cursor_bar=request.cursor_bar,
-                bar_width=request.bar_width,
-                settings_time=request.settings.get("time", "C"),
-                default_duration=4,
-            ),
         )
 
 

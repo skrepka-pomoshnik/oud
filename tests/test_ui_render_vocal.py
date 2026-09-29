@@ -33,7 +33,7 @@ class _Screen(Screen):
         self.refreshes += 1
 
 
-def _args(mode: str = "normal"):
+def _args():
     piece = Piece(title="T", bars=[Bar()], strings=6)
     return {
         "stdscr": _Screen(),
@@ -52,11 +52,6 @@ def _args(mode: str = "normal"):
         "slurs": [],
         "ties": [],
         "holds": [],
-        "mode": mode,
-        "cmdline": "",
-        "message": "",
-        "status_line": "status",
-        "searchline": "",
         "settings": {
             "style": "french",
             "showtuning": "on",
@@ -77,13 +72,7 @@ def _args(mode: str = "normal"):
             "maxbars": "2",
             "measuresstep": "10",
         },
-        "ascii_lines": None,
         "stave_breaks": set(),
-        "plugin_title": "Plugins",
-        "plugin_items": ["a"],
-        "plugin_index": 0,
-        "plugin_offset": 0,
-        "help_offset": 0,
         "playback_bar": None,
         "playback_col": None,
     }
@@ -101,7 +90,7 @@ def _render_lines(kwargs: dict) -> list[str]:
 
 
 def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Texted",
         bars=[
@@ -134,7 +123,7 @@ def test_ft3_melody_and_lyrics_render_as_bar_aligned_text_rows() -> None:
 
 
 def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="MelodyNotes",
         bars=[
@@ -159,7 +148,7 @@ def test_melody_notes_view_renders_staff_rows_with_noteheads() -> None:
 
 
 def test_inferred_melody_is_not_clipped_by_sparse_lyrics() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["bar_width"] = 24
     kwargs["piece"] = Piece(
         title="InferredVocalDense",
@@ -187,7 +176,7 @@ def test_inferred_melody_is_not_clipped_by_sparse_lyrics() -> None:
 
 
 def test_raw_text_lanes_follow_note_onsets_without_structured_events() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["bar_width"] = 24
     kwargs["piece"] = Piece(
         title="RawAligned",
@@ -231,7 +220,7 @@ def test_compact_justify_packs_more_bars_per_system_than_stretch() -> None:
             ],
         )
 
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=24, w=100)
     kwargs["bar_width"] = 16
     kwargs["piece"] = Piece(
@@ -256,7 +245,7 @@ def test_compact_justify_packs_more_bars_per_system_than_stretch() -> None:
 
 
 def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="TextedOff",
         bars=[
@@ -278,7 +267,7 @@ def test_ft3_melody_and_lyrics_rows_can_be_hidden() -> None:
 
 
 def test_vocal_renderer_displays_all_lyric_rows_without_two_row_cap() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="ManyLyrics",
         bars=[
@@ -304,7 +293,7 @@ def test_vocal_renderer_displays_all_lyric_rows_without_two_row_cap() -> None:
 
 
 def test_vocal_renderer_selects_first_or_current_lyric_stanza() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="SelectedLyrics",
         bars=[
@@ -332,7 +321,7 @@ def test_vocal_renderer_selects_first_or_current_lyric_stanza() -> None:
 
 
 def test_vocal_renderer_orders_lyric_rows_by_verse_index() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["bar_width"] = 20
     kwargs["piece"] = Piece(
         title="VerseOrder",
@@ -356,7 +345,7 @@ def test_vocal_renderer_orders_lyric_rows_by_verse_index() -> None:
 
 
 def test_vocalpos_top_places_melody_rows_above_tab_staff() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="TopVocal",
         bars=[
@@ -378,7 +367,7 @@ def test_vocalpos_top_places_melody_rows_above_tab_staff() -> None:
 
 
 def test_vocalpos_bottom_places_melody_rows_below_tab_staff() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="BottomVocal",
         bars=[
@@ -400,7 +389,7 @@ def test_vocalpos_bottom_places_melody_rows_below_tab_staff() -> None:
 
 
 def test_ft3_structured_text_events_render_onset_aligned_over_raw_text_fallback() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["bar_width"] = 20
     kwargs["piece"] = Piece(
         title="StructuredText",
@@ -440,7 +429,7 @@ def test_ft3_structured_text_events_render_onset_aligned_over_raw_text_fallback(
 
 
 def test_ft3_structured_text_events_keep_later_onsets_stable_after_long_first_token() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["bar_width"] = 24
     kwargs["piece"] = Piece(
         title="StructuredDense",

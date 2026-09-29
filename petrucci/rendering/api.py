@@ -1,189 +1,59 @@
+"""Paint a Piece score into a terminal screen.
+
+The caller owns every row of the screen it passes in; Petrucci paints score
+content only. Status lines, prompts, and pages belong to the application.
+"""
+
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from enum import StrEnum
 
 from petrucci.adapters.piece_view import typeset_piece_score_view
 from petrucci.core.imported import project_imported_staff
 from petrucci.core.model import Piece
 from petrucci.rendering.bar.legacy import LegacyRenderRequest, render_legacy_piece
-from petrucci.rendering.primitives.helpers import apply_overrides as _apply_overrides_impl
-from petrucci.rendering.primitives.helpers import bass_strings_used as _bass_strings_used_impl
-from petrucci.rendering.primitives.helpers import clean_text as _clean_text
-from petrucci.rendering.primitives.helpers import render_help as _render_help
-from petrucci.rendering.primitives.helpers import render_info as _render_info
-from petrucci.rendering.primitives.helpers import render_notes as _render_notes
-from petrucci.rendering.primitives.helpers import render_plugin as _render_plugin
-from petrucci.rendering.primitives.helpers import safe_addstr as _safe_addstr
-from petrucci.rendering.system.status import build_status_lines, status_attr_for_message
+from petrucci.rendering.staff.playback import PlaybackOverlayCache
 from petrucci.terminal.canvas.framebuffer import draw_frame_rows
-from petrucci.terminal.canvas.screen import A_REVERSE, Screen
+from petrucci.terminal.canvas.screen import Screen
 from petrucci.terminal.text.lyrics import piece_for_lyric_display
 
 
-def _bass_strings_used(piece: Piece, overrides: dict[tuple[int, int, int], str]) -> set[int]:
-    return _bass_strings_used_impl(piece, overrides)
+class PieceView(StrEnum):
+    """Which renderer painted the score."""
+
+    NOTATION = "notation"
+    TABLATURE = "tablature"
 
 
-def _apply_overrides(
-    cells: list[list[str]],
-    overrides: dict[tuple[int, int, int], str],
-    bar_index: int,
-    strings: int,
-    bar_width: int,
-) -> None:
-    _apply_overrides_impl(cells, overrides, bar_index, strings, bar_width)
-
-
-def _render_ascii_preview(
-    stdscr: Screen,
-    ascii_lines: list[str],
-    status_line: str,
-    mode: str,
-    status_attr: int,
+def _render_notation(
+    screen: Screen,
+    piece: Piece,
     *,
-    show_status: bool,
-) -> None:
-    height, _width = stdscr.getmaxyx()
-    for idx, line in enumerate(ascii_lines[: max(0, height - int(show_status))]):
-        _safe_addstr(stdscr, idx, 0, _clean_text(line))
-    if show_status:
-        _safe_addstr(
-            stdscr,
-            height - 1,
-            0,
-            _clean_text(f"{status_line}  {mode}  ascii preview"),
-            status_attr,
-        )
-
-
-@dataclass(frozen=True)
-class _AuxiliaryRequest:
-    mode: str
-    status_line: str
-    status_attr: int
-    help_offset: int
-    plugin_title: str
-    plugin_items: list[str]
-    plugin_index: int
-    plugin_offset: int
-    message: str
-    ascii_lines: list[str] | None
-    settings: dict[str, str]
-    show_status: bool
-    help_lines: Sequence[str] = ()
-
-
-@dataclass(frozen=True)
-class _CanonicalRequest:
-    width: int
-    height: int
-    mode: str
-    bar_offset: int
-    cursor_bar: int
-    cursor_col: int
-    playback_bar: int | None
-    playback_col: int | None
-    settings: dict[str, str]
-    focused_staff: int | None
-    cursor_maps: dict[int, list[int]] | None
-    status_line: str
-    status_attr: int
-    cmdline: str
-    searchline: str
-    message: str
-    show_status: bool
-
-
-def _render_auxiliary(
-    screen: Screen,
-    piece: Piece,
-    width: int,
-    height: int,
-    request: _AuxiliaryRequest,
+    bar_offset: int,
+    cursor: tuple[int, int],
+    playback: tuple[int, int] | None,
+    settings: dict[str, str],
+    focused_staff: int | None,
+    cursor_display_maps: dict[int, list[int]] | None,
 ) -> bool:
-    if request.mode == "help":
-        status = build_status_lines(
-            mode=request.mode,
-            cmdline="",
-            searchline="",
-            message=request.message,
-            status_line=request.status_line,
-            dur_text=None,
-        )
-        _render_help(screen, _clean_text(status), request.status_attr, request.help_offset, request.help_lines)
-    elif request.mode == "info":
-        _render_info(
-            screen,
-            request.status_line,
-            request.status_attr,
-            request.help_offset,
-            piece,
-            settings={**request.settings, "terminal": f"{width}x{height}"},
-        )
-    elif request.mode == "notes":
-        _render_notes(screen, request.status_line, request.status_attr, request.help_offset, piece)
-    elif request.mode == "plugin":
-        _render_plugin(
-            screen,
-            "plugin  j/k move  h back  l/enter open  d download  q close",
-            request.status_attr,
-            request.plugin_title,
-            request.plugin_items,
-            index=request.plugin_index,
-            offset=request.plugin_offset,
-            message=request.message,
-        )
-    elif request.ascii_lines is not None:
-        _render_ascii_preview(
-            screen,
-            request.ascii_lines,
-            request.status_line,
-            request.mode,
-            request.status_attr,
-            show_status=request.show_status,
-        )
-    else:
-        return False
-    screen.refresh()
-    return True
-
-
-def _render_canonical(
-    screen: Screen,
-    piece: Piece,
-    request: _CanonicalRequest,
-) -> bool:
-    content_height = max(1, request.height - int(request.show_status))
+    height, width = screen.getmaxyx()
+    content_height = max(1, height)
     canonical = typeset_piece_score_view(
         piece,
-        width=request.width,
+        width=width,
         height=content_height,
-        bar_offset=request.bar_offset,
-        cursor=(request.cursor_bar, request.cursor_col),
-        playback=(request.playback_bar, request.playback_col)
-        if request.playback_bar is not None and request.playback_col is not None
-        else None,
-        settings=request.settings,
-        focused_imported_staff_index=request.focused_staff,
+        bar_offset=bar_offset,
+        cursor=cursor,
+        playback=playback,
+        settings=settings,
+        focused_imported_staff_index=focused_staff,
     )
     if canonical is None:
         return False
     draw_frame_rows(screen, canonical.result.frame, set(range(content_height)))
-    if request.cursor_maps is not None:
-        request.cursor_maps.clear()
-        request.cursor_maps.update(canonical.cursor_display_maps)
-    text = build_status_lines(
-        mode=request.mode,
-        cmdline=request.cmdline,
-        searchline=request.searchline,
-        message=request.message,
-        status_line=request.status_line,
-        dur_text=None,
-    )
-    if request.show_status:
-        _safe_addstr(screen, request.height - 1, 0, _clean_text(text), request.status_attr)
-    screen.refresh()
+    if cursor_display_maps is not None:
+        cursor_display_maps.clear()
+        cursor_display_maps.update(canonical.cursor_display_maps)
     return True
 
 
@@ -205,87 +75,42 @@ def render_piece(
     slurs: list[tuple[int, int, int]],
     ties: list[tuple[int, int, int]],
     holds: list[tuple[int, int, int]],
-    mode: str,
-    cmdline: str,
-    message: str,
-    status_line: str,
-    searchline: str,
     settings: dict[str, str],
-    ascii_lines: list[str] | None,
     stave_breaks: set[int],
-    plugin_title: str,
-    plugin_items: list[str],
-    plugin_index: int,
-    plugin_offset: int,
-    help_offset: int = 0,
     playback_bar: int | None = None,
     playback_col: int | None = None,
     glisses: list[tuple[int, int, int]] | None = None,
-    playback_cache=None,
+    playback_cache: PlaybackOverlayCache | None = None,
     playback_markers: list[tuple[int, int]] | None = None,
     cursor_display_maps: dict[int, list[int]] | None = None,
-    message_level: str = "info",
     focused_imported_staff_index: int | None = None,
     playback_verse: int | None = None,
-    help_lines: Sequence[str] = (),
-) -> None:
+) -> PieceView:
+    """Paint the score into every row of ``stdscr`` and report which view was used."""
+
     piece = project_imported_staff(piece, focused_imported_staff_index)
     piece = piece_for_lyric_display(piece, settings, active_verse_index=playback_verse)
     stdscr.erase()
+    playback = (playback_bar, playback_col) if playback_bar is not None and playback_col is not None else None
+    if _render_notation(
+        stdscr,
+        piece,
+        bar_offset=bar_offset,
+        cursor=(cursor_bar, cursor_col),
+        playback=playback,
+        settings=settings,
+        focused_staff=focused_imported_staff_index,
+        cursor_display_maps=cursor_display_maps,
+    ):
+        stdscr.refresh()
+        return PieceView.NOTATION
     height, width = stdscr.getmaxyx()
-    status_attr = status_attr_for_message(message_level) if message else A_REVERSE
-    show_status = settings.get("bottompanel", "on") != "off" or mode in {
-        "command",
-        "search",
-        "help",
-        "info",
-        "notes",
-        "plugin",
-    }
-    auxiliary = _AuxiliaryRequest(
-        mode,
-        status_line,
-        status_attr,
-        help_offset,
-        plugin_title,
-        plugin_items,
-        plugin_index,
-        plugin_offset,
-        message,
-        ascii_lines,
-        settings,
-        show_status,
-        help_lines,
-    )
-    if _render_auxiliary(stdscr, piece, width, height, auxiliary):
-        return
-    canonical = _CanonicalRequest(
-        width,
-        height,
-        mode,
-        bar_offset,
-        cursor_bar,
-        cursor_col,
-        playback_bar,
-        playback_col,
-        settings,
-        focused_imported_staff_index,
-        cursor_display_maps,
-        status_line,
-        status_attr,
-        cmdline,
-        searchline,
-        message,
-        show_status,
-    )
-    if _render_canonical(stdscr, piece, canonical):
-        return
     render_legacy_piece(
         stdscr,
         LegacyRenderRequest(
             piece,
             width,
-            height + int(not show_status),
+            height,
             bar_offset,
             cursor_bar,
             cursor_string,
@@ -301,20 +126,17 @@ def render_piece(
             ties,
             holds,
             glisses,
-            mode,
-            cmdline,
-            message,
-            status_line,
-            searchline,
             settings,
             stave_breaks,
-            help_offset,
             playback_bar,
             playback_col,
             playback_cache,
             playback_markers,
             cursor_display_maps,
-            status_attr,
-            show_status,
         ),
     )
+    stdscr.refresh()
+    return PieceView.TABLATURE
+
+
+__all__ = ["PieceView", "render_piece"]

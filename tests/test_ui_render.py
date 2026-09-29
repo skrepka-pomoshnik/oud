@@ -1,8 +1,9 @@
 from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.core.music.tuning import default_bass_strings
 from petrucci.input.tablature.input import REST_OVERRIDE
-from petrucci.rendering.api import _apply_overrides, _bass_strings_used
 from petrucci.rendering.primitives.geometry import _scale_chord_row
+from petrucci.rendering.primitives.helpers import apply_overrides as _apply_overrides
+from petrucci.rendering.primitives.helpers import bass_strings_used as _bass_strings_used
 from petrucci.rendering.primitives.spacing import (
     build_chord_scale_map as _build_chord_scale_map,
 )

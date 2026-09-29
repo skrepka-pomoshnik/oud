@@ -6,9 +6,9 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from oud.editor.commands.help import help_lines
 from oud.editor.core.coordinates import string_index
 from oud.editor.core.feedback.messages import MISSING_LESS
+from oud.editor.core.input.help import help_lines
 from oud.editor.core.state import EditorState
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import tuning_preset

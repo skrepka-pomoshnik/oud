@@ -13,10 +13,10 @@ from petrucci.adapters.duet import (
 )
 from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from petrucci.input.tablature.input import REST_OVERRIDE
-from petrucci.rendering.api import _apply_overrides, render_piece
+from petrucci.rendering.api import render_piece
+from petrucci.rendering.primitives.helpers import apply_overrides as _apply_overrides
 from petrucci.rendering.staff.text import MELODY_FILLED_NOTEHEAD_GLYPH, MELODY_NOTEHEAD_GLYPH
 from petrucci.rendering.staff.vocal import melody_row_count
-from petrucci.rendering.system.status import status_attr_for_message
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
 
 
@@ -41,7 +41,7 @@ class _Screen(Screen):
         self.refreshes += 1
 
 
-def _args(mode: str = "normal"):
+def _args():
     piece = Piece(title="T", bars=[Bar()], strings=6)
     return {
         "stdscr": _Screen(),
@@ -60,11 +60,6 @@ def _args(mode: str = "normal"):
         "slurs": [],
         "ties": [],
         "holds": [],
-        "mode": mode,
-        "cmdline": "",
-        "message": "",
-        "status_line": "status",
-        "searchline": "",
         "settings": {
             "style": "french",
             "showtuning": "on",
@@ -85,13 +80,7 @@ def _args(mode: str = "normal"):
             "maxbars": "2",
             "measuresstep": "10",
         },
-        "ascii_lines": None,
         "stave_breaks": set(),
-        "plugin_title": "Plugins",
-        "plugin_items": ["a"],
-        "plugin_index": 0,
-        "plugin_offset": 0,
-        "help_offset": 0,
         "playback_bar": None,
         "playback_col": None,
     }
@@ -106,17 +95,6 @@ def _render_lines(kwargs: dict) -> list[str]:
     run_kwargs["stdscr"] = fb
     render_piece(**run_kwargs)
     return fb.snapshot().lines
-
-
-def test_render_piece_applies_message_severity_to_status_row() -> None:
-    kwargs = _args()
-    kwargs["message"] = "Write failed"
-    kwargs["message_level"] = "error"
-    render_piece(**kwargs)
-
-    status_calls = [call for call in kwargs["stdscr"].calls if call[0] == kwargs["stdscr"].h - 1]
-    assert status_calls
-    assert status_calls[-1][3] == status_attr_for_message("error")
 
 
 def _melody_line_has_glyph(line: str, notehead_glyphs: tuple[str, str]) -> bool:
@@ -176,27 +154,6 @@ def test_apply_overrides_wrapper() -> None:
     assert cells[1][2] == "a"
 
 
-def test_render_piece_modes_and_help() -> None:
-    # info
-    kwargs = _args("info")
-    render_piece(**kwargs)
-    assert kwargs["stdscr"].refreshes == 1
-    # plugin
-    kwargs = _args("plugin")
-    render_piece(**kwargs)
-    assert kwargs["stdscr"].refreshes == 1
-    # ascii preview
-    kwargs = _args("normal")
-    kwargs["ascii_lines"] = ["abc", "def"]
-    render_piece(**kwargs)
-    assert kwargs["stdscr"].refreshes == 1
-    # help mode paints the caller-owned lines as a page
-    kwargs = _args("help")
-    kwargs["help_lines"] = ["HELP", "generated line"]
-    render_piece(**kwargs)
-    assert kwargs["stdscr"].refreshes == 1
-
-
 def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:
     called = {}
 
@@ -205,7 +162,7 @@ def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:
         called["reverse"] = kwargs["reverse_strings"]
 
     monkeypatch.setattr("petrucci.rendering.bar.legacy.render_systems", _fake_render_systems)
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["settings"]["viewinvert"] = "on"
     render_piece(**kwargs)
     assert called["bars_limit"] == 2
@@ -213,9 +170,10 @@ def test_render_piece_normal_calls_systems_and_status(monkeypatch) -> None:
     assert kwargs["stdscr"].refreshes == 1
 
 
-def test_render_piece_draws_partial_next_system_above_status() -> None:
-    kwargs = _args("normal")
-    kwargs["stdscr"] = _Screen(h=19, w=80)
+def test_render_piece_draws_partial_next_system_in_the_last_rows() -> None:
+    kwargs = _args()
+    # 18 score rows: the editor keeps the 19th for its status row.
+    kwargs["stdscr"] = _Screen(h=18, w=80)
     kwargs["piece"] = Piece(
         title="Partial",
         bars=[
@@ -229,12 +187,12 @@ def test_render_piece_draws_partial_next_system_above_status() -> None:
 
     lines = _render_lines(kwargs)
 
-    assert any("b" in line for line in lines[11:-1])
-    assert "status" in lines[-1]
+    assert len(lines) == 18
+    assert any("b" in line for line in lines[11:])
 
 
 def test_render_piece_hides_orphaned_one_line_system_preview() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=24, w=80)
     kwargs["piece"] = Piece(
         title="No orphan",
@@ -258,7 +216,7 @@ def test_render_piece_passes_explicit_barsperline_limit(monkeypatch) -> None:
         called["bars_limit"] = kwargs["bars_per_line_limit"]
 
     monkeypatch.setattr("petrucci.rendering.bar.legacy.render_systems", _fake_render_systems)
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["settings"]["layout"] = "auto"
     kwargs["settings"]["barsperline"] = "4"
     kwargs["settings"]["maxbars"] = "0"
@@ -273,7 +231,7 @@ def test_render_piece_barsperline_zero_keeps_auto_limit(monkeypatch) -> None:
         called["bars_limit"] = kwargs["bars_per_line_limit"]
 
     monkeypatch.setattr("petrucci.rendering.bar.legacy.render_systems", _fake_render_systems)
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["settings"]["layout"] = "auto"
     kwargs["settings"]["barsperline"] = "0"
     kwargs["settings"]["maxbars"] = "0"
@@ -299,7 +257,7 @@ def test_render_piece_duet_passes_staff_specific_playback_markers(monkeypatch) -
         calls.append(list(kwargs["playback_markers"]))
 
     monkeypatch.setattr("petrucci.rendering.system.duet.render_systems", _fake_render_systems)
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = piece
     kwargs["settings"]["duetscoreview"] = "both"
     kwargs["playback_markers"] = [(0, 1), (1, 3)]
@@ -308,7 +266,7 @@ def test_render_piece_duet_passes_staff_specific_playback_markers(monkeypatch) -
 
 
 def test_render_piece_duet_publishes_cursor_maps_for_raw_bars() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Duet maps",
         bars=[
@@ -331,7 +289,7 @@ def test_render_piece_duet_publishes_cursor_maps_for_raw_bars() -> None:
 
 
 def test_render_piece_duet_builds_shared_minimal_playback_cache() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Duet playback cache",
         bars=[
@@ -376,7 +334,7 @@ def test_render_piece_duet_uses_piece_mapping_for_raw_bar_offset(monkeypatch) ->
         bar_offsets.append(kwargs["bar_offset"])
 
     monkeypatch.setattr("petrucci.rendering.system.duet.render_systems", _fake_render_systems)
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = piece
     kwargs["settings"]["duetscoreview"] = "both"
     kwargs["bar_offset"] = 16
@@ -400,7 +358,7 @@ def test_playback_highlight_prefers_nearest_note_glyph_not_dash() -> None:
         ],
         style="french",
     )
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = piece
     kwargs["stdscr"] = _Screen(h=18, w=80)
     kwargs["bar_width"] = 12
@@ -436,7 +394,7 @@ def test_cut_time_cue_keeps_four_equal_eighth_onsets_visibly_separate() -> None:
             ),
         ],
     )
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = piece
     kwargs["stdscr"] = _Screen(h=18, w=40)
     kwargs["settings"]["layout"] = "auto"
@@ -472,7 +430,7 @@ def test_grid_grouped_eighths_keep_four_visible_note_columns_with_hidden_redunda
             ),
         ],
     )
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = piece
     kwargs["stdscr"] = _Screen(h=18, w=40)
     kwargs["settings"]["layout"] = "auto"
@@ -495,7 +453,7 @@ def test_grid_grouped_eighths_keep_four_visible_note_columns_with_hidden_redunda
 
 
 def test_render_header_hides_tuning_and_shows_readable_meta() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"].title = "Lachrimae"
     kwargs["piece"].composer = "John Dowland"
     kwargs["piece"].bars[0].time_sig = "O"
@@ -512,7 +470,7 @@ def test_render_header_hides_tuning_and_shows_readable_meta() -> None:
 
 
 def test_render_header_composer_aligns_with_score_right_edge() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(w=80, h=20)
     kwargs["piece"].title = "T"
     kwargs["piece"].composer = "ABCD"
@@ -529,7 +487,7 @@ def test_render_header_composer_aligns_with_score_right_edge() -> None:
 
 
 def test_render_shows_time_signature_at_left_of_score_once() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O"), Bar()], strings=6)
     render_piece(**kwargs)
     time_calls = [
@@ -543,7 +501,7 @@ def test_render_shows_time_signature_at_left_of_score_once() -> None:
 
 
 def test_render_duet_score_view_both_shows_two_staff_labels_and_brace() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Duet",
         bars=[
@@ -566,7 +524,7 @@ def test_render_duet_score_view_both_shows_two_staff_labels_and_brace() -> None:
 
 
 def test_render_duet_score_view_frame_preserves_title_and_label_text() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=28, w=100)
     kwargs["piece"] = Piece(
         title="Duet Title",
@@ -591,7 +549,7 @@ def test_render_duet_score_view_frame_preserves_title_and_label_text() -> None:
 
 
 def test_render_duet_score_view_single_staff_hides_other_staff() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Duet",
         bars=[
@@ -611,7 +569,7 @@ def test_render_duet_score_view_single_staff_hides_other_staff() -> None:
 
 
 def test_render_duet_score_view_mirrors_playback_marker_on_both_staves() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=28, w=100)
     kwargs["piece"] = Piece(
         title="Duet",
@@ -633,7 +591,7 @@ def test_render_duet_score_view_mirrors_playback_marker_on_both_staves() -> None
 
 
 def test_playback_marker_does_not_mutate_staff_cells_with_combining_marks() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=20, w=90)
     kwargs["piece"] = Piece(
         title="Playback Stable",
@@ -676,7 +634,7 @@ def test_playback_marker_does_not_mutate_staff_cells_with_combining_marks() -> N
 
 
 def test_playback_highlights_active_note_cell_with_attribute() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=20, w=90)
     kwargs["piece"] = Piece(
         title="Playback Highlight",
@@ -703,7 +661,7 @@ def test_playback_highlights_active_note_cell_with_attribute() -> None:
 
 
 def test_system_height_only_reserves_bass_course_where_used() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=28, w=80)
     kwargs["piece"] = Piece(
         title="Local bass height",
@@ -721,7 +679,7 @@ def test_system_height_only_reserves_bass_course_where_used() -> None:
 
 
 def test_playback_renders_separate_melody_marker_when_melody_visible() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=24, w=100)
     kwargs["piece"] = Piece(
         title="Melody Marker",
@@ -752,7 +710,7 @@ def test_playback_renders_separate_melody_marker_when_melody_visible() -> None:
 
 
 def test_playback_markers_do_not_mutate_vocal_text_geometry() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=28, w=110)
     kwargs["piece"] = Piece(
         title="Vocal Stable",
@@ -792,7 +750,7 @@ def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
             chords=[Chord(note_type=8, dotted=(idx % 2 == 0), grid=None, notes=[Note(1, 1, 0)]) for idx in range(6)],
         )
 
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=36, w=120)
     kwargs["piece"] = Piece(
         title="Duet Align",
@@ -822,7 +780,7 @@ def test_render_duet_barlines_remain_column_aligned_between_staves() -> None:
 
 
 def test_render_duet_top_staff_rows_share_same_barline_columns() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=36, w=120)
     kwargs["piece"] = Piece(
         title="Duet L1",
@@ -848,7 +806,7 @@ def test_render_duet_top_staff_rows_share_same_barline_columns() -> None:
 
 
 def test_render_duet_top_staff_rows_have_equal_symbol_count() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=36, w=120)
     kwargs["piece"] = Piece(
         title="Duet Width",
