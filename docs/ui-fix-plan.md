@@ -143,9 +143,13 @@ passes.
 
 ## Phase 3: editor chrome out of Petrucci
 
-- [ ] Add an Oud `StatusModel`: identity, position, mode, pending keys and
+- [x] Add an Oud `StatusModel`: identity, position, mode, pending keys and
   count, message and level. It renders into fixed segments so the line does not
   jump, and it truncates by priority at 80 columns.
+  Done: `oud/editor/services/screen/status.py`. Identity and position start at
+  the left edge; pending keys, duration, and mode end at the right edge; the
+  message sits between. Too-narrow rows drop identity, duration, pending keys,
+  meter, and position in that order, then cut the message; the mode stays.
 - [ ] Replace the cryptic `M` meter marker with a named diagnostic segment
   (`meter 5/6`) and show it only in normal mode.
 - [ ] Show one position vocabulary across TAB and FT3 projections (`beat`, not

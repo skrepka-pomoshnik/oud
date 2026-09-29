@@ -20,46 +20,19 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 
 ## Order of work
 
-1. Editor rebuild for typing: `C1` → `C2` → `C3` → `C4` → `C5` → `C6`.
+1. Editor rebuild for typing: `C2` → `C3` → `C4` → `C5` → `C6`.
 2. Note typing: `C7`.
 3. Transposition: `C8`.
 4. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
 5. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow.
-`docs/ui-fix-plan.md` holds the evidence and acceptance for `C1`–`C6` and
+`docs/ui-fix-plan.md` holds the evidence and acceptance for `C2`–`C6` and
 `S2`–`S8`; tick items there as well.
 
 ---
 
 ## Complex tasks (owner: Claude)
-
-### C1. Editor chrome out of Petrucci (UI plan phase 3, core)
-
-Why complex: changes Petrucci's public rendering entry point and the Oud/Petrucci
-boundary.
-
-- Files: `petrucci/rendering/api.py` (`render_piece`, about 40 arguments),
-  `petrucci/rendering/system/status.py` (`build_status_lines`,
-  `bar_meter_integrity_marker`, `resolve_duration_text`),
-  `petrucci/rendering/bar/legacy.py`, `oud/presentation/tui/loop.py:156`,
-  `oud/editor/services/io/files.py:103`, `oud/editor/services/status.py`.
-- Steps:
-  1. Add an Oud `StatusModel` record with identity, position, mode, pending keys
-     and count, message, and level. It renders into fixed segments so the line
-     does not jump, and truncates by priority at 80 columns.
-  2. Move the status, command/search prompt, info, notes, plugin, and help
-     painting into `oud/presentation`. Petrucci returns the score frame only.
-  3. Drop every editor-only argument from `render_piece` (`mode`, `cmdline`,
-     `searchline`, `message`, `status_line`, `plugin_*`, `help_*`,
-     `message_level`). Delete the editor-only helpers in
-     `petrucci/rendering/system/status.py`.
-- Acceptance: Petrucci has no editor chrome code or arguments; the import
-  boundary test still passes; rendered frames at 80x24 and 120x40 match
-  before/after for normal, insert, command, help, info, notes, and plugin modes.
-- Progress: steps 2 and 3 are done (`oud/editor/services/screen`, frame-identical).
-  Step 1, the `StatusModel`, is open.
-- Unblocks: `S4`, `S5`.
 
 ### C2. Onset-based tablature transaction (UI plan phase 4, model)
 
@@ -101,7 +74,7 @@ user edits.
   4. The status beat comes from the onset and the bar's own meter.
 - Acceptance: every keyscript and transaction fixture passes; editing an imported
   bar leaves unedited chords identical; no edit path writes a grid map.
-- Depends on: `C1`, `C2`.
+- Depends on: `C2`.
 
 ### C4. Retire the grid maps and float rhythm (UI plan phase 4, readers)
 
@@ -345,7 +318,8 @@ Why complex: a new import/export format; experimental, lowest priority.
 
 ### S2. Scroll the command prompt horizontally (UI plan phase 3)
 
-- Files: `oud/presentation/tui/prompt.py`, the prompt painting call site.
+- Files: `oud/presentation/tui/prompt.py`, `prompt_text` in
+  `oud/editor/services/screen/status.py`.
 - Keep the cursor visible when the text is wider than the screen, so a long
   prefilled Save As path stays editable at 80 columns.
 - Acceptance: tests at 80 columns with a path longer than the line, for typing,
@@ -353,7 +327,7 @@ Why complex: a new import/export format; experimental, lowest priority.
 
 ### S3. One help surface (UI plan phase 3)
 
-- Files: `oud/editor/commands/help.py`,
+- Files: `oud/editor/core/input/help.py`,
   `oud/editor/interaction/normal/commands.py` (`help_pager`).
 - The in-app overlay and the `less` pager show identical generated content from
   the key table.
@@ -364,16 +338,17 @@ Why complex: a new import/export format; experimental, lowest priority.
 
 - Replace the cryptic `M` from `bar_meter_integrity_marker` with a segment such
   as `meter 5/6`, shown only in normal mode.
+- Files: `oud/editor/services/screen/rhythm.py` (`bar_meter_marker`) and the
+  `meter` segment in `oud/editor/services/screen/status.py`.
 - Acceptance: status tests for a full bar, an underfull bar, and an overfull bar.
-- Depends on: `C1` (the status moves to Oud there).
 
 ### S5. One position vocabulary (UI plan phase 3)
 
-- `oud/editor/services/status.py` falls back to `col:N` when the meter does not
-  parse. Show `beat:` in every TAB and FT3 projection; `C3` later makes it exact.
+- `oud/editor/services/screen/status.py` falls back to `col:N` when the meter
+  does not parse. Show `beat:` in every TAB and FT3 projection; `C3` later makes
+  it exact.
 - Acceptance: no `col:` in any status line; tests for TAB, FT3 projection, and an
   unparseable meter.
-- Depends on: `C1`.
 
 ### S6. Idempotent TAB save (UI plan phase 4)
 

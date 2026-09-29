@@ -1,5 +1,32 @@
 # DONE
 
+## C1: editor chrome out of Petrucci, typed status row (2026-09-29)
+
+- Completes `C1` (the chrome move is recorded in the entry below).
+- Added `StatusModel` in `oud/editor/services/screen/status.py` with identity,
+  position, meter marker, message and level, pending keys, duration, and mode.
+  - Identity and position start at the left edge. Pending count and keys (and
+    the insert prefix while inserting), `len:`, and the mode end at the right
+    edge, so moving the cursor or changing bars does not move them.
+  - The message sits between the two groups. It no longer hides `len:`.
+  - When the row is too narrow, identity, duration, pending keys, meter, and
+    position are dropped in that order, then the message is cut; the mode stays.
+  - The row is padded to the screen width minus the last column (curses errors
+    when the bottom-right cell is written), so reverse video spans the row.
+- Every status row goes through the model: score, help, info and notes pages
+  (which now show their mode), the plugin browser, and the ASCII preview. The
+  command and search prompts keep their own line (`prompt_text`).
+- Pending counts and keys (`3d`, `g`) are now visible; before, nothing showed a
+  half-typed command.
+- The README screenshot is regenerated from the real editor frame. The old
+  image had the status text written over a line of tablature.
+- Validation: against the 441-frame baseline, every score row, playback overlay
+  cache, and cursor map is identical; only status rows changed (350 frames).
+  New tests pin the left and right anchors, stable right segments while the
+  cursor moves, pending keys, the insert prefix, the exact drop order at each
+  width, message cutting, and the empty last column. `./scripts/quality.sh`
+  passes: 1,803 passed, 119 skipped, 95.25% coverage.
+
 ## C1 (part): editor chrome moved out of Petrucci (2026-09-29)
 
 - Petrucci's `render_piece` now paints score content into every row of the
