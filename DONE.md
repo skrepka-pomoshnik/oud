@@ -1,5 +1,10 @@
 # DONE
 
+## S28: MusicXML import warns when it drops notes (2026-09-29)
+
+- Pitched notes that no string and fret describe (other parts, untabbed staves) are counted in an informational import warning, `MusicXML: N notes without tablature were not read`. Files Oud wrote (their extra parts are read) get no warning. `oud convert` treats `MusicXML: ` warnings as informational and still converts (`is_informational_warning`).
+- Validation: `tests/test_musicxml_import_warnings.py` (standard-only, two parts, singular, tab-only, Oud's layered file, conversion still writes). Gate: 1,916 passed.
+
 ## S27: volta endings in MusicXML (2026-09-29)
 
 - `Bar.ending_numbers` is written as `<ending number="1, 2" type="start">` on the left barline of the first bar of a run of bars with the same numbers and `type="stop"` on the right barline of the last one, and read back with the volta carried over the bars in between. Adjacent runs with the same numbers are one volta.

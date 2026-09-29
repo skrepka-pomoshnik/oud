@@ -13,6 +13,7 @@ from oud.exports.export_tab import export_ascii, export_tab
 from oud.exports.lilypond import lilypond_text, print_lilypond_pdf
 from oud.exports.midi import export_midi
 from oud.exports.musicxml import export_mxl, musicxml_text
+from oud.importers.musicxml import is_informational_warning
 from oud.importers.tab import parse_tab_text_data
 from oud.presentation.command_io import (
     OutputExistsError,
@@ -133,8 +134,9 @@ def _read_stdin(
 
 
 def _validate_piece(piece: Piece, path: str) -> None:
-    if piece.import_warnings:
-        details = "; ".join(piece.import_warnings)
+    blocking = [warning for warning in piece.import_warnings if not is_informational_warning(warning)]
+    if blocking:
+        details = "; ".join(blocking)
         raise _error(EXIT_INPUT, f"cannot convert {path}: {details}")
     if not piece.bars:
         raise _error(EXIT_INPUT, f"cannot convert {path}: input contains no score bars")

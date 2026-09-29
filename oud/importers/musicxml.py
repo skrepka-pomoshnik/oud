@@ -422,6 +422,38 @@ def _tab_style(details: ET.Element | None, fields: dict[str, str]) -> str | None
     return None
 
 
+INFORMATIONAL_WARNING_PREFIX = "MusicXML: "
+
+
+def is_informational_warning(warning: str) -> bool:
+    """Import warnings that report dropped content but leave a piece that can be used and converted."""
+
+    return warning.startswith(INFORMATIONAL_WARNING_PREFIX)
+
+
+def _sounding_notes(part: ET.Element) -> list[ET.Element]:
+    return [
+        note
+        for note in part.iter()
+        if _local(note.tag) == "note" and _child(note, "rest") is None and _child(note, "grace") is None
+    ]
+
+
+def _unread_note_count(root: ET.Element, tab_part: ET.Element) -> int:
+    """Pitched notes that no string/fret describes: those of other parts and of untabbed staves."""
+
+    count = 0
+    for part in _children(root, "part"):
+        notes = _sounding_notes(part)
+        count += len(notes) if part is not tab_part else sum(_technical(note) is None for note in notes)
+    return count
+
+
+def _dropped_notes_warning(count: int) -> str:
+    noun, verb = ("note", "was") if count == 1 else ("notes", "were")
+    return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} without tablature {verb} not read"
+
+
 def _parse_piece(root: ET.Element) -> Piece:
     title, composer = _piece_metadata(root)
     part = max(_children(root, "part"), key=_technical_count, default=None)
@@ -440,6 +472,8 @@ def _parse_piece(root: ET.Element) -> Piece:
     if written_by_oud(root):
         # Oud writes an imported score's notation staffs as further parts.
         piece.imported_score = read_notation_score(root, part)
+    elif unread := _unread_note_count(root, part):
+        piece.import_warnings.append(_dropped_notes_warning(unread))
     return piece
 
 

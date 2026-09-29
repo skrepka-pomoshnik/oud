@@ -518,24 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S28. Warn when a MusicXML import drops notes
-
-- Where: `_parse_piece` in `oud/importers/musicxml.py`; `Piece.import_warnings`
-  is shown on open and refuses `oud convert` (see `_validate_piece` in
-  `oud/presentation/cli_convert.py`, so decide the warning text with care: a
-  dropped-notes warning must not stop a conversion of a tab file).
-- Do: count (a) notes in parts that are not the chosen tablature part and (b)
-  notes in the tablature part that have no `string`/`fret`. When the count is
-  above zero, append `"MusicXML: N notes without tablature were not read"`
-  to `piece.import_warnings`; skip the warning for parts Oud wrote itself
-  (`written_by_oud`).
-- Also: `_validate_piece` must treat this warning as informational (still
-  convert), by checking a constant prefix exported from the importer.
-- Acceptance: tests with inline XML: a standard-notation-only score (warning
-  with the note count), a score with a tab part plus a standard part (warning
-  counts the standard notes), a tab-only score (no warning), Oud's own layered
-  file (no warning); `oud convert` of the first still writes its output.
-
 ### S29. Do not merge grace notes into chords on MusicXML import
 
 - Where: `_Timeline._note` in `oud/importers/musicxml.py`. A `<grace/>` note has
