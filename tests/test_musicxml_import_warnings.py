@@ -140,3 +140,20 @@ def test_a_bar_without_tuplets_is_read_from_its_durations() -> None:
 
     assert [(chord.note_type, chord.dotted) for chord in piece.bars[0].chords] == [(4, False), (5, False)]
     assert piece.import_warnings == []
+
+
+def _fingered(count: int) -> str:
+    note = (
+        "<note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><type>quarter</type>"
+        "<notations><technical><fingering>1</fingering></technical></notations></note>"
+    )
+    return note * count
+
+
+def test_a_fingered_notation_staff_is_never_taken_for_the_tablature_part() -> None:
+    xml = _score(("P1", _note(0)), ("P2", _fingered(3)))  # the standard staff has more <technical> elements
+
+    piece = _parse_piece(ET.fromstring(xml))  # noqa: S314 - inline test data
+
+    assert [[(n.string, n.fret) for n in c.notes] for c in piece.bars[0].chords] == [[(1, 0)]]
+    assert piece.import_warnings == ["MusicXML: 3 notes without tablature were not read"]

@@ -42,8 +42,8 @@ def _layered_piece() -> Piece:
                 melody_events=[
                     MelodyEvent("c'", 0, note_type=4, slur_start=True),
                     MelodyEvent("r", 1, note_type=4, is_rest=True, fermata=True),
-                    MelodyEvent("d'", 2, note_type=5, beam="start"),
-                    MelodyEvent("e'", 3, note_type=5, beam="end"),
+                    MelodyEvent("d'", 2, note_type=5, beam="start", harmonic=True),
+                    MelodyEvent("e'", 3, note_type=5, beam="end", fingering="2"),
                 ],
             ),
             ImportedBarContent(
@@ -84,7 +84,7 @@ def _staffs(piece: Piece) -> list[tuple[str, str | None, list[tuple[int, list[ob
                     [
                         (
                             (e.text, e.onset_index, e.note_type, e.dotted, e.is_rest, e.tie_from_previous),
-                            (e.fermata, e.slur_start, e.slur_end, e.beam),
+                            (e.fermata, e.slur_start, e.slur_end, e.beam, e.fingering, e.harmonic),
                         )
                         for e in bar.melody_events
                     ]

@@ -63,7 +63,7 @@ and a bar-by-bar probe.
 | Empty bar | Supported | Written as a whole-measure rest (`rest measure="yes"`, in the meter in force); a foreign measure rest also reads as an empty bar |
 | Slurs, ties, holds, ornaments, annotations, highlights | Lost | Editor-side marks: never written, in MusicXML or in `.tab`, and the save says nothing |
 | Tuplets | Lost | No model: not written; the `:tuplet` command only adds a text mark, which is lost too |
-| Notation staves of an imported score | Partial | Pitch, rhythm, rests, ties, lyrics, slurs, fermatas and beams are kept; fingerings, harmonics, ornaments, clefs and keys are not |
+| Notation staves of an imported score | Partial | Pitch, rhythm, rests, ties, lyrics, slurs, fermatas, beams, fingerings and harmonics are kept; ornaments, clefs and keys are not |
 
 ## Reading files from other programs
 
