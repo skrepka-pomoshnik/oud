@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from oud.editor.core.document import DocumentMode, classify_document
 from oud.editor.editing.primitives.undo import undo
 from oud.editor.editing.score.operations import cmd_bar
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write
+from oud.editor.services.screen.compose import compose_editor_frame
 from petrucci.core.model import (
     Bar,
     Chord,
@@ -35,14 +38,14 @@ def _layered_piece() -> Piece:
             ImportedBarContent(
                 0,
                 melody_events=[
-                    MelodyEvent("c'", 0, note_type=4),
-                    MelodyEvent("r", 1, note_type=4, is_rest=True),
+                    MelodyEvent("c'", 0, note_type=4, slur_start=True),
+                    MelodyEvent("r", 1, note_type=4, is_rest=True, fermata=True),
                 ],
             ),
             ImportedBarContent(
                 1,
                 melody_events=[
-                    MelodyEvent("f#", 0, note_type=5, dotted=True),
+                    MelodyEvent("f#", 0, note_type=5, dotted=True, slur_end=True),
                     MelodyEvent("bb,", 1, note_type=6),
                     MelodyEvent("bb,", 2, note_type=4, tie_from_previous=True),
                 ],
@@ -75,7 +78,10 @@ def _staffs(piece: Piece) -> list[tuple[str, str | None, list[tuple[int, list[ob
                 (
                     bar.source_bar_index,
                     [
-                        (e.text, e.onset_index, e.note_type, e.dotted, e.is_rest, e.tie_from_previous)
+                        (
+                            (e.text, e.onset_index, e.note_type, e.dotted, e.is_rest, e.tie_from_previous),
+                            (e.fermata, e.slur_start, e.slur_end),
+                        )
                         for e in bar.melody_events
                     ]
                     + [
@@ -149,3 +155,27 @@ def test_bar_insert_and_delete_keep_staffs_aligned_and_undo_restores_them() -> N
 
     undo(state, config_path="config.toml")
     assert _staffs(state.piece) == before
+
+
+@pytest.mark.parametrize(("width", "height"), [(80, 24), (120, 40)])
+def test_the_lute_label_never_overwrites_the_tablature_staff(width: int, height: int) -> None:
+    state = keyscript_state(piece=_layered_piece(), width=width, height=height, settings_override={"time": "2/4"})
+    lines = compose_editor_frame(state, height=height, width=width).frame.lines
+
+    first = next(index for index, line in enumerate(lines) if "|a" in line)
+    tab_rows = lines[first : first + 6]
+    staff_column = tab_rows[0].index("|a")
+
+    # The label sits in its own column and the staff keeps its barline and lines.
+    assert [row[staff_column] for row in tab_rows] == ["|"] * 6, tab_rows
+    assert tab_rows[2].startswith("lute ")
+    assert all(row[:staff_column].strip() == "" for index, row in enumerate(tab_rows) if index != 2)
+    assert tab_rows[2][staff_column + 1 :].startswith("-")
+
+
+def test_a_solo_piece_has_no_label_over_its_staff() -> None:
+    piece = Piece(title="Solo", bars=[_tab_bar(0), _tab_bar(2)], strings=6, style="french")
+    state = keyscript_state(piece=piece, width=80, height=24, settings_override={"time": "2/4"})
+    lines = compose_editor_frame(state, height=24, width=80).frame.lines
+
+    assert not any(line.startswith("lute") for line in lines)

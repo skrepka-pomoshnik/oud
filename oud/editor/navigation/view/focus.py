@@ -9,6 +9,7 @@ from petrucci.adapters.duet import (
     duet_staff_labels,
     is_duet_score_piece,
 )
+from petrucci.adapters.piece_view import TAB_STAFF_LABEL
 from petrucci.core.model import ImportedStaff, Piece
 
 if TYPE_CHECKING:
@@ -41,7 +42,7 @@ def visible_view_staffs(piece: Piece) -> tuple[ViewStaff, ...]:
 
     staffs: list[ViewStaff] = []
     if _has_tablature(piece) or piece.imported_score is None:
-        staffs.append(ViewStaff(key="tab", label="Tab"))
+        staffs.append(ViewStaff(key="tab", label=TAB_STAFF_LABEL))
     if piece.imported_score is not None:
         staffs.extend(_imported_view_staffs(piece.imported_score.staffs))
     return tuple(staffs) or (ViewStaff(key="score", label="Score"),)

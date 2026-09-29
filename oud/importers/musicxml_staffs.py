@@ -94,6 +94,8 @@ def _melody_event(node: ET.Element, onset: int) -> MelodyEvent:
     actual = _text(_child(modification, "actual-notes")) if modification is not None else ""
     normal = _text(_child(modification, "normal-notes")) if modification is not None else ""
     is_rest = _child(node, "rest") is not None
+    notations = _child(node, "notations")
+    slurs = {slur.get("type") for slur in _children(notations, "slur")} if notations is not None else set()
     return MelodyEvent(
         text="r" if is_rest else _pitch_text(_child(node, "pitch")),
         onset_index=onset,
@@ -103,6 +105,9 @@ def _melody_event(node: ET.Element, onset: int) -> MelodyEvent:
         tie_from_previous=any(tie.get("type") == "stop" for tie in _children(node, "tie")),
         tuplet_actual=int(actual) if actual.isdigit() else None,
         tuplet_normal=int(normal) if normal.isdigit() else None,
+        fermata=notations is not None and _child(notations, "fermata") is not None,
+        slur_start="start" in slurs,
+        slur_end="stop" in slurs,
     )
 
 

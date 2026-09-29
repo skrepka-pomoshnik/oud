@@ -160,12 +160,22 @@ def _append_note(
         SubElement(note, "tie", type=kind)
     SubElement(note, "voice").text = "1"
     _append_rhythm(note, event)
-    if ties:
-        notations = SubElement(note, "notations")
-        for kind in ties:
-            SubElement(notations, "tied", type=kind)
+    _append_notations(note, event, ties)
     for row_index, syllable in syllables:
         _append_lyric(note, row_index, syllable)
+
+
+def _append_notations(note: Element, event: MelodyEvent, ties: list[str]) -> None:
+    slurs = [kind for kind, present in (("start", event.slur_start), ("stop", event.slur_end)) if present]
+    if not (ties or slurs or event.fermata):
+        return
+    notations = SubElement(note, "notations")
+    for kind in ties:
+        SubElement(notations, "tied", type=kind)
+    for kind in slurs:
+        SubElement(notations, "slur", type=kind, number="1")
+    if event.fermata:
+        SubElement(notations, "fermata")
 
 
 def _append_rhythm(note: Element, event: MelodyEvent) -> None:

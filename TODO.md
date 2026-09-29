@@ -348,7 +348,7 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
   3. Duet FT3 scores stay view-only: they keep two lute parts in one bar list.
      Editing them needs a second tablature part in the model.
   4. Notation-staff details MusicXML could carry but Oud does not write yet:
-     ornaments, fingerings, slurs, fermatas, beams, clefs and key signatures of
+     ornaments, fingerings, beams, clefs and key signatures of
      imported staffs (`oud/exports/musicxml_staffs.py`).
 - Acceptance: ornaments, fingerings and text survive the round trip like the
   rest (default save, native reopen and the lossless core are done, see
@@ -374,29 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S7. The staff label overwrites the tablature
-
-- Where: `petrucci/adapters/piece_view.py:253` paints `lute` five columns left
-  of the first measure (`measure_boxes[0].x - 5`), over the staff lines when
-  the measure starts closer to the edge.
-- Do: reserve the label's width (plus one space) before the first measure of
-  every system, or leave the label out when the terminal is narrower than the
-  label plus one measure.
-- Acceptance: a regression test that renders a solo TAB piece and a piece with
-  a notation staff (build one like `_layered_piece` in
-  `tests/test_layered_scores.py`) at 80x24 and 120x40 and checks that the
-  staff's first column still shows its line character.
-
-### S8. One label for the tablature staff
-
-- Where: the focus list calls the lane `Tab`
-  (`oud/editor/navigation/view/focus.py:44`) while the staff is drawn as
-  `lute` (`petrucci/adapters/piece_view.py:198`).
-- Do: define the label once (a constant in `petrucci/adapters/piece_view.py`)
-  and use it in both places.
-- Acceptance: a test that the status `focus:` text equals the drawn staff label
-  for a solo piece and for a piece with a notation staff.
-
 ### S9. Checksums for companion MIDI files
 
 - Where: `scripts/corpus/midi/references.py` fetches and caches companion MIDI
@@ -407,31 +384,6 @@ the complex list with a note instead of widening it.
   `stale companion MIDI: <path>` before any parity check.
 - Acceptance: tests with small files in `tmp_path` (no network): a matching
   file passes, an altered file produces the diagnostic.
-
-### S18. `oud convert` without an output path
-
-- Where: `oud/presentation/app.py:210` makes `output` required;
-  `convert_command` is in `oud/presentation/cli_convert.py:167`.
-- Do: make `output` optional (`nargs="?"`); when it is missing, write
-  `<input stem>.musicxml` next to the input (MusicXML is the default format,
-  see `C16`). Existing files still need `--force`. Reading from `-` still
-  needs an explicit output.
-- Acceptance: tests in `tests/test_cli_contract.py`: `oud convert x.tab`
-  writes `x.musicxml`; a second run without `--force` fails with the existing
-  "exists" error; `oud convert - ` without output is a usage error.
-
-### S19. Fermatas and slurs on notation staffs in MusicXML
-
-- Where: `oud/exports/musicxml_staffs.py` writes notation staffs and
-  `oud/importers/musicxml_staffs.py` reads them back. `MelodyEvent` has
-  `fermata`, `slur_start` and `slur_end` (`petrucci/core/model.py`), which are
-  not written yet.
-- Do: write `<notations><fermata/></notations>` and
-  `<slur type="start|stop" number="1"/>` inside the note's `notations`
-  element (after any `tied`), and read them back into the same fields.
-- Acceptance: extend `_layered_piece` and `_staffs` in
-  `tests/test_layered_scores.py` with a fermata and a slur pair; the MusicXML
-  round-trip test still passes.
 
 ### S10. Document the supported historical-notation matrix
 
