@@ -35,7 +35,7 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 6. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow;
-S2–S5, S7–S10, S18 and S19 need nothing outside the repository.
+S11 and S20–S23 need nothing outside the repository.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
@@ -57,15 +57,25 @@ including rendering, TAB/MusicXML/MIDI export, playback, and verification.
   `oud/editor/editing/transforms.py`, `oud/exports/midi/projection.py`,
   `oud/exports/musicxml.py`, and the remaining readers found by
   `grep -rlE "\.overrides|\.durations|\.dotted\b" oud petrucci`.
+- Finding (2026-09-29): in production `overrides` and `dotted` are never
+  filled. Every loader returns `{}` for them; typing writes chords. Only these
+  still write them: `apply_override` (`:transpose` in `handlers/settings.py`),
+  score paste (`editing/score/operations.py:213-227`), the transforms in
+  `editing/transforms.py`, and tests. `durations` is derived from the chords by
+  `build_durations`. So readers can switch to the chords, and the real decision
+  is the compatibility path: exporters and the renderer still accept a `Piece`
+  whose bars have `notes` plus grid maps and no `chords` (many tests build
+  pieces that way). Decide that first (keep it as a documented import path, or
+  convert such pieces to chords on load), then migrate. `C8` replaces the
+  transposition writers.
 - Steps:
   1. Migrate readers one layer at a time: exports, then playback, then
      rendering, then visual/transforms/find.
   2. Replace float quarter-beat rhythm with `Fraction` and per-bar meters.
   3. Delete `overrides`, `durations`, `dotted` from `EditorState` and
      `render_piece`.
-  4. Delete the test-only grid primitives `clear_cell`, `clear_cell_note` and
-     `apply_duration` (`petrucci.input.tablature.grid`) and the `grid` setting,
-     which no longer affects typing.
+  4. Delete the test-only grid primitives (`S20`) and the `grid` setting
+     (`S21`).
   5. Lay out bars that are not full against their meter, not their content:
      today an incomplete bar re-spaces while typing and `beatsnap=soft` centres
      a lone event.
@@ -374,18 +384,114 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
+### S11. Engraving matrix: cases for features it does not cover yet
+
+- Where: `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` lists six
+  `cases` (tablature rhythm, voice + lute + lyrics, polyphonic collisions,
+  broken spans, repeats and voltas, Gerbode multiverse) and their builders in
+  `tests/engraving_quality_matrix.py` (`_FIXTURE_BUILDERS`, one function per
+  case, each returns a `MatrixFixture`). `tests/test_lilypond_engraving_profile.py`
+  walks every case: it lays the proof score out and exports the piece.
+- Missing: the supported-behavior table (`docs/supported-behavior.md`, section
+  "Historical notation constructs") lists fermatas, tuplets, common/cut time and
+  key signatures as supported, but none has a matrix case of its own.
+- Do: add four cases, one per feature: `fermata`, `tuplet-triplet`,
+  `cut-time`, `key-signature`. For each: (1) a `_x_fixture()` builder next to
+  the others, small (one bar, two to three events, built with
+  `_event(...)` and `NotationScore`, plus the matching `Piece` for the export);
+  (2) an entry in `_FIXTURE_BUILDERS`; (3) a `cases` entry copying an existing
+  one's keys (`id`, `fixture` (same as `id`), `features`, `proof`,
+  `lilypond.contains`, `petrucci_contract`, `lilypond_contract`, `upstream`);
+  (4) a `microcases` entry with 1-2 assertions.
+- Pick `proof.required_roles` and `lilypond.contains` from what the code
+  really emits: export the fixture once (`export_lilypond`), read the `.ly`,
+  and use tokens that prove the feature (for example `\fermata`, `\time 2/2`,
+  `\key`, `\scaleDurations`). Do not guess tokens.
+- These cases have no upstream project behind them: allow an empty `upstream`
+  list only for cases with `"origin": "oud"`, and add that key to the four new
+  cases. Change the assertion in
+  `test_engraving_matrix_links_proof_export_and_upstream_invariants`
+  accordingly (`assert case["upstream"] or case.get("origin") == "oud"`).
+- Acceptance: `tests/test_lilypond_engraving_profile.py` passes with 10 cases;
+  `len(matrix["cases"]) >= 10`; each new case's `features` name its feature;
+  `docs/engraving-regressions.md` lists the four features under the matrix.
+- Out of scope: real FT3 entries (`S24`), collision tuning, other features.
+
+### S20. Delete the grid primitives that only tests use
+
+- Where: `oud/editor/editing/primitives/edits.py` still has `apply_duration`,
+  `clear_cell` and `clear_cell_note`; `petrucci/input/tablature/grid.py` has
+  the functions behind them: `set_tab_duration`, `clear_tab_cell`,
+  `clear_tab_note` and their private helpers. Only tests call them (typing
+  goes through `apply_tab_transaction` since `C3`).
+- Do: delete those three wrappers and three functions, then delete whatever
+  becomes unused in `grid.py` (find it with `.venv/bin/ruff check` and
+  `grep -rnw <name> oud petrucci`; candidates: `_clear_encoded_cells`,
+  `_clear_rhythm`, `_clear_dot`, `_clear_chord_note`, `_column_has_notes`,
+  `_rhythm_snapshot`, `_tab_onset_key`, `TabRhythmDelta`, `TabDotDelta`).
+- Keep (production code still uses them): `apply_override` and `set_tab_cell`
+  (`oud/editor/commands/handlers/settings.py:627`, replaced by `C8`),
+  `EditableTablature`, `TabMutation`, `TabCellDelta` while `set_tab_cell` needs
+  it, `chord_index_at_col`, `insert_chord`, `delete_chord`, `set_chord_note`.
+- Tests: delete the tests that exist only for the deleted functions
+  (`tests/test_editor.py`: the `apply_duration` undo test and
+  `test_clear_cell_*`; `tests/test_tui_commands.py`:
+  `test_apply_duration_replaces_column`; the matching cases in
+  `tests/test_petrucci_contract_edges.py`). Do not weaken other tests.
+- Acceptance: `grep -rnwE "apply_duration|clear_cell|clear_cell_note|set_tab_duration|clear_tab_cell|clear_tab_note" oud petrucci tests`
+  prints nothing; the gate passes; `grid.py` is shorter by the deleted code.
+
+### S21. Remove the obsolete `grid` setting
+
+- Where: the `grid` setting no longer affects anything. It is defaulted in
+  `oud/settings.py:124`, listed as a boolean in
+  `oud/editor/commands/handlers/settings.py:44` (`_BOOL_KEYS`), shown on the
+  settings page in `oud/editor/services/screen/pages.py:64`, and named in
+  `docs/user-guide.md:244`. Tests that mention it: `tests/test_tui_commands_exec.py`
+  (lines 40, 110-119, 255).
+- Do: remove it from those places. A user's old config may still contain
+  `grid = ...`; loading it must not fail or warn.
+- Acceptance: `grep -rnw grid oud/settings.py oud/editor docs/user-guide.md`
+  has no hit for the setting; a new test loads a config file with
+  `grid = "on"` and gets normal settings with no `grid` key; `:set grid=on`
+  answers `Unknown set key: grid` (as `:set nosuch=on` does today); the gate
+  passes.
+- Out of scope: the `gridflags` tool, `Chord.grid` (beam grids), and any
+  "grid" in comments about display columns.
+
+### S22. Beams on notation staves in MusicXML
+
+- Where: `oud/exports/musicxml_staffs.py` writes notation staves;
+  `oud/importers/musicxml_staffs.py` reads them back. `MelodyEvent.beam` holds
+  `"start"`, `"continue"`, `"end"` or `None` (FT3 vocal beams).
+- Do: in `_append_note` (after the rhythm elements, before `notations`) write
+  `<beam number="1">begin|continue|end</beam>` for `start|continue|end`
+  (MusicXML's word for `start` is `begin`); in `_melody_event` read
+  `<beam number="1">` back the same way. Ignore beams with other numbers.
+- Acceptance: extend `_layered_piece` and `_staffs` in
+  `tests/test_layered_scores.py` with a beamed pair (`start`, `end`) and a
+  three-note group (`start`, `continue`, `end`); the MusicXML round trip
+  test passes; a note without a beam writes no `<beam>` element.
+
+### S23. Fingerings and harmonics on notation staves in MusicXML
+
+- Where: same files as `S22`. `MelodyEvent.fingering` is text (usually a
+  digit) and `MelodyEvent.harmonic` is a bool.
+- Do: write `<technical><fingering>TEXT</fingering></technical>` and
+  `<technical><harmonic/></technical>` inside the note's `notations` element
+  (extend `_append_notations`, created in `S19`), and read both back.
+- Check: `_technical_count` in `oud/importers/musicxml.py` picks the part with
+  the most notes that have `string` and `fret`; these `technical` elements
+  have neither, so notation staves must still never be taken for the tablature
+  part. Add a test for that (a notation staff with more fingerings than the
+  tablature part has notes).
+- Acceptance: extend the layered-score round trip with one fingering and one
+  harmonic; the new tab-part test passes.
+
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
 Not suitable for unattended work: each needs something the cloud environment
 does not have, or open-ended judgement.
-
-### S11. Engraving-quality matrix coverage
-
-- File: `tests/fixtures/ft3/manifests/engraving-quality-matrix.json`.
-- Give every supported notation feature one source-independent microcase. The
-  inventory covers six feature families and registers the Felice benchmark. Add
-  a real FT3 entry whenever a family is promoted from partial support (**Needs**
-  the local corpus for that half).
 
 ### S12. Dual-engine PDF comparisons for every microcase
 
@@ -449,6 +555,13 @@ Opt-in renderers only; the default ASCII and pretty modes are unaffected.
   refusal, playback failure/success, PDF failure/success, resize, and reopen.
 - Run real curses cases at 80x24 and 120x40 and retain terminal output on
   failure.
+
+### S24. Engraving matrix: real FT3 entries
+
+- Add a real FT3 entry (source URL, checksum, expected metadata) to
+  `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` whenever a
+  feature family is promoted from partial support. **Needs** the local corpus.
+  The source-independent half is `S11`.
 
 ---
 
