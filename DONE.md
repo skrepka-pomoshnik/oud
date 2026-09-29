@@ -1,5 +1,10 @@
 # DONE
 
+## S4: the status row names a bar's length problem (2026-09-29)
+
+- `bar_meter_marker` returns `meter:<length> of <meter>` (length in whole notes, meter as written) instead of `M`: `meter:1/2 of 3/4` is a 3/4 bar holding two quarters, `meter:1/1 of 3/4` an overfull one. Full and empty bars, and unknown meters, show nothing.
+- Validation: `tests/test_editor_status_row.py` (full, underfull and overfull 3/4 bars, 6/8, empty). Gate: 1,860 passed.
+
 ## S3: the help overlay and the pager share one text (2026-09-29)
 
 - The overlay and the `less` pager both print `help_lines(state)`; a test now locks that for every key style (`vim`, `vim+arrows`, `casual`, `casual+arrows`). No production change was needed.
