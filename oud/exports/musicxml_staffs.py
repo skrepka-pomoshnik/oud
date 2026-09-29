@@ -165,9 +165,19 @@ def _append_note(
         SubElement(note, "tie", type=kind)
     SubElement(note, "voice").text = "1"
     _append_rhythm(note, event)
+    _append_beam(note, event)
     _append_notations(note, event, ties)
     for row_index, syllable in syllables:
         _append_lyric(note, row_index, syllable)
+
+
+_BEAMS = {"start": "begin", "continue": "continue", "end": "end"}
+
+
+def _append_beam(note: Element, event: MelodyEvent) -> None:
+    beam = _BEAMS.get(event.beam or "")
+    if beam is not None:
+        SubElement(note, "beam", number="1").text = beam
 
 
 def _append_notations(note: Element, event: MelodyEvent, ties: list[str]) -> None:
