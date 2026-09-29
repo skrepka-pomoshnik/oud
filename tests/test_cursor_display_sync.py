@@ -8,6 +8,8 @@ TUI loop and assert the drawn cursor never stalls.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from oud.editor.core.state import EditorState
@@ -18,6 +20,7 @@ from oud.editor.services.screen.compose import compose_editor_frame
 from oud.presentation.tui.commands import apply_command
 from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.terminal.canvas.screen import A_REVERSE
+from tests.helpers_ft3 import write_galliard
 from tests.helpers_keyscript import keyscript_state
 
 
@@ -66,15 +69,13 @@ def _opened(path: str) -> EditorState:
     return state
 
 
-@pytest.mark.ft3_corpus
-def test_drawn_cursor_moves_on_every_l_press_in_chord_bars() -> None:
-    state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
+def test_drawn_cursor_moves_on_every_l_press_in_chord_bars(tmp_path: Path) -> None:
+    state = _opened(str(write_galliard(tmp_path)))
     assert _count_stalls(state, "l", 40) == 0
 
 
-@pytest.mark.ft3_corpus
-def test_drawn_cursor_moves_on_every_h_press_in_chord_bars() -> None:
-    state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
+def test_drawn_cursor_moves_on_every_h_press_in_chord_bars(tmp_path: Path) -> None:
+    state = _opened(str(write_galliard(tmp_path)))
     for _ in range(40):
         _press(state, "l")
     assert _count_stalls(state, "h", 40) == 0
@@ -93,9 +94,8 @@ def test_drawn_cursor_moves_in_vocal_piece_with_scrolling() -> None:
     assert _count_stalls(state, "h", 60) == 0
 
 
-@pytest.mark.ft3_corpus
-def test_renderer_publishes_cursor_maps_for_rendered_bars() -> None:
-    state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
+def test_renderer_publishes_cursor_maps_for_rendered_bars(tmp_path: Path) -> None:
+    state = _opened(str(write_galliard(tmp_path)))
     assert state.display_cursor_maps
     for bar_index, mapping in state.display_cursor_maps.items():
         assert len(mapping) == state.bar_width, bar_index

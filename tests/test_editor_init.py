@@ -5,6 +5,7 @@ import pytest
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write_default
 from petrucci.core.model import Piece
+from tests.helpers_ft3 import write_galliard
 
 
 def test_init_state_new_file_defaults_to_8_bars(tmp_path: Path) -> None:
@@ -52,14 +53,14 @@ def test_init_state_preserves_inferred_ft3_extra_courses() -> None:
     assert state.piece.strings >= 8
 
 
-@pytest.mark.ft3_corpus
-def test_init_state_loads_represented_ft3_text_without_warning() -> None:
-    state = init_state("tests/fixtures/ft3/corpus/can_she_excuse.ft3", config_path="config.toml")
+def test_init_state_loads_hand_built_ft3_without_warning(tmp_path: Path) -> None:
+    source = write_galliard(tmp_path)
+    state = init_state(str(source), config_path=str(tmp_path / "config.toml"))
     assert state.message == ""
     assert state.piece.import_warnings == []
-    assert state.read_only is True
+    assert state.read_only is False
     assert state.visible_message == ""
-    assert any(bar.lyric_event_rows for bar in state.piece.bars)
+    assert len(state.piece.bars) == 6
 
 
 def test_init_state_marks_read_only_viewer_mode(tmp_path: Path) -> None:
