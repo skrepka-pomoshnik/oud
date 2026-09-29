@@ -202,9 +202,11 @@ class _Timeline:
             self.previous_onset = onset
             self.cursor += duration
         self.measure_end = max(self.measure_end, onset + duration, self.cursor)
-        if _child(node, "rest") is not None:
-            # A rest in the main voice is an event of its own; other voices' rests only fill space.
-            if _text(_child(node, "voice")) in _FIRST_VOICE:
+        rest = _child(node, "rest")
+        if rest is not None:
+            # A rest in the main voice is an event of its own; other voices' rests, and a whole-measure
+            # rest (an empty bar), only fill space.
+            if rest.get("measure") != "yes" and _text(_child(node, "voice")) in _FIRST_VOICE:
                 self.rests.add(onset)
             return
         technical = _technical(node)
@@ -255,7 +257,8 @@ def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end:
 
 def _rest_chord(measure: ET.Element) -> Chord | None:
     for note_node in _children(measure, "note"):
-        if _child(note_node, "rest") is None:
+        rest = _child(note_node, "rest")
+        if rest is None or rest.get("measure") == "yes":
             continue
         note_type, dotted = _note_type(note_node)
         return Chord(note_type=note_type, dotted=dotted, grid=None, notes=[])

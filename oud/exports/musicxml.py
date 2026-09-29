@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import zipfile
 from collections.abc import Sequence
+from fractions import Fraction
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from oud.exports.musicxml_staffs import append_notation_parts
+from oud.exports.musicxml_staffs import append_measure_rest, append_notation_parts
 from petrucci.core.model import Bar, Piece
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import default_tuning_pitches
@@ -660,6 +661,17 @@ def _append_musicxml_override_notes(
         remaining_fermata = False
 
 
+def _effective_meter(piece: Piece, bar_index: int, settings: dict[str, str]) -> Fraction:
+    """The meter in force in a bar: its own, else the latest earlier one, else the setting."""
+
+    for bar in reversed(piece.bars[: bar_index + 1]):
+        if bar.time_sig:
+            beats, unit = _time_for_bar(bar, settings)
+            return Fraction(beats, unit)
+    beats, unit = _time_for_bar(piece.bars[bar_index], settings)
+    return Fraction(beats, unit)
+
+
 def _append_musicxml_measure_notes(
     measure: Element,
     bar: Bar,
@@ -671,6 +683,7 @@ def _append_musicxml_measure_notes(
     style: str,
     dotted: set[tuple[int, int]] | None,
     pitch_for_string: list[int],
+    settings: dict[str, str],
 ) -> None:
     if bar.chords:
         _append_musicxml_chord_notes(
@@ -692,6 +705,9 @@ def _append_musicxml_measure_notes(
         pitch_for_string=pitch_for_string,
         fermata_pending=bool(bar.fermata),
     )
+    if measure.find("note") is None:
+        # An empty bar needs a measure rest, or other programs show nothing.
+        append_measure_rest(measure, _effective_meter(piece, bar_index, settings), DIVISIONS)
 
 
 def _append_musicxml_measure_prefix(
@@ -785,6 +801,7 @@ def _append_musicxml_measure(
         style=style,
         dotted=dotted,
         pitch_for_string=pitch_for_string,
+        settings=settings,
     )
     _finish_musicxml_measure(measure, bar, repeat, _ending_stop(piece.bars, bar_index))
 

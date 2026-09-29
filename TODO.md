@@ -518,20 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S31. Measure rests for empty bars in MusicXML
-
-- Where: an empty bar is written as a bare `<measure>` (valid, but other
-  programs show nothing); `_rest_chord` in `oud/importers/musicxml.py` turns
-  the first rest of a bar into a chord, including a whole-measure rest.
-- Do: write `<note><rest measure="yes"/><duration>D</duration><voice>1</voice></note>`
-  for an empty bar in the tablature part (D from the bar's meter, as
-  `_append_measure_rest` in `oud/exports/musicxml_staffs.py` already does for
-  notation parts; reuse it instead of copying it); read
-  `rest measure="yes"` as an empty bar (no rest chord).
-- Acceptance: a piece with an empty bar keeps it empty through write and read;
-  a foreign file with a measure rest opens with an empty bar, not a rest
-  chord; the schema test passes.
-
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
 Not suitable for unattended work: each needs something the cloud environment

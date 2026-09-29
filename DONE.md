@@ -1,5 +1,10 @@
 # DONE
 
+## S31: measure rests for empty bars in MusicXML (2026-09-29)
+
+- An empty bar in the tablature part is written as `<rest measure="yes"/>` with the duration of the meter in force (its own, else the latest earlier one). A whole-measure rest in any MusicXML file reads as an empty bar, not as a rest chord; a real rest is still a rest chord. `append_measure_rest` in `oud/exports/musicxml_staffs.py` is shared with the notation staves.
+- Validation: `tests/test_musicxml_roundtrip.py` (empty bar round trip and inherited 3/4 duration, foreign measure rest, real rest); the schema test validates the edge piece's empty bar. Gate: 1,924 passed.
+
 ## S30: tuplets are read by their written value (2026-09-29)
 
 - A tablature note with `time-modification` takes its value from its `<type>` and `<dot>` instead of its duration. Three triplet eighths were read as dotted 16ths and a 2/4 bar measured 17/32; it now reads three eighths (5/8, so the status row shows the meter difference) and warns `MusicXML: N tuplet groups were read without tuplet timing`. Real tuplet timing is `C17` step 2.
