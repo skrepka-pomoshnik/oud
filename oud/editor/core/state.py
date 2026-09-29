@@ -52,6 +52,7 @@ class EditorState:
         self.message = ""
         self.path: str | None = None
         self.write_path: str | None = None
+        self.suggested_write_path: str | None = None
         self.source_format = "new"
         self.document_mode = DocumentMode.NATIVE
         self.forced_read_only = False

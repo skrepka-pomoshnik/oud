@@ -55,6 +55,7 @@ def configure_document(
     state.source_format = source_format(path)
     state.document_mode = classify_document(path, state.piece)
     state.write_path = path if state.source_format == "tab" else None
+    state.suggested_write_path = None
     state.forced_read_only = forced_read_only
     state.read_only = forced_read_only or state.document_mode is DocumentMode.IMPORTED_READ_ONLY
     state.pending_overwrite_path = None
@@ -101,7 +102,7 @@ def default_write_path(state: EditorState) -> str:
 
     if state.path:
         return str(Path(state.path).with_suffix(".tab"))
-    return "untitled.tab"
+    return state.suggested_write_path or "untitled.tab"
 
 
 def display_path(state: EditorState) -> str:

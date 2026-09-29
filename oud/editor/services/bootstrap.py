@@ -20,6 +20,10 @@ def _invalid_source(path: str | None, piece: Piece) -> bool:
     return bool(path and (Path(path).is_dir() or (piece.import_warnings and not piece.bars)))
 
 
+def _is_new_tab(path: str | None) -> bool:
+    return bool(path and path.lower().endswith(".tab") and not Path(path).exists())
+
+
 def _ensure_initial_bars(piece: Piece, settings: dict[str, str]) -> None:
     if piece.bars:
         return
@@ -89,20 +93,25 @@ def init_state(
     read_only: bool = False,
 ) -> EditorState:
     settings = load_settings(config_path)
-    requested_path = path
-    piece, overrides, durations, dotted, bar_width = load_piece_data(path)
-    invalid_source = _invalid_source(requested_path, piece)
+    # A missing .tab path names a new document: nothing is written until the
+    # first :w, which asks for the destination with this path filled in.
+    new_tab = _is_new_tab(path)
+    piece, overrides, durations, dotted, bar_width = load_piece_data(None if new_tab else path)
+    if new_tab:
+        piece.title = Path(str(path)).stem
+    invalid_source = new_tab or _invalid_source(path, piece)
     _ensure_initial_bars(piece, settings)
 
     state = EditorState(piece, settings, config_path=config_path)
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
-    # A missing .tab path is a new document; there is no source text to keep yet.
     if path and path.lower().endswith(".tab") and Path(path).is_file():
         state.tab_data = load_tab_data(path)
     valid_path = None if invalid_source else path
     configure_document(state, valid_path, forced_read_only=read_only)
+    if new_tab:
+        state.suggested_write_path = path
     _apply_piece_metadata(state)
     _apply_path_defaults(state, path)
     _apply_spacing(state, bar_width)

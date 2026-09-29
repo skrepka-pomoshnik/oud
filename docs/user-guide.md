@@ -165,7 +165,7 @@ Durations belong to events and are rendered according to the current flag style 
 ## 6.1 File and session
 
 - `:e <path>` open file
-- `:w [path]` write TAB; new/imported documents prompt for a `.tab` destination
+- `:w [path]` write TAB; new/imported documents prompt for a `.tab` destination (`oud new.tab` on a missing file pre-fills `new.tab`; nothing is written until you confirm)
 - `:wa [path]` / `:wascii [path]` write ASCII snapshot/export
 - `:wq`, `:x` write + quit
 - `:q!` force quit
