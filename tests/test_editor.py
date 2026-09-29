@@ -1,3 +1,6 @@
+import copy
+from fractions import Fraction
+
 import pytest
 
 from oud.editor.commands import dispatch as cmd_ops
@@ -9,9 +12,9 @@ from oud.editor.editing.primitives import undo as undo_ops
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
 from petrucci.core.model import Bar, Chord, Note, Piece
-from petrucci.input.tablature.input import REST_OVERRIDE
 from petrucci.rendering.api import render_piece
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from tests.helpers_keyscript import tab_events
 
 
 def _state() -> EditorState:
@@ -106,8 +109,7 @@ def test_insert_duration_updates_chord_note_type() -> None:
     state.piece.bars[0].chords = [chord]
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
-    assert state.piece.bars[0].chords == []
-    assert state.durations[(0, 0, 0)] == 8
+    assert tab_events(state) == [("8", [(1, 0)])]
 
 
 def test_insert_duration_digits_map_in_french() -> None:
@@ -130,33 +132,31 @@ def test_insert_duration_digits_map_in_french() -> None:
 
 
 def test_insert_french_duration_alias_letters_insert_frets() -> None:
-    for ch in "ehst":
+    for ch, fret in zip("ehst", (4, 7, 17, 18), strict=True):
         state = _state()
         state.mode = Mode.INSERT
         actions.handle_insert(state, ord(ch))
-        assert state.overrides[(0, 0, 0)] == ch
+        assert tab_events(state) == [("4", [(1, fret)])]
         assert state.current_duration == 4
 
 
-def test_insert_fret_snaps_to_chord_slot_when_cursor_in_gap() -> None:
+def test_insert_fret_on_an_event_sets_that_course_and_advances() -> None:
     state = _state()
-    chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
-    state.piece.bars[0].chords = [chord]
-    state.cursor_col = 1
+    state.piece.bars[0].chords = [Chord(note_type=4, dotted=False, grid=None, notes=[Note(2, 0, 0)])]
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
-    assert state.overrides[(0, 0, 0)] == "a"
-    assert (0, 0, 1) not in state.overrides
+    assert tab_events(state) == [("4", [(2, 0), (1, 0)])]
+    assert state.cursor_onset == Fraction(1, 4)
 
 
-def test_insert_flattens_chords_to_grid() -> None:
+def test_insert_keeps_imported_chords() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
     state.piece.bars[0].chords = [chord]
     state.mode = Mode.INSERT
-    actions.handle_insert(state, ord("a"))
-    assert state.piece.bars[0].chords == []
-    assert state.overrides[(0, 0, 0)] == "a"
+    actions.handle_insert(state, ord("b"))
+    assert tab_events(state) == [("4", [(1, 1)])]
+    assert state.overrides == {}
 
 
 def test_insert_note_records_single_grouped_undo() -> None:
@@ -166,55 +166,37 @@ def test_insert_note_records_single_grouped_undo() -> None:
     assert len(state.undo_stack) == 1
     assert state.undo_stack[-1].kind == "group"
     undo_ops.undo(state, config_path="config.toml")
-    assert state.overrides == {}
-    assert state.durations == {}
+    assert tab_events(state) == []
 
 
-def test_insert_flattened_chord_bar_undo_restores_structured_chords() -> None:
+def test_insert_into_imported_chord_undo_restores_the_chords() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=True, grid=None, notes=[Note(1, 0, 0)])
-    state.piece.bars[0].chords = [chord]
+    state.piece.bars[0].chords = [copy.deepcopy(chord)]
     state.piece.bars[0].notes = [Note(1, 0, 0)]
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("b"))
-    assert state.piece.bars[0].chords == []
-    assert state.overrides
-    assert state.durations
-    assert state.dotted
+    assert tab_events(state) == [("4.", [(1, 1)])]
+    assert state.piece.bars[0].notes == [Note(1, 1, 0)]
 
     undo_ops.undo(state, config_path="config.toml")
 
     assert state.piece.bars[0].chords == [chord]
     assert state.piece.bars[0].notes == [Note(1, 0, 0)]
     assert state.overrides == {}
-    assert state.durations == {}
-    assert state.dotted == set()
 
 
-def test_insert_note_snaps_to_nearest_chord_slot_left_tie() -> None:
+def test_insert_duration_on_the_append_slot_changes_the_last_event() -> None:
     state = _state()
     state.piece.bars[0].chords = [
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
         Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
     ]
     state.mode = Mode.INSERT
-    state.cursor_col = 2
-    actions.handle_insert(state, ord("b"))
-    assert state.overrides[(0, 0, 0)] == "b"
-    assert (0, 0, 2) not in state.durations
-
-
-def test_insert_duration_snaps_to_existing_chord_slot() -> None:
-    state = _state()
-    state.piece.bars[0].chords = [
-        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
-        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
-    ]
-    state.mode = Mode.INSERT
-    state.cursor_col = 2
+    state.cursor_onset = Fraction(1, 2)
     actions.handle_insert(state, ord("6"))
-    assert state.durations[(0, 0, 0)] == 32
-    assert (0, 0, 2) not in state.durations
+    assert tab_events(state) == [("4", [(1, 0)]), ("32", [(1, 2)])]
+    assert state.cursor_onset == Fraction(9, 32)
 
 
 def test_confirm_quit_when_modified() -> None:
@@ -245,17 +227,20 @@ def test_confirm_quit_when_modified() -> None:
 def test_insert_duration_does_not_advance_cursor() -> None:
     state = _state()
     state.mode = Mode.INSERT
-    state.cursor_col = 0
     actions.handle_insert(state, ord("4"))
-    assert state.cursor_col == 0
+    assert state.cursor_onset == Fraction(0)
 
 
 def test_insert_dot_toggles_dotted() -> None:
     state = _state()
     state.mode = Mode.INSERT
-    state.cursor_col = 2
     actions.handle_insert(state, ord("."))
-    assert (0, 2) in state.dotted
+    assert state.message == "No event here"
+    actions.handle_insert(state, ord("a"))
+    actions.handle_insert(state, ord("."))
+    assert tab_events(state) == [("4.", [(1, 0)])]
+    actions.handle_insert(state, ord("."))
+    assert tab_events(state) == [("4", [(1, 0)])]
 
 
 def test_redo_restores_override() -> None:
@@ -314,9 +299,7 @@ def test_insert_italian_digit_sets_fret_not_duration() -> None:
     state.settings["style"] = "italian"
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("1"))
-    assert (0, 0, 0) in state.overrides
-    assert state.overrides[(0, 0, 0)] == "1"
-    assert state.durations[(0, 0, 0)] == state.current_duration
+    assert tab_events(state) == [(str(state.current_duration), [(1, 1)])]
 
 
 def test_insert_italian_semicolon_duration_sets_duration() -> None:
@@ -325,7 +308,8 @@ def test_insert_italian_semicolon_duration_sets_duration() -> None:
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord(";"))
     actions.handle_insert(state, ord("4"))
-    assert state.durations[(0, 0, 0)] == 8
+    assert state.current_duration == 8
+    assert tab_events(state) == []
 
 
 def test_insert_italian_multifret_with_comma() -> None:
@@ -336,16 +320,14 @@ def test_insert_italian_multifret_with_comma() -> None:
     actions.handle_insert(state, ord(","))
     actions.handle_insert(state, ord("1"))
     actions.handle_insert(state, ord("2"))
-    assert state.overrides[(0, 0, 0)] == "1"
-    assert state.overrides[(0, 0, 1)] == "2"
+    assert tab_events(state) == [("4", [(1, 12)])]
 
 
-def test_insert_rest_sets_override_and_duration() -> None:
+def test_insert_rest_appends_a_rest_with_the_current_duration() -> None:
     state = _state()
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("z"))
-    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
-    assert state.durations[(0, 0, 0)] == state.current_duration
+    assert tab_events(state) == [(str(state.current_duration), [])]
 
 
 def test_insert_rest_finishes_replace_once_mode() -> None:
@@ -357,30 +339,17 @@ def test_insert_rest_finishes_replace_once_mode() -> None:
     assert state.replace_once is False
 
 
-def test_insert_rest_snaps_to_chord_slot_when_cursor_in_gap() -> None:
-    state = _state()
-    state.piece.bars[0].chords = [
-        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
-        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 2, 0)]),
-    ]
-    state.mode = Mode.INSERT
-    state.cursor_col = 1
-    actions.handle_insert(state, ord("z"))
-    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
-    assert (0, 0, 1) not in state.overrides
-
-
 @pytest.mark.parametrize(
-    ("prefix_count", "expected_string_index"),
+    ("prefix_count", "expected_course"),
     [
-        (1, 6),  # /a -> 7th course
-        (2, 7),  # //a -> 8th course
-        (3, 8),  # ///a -> 9th course
+        (1, 7),  # /a -> 7th course
+        (2, 8),  # //a -> 8th course
+        (3, 9),  # ///a -> 9th course
     ],
 )
 def test_insert_french_bass_slash_shorthand_targets_extra_courses(
     prefix_count: int,
-    expected_string_index: int,
+    expected_course: int,
 ) -> None:
     state = _state()
     state.mode = Mode.INSERT
@@ -389,9 +358,8 @@ def test_insert_french_bass_slash_shorthand_targets_extra_courses(
     for _ in range(prefix_count):
         actions.handle_insert(state, ord("/"))
     actions.handle_insert(state, ord("a"))
-    assert state.overrides[(0, expected_string_index, 0)] == "a"
-    assert state.durations[(0, expected_string_index, 0)] == state.current_duration
-    assert state.cursor_col == 1
+    assert tab_events(state) == [(str(state.current_duration), [(expected_course, 0)])]
+    assert state.cursor_onset == Fraction(1, 4)
 
 
 def test_insert_french_bass_slash_shorthand_rejects_missing_course() -> None:
@@ -403,7 +371,7 @@ def test_insert_french_bass_slash_shorthand_rejects_missing_course() -> None:
     actions.handle_insert(state, ord("/"))
     actions.handle_insert(state, ord("a"))
     assert "Bass string not available" in state.message
-    assert not any(key[1] >= 6 for key in state.overrides)
+    assert tab_events(state) == []
 
 
 def test_row_overflow_advances_to_next_bar() -> None:
@@ -413,7 +381,7 @@ def test_row_overflow_advances_to_next_bar() -> None:
         actions.handle_insert(state, ord("a"))
     state.cursor_string = 1
     actions.handle_insert(state, ord("a"))
-    assert (0, 1, 4) in state.overrides
+    assert tab_events(state, 1) == [("4", [(2, 0)])]
 
 
 def test_insert_french_digit_sets_duration() -> None:
@@ -421,49 +389,42 @@ def test_insert_french_digit_sets_duration() -> None:
     state.settings["style"] = "french"
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("3"))
-    assert (0, 0, 0) in state.durations
-    assert state.durations[(0, 0, 0)] == 4
+    assert state.current_duration == 4
+    assert tab_events(state) == []
 
 
 def test_insert_french_duration_keys() -> None:
     state = _state()
     state.settings["style"] = "french"
     state.mode = Mode.INSERT
-    actions.handle_insert(state, ord("4"))
-    assert state.durations[(0, 0, 0)] == 8
-    state.cursor_col = 1
-    actions.handle_insert(state, ord("5"))
-    assert state.durations[(0, 0, 1)] == 16
-    state.cursor_col = 2
-    actions.handle_insert(state, ord("6"))
-    assert state.durations[(0, 0, 2)] == 32
+    actions.handle_insert(state, ord("a"))
+    for key, expected in (("4", "8"), ("5", "16"), ("6", "32")):
+        actions.handle_insert(state, ord(key))
+        assert tab_events(state) == [(expected, [(1, 0)])]
 
 
-def test_insert_duration_then_note_uses_same_col() -> None:
+def test_insert_duration_then_note_uses_the_new_duration() -> None:
     state = _state()
     state.settings["style"] = "french"
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("6"))
-    assert state.cursor_col == 0
+    assert state.cursor_onset == Fraction(0)
     actions.handle_insert(state, ord("a"))
-    assert state.overrides[(0, 0, 0)] == "a"
-    assert state.cursor_col == 1
+    assert tab_events(state) == [("32", [(1, 0)])]
+    assert state.cursor_onset == Fraction(1, 32)
 
 
-def test_insert_duration_on_other_string_snaps_to_same_time_slot() -> None:
+def test_insert_duration_on_other_string_changes_the_typed_note_and_appends_after_it() -> None:
     state = _state()
     state.settings["style"] = "french"
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("3"))
     actions.handle_insert(state, ord("a"))
-    assert state.cursor_col == 1
     state.cursor_string = 5
     actions.handle_insert(state, ord("2"))
-    # Duration change on another row should align to previous onset.
-    assert state.cursor_col == 0
+    assert state.cursor_onset == Fraction(1, 2)
     actions.handle_insert(state, ord("b"))
-    assert state.overrides[(0, 5, 0)] == "b"
-    assert (0, 5, 1) not in state.overrides
+    assert tab_events(state) == [("2", [(1, 0)]), ("2", [(6, 1)])]
 
 
 def test_duration_persists_for_new_notes() -> None:
@@ -473,87 +434,60 @@ def test_duration_persists_for_new_notes() -> None:
     actions.handle_insert(state, ord("4"))
     assert state.current_duration == 8
     actions.handle_insert(state, ord("a"))
-    assert state.durations[(0, 0, 0)] == 8
     actions.handle_insert(state, ord("b"))
-    assert state.durations[(0, 0, 1)] == 8
+    assert tab_events(state) == [("8", [(1, 0)]), ("8", [(1, 1)])]
 
 
-def test_insert_note_uses_selected_duration_for_overflow_not_other_row_column_duration() -> None:
+def test_insert_note_fits_when_the_bar_has_room_for_its_duration() -> None:
     state = _state()
     state.mode = Mode.INSERT
-    state.bar_width = 40
-    state.piece.bars.append(Bar())
-    # Another row/same column stores a quarter duration.
-    state.overrides[(0, 0, 0)] = "a"
-    state.durations[(0, 0, 0)] = 4
-    # Target row is nearly full with 32nds: 28 * 1/8 quarter-beats = 3.5
-    for col in range(1, 29):
-        state.overrides[(0, 1, col)] = "a"
-        state.durations[(0, 1, col)] = 32
-    state.cursor_string = 1
-    state.cursor_col = 0
+    state.piece.bars[0].chords = [Chord(7, False, None, [Note(1, 0, 0)]) for _ in range(31)]
+    state.cursor_onset = Fraction(31, 32)
     state.current_duration = 32
-
-    actions.handle_insert(state, ord("b"))
-
-    # 32nd should fit in bar 0; old bug treated it as quarter from row 0 col 0 and advanced.
-    assert state.cursor_bar == 0
-    assert state.overrides[(0, 1, 0)] == "b"
-    assert state.durations[(0, 1, 0)] == 32
-
-
-def test_insert_note_on_existing_column_does_not_rewrite_duration() -> None:
-    state = _state()
-    state.mode = Mode.INSERT
-    state.overrides[(0, 0, 0)] = "a"
-    state.durations[(0, 0, 0)] = 4
-    state.current_duration = 8
-    state.cursor_col = 0
     state.cursor_string = 1
 
     actions.handle_insert(state, ord("b"))
-    assert state.overrides[(0, 1, 0)] == "b"
-    assert state.durations[(0, 0, 0)] == 4
 
-    state.cursor_col = 0
+    assert tab_events(state)[-1] == ("32", [(2, 1)])
+    assert len(state.piece.bars) == 2
+
+
+def test_insert_note_on_existing_event_does_not_rewrite_duration() -> None:
+    state = _state()
+    state.mode = Mode.INSERT
+    state.piece.bars[0].chords = [Chord(4, False, None, [Note(1, 0, 0)])]
+    state.current_duration = 8
+    state.cursor_string = 1
+
+    actions.handle_insert(state, ord("b"))
+    assert tab_events(state) == [("4", [(1, 0), (2, 1)])]
+
+    state.cursor_onset = Fraction(0)
     state.cursor_string = 1
     actions.handle_insert(state, ord(" "))
-    assert (0, 1, 0) not in state.overrides
-    assert state.overrides[(0, 0, 0)] == "a"
-    assert state.durations[(0, 0, 0)] == 4
+    assert tab_events(state) == [("4", [(1, 0)])]
 
 
-def test_repeated_add_remove_undo_keeps_column_duration_stable() -> None:
+def test_repeated_add_remove_undo_keeps_the_event_duration_stable() -> None:
     state = _state()
     state.mode = Mode.INSERT
-    state.overrides[(0, 0, 0)] = "a"
-    state.durations[(0, 0, 0)] = 4
+    state.piece.bars[0].chords = [Chord(4, False, None, [Note(1, 0, 0)])]
 
     for _ in range(6):
         state.current_duration = 8
-        state.cursor_col = 0
+        state.cursor_onset = Fraction(0)
         state.cursor_string = 1
         actions.handle_insert(state, ord("b"))
-        assert state.durations[(0, 0, 0)] == 4
-        assert state.overrides[(0, 1, 0)] == "b"
+        assert tab_events(state) == [("4", [(1, 0), (2, 1)])]
 
-        state.cursor_col = 0
-        state.cursor_string = 1
+        state.cursor_onset = Fraction(0)
         actions.handle_insert(state, ord(" "))
-        assert (0, 1, 0) not in state.overrides
-        assert state.durations[(0, 0, 0)] == 4
+        assert tab_events(state) == [("4", [(1, 0)])]
 
         undo_ops.undo(state, config_path="config.toml")
-        assert state.overrides[(0, 1, 0)] == "b"
-        assert state.durations[(0, 0, 0)] == 4
-
+        assert tab_events(state) == [("4", [(1, 0), (2, 1)])]
         undo_ops.undo(state, config_path="config.toml")
-        if (0, 1, 0) in state.overrides:
-            # With per-cell duration recording, insertion can be two undo steps
-            # (duration + override) instead of one.
-            undo_ops.undo(state, config_path="config.toml")
-        assert (0, 1, 0) not in state.overrides
-        assert state.durations[(0, 0, 0)] == 4
+        assert tab_events(state) == [("4", [(1, 0)])]
 
 
 def test_invalid_key_does_not_set_duration() -> None:
@@ -561,15 +495,7 @@ def test_invalid_key_does_not_set_duration() -> None:
     state.settings["style"] = "french"
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("!"))
-    assert state.durations == {}
-
-
-def test_grid_mode_advances_two_cells() -> None:
-    state = _state()
-    state.settings["grid"] = "on"
-    state.mode = Mode.INSERT
-    actions.handle_insert(state, ord("a"))
-    assert state.cursor_col == 2
+    assert tab_events(state) == []
 
 
 def test_convert_overrides_french_to_italian() -> None:
@@ -610,15 +536,23 @@ def test_ornament_annotation_highlight() -> None:
 
 def test_slur_tie_hold_spans() -> None:
     state = _state()
+    state.piece.bars[0].chords = [Chord(5, False, None, [Note(1, 0, 0)]) for _ in range(8)]
+
+    def at(eighth: int) -> int:
+        state.cursor_onset = Fraction(eighth, 8)
+        return state.cursor_col
+
+    columns = [at(0), at(2), at(3), at(4)]
+    state.cursor_onset = Fraction(0)
     cmd_ops.set_slur(state, "start")
-    state.cursor_col = 2
+    at(2)
     cmd_ops.set_slur(state, "end")
     cmd_ops.set_tie(state, "start")
-    state.cursor_col = 3
+    at(3)
     cmd_ops.set_tie(state, "end")
     cmd_ops.set_hold(state, "start")
-    state.cursor_col = 4
+    at(4)
     cmd_ops.set_hold(state, "end")
-    assert state.slurs == [(0, 0, 2)]
-    assert state.ties == [(0, 2, 3)]
-    assert state.holds == [(0, 3, 4)]
+    assert state.slurs == [(0, columns[0], columns[1])]
+    assert state.ties == [(0, columns[1], columns[2])]
+    assert state.holds == [(0, columns[2], columns[3])]

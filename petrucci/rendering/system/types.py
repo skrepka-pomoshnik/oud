@@ -22,6 +22,7 @@ class SystemRenderContext:
     cursor_bar: int
     cursor_string: int
     cursor_col: int
+    cursor_event: int | None
     bar_width: int
     overrides: dict[tuple[int, int, int], str]
     durations: dict[tuple[int, int, int], int]

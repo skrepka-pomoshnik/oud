@@ -49,7 +49,7 @@ def test_petrucci_render_piece_takes_no_editor_chrome() -> None:
 def test_tablature_status_row_shows_position_mode_and_duration(state: EditorState) -> None:
     lines = _lines(state)
     assert lines[-1].startswith("triste.tab [TAB] bar:1 beat:1/6 str:1 ")
-    assert lines[-1].endswith("len:2  normal")
+    assert lines[-1].endswith("len:2.  normal")
     assert any("|" in line and "-" in line for line in lines[:-1])
 
 

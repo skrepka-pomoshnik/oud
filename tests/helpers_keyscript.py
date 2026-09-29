@@ -7,6 +7,7 @@ from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
 from oud.settings import DEFAULT_SETTINGS
 from petrucci.core.model import Bar, Piece
+from petrucci.input.tablature.mutation import TabDuration
 from petrucci.rendering.api import render_piece
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
 
@@ -131,3 +132,14 @@ def first_flag_and_top_note_x(lines: Iterable[str]) -> tuple[int | None, int | N
     glyph_positions = [i for i, ch in enumerate(flag_row) if ch in ("|", "\\", "=")]
     flag_x = glyph_positions[0] if glyph_positions else None
     return (flag_x, note_x if note_x >= 0 else None)
+
+
+def tab_events(state: EditorState, bar_index: int = 0) -> list[tuple[str, list[tuple[int, int]]]]:
+    """A bar's events as (written duration, [(course, fret), ...]); a dot marks dotted durations."""
+
+    events: list[tuple[str, list[tuple[int, int]]]] = []
+    for chord in state.piece.bars[bar_index].chords:
+        duration = TabDuration.of(chord)
+        text = f"{duration.denominator}." if duration.dotted else str(duration.denominator)
+        events.append((text, [(note.string, note.fret) for note in chord.notes]))
+    return events

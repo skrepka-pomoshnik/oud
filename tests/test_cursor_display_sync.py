@@ -8,50 +8,26 @@ TUI loop and assert the drawn cursor never stalls.
 
 from __future__ import annotations
 
+import pytest
+
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key
 from oud.editor.navigation.viewport import ensure_cursor_visible
+from oud.editor.services.screen.compose import compose_editor_frame
 from oud.presentation.tui.commands import apply_command
-from petrucci.rendering.api import render_piece
-from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.terminal.canvas.screen import A_REVERSE
 from tests.helpers_keyscript import keyscript_state
 
 
-def _render(state: EditorState) -> FrameBuffer:
+def _render(state: EditorState) -> Frame:
     ensure_cursor_visible(state, state.screen_width, state.screen_height)
-    state.display_cursor_maps.clear()
-    fb = FrameBuffer(state.screen_height, state.screen_width)
-    render_piece(
-        fb,
-        state.piece,
-        state.bar_offset,
-        state.cursor_bar,
-        state.cursor_string,
-        cursor_col=state.cursor_col,
-        bar_width=state.bar_width,
-        overrides=state.overrides,
-        durations=state.durations,
-        ornaments=state.ornaments,
-        annotations=state.annotations,
-        highlights=state.highlights,
-        dotted=state.dotted,
-        slurs=state.slurs,
-        ties=state.ties,
-        holds=state.holds,
-        settings=state.settings,
-        stave_breaks=state.stave_breaks,
-        playback_bar=state.playback_bar,
-        playback_col=state.playback_col,
-        glisses=state.glisses,
-        cursor_display_maps=state.display_cursor_maps,
-    )
-    return fb
+    return compose_editor_frame(state, height=state.screen_height, width=state.screen_width).frame
 
 
 def _drawn_cursor(state: EditorState) -> tuple[int, int, int] | None:
-    frame = _render(state).snapshot()
+    frame = _render(state)
     for y, row in enumerate(frame.attrs):
         reverse_cells = [x for x, attr in enumerate(row) if attr & A_REVERSE]
         # The status bar is fully reversed; the cursor is a single cell.
@@ -90,11 +66,13 @@ def _opened(path: str) -> EditorState:
     return state
 
 
+@pytest.mark.ft3_corpus
 def test_drawn_cursor_moves_on_every_l_press_in_chord_bars() -> None:
     state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     assert _count_stalls(state, "l", 40) == 0
 
 
+@pytest.mark.ft3_corpus
 def test_drawn_cursor_moves_on_every_h_press_in_chord_bars() -> None:
     state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     for _ in range(40):
@@ -108,12 +86,14 @@ def test_drawn_cursor_moves_in_tab_grid_bars() -> None:
     assert _count_stalls(state, "h", 40) == 0
 
 
+@pytest.mark.ft3_corpus
 def test_drawn_cursor_moves_in_vocal_piece_with_scrolling() -> None:
     state = _opened("tests/fixtures/ft3/corpus/32_passacaglia.ft3")
     assert _count_stalls(state, "l", 60) == 0
     assert _count_stalls(state, "h", 60) == 0
 
 
+@pytest.mark.ft3_corpus
 def test_renderer_publishes_cursor_maps_for_rendered_bars() -> None:
     state = _opened("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3")
     assert state.display_cursor_maps

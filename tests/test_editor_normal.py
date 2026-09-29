@@ -1,10 +1,16 @@
+from fractions import Fraction
+
+from oud.editor.core.coordinates import cursor_event
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key as dispatch_key
-from petrucci.core.model import Bar, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.rendering.api import render_piece
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from tests.helpers_keyscript import tab_events
+
+QUARTER = Fraction(1, 4)
 
 
 def _state() -> EditorState:
@@ -36,6 +42,16 @@ def _state() -> EditorState:
     return EditorState(piece, settings)
 
 
+def _bar(*notes: tuple[int, int] | list[tuple[int, int]], note_type: int = 4) -> Bar:
+    """One event per argument; an argument is a (course, fret) note or a list of them."""
+
+    chords = []
+    for event in notes:
+        pairs = event if isinstance(event, list) else [event]
+        chords.append(Chord(note_type, False, None, [Note(course, fret, 0) for course, fret in pairs]))
+    return Bar(chords=chords)
+
+
 def _render_lines(state: EditorState, *, width: int = 80, height: int = 24) -> list[str]:
     fb = FrameBuffer(height, width)
     render_piece(
@@ -64,140 +80,58 @@ def _render_lines(state: EditorState, *, width: int = 80, height: int = 24) -> l
     return fb.snapshot().lines
 
 
-def _press(state: EditorState, key: int) -> bool:
-    return dispatch_key(
-        state,
-        key,
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
+def _press(state: EditorState, *keys: int | str) -> None:
+    for key in keys:
+        dispatch_key(
+            state,
+            key if isinstance(key, int) else ord(key),
+            handle_insert=actions.handle_insert,
+            handle_normal=actions.handle_normal,
+            handle_command=lambda _state, _key: True,
+            handle_search=lambda _state, _key: True,
+        )
+
+
+def _four_quarters() -> Bar:
+    return _bar((1, 0), (1, 1), (1, 2), (1, 3))
 
 
 def test_normal_mode_counts_move() -> None:
     state = _state()
-    dispatch_key(
-        state,
-        ord("2"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("l"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 2
+    state.piece.bars = [_four_quarters()]
+    _press(state, "2", "l")
+    assert state.cursor_onset == Fraction(1, 2)
 
 
 def test_normal_find_forward_and_repeat() -> None:
     state = _state()
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 0, 3)] = "a"
-    dispatch_key(
-        state,
-        ord("f"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("a"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 1
-    dispatch_key(
-        state,
-        ord(";"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 3
+    state.piece.bars = [_bar((1, 1), (1, 0), (1, 1), (1, 0))]
+    _press(state, "f", "a")
+    assert state.cursor_onset == QUARTER
+    _press(state, ";")
+    assert state.cursor_onset == Fraction(3, 4)
 
 
 def test_normal_find_backward_and_reverse_repeat() -> None:
     state = _state()
-    state.cursor_col = 6
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 0, 3)] = "a"
-    state.overrides[(0, 0, 5)] = "a"
-    state.overrides[(0, 0, 6)] = "a"
-    dispatch_key(
-        state,
-        ord("F"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("a"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 5
-    dispatch_key(
-        state,
-        ord(","),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 6
+    state.piece.bars = [_bar((1, 1), (1, 0), (1, 1), (1, 0), (1, 1), (1, 0), (1, 0), (1, 1), note_type=5)]
+    state.cursor_onset = Fraction(6, 8)
+    _press(state, "F", "a")
+    assert cursor_event(state) == 5
+    _press(state, ",")
+    assert cursor_event(state) == 6
 
 
 def test_normal_word_search_and_repeat() -> None:
     state = _state()
-    state.piece.bars.append(Bar())
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 0, 3)] = "a"
-    state.overrides[(1, 0, 0)] = "a"
-    state.cursor_bar = 0
-    state.cursor_col = 1
-    dispatch_key(
-        state,
-        ord("*"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert (state.cursor_bar, state.cursor_col) == (0, 3)
-    dispatch_key(
-        state,
-        ord("n"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert (state.cursor_bar, state.cursor_col) == (1, 0)
-    dispatch_key(
-        state,
-        ord("N"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert (state.cursor_bar, state.cursor_col) == (0, 3)
+    state.piece.bars = [_bar((1, 1), (1, 0), (1, 1), (1, 0)), _bar((1, 0))]
+    state.cursor_onset = QUARTER
+    _press(state, "*")
+    assert (state.cursor_bar, state.cursor_onset) == (0, Fraction(3, 4))
+    _press(state, "n")
+    assert (state.cursor_bar, state.cursor_onset) == (1, Fraction(0))
+    _press(state, "N")
+    assert (state.cursor_bar, state.cursor_onset) == (0, Fraction(3, 4))
 
 
 def test_normal_percent_jump_between_repeats() -> None:
@@ -206,95 +140,43 @@ def test_normal_percent_jump_between_repeats() -> None:
     state.piece.bars[0].repeat = ".:"
     state.piece.bars[2].repeat = ":."
     state.cursor_bar = 0
-    dispatch_key(
-        state,
-        ord("%"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
+    _press(state, "%")
     assert state.cursor_bar == 2
 
 
 def test_normal_marks_set_and_jump() -> None:
     state = _state()
-    state.cursor_bar = 0
-    state.cursor_col = 2
-    dispatch_key(
-        state,
-        ord("m"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("a"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.marks["a"] == (0, 0, 2)
+    state.piece.bars = [_four_quarters(), _four_quarters()]
+    state.cursor_onset = Fraction(1, 2)
+    _press(state, "m", "a")
+    assert state.marks["a"] == (0, 0, state.cursor_col)
     state.cursor_bar = 1
-    state.cursor_col = 0
-    dispatch_key(
-        state,
-        ord("'"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("a"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert (state.cursor_bar, state.cursor_col) == (0, 2)
+    state.cursor_onset = Fraction(0)
+    _press(state, "'", "a")
+    assert (state.cursor_bar, state.cursor_onset) == (0, Fraction(1, 2))
 
 
 def test_normal_mode_x_clears_cell() -> None:
     state = _state()
-    state.overrides[(0, 0, 0)] = "a"
-    dispatch_key(
-        state,
-        ord("x"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert (0, 0, 0) not in state.overrides
+    state.piece.bars = [_bar([(1, 0), (2, 1)])]
+    _press(state, "x")
+    assert tab_events(state) == [("4", [(2, 1)])]
 
 
 def test_normal_mode_caret_moves_to_first_note() -> None:
     state = _state()
-    state.cursor_col = 5
-    state.overrides[(0, 0, 2)] = "a"
-    state.overrides[(0, 0, 4)] = "b"
-    dispatch_key(
-        state,
-        ord("^"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 2
+    state.piece.bars = [_bar((2, 0), (2, 1), (1, 0), (1, 1))]
+    state.cursor_onset = Fraction(3, 4)
+    _press(state, "^")
+    assert state.cursor_onset == Fraction(1, 2)
 
 
 def test_insert_mode_space_clears_cell() -> None:
     state = _state()
-    state.overrides[(0, 0, 0)] = "a"
+    state.piece.bars = [_bar([(1, 0), (2, 2)])]
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord(" "))
-    assert (0, 0, 0) not in state.overrides
+    assert tab_events(state) == [("4", [(2, 2)])]
 
 
 def test_insert_mode_barline_sets_barline() -> None:
@@ -308,36 +190,31 @@ def test_insert_mode_duration_does_not_advance() -> None:
     state = _state()
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
-    assert state.cursor_col == 0
+    assert (state.cursor_bar, state.cursor_onset) == (0, Fraction(0))
+    assert state.current_duration == 8
 
 
 def test_insert_overflow_moves_to_next_bar() -> None:
     state = _state()
     state.mode = Mode.INSERT
-    for col in range(4):
-        state.durations[(0, 0, col)] = 4
-        state.overrides[(0, 0, col)] = "a"
-    state.cursor_col = 4
-    actions.handle_insert(state, ord("b"))
+    for ch in "abcdb":
+        actions.handle_insert(state, ord(ch))
     assert state.cursor_bar == 1
-    assert (1, 0, 0) in state.overrides
+    assert tab_events(state, 1) == [("4", [(1, 1)])]
 
 
 def test_insert_mode_notes_insert_and_arrows_move() -> None:
     state = _state()
     state.mode = Mode.INSERT
-    for idx, ch in enumerate("abcdnf"):
+    for ch in "abcdnf":
         actions.handle_insert(state, ord(ch))
-        if idx < 4:
-            assert state.overrides[(0, 0, idx)] == ch
-        else:
-            assert state.overrides[(1, 0, idx - 4)] == ch
-    assert state.cursor_bar == 1
-    assert state.cursor_col == 2
+    assert [notes for _duration, notes in tab_events(state, 0)] == [[(1, 0)], [(1, 1)], [(1, 2)], [(1, 3)]]
+    assert [notes for _duration, notes in tab_events(state, 1)] == [[(1, 12)], [(1, 5)]]
+    assert (state.cursor_bar, state.cursor_onset) == (1, Fraction(1, 2))
     actions.handle_insert(state, state.keycodes.left)
-    assert state.cursor_col == 1
+    assert state.cursor_onset == QUARTER
     actions.handle_insert(state, state.keycodes.right)
-    assert state.cursor_col == 2
+    assert state.cursor_onset == Fraction(1, 2)
     actions.handle_insert(state, state.keycodes.up)
     assert state.cursor_string == -1
     actions.handle_insert(state, state.keycodes.down)
@@ -353,8 +230,7 @@ def test_insert_mode_arrow_movement_clears_bass_slash_prefix() -> None:
     actions.handle_insert(state, state.keycodes.right)
     assert state.insert_prefix == ""
     actions.handle_insert(state, ord("a"))
-    assert (0, 0, 1) in state.overrides
-    assert (0, 6, 1) not in state.overrides
+    assert tab_events(state, state.cursor_bar) == [("4", [(1, 0)])]
 
 
 def test_insert_mode_arrow_movement_clears_italian_multifret_prefix() -> None:
@@ -373,35 +249,33 @@ def test_insert_mode_backspace_clears_note() -> None:
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     actions.handle_insert(state, ord("b"))
-    assert (0, 0, 0) in state.overrides
-    assert (0, 0, 1) in state.overrides
-    state.cursor_col = 1
+    state.cursor_onset = QUARTER
     actions.handle_insert(state, 127)
-    assert (0, 0, 1) not in state.overrides
-    assert state.cursor_col == 0
+    assert tab_events(state) == [("4", [(1, 0)])]
+    assert state.cursor_onset == Fraction(0)
 
 
-def test_insert_mode_delete_clears_forward() -> None:
+def test_insert_mode_delete_removes_the_event_and_keeps_the_cursor() -> None:
     state = _state()
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("a"))
     actions.handle_insert(state, ord("b"))
-    state.cursor_col = 0
+    state.cursor_onset = Fraction(0)
     actions.handle_insert(state, state.keycodes.dc)
-    assert (0, 0, 0) not in state.overrides
-    assert state.cursor_col == 1
+    assert tab_events(state) == [("4", [(1, 1)])]
+    assert state.cursor_onset == Fraction(0)
 
 
-def test_insert_duration_after_other_row_duration() -> None:
+def test_insert_duration_key_changes_the_event_on_every_course() -> None:
     state = _state()
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("4"))
     actions.handle_insert(state, ord("a"))
     state.cursor_string = 1
-    state.cursor_col = 0
+    state.cursor_onset = Fraction(0)
     actions.handle_insert(state, ord("5"))
     actions.handle_insert(state, ord("b"))
-    assert state.durations[(0, 1, 0)] == 16
+    assert tab_events(state) == [("16", [(1, 0), (2, 1)])]
 
 
 def test_insert_after_row_full_advances_and_allows_next_bar() -> None:
@@ -412,10 +286,8 @@ def test_insert_after_row_full_advances_and_allows_next_bar() -> None:
     actions.handle_insert(state, state.keycodes.down)
     actions.handle_insert(state, ord("5"))
     actions.handle_insert(state, ord("a"))
-    for _ in range(state.bar_width):
-        actions.handle_insert(state, state.keycodes.right)
-    actions.handle_insert(state, ord("b"))
-    assert (state.cursor_bar, 1, state.cursor_col - 1) in state.overrides
+    assert state.cursor_bar == 1
+    assert tab_events(state, 1) == [("16", [(2, 0)])]
 
 
 def test_insert_other_row_when_first_full_stays_in_bar() -> None:
@@ -426,53 +298,23 @@ def test_insert_other_row_when_first_full_stays_in_bar() -> None:
     actions.handle_insert(state, state.keycodes.down)
     for _ in range(4):
         actions.handle_insert(state, state.keycodes.left)
-    actions.handle_insert(state, ord("5"))
     actions.handle_insert(state, ord("a"))
     assert state.cursor_bar == 0
-    assert state.overrides[(0, 1, 0)] == "a"
+    assert tab_events(state)[0] == ("4", [(1, 0), (2, 0)])
 
 
 def test_normal_mode_counts_move_right() -> None:
     state = _state()
-    dispatch_key(
-        state,
-        ord("3"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("l"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    assert state.cursor_col == 3
+    state.piece.bars = [_four_quarters()]
+    _press(state, "3", "l")
+    assert state.cursor_onset == Fraction(3, 4)
 
 
 def test_gb_adds_bass_string() -> None:
     state = _state()
     start_strings = state.piece.strings
     state.settings["bassstrings"] = "d2"
-    dispatch_key(
-        state,
-        ord("g"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("b"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
+    _press(state, "g", "b")
     assert state.piece.strings == start_strings + 1
     assert state.cursor_string == state.piece.strings - 1
 
@@ -480,22 +322,7 @@ def test_gb_adds_bass_string() -> None:
 def test_gb_requires_bass_strings_setting() -> None:
     state = _state()
     state.settings["bassstrings"] = ""
-    dispatch_key(
-        state,
-        ord("g"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
-    dispatch_key(
-        state,
-        ord("b"),
-        handle_insert=actions.handle_insert,
-        handle_normal=actions.handle_normal,
-        handle_command=lambda _state, _key: True,
-        handle_search=lambda _state, _key: True,
-    )
+    _press(state, "g", "b")
     assert state.message == "No bass strings configured"
 
 
@@ -506,7 +333,7 @@ def test_insert_bass_slash_shorthand() -> None:
     state.mode = Mode.INSERT
     actions.handle_insert(state, ord("/"))
     actions.handle_insert(state, ord("a"))
-    assert state.overrides[(0, 6, 0)] == "a"
+    assert tab_events(state) == [("4", [(7, 0)])]
 
 
 def _first_flag_row(lines: list[str], top_g_idx: int) -> str:
@@ -538,20 +365,9 @@ def _assert_time_cue_is_clear(lines: list[str], flag_row: str) -> None:
         assert flag_row[time_x] == " "
 
 
-def _assert_inserted_a_alignment(lines: list[str], expected_flag_x: int | None) -> int:
-    top_g_idx = next(i for i, line in enumerate(lines) if "g|" in line)
-    flag_x, note_x = _flag_and_note_x(lines, top_g_idx)
-    if expected_flag_x is None:
-        expected_flag_x = flag_x
-    assert flag_x == expected_flag_x
-    assert flag_x == note_x
-    _assert_time_cue_is_clear(lines, _first_flag_row(lines, top_g_idx))
-    return expected_flag_x
-
-
-def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> None:
+def _typing_state(width: int) -> EditorState:
     state = _state()
-    state.screen_width = 28
+    state.screen_width = width
     state.screen_height = 20
     state.settings.update(
         {
@@ -571,42 +387,27 @@ def test_keypress_insert_aaaa_keeps_first_flag_aligned_and_off_time_cue() -> Non
         },
     )
     state.glisses = getattr(state, "glisses", [])
-    _press(state, ord("i"))
-    first_flag_x: int | None = None
+    return state
+
+
+def test_keypress_insert_aaaa_keeps_first_flag_on_the_note_and_off_time_cue() -> None:
+    state = _typing_state(28)
+    _press(state, "i")
     for _ in range(4):
-        _press(state, ord("a"))
+        _press(state, "a")
         lines = _render_lines(state, width=state.screen_width, height=state.screen_height)
-        first_flag_x = _assert_inserted_a_alignment(lines, first_flag_x)
+        top_g_idx = next(i for i, line in enumerate(lines) if "g|" in line)
+        flag_x, note_x = _flag_and_note_x(lines, top_g_idx)
+        assert flag_x == note_x
+        _assert_time_cue_is_clear(lines, _first_flag_row(lines, top_g_idx))
 
 
-def test_keypress_insert_aaaa_then_l_moves_one_cell_per_press_on_grid_bar() -> None:
-    state = _state()
-    state.screen_width = 18
-    state.screen_height = 20
-    state.settings.update(
-        {
-            "layout": "auto",
-            "justify": "smart",
-            "beatsnap": "soft",
-            "showtuning": "off",
-            "showdur": "off",
-            "showspans": "off",
-            "showfingerings": "off",
-            "showornaments": "off",
-            "linelen": "0",
-            "barsperline": "0",
-            "maxbars": "0",
-            "barpad": "1",
-            "flagredundant": "on",
-        },
-    )
-    for key in ("i", "a", "a", "a", "a"):
-        _press(state, ord(key))
-    _press(state, 27)
-    cols: list[int] = []
-    for _ in range(10):
-        _press(state, ord("l"))
-        cols.append(state.cursor_col)
-    # One press per rendered cell. Short systems retain the configured grid width
-    # instead of collapsing an empty bar or stretching it to the full terminal.
-    assert cols == [5, 6, 7, 8, 9, 10, 11, 0, 1, 2]
+def test_keypress_insert_aaaa_then_l_moves_one_event_per_press() -> None:
+    state = _typing_state(18)
+    _press(state, "i", "a", "a", "a", "a", 27)
+    state.cursor_bar, state.cursor_onset = 0, Fraction(0)
+    stops = []
+    for _ in range(5):
+        _press(state, "l")
+        stops.append((state.cursor_bar, state.cursor_onset))
+    assert stops == [(0, QUARTER), (0, Fraction(1, 2)), (0, Fraction(3, 4)), (1, Fraction(0)), (2, Fraction(0))]

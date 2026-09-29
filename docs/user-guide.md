@@ -104,6 +104,29 @@ creates a new bar.
 
 ## 5) Entering Notes
 
+The cursor rests on an event of the bar (a chord, a single note, or a rest) or
+on the bar's append slot after its last event. A bar that already fills its
+meter has no append slot. `h`/`l` step one event, however densely the bar is
+drawn, so a bar of sixteenths or thirty-seconds is visited event by event.
+
+In insert mode:
+
+- A fret on the append slot adds an event with the current duration; if it would
+  not fit in the bar's meter, it goes to the next bar. The cursor moves on.
+- A fret on an event sets that course's note and keeps the event's duration and
+  the other courses. To build a chord, step back onto the event (`h` or an arrow)
+  and type on another course.
+- `z` adds a rest, or turns the event under the cursor into a rest.
+- A duration key or `.` changes the event under the cursor, or the event just
+  typed when the cursor is on the append slot, and becomes the current duration.
+- `x`, `Space`, `Backspace` and `Delete` remove the course's note; an event left
+  without notes, or a rest, is removed and later events move earlier.
+- `R` (replace mode) changes existing notes only and does not move.
+
+Every keystroke that edits is one undo step. The status row shows the bar, the
+beat from the event's onset and the bar's own meter, and `len:` with the duration
+of the event under the cursor (the current typing duration on the append slot).
+
 ## 5.1 French tablature
 
 - Frets by letters (`a..`), with historical mapping rules.
@@ -135,7 +158,7 @@ French insert-mode digit mapping:
 
 Italian mode keeps numeric fret entry; type `;` then `1`..`7` to set a duration.
 
-Durations are tracked per onset column and rendered according to current flag style/redundancy settings.
+Durations belong to events and are rendered according to the current flag style and redundancy settings.
 
 ## 6) Core Commands
 

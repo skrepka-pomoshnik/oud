@@ -20,7 +20,7 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 
 ## Order of work
 
-1. Editor rebuild for typing: `C3` → `C4` → `C5` → `C6`.
+1. Editor rebuild for typing: `C4` → `C5` → `C6`.
 2. Note typing: `C7`.
 3. Transposition: `C8`.
 4. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
@@ -33,27 +33,6 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 ---
 
 ## Complex tasks (owner: Claude)
-
-### C3. Onset cursor and one edit path (UI plan phase 4, editor)
-
-Why complex: rewrites cursor semantics and every insert path, and risks losing
-user edits.
-
-- Files: `oud/editor/interaction/insert/actions.py` (`_flatten_chords_to_grid`
-  at line 104 and every `_handle_insert_*`), `oud/editor/navigation/motions.py`,
-  `cursor_map.py`, `layout.py`, `oud/editor/editing/primitives/edits.py`,
-  `rhythm.py`, `oud/editor/core/state.py`.
-- Steps:
-  1. The cursor becomes (bar, exact onset `Fraction`, course) with an explicit
-     append slot. `h`/`l` step between onsets, not justified filler cells.
-  2. Route French letters, Italian numbers, bass-course entry (`/`), rests (`z`),
-     dots, durations, replace mode, and delete through `apply_tab_transaction`
-     (`petrucci.input.tablature.mutation`, onsets in whole notes). The Italian
-     path currently writes the grid through `enter_fret`.
-  3. Delete `_flatten_chords_to_grid`. Editing an imported bar keeps its chords.
-  4. The status beat comes from the onset and the bar's own meter.
-- Acceptance: every keyscript and transaction fixture passes; editing an imported
-  bar leaves unedited chords identical; no edit path writes a grid map.
 
 ### C4. Retire the grid maps and float rhythm (UI plan phase 4, readers)
 
@@ -75,9 +54,17 @@ including rendering, TAB/MusicXML/MIDI export, playback, and verification.
   2. Replace float quarter-beat rhythm with `Fraction` and per-bar meters.
   3. Delete `overrides`, `durations`, `dotted` from `EditorState` and
      `render_piece`.
+  4. Delete the test-only grid primitives `clear_cell`, `clear_cell_note` and
+     `apply_duration` (`petrucci.input.tablature.grid`) and the `grid` setting,
+     which no longer affects typing.
+  5. Lay out bars that are not full against their meter, not their content:
+     today an incomplete bar re-spaces while typing and `beatsnap=soft` centres
+     a lone event.
+  6. Pass `cursor_event` through the duet renderer (it is `None` there, so the
+     duet cursor still uses the scaled column).
 - Acceptance: the grep above returns nothing; TAB save/reopen, MIDI, MusicXML,
   and LilyPond outputs are unchanged for every repo TAB file and fixture.
-- Depends on: `C3`, `S6`.
+- Depends on: `S6`.
 
 ### C5. Typed undo transactions (UI plan phase 4)
 

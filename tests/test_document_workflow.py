@@ -14,7 +14,7 @@ from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.input import handle_command
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
-from tests.helpers_keyscript import press_keys
+from tests.helpers_keyscript import press_keys, tab_events
 
 PURE_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
 MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
@@ -212,9 +212,9 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
 
     target = tmp_path / "first-score.tab"
     press_keys(state, ["i", "a", 27])
-    assert state.overrides == {(0, 0, 0): "a"}
+    assert tab_events(state) == [("4", [(1, 0)])]
     press_keys(state, ["u"])
-    assert state.overrides == {}
+    assert tab_events(state) == []
 
     apply_command(state, f"w {target}", config)
     assert target.exists()

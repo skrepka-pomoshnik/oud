@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from oud.editor.core.coordinates import effective_time_signature
 from oud.editor.core.document import display_path, document_status_label
 from oud.editor.core.feedback.messages import MessageLevel
 from oud.editor.core.input.modes import INSERT_MODES, Mode
@@ -184,10 +185,10 @@ def _position(state: EditorState) -> str:
     if state.read_only:
         return _read_only_position(state)
     beat_text = f"col:{state.cursor_col + 1}"
-    parsed = parse_time_signature_value(state.settings.get("time", "C"))
-    if parsed is not None and state.bar_width > 0:
-        beats, _unit = parsed
-        beat_index = min(beats, max(1, int(state.cursor_col * beats / state.bar_width) + 1))
+    parsed = parse_time_signature_value(effective_time_signature(state, state.cursor_bar))
+    if parsed is not None:
+        beats, unit = parsed
+        beat_index = min(beats, int(state.cursor_onset * unit) + 1)
         beat_text = f"beat:{beat_index}/{beats}"
     location = f"str:{state.cursor_string + 1}"
     if is_duet_score_piece(state.piece):

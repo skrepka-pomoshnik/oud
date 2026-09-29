@@ -1,4 +1,6 @@
+import copy
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -219,13 +221,17 @@ def test_cmd_pause_cursor_and_col_commands(tmp_path: Path) -> None:
     cmd.apply_command(state, "pause", str(tmp_path / "cfg.toml"))
     assert state.message == "MIDI not playing"
 
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
+    state.piece.bars[1].chords = [copy.deepcopy(quarter) for _ in range(3)]
     cmd.apply_command(state, "cursor 2 3 5", str(tmp_path / "cfg.toml"))
     assert state.cursor_bar == 1
     assert state.cursor_string == 2
-    assert state.cursor_col == 4
+    assert state.cursor_onset == Fraction(3, 4)
+    assert state.message == "Cursor 2:3:4"
 
     cmd.apply_command(state, "col 2", str(tmp_path / "cfg.toml"))
-    assert state.cursor_col == 1
+    assert state.cursor_onset == Fraction(1, 4)
+    assert state.message == "Event 2"
 
     cmd.apply_command(state, "cursor nope", str(tmp_path / "cfg.toml"))
     assert state.message.startswith("Usage: cursor")
@@ -419,23 +425,27 @@ def test_cmd_set_deprecated_show_aliases_map_to_explicit_keys(
 
 def test_sign_commands_arpeggio_separee_and_tuplet() -> None:
     state = _state()
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
+    state.piece.bars[0].chords = [copy.deepcopy(quarter) for _ in range(4)]
     state.cursor_bar = 0
-    state.cursor_col = 3
+    state.cursor_onset = Fraction(3, 4)
+    key = (0, state.cursor_col)
+    assert key[1] > 0
 
     cmd.apply_command(state, "arpeggio on", "cfg.toml")
-    assert state.ornaments[(0, 3)] == "~"
+    assert state.ornaments[key] == "~"
     assert state.message == "Arpeggio on"
 
     cmd.apply_command(state, "separee on", "cfg.toml")
-    assert state.ornaments[(0, 3)] == ":"
+    assert state.ornaments[key] == ":"
     assert state.message == "Separee on"
 
     cmd.apply_command(state, "tuplet 3", "cfg.toml")
-    assert state.annotations[(0, 3)] == "³"
+    assert state.annotations[key] == "³"
     assert state.message == "Tuplet 3"
 
     cmd.apply_command(state, "tuplet clear", "cfg.toml")
-    assert (0, 3) not in state.annotations
+    assert key not in state.annotations
     assert state.message == "Tuplet cleared"
 
 

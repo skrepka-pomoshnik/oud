@@ -18,7 +18,6 @@ from petrucci import (
     TabPosition,
     apply_tab_mutation,
 )
-from petrucci.input.tablature.grid import EditableTablature, clear_tab_note, enter_grid_fret
 from petrucci.input.tablature.mutation import bar_content_length, bar_meter_length, event_onsets
 
 QUARTER = TabDuration(4)
@@ -284,36 +283,3 @@ def test_a_rejected_transaction_leaves_every_bar_unchanged() -> None:
 def test_error_keeps_the_first_operation_index() -> None:
     error = TabMutationError("bad", "failure", operation_index=1)
     assert error.at_operation(2) is error
-
-
-def _grid(style: str) -> EditableTablature:
-    return EditableTablature([Bar()], 6, 12, {}, {}, set(), style)
-
-
-def test_grid_fret_entry_writes_two_digit_italian_frets() -> None:
-    grid = _grid("italian")
-
-    enter_grid_fret(grid, (0, 2, 3), 12, duration=8)
-
-    assert grid.cells == {(0, 2, 3): "1", (0, 2, 4): "2"}
-    assert grid.durations == {(0, 2, 3): 8}
-
-
-def test_grid_fret_replacement_and_delete_remove_the_continuation() -> None:
-    grid = _grid("italian")
-    enter_grid_fret(grid, (0, 2, 3), 12, duration=8)
-
-    enter_grid_fret(grid, (0, 2, 3), 4, duration=8)
-    assert grid.cells == {(0, 2, 3): "4"}
-    assert grid.durations == {(0, 2, 3): 8}
-
-    enter_grid_fret(grid, (0, 2, 3), 12, duration=8)
-    clear_tab_note(grid, (0, 2, 3))
-    assert grid.cells == {}
-    assert grid.durations == {}
-
-
-def test_grid_fret_entry_uses_french_letters() -> None:
-    grid = _grid("french")
-    enter_grid_fret(grid, (0, 0, 0), 2, duration=4)
-    assert grid.cells == {(0, 0, 0): "c"}

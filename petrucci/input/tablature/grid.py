@@ -190,42 +190,6 @@ def clear_tab_note(document: EditableTablature, key: CellKey) -> TabMutation:
     )
 
 
-def enter_grid_fret(
-    document: EditableTablature,
-    key: CellKey,
-    fret: int,
-    *,
-    duration: int,
-) -> tuple[TabMutation, ...]:
-    """Write one fret into the grid, replacing that course's note at the column."""
-
-    _validate_cell_key(document, key)
-    if fret < 0:
-        _reject("invalid-fret", "fret must be non-negative")
-    bar_index, string_index, column = key
-    changes: list[TabMutation] = []
-    replaced = clear_tab_note(document, key)
-    if replaced.changed:
-        changes.append(replaced)
-    symbols = _fret_symbols(document.style, fret)
-    if column + len(symbols) > document.bar_width:
-        _reject("bar-overflow", "fret representation extends beyond the bar")
-    for offset, symbol in enumerate(symbols):
-        changes.append(set_tab_cell(document, (bar_index, string_index, column + offset), symbol))
-    if not _rhythm_snapshot(document, bar_index, column):
-        changes.append(set_tab_duration(document, key, duration))
-    return tuple(changes)
-
-
-def _fret_symbols(style: str, fret: int) -> str:
-    if style == "italian":
-        return str(fret)
-    letters = "abcdefghiklmnopqrst"
-    if fret >= len(letters):
-        _reject("invalid-fret", "fret cannot be represented in French tablature")
-    return letters[fret]
-
-
 def _validate_cell_key(document: EditableTablature, key: CellKey) -> None:
     bar_index, string_index, column = key
     if not 0 <= bar_index < len(document.bars):
@@ -319,7 +283,6 @@ __all__ = [
     "clear_tab_cell",
     "clear_tab_note",
     "delete_chord",
-    "enter_grid_fret",
     "insert_chord",
     "set_chord_note",
     "set_tab_cell",

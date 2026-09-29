@@ -317,7 +317,9 @@ def _draw_cursor(
 ) -> None:
     if context.abs_bar != context.cursor_bar:
         return
-    cursor_grid_col = _scale_col(context.cursor_col, context.bar_width, context.grid_width)
+    cursor_grid_col = context.cursor_grid_col
+    if cursor_grid_col is None:
+        cursor_grid_col = _scale_col(context.cursor_col, context.bar_width, context.grid_width)
     matching = next((col for col, _denom, _dot in positions if col == cursor_grid_col), None)
     if matching is None:
         return

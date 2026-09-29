@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write
 from oud.exports.lilypond import export_lilypond
@@ -9,13 +11,14 @@ from oud.exports.midi import export_midi
 from tests.helpers_keyscript import press_keys
 
 
+@pytest.mark.ft3_corpus
 def test_real_piece_edit_save_export_and_reopen(tmp_path: Path) -> None:
     config_path = str(tmp_path / "config.toml")
     state = init_state("tests/fixtures/ft3/corpus/02_forlorne_hope_8C.ft3", config_path=config_path)
     original_bar_count = len(state.piece.bars)
 
     press_keys(state, ["i", "a", 27, "h", "R", "b", 27])
-    assert state.overrides[(0, 0, 0)] == "b"
+    assert (1, 1) in [(note.string, note.fret) for note in state.piece.bars[0].chords[0].notes]
     assert state.modified is True
 
     saved_tab = tmp_path / "edited.tab"

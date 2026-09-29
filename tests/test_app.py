@@ -1,5 +1,7 @@
+import copy
 import curses
 import subprocess
+from fractions import Fraction
 from typing import cast
 
 from oud.editor.commands.dispatch import cmd_bar, cmd_stave
@@ -14,7 +16,7 @@ from oud.presentation.tui.input import handle_command as handle_command_input
 from oud.presentation.tui.input import handle_search as handle_search_input
 from oud.presentation.tui.input import history_next, history_prev, parse_search
 from oud.presentation.tui.loop import InterruptLatch, _read_input_batch, run_loop
-from petrucci.core.model import Bar, ImportedScore, Piece
+from petrucci.core.model import Bar, Chord, ImportedScore, Piece
 from petrucci.terminal.canvas.framebuffer import Frame
 
 
@@ -114,7 +116,9 @@ def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     configure_document(state, str(tmp_path / "example.ft3"))
     state.cursor_bar = 1
     state.cursor_string = 2
-    state.cursor_col = 3
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[])
+    state.piece.bars.append(Bar(chords=[copy.deepcopy(quarter) for _ in range(4)]))
+    state.cursor_onset = Fraction(1, 4)
     state.modified = True
     line = status_line(state)
     assert "example.ft3*" in line

@@ -40,6 +40,7 @@ def render_staff_grid(
     cells: list[list[str]],
     cursor_bar: int,
     cursor_col: int,
+    cursor_grid_col: int | None,
     cursor_string: int,
     display_width: int,
     draw_pad: int,
@@ -114,6 +115,7 @@ def render_staff_grid(
             bar_x=bar_x,
             cursor_bar=cursor_bar,
             cursor_col=cursor_col,
+            cursor_grid_col=cursor_grid_col,
             cursor_display_index=cursor_display_index,
             display_idx=display_idx,
             draw_pad=draw_pad,
@@ -307,6 +309,7 @@ def _draw_cursor(
     bar_x: int,
     cursor_bar: int,
     cursor_col: int,
+    cursor_grid_col: int | None,
     cursor_display_index: int | None,
     display_idx: int,
     draw_pad: int,
@@ -315,9 +318,14 @@ def _draw_cursor(
     row_text: str,
     y: int,
 ) -> None:
-    if abs_bar != cursor_bar or display_idx != cursor_display_index or not (0 <= cursor_col < bar_width):
+    if abs_bar != cursor_bar or display_idx != cursor_display_index:
         return
-    source_col = _scale_col(cursor_col, bar_width, grid_width) if bar.chords else cursor_col
+    if cursor_grid_col is not None:
+        source_col = cursor_grid_col
+    elif not 0 <= cursor_col < bar_width:
+        return
+    else:
+        source_col = _scale_col(cursor_col, bar_width, grid_width) if bar.chords else cursor_col
     scaled_col = grid_map[source_col]
     cell_idx = draw_pad + scaled_col
     if 0 <= cell_idx < len(row_text):

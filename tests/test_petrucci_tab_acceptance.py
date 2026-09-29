@@ -24,7 +24,7 @@ from petrucci import (
     TabPosition,
     apply_tab_mutation,
 )
-from tests.helpers_keyscript import keyscript_state, press_keys, render_lines
+from tests.helpers_keyscript import keyscript_state, press_keys, render_lines, tab_events
 
 QUARTER = TabDuration(4)
 
@@ -62,7 +62,7 @@ def test_extra_bass_course_transaction_and_keyscript_per_style(
         press_keys(state, ["i"])
         state.cursor_string = next(row for row in range(7) if string_index(state, row) == 6)
         press_keys(state, ["8", 27])
-    assert state.overrides[(0, 6, 0)] == symbol
+    assert tab_events(state) == [("4", [(7, fret)])]
     assert any(line.lstrip().startswith("d|") and symbol in line.split("|", 1)[1] for line in render_lines(state))
 
 
@@ -98,24 +98,18 @@ def test_repeated_chord_transaction_round_trips_through_tab(
     ]
 
 
-@pytest.mark.parametrize(
-    ("style", "before", "replacement"),
-    [("french", ("a", "b"), "c"), ("italian", ("0", "1"), "2")],
-)
+@pytest.mark.parametrize(("style", "replacement"), [("french", "c"), ("italian", "2")])
 def test_string_movement_replaces_only_the_selected_course(
     style: str,
-    before: tuple[str, str],
     replacement: str,
 ) -> None:
     state = keyscript_state(style=style)
-    state.overrides.update({(0, 0, 0): before[0], (0, 1, 0): before[1]})
-    state.durations[(0, 0, 0)] = 4
+    state.piece.bars[0].chords = [Chord(4, False, None, [Note(1, 0, 0), Note(2, 1, 0)])]
 
     press_keys(state, ["j", "R", replacement, 27])
 
     assert state.cursor_string == 1
-    assert state.overrides[(0, 0, 0)] == before[0]
-    assert state.overrides[(0, 1, 0)] == replacement
+    assert tab_events(state) == [("4", [(1, 0), (2, 2)])]
 
 
 def test_replacement_and_partial_deletion_retain_onset_attachments() -> None:

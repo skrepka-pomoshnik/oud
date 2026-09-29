@@ -1,6 +1,7 @@
 """Tablature edits at exact onsets.
 
 A bar's events are its ordered ``Chord`` list; a chord without notes is a rest.
+``Bar.notes`` is kept as the flat list of the chord notes of every edited bar.
 An event's onset is the sum of the written durations before it, in whole notes
 from the start of the bar. Edits address events by onset, never by display
 column, and a transaction is applied atomically.
@@ -212,12 +213,14 @@ def apply_tab_mutation(document: TabDocument, transaction: TabEditTransaction) -
     """Apply every edit or none; the error names the rejected operation."""
 
     snapshots: dict[int, list[Chord]] = {}
+    notes: dict[int, list[Note]] = {}
     for index, operation in enumerate(transaction.operations):
         try:
-            _apply(document, operation, snapshots)
+            _apply(document, operation, snapshots, notes)
         except TabMutationError as exc:
             for bar_index, chords in snapshots.items():
                 document.bars[bar_index].chords = chords
+                document.bars[bar_index].notes = notes[bar_index]
             raise exc.at_operation(index) from exc
     changes = (
         TabChordDelta(bar_index, tuple(before), tuple(copy.deepcopy(document.bars[bar_index].chords)))
@@ -226,7 +229,12 @@ def apply_tab_mutation(document: TabDocument, transaction: TabEditTransaction) -
     return TabMutationResult(tuple(delta for delta in changes if delta.before != delta.after))
 
 
-def _apply(document: TabDocument, operation: TabEdit, snapshots: dict[int, list[Chord]]) -> None:
+def _apply(
+    document: TabDocument,
+    operation: TabEdit,
+    snapshots: dict[int, list[Chord]],
+    notes: dict[int, list[Note]],
+) -> None:
     position = operation.position
     if position.bar_index >= len(document.bars):
         _reject("invalid-position", "bar index is outside the document")
@@ -237,8 +245,11 @@ def _apply(document: TabDocument, operation: TabEdit, snapshots: dict[int, list[
     bar = document.bars[position.bar_index]
     if position.bar_index not in snapshots:
         snapshots[position.bar_index] = copy.deepcopy(bar.chords)
+        notes[position.bar_index] = list(bar.notes)
     length_before = bar_content_length(bar)
     _EDITORS[operation.intent](bar, operation)
+    # Bar.notes mirrors the chord notes in order, as the importers build it.
+    bar.notes = [note for chord in bar.chords for note in chord.notes]
     _check_meter(document, position.bar_index, length_before)
 
 

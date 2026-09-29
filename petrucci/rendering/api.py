@@ -85,8 +85,14 @@ def render_piece(
     cursor_display_maps: dict[int, list[int]] | None = None,
     focused_imported_staff_index: int | None = None,
     playback_verse: int | None = None,
+    cursor_event: int | None = None,
 ) -> PieceView:
-    """Paint the score into every row of ``stdscr`` and report which view was used."""
+    """Paint the score into every row of ``stdscr`` and report which view was used.
+
+    ``cursor_event`` places the tablature cursor on that event of the cursor bar
+    (``len(bar.chords)`` is the append slot) however densely the bar is drawn;
+    without it ``cursor_col`` is scaled from the ``bar_width`` grid.
+    """
 
     piece = project_imported_staff(piece, focused_imported_staff_index)
     piece = piece_for_lyric_display(piece, settings, active_verse_index=playback_verse)
@@ -133,6 +139,7 @@ def render_piece(
             playback_cache,
             playback_markers,
             cursor_display_maps,
+            cursor_event,
         ),
     )
     stdscr.refresh()

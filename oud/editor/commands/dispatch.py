@@ -10,7 +10,7 @@ from oud.editor.commands.handlers.misc import (
     cmd_verify,
     cmd_vocal,
     parse_time_signature,
-    row_first_note_col,
+    row_first_note_onset,
     tuning_preset_value,
 )
 from oud.editor.commands.handlers.notation import (
@@ -111,7 +111,7 @@ __all__ = [
     "parse_time_signature",
     "paste_bar",
     "print_pdf",
-    "row_first_note_col",
+    "row_first_note_onset",
     "set_annotation",
     "set_barline",
     "set_dynamic",
