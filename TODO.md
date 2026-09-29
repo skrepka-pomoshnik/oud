@@ -298,7 +298,8 @@ content to a sidecar in a format Oud already reads and writes.
 `docs/tab-format.md` holds the format summary, the reference-parser recipe
 (`tab -v` from <https://github.com/mandovinnie/Lute-Tab>), and the support
 table. Every **Lost** and **Partial** row there is a step here. Reading
-without data loss and writing the program's syntax are done (see `DONE.md`).
+without data loss, writing the program's syntax, and verbatim preservation of
+unedited lines are done (see `DONE.md`).
 
 `.tab` has first-class support but is not Oud's main format (see Format goals).
 
@@ -306,13 +307,10 @@ without data loss and writing the program's syntax are done (see `DONE.md`).
   `oud/editor/services/io/files.py`, `oud/editor/services/io/loading.py`,
   `oud/presentation/cli_convert.py`, `docs/tab-format.md`.
 - Steps:
-  1. Preserve everything else. Constructs Oud does not model (comments, `$`
-     settings, option lines, bar variants, text, `M` music lines, `T` text,
-     keys, fermatas, page and system breaks, ornaments, fingerings, and
-     barline variants) are carried verbatim on the bar or
-     chord they belong to and written back unchanged. The `M` line is the
-     format's own single melody line; `C7` uses it for a melody above the tab.
-     Triplets need tuplet timing in the chord model.
+  1. Keep marks on edited chords: today an edited chord line is written fresh
+     and loses its ornaments, fingerings and `M`/`T` text (see
+     `docs/tab-format.md`). Needs the marks in the model (`Note` has ornament
+     and fingering fields). Triplets need tuplet timing in the chord model.
   2. Sidecar: when a save holds content TAB cannot express (several notation
      staffs, lyrics beyond `T` text, anything the table marks unsupported),
      write `name.tab` plus `name.musicxml` with that content and warn, naming

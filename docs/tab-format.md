@@ -105,7 +105,13 @@ saves them.
 
 Status after a load → save → load round trip, checked 2026-09-29 against the
 manual and the reference parser; `tests/test_tab_import_original.py` holds the
-reading cases. **Lost** means the construct is read but
+reading cases. **Preserved** means Oud does not model the construct but writes
+it back verbatim (`tests/test_tab_preservation.py`): an unedited file in the
+program's syntax saves byte-identically after Oud's first header line. A chord
+line is reused while it still reads as the chord; an edited chord is written
+fresh and loses its marks. The header is reused while its title, composer,
+author, tuning and tempo are unchanged; otherwise Oud writes a fresh header and
+keeps the other header lines. Files in Oud's earlier dialect are rewritten. **Lost** means the construct is read but
 dropped silently, which violates the `C15` rule.
 
 | Construct | Status | Notes |
@@ -114,9 +120,9 @@ dropped silently, which violates the `C15` rule.
 | Fret letter `j` | Supported | Fret 9 |
 | Flags `0`–`5`, `W`, `w`, `x` (repeat flag) | Supported | Values survive; source flag characters do not |
 | Dotted flag `2.` | Supported | |
-| Breve `B`, longa `L` | Partial | Read as whole notes |
-| Grids `#2`, `x` | Partial | Durations survive; the grid (beam) is lost |
-| Triplet `t3` | Partial | Notes kept at the flag's value; tuplet timing is not modelled and a warning says so |
+| Breve `B`, longa `L` | Preserved | Read as whole notes; the line is written back while unedited |
+| Grids `#2`, `x` | Preserved | Durations are modelled; the grid is kept by writing the line back while unedited |
+| Triplet `t3` | Partial | Written back while unedited; tuplet timing is not modelled and a warning says so |
 | Rests `R2`, `R1.` | Supported | |
 | Rest in a note line (`2R`) | Supported | |
 | Bass courses (position 7) | Supported | Slashes, `s`/`t`, and digits; the course count grows to the highest used course |
@@ -124,20 +130,20 @@ dropped silently, which violates the `C15` rule.
 | Modifier after the flag (`2-a`, `2.a`, `2!a`, `2\|a`) | Supported | Not read as course 1 |
 | Italian `!x`, `y`, `z`, `Nxx` | Supported | |
 | `Nxx` high fret | Supported | |
-| Prefix ornaments and symbols | Partial | Notes land on the right course; the symbol is dropped |
-| Postfix ornaments `&+`, fingering `.` `:` `\|` | Lost | The note survives; the mark is dropped |
-| Left-hand fingering `\1`–`\4` | Partial | The note is right; the fingering is dropped |
-| Music line `M` (pitch, clef, beams, ties), `MG`, `MF` | Lost | |
-| Chord text `T` | Lost | |
+| Prefix ornaments and symbols | Preserved | Kept with the chord line; dropped if that chord is edited |
+| Postfix ornaments `&+`, fingering `.` `:` `\|` | Preserved | Kept with the chord line; dropped if that chord is edited |
+| Left-hand fingering `\1`–`\4` | Preserved | Kept with the chord line; dropped if that chord is edited |
+| Music line `M` (pitch, clef, beams, ties), `MG`, `MF` | Preserved | Kept verbatim, on the chord line or as its own line; not modelled |
+| Chord text `T` | Preserved | Kept verbatim; not modelled |
 | Barline `b` | Supported | |
-| Barline variants `bb`, `b!`, `bT`, `bQ`, `bX`, `b2`, `bv` | Lost | Read as a plain barline |
-| Thick barline `B`, `B!`, `BX`, `BL`; `.bb.` | Partial | A barline; the variant is not kept |
-| Time signatures `S3-4`, `S12-8`, `SC`, `Sc\|` | Partial | Meter kept; the drawing variant is not |
+| Barline variants `bb`, `b!`, `bT`, `bQ`, `bX`, `b2`, `bv` | Preserved | Read as a barline; the closing barline is written as it was |
+| Thick barline `B`, `B!`, `BX`, `BL`; `.bb.` | Preserved | As above |
+| Time signatures `S3-4`, `S12-8`, `SC`, `Sc\|` | Supported | The bar's own `S` line is written back while its meter is unchanged |
 | Titles and text `{…}`, `{a/b}` | Supported | |
-| Text above a system `[…}` | Lost | |
-| Comments `%`, option lines `-…`, `$` settings | Lost | Only `-tuning` and `$time` are read |
+| Text above a system `[…}` | Preserved | Kept verbatim at its place in the bar |
+| Comments `%`, option lines `-…`, `$` settings | Preserved | In the header and in the music; `-milan` is dropped because Oud writes the default Italian order |
 | `-tuning` | Supported | Read in either notation, written in the program's |
 | Blank lines (system breaks) | Supported | |
 | `e` end marker | Supported | |
-| Key `k`, fermata `Y`/`y`, `p`, `P`, `V`, `I`, `i`, `j`, `f`, `d`, `D`, `Q`, `O`, `A`, `*A`, `~` | Lost | |
+| Key `k`, fermata `Y`/`y`, `p`, `P`, `V`, `I`, `i`, `j`, `f`, `d`, `D`, `Q`, `O`, `A`, `*A`, `~` | Preserved | Kept verbatim at their place; not modelled |
 
