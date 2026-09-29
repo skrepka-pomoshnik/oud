@@ -34,7 +34,8 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 5. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
 6. Publication and source model: `C12`, `C13`, `C14`.
 
-`S` items run in parallel with the `C` chain whenever their dependencies allow.
+`S` items run in parallel with the `C` chain whenever their dependencies allow;
+S2–S5, S7–S10, S18 and S19 need nothing outside the repository.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
@@ -357,65 +358,146 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
 
 ## Not complex tasks (open to any contributor)
 
-### S2. Scroll the command prompt horizontally (UI plan phase 3)
+These are sized for one focused session each. Work them in any order.
 
-- Files: `oud/presentation/tui/prompt.py`, `prompt_text` in
-  `oud/editor/services/screen/status.py`.
-- Keep the cursor visible when the text is wider than the screen, so a long
-  prefilled Save As path stays editable at 80 columns.
-- Acceptance: tests at 80 columns with a path longer than the line, for typing,
-  deleting, and history recall.
+How to work an `S` task:
 
-### S3. One help surface (UI plan phase 3)
+1. Read `AGENTS.md`. Run `./scripts/quality.sh` once before changing anything.
+2. Write the acceptance test first and watch it fail.
+3. Change only the files the task names. Keep functions at complexity 7 or
+   less and modules under 1,000 lines (the gate checks both).
+4. Run `./scripts/quality.sh` until every line says `[ok]`.
+5. Delete the task here, add an entry at the top of `DONE.md` (what changed,
+   the test names, the gate numbers), and commit with a short imperative
+   subject.
 
-- Files: `oud/editor/core/input/help.py`,
-  `oud/editor/interaction/normal/commands.py` (`help_pager`).
-- The in-app overlay and the `less` pager show identical generated content from
-  the key table.
-- Acceptance: a test that compares the overlay lines with the pager text for
-  each key style.
+If a step turns out to need a model or format change, stop and move the task to
+the complex list with a note instead of widening it.
 
-### S4. Named meter diagnostic in the status line (UI plan phase 3)
+### S2. Keep the end of a long command visible
 
-- Replace the cryptic `M` from `bar_meter_integrity_marker` with a segment such
-  as `meter 5/6`, shown only in normal mode.
-- Files: `oud/editor/services/screen/rhythm.py` (`bar_meter_marker`) and the
-  `meter` segment in `oud/editor/services/screen/status.py`.
-- Acceptance: status tests for a full bar, an underfull bar, and an overfull bar.
+- Where: `prompt_text` in `oud/editor/services/screen/status.py:140` builds
+  the command row as `:` + `state.cmdline`; the row is cut at the screen width,
+  so a long prefilled Save As path hides its end, where typing happens.
+- Do: give `prompt_text` the width (the callers `status_row_text` and
+  `compose_editor_frame` know it). When `:` + text is wider than the width,
+  show `<` followed by the last `width - 1` characters, so the end of the
+  text, where the cursor is, stays visible. Search prompts (`/`) work the same.
+- Acceptance: new tests in `tests/test_editor_status_row.py`: at width 80, a
+  120-character `cmdline` shows its last 79 characters after `<`; typing one
+  more character shows it; a short command is unchanged.
+- Out of scope: moving the cursor inside the line.
 
-### S5. One position vocabulary (UI plan phase 3)
+### S3. Lock the shared help text with a test
 
-- `oud/editor/services/screen/status.py` falls back to `col:N` when the meter
-  does not parse. Show `beat:` in every TAB and FT3 projection; `C3` later makes
-  it exact.
-- Acceptance: no `col:` in any status line; tests for TAB, FT3 projection, and an
-  unparseable meter.
+- Where: the help overlay (`compose.py:49`) and the `less` pager
+  (`show_help` in `oud/editor/commands/handlers/misc.py:44`) both print
+  `help_lines(state)` from `oud/editor/core/input/help.py:61`. Only plugin
+  mode differs (it shows `plugins/<name>.txt` in the pager).
+- Do: add a test that, for each key style (`vim`, `vim+arrows`, `casual`,
+  `casual+arrows`; the `keys` setting, see
+  `tests/test_keymap_table.py`), captures the text passed to the fake `less`
+  (`run_fn`, as in `tests/test_tui_commands_exec.py:78`) and compares it with
+  `help_lines(state)`.
+- Acceptance: the new test passes; no production change is expected. If it
+  fails, make the overlay and pager use the same lines.
 
-### S7. Staff label overwrites the tablature staff (viewer)
+### S4. Say what is wrong with a bar's length
 
-- The `lute` staff label overwrites the start of the tablature staff.
-- Acceptance: the label occupies its own prefix columns; regression at 80x24 and
-  120x40 for solo and mixed scores.
+- Where: `bar_meter_marker` in `oud/editor/services/screen/rhythm.py` returns
+  `M` when the cursor bar's events do not fill its meter; the status row shows
+  it as the `meter` segment.
+- Do: return `meter:<content> of <meter>` instead, where content is
+  `bar_content_length(bar)` (`petrucci/input/tablature/mutation.py:195`,
+  whole notes) written over the meter's denominator, for example
+  `meter:5/8 of 3/4` or `meter:7/8 of 3/4`. Keep `None` for a full bar, an
+  empty bar and an unknown meter. Rename `METER_MISMATCH_MARKER`.
+- Acceptance: tests in `tests/test_editor_status_row.py` for a full bar (no
+  segment), an underfull bar and an overfull bar in 3/4, and a 6/8 bar.
 
-### S8. Focus label matches the staff label (viewer)
+### S5. No `col:` in the status row
 
-- File: `oud/editor/navigation/view/focus.py:44` names the tablature lane `Tab`,
-  while the staff label reads `lute`. Use one label source.
-- Acceptance: status `focus:` equals the rendered staff label for solo, mixed,
-  and duet scores.
+- Where: `_position` in `oud/editor/services/screen/status.py:184` falls back
+  to `col:N` when `parse_time_signature_value`
+  (`petrucci/core/music/time.py:4`) cannot parse the meter. It returns `None`
+  for `C|` and single numbers such as `3`.
+- Do: (1) parse `C|` and `C/` as 2/2 in `parse_time_signature_value`, with a
+  test in `tests/test_petrucci_time.py` (create it if missing); (2) when the
+  meter still does not parse, show `ev:<k>/<n>`, the cursor's stop number
+  among `bar_stops(state, bar)` (`oud/editor/core/coordinates.py:123`).
+- Acceptance: tests for a 3/4 bar (`beat:`), a `C|` bar (`beat:k/2`), and a
+  bar with meter `3` (`ev:`); `grep -rn '"col:' oud` finds nothing.
 
-### S9. Companion-MIDI provenance in audit reports
+### S7. The staff label overwrites the tablature
 
-- Files: `scripts/corpus/midi/`.
-- Store the companion MIDI checksum and retrieval provenance in audit reports so
-  stale optional evidence is diagnosed before parity assertions run.
-- Acceptance: a stale or altered companion MIDI produces an explicit diagnostic.
+- Where: `petrucci/adapters/piece_view.py:253` paints `lute` five columns left
+  of the first measure (`measure_boxes[0].x - 5`), over the staff lines when
+  the measure starts closer to the edge.
+- Do: reserve the label's width (plus one space) before the first measure of
+  every system, or leave the label out when the terminal is narrower than the
+  label plus one measure.
+- Acceptance: a regression test that renders a solo TAB piece and a piece with
+  a notation staff (build one like `_layered_piece` in
+  `tests/test_layered_scores.py`) at 80x24 and 120x40 and checks that the
+  staff's first column still shows its line character.
+
+### S8. One label for the tablature staff
+
+- Where: the focus list calls the lane `Tab`
+  (`oud/editor/navigation/view/focus.py:44`) while the staff is drawn as
+  `lute` (`petrucci/adapters/piece_view.py:198`).
+- Do: define the label once (a constant in `petrucci/adapters/piece_view.py`)
+  and use it in both places.
+- Acceptance: a test that the status `focus:` text equals the drawn staff label
+  for a solo piece and for a piece with a notation staff.
+
+### S9. Checksums for companion MIDI files
+
+- Where: `scripts/corpus/midi/references.py` fetches and caches companion MIDI
+  files; `scripts/corpus/midi/audit.py` reports on them. Neither records a
+  checksum, so a changed or stale cached file goes unnoticed.
+- Do: add the SHA-256 of the cached file to `ReferenceFetch` and to the audit
+  report; when a report names a checksum and the cached file's differs, report
+  `stale companion MIDI: <path>` before any parity check.
+- Acceptance: tests with small files in `tmp_path` (no network): a matching
+  file passes, an altered file produces the diagnostic.
+
+### S18. `oud convert` without an output path
+
+- Where: `oud/presentation/app.py:210` makes `output` required;
+  `convert_command` is in `oud/presentation/cli_convert.py:167`.
+- Do: make `output` optional (`nargs="?"`); when it is missing, write
+  `<input stem>.musicxml` next to the input (MusicXML is the default format,
+  see `C16`). Existing files still need `--force`. Reading from `-` still
+  needs an explicit output.
+- Acceptance: tests in `tests/test_cli_contract.py`: `oud convert x.tab`
+  writes `x.musicxml`; a second run without `--force` fails with the existing
+  "exists" error; `oud convert - ` without output is a usage error.
+
+### S19. Fermatas and slurs on notation staffs in MusicXML
+
+- Where: `oud/exports/musicxml_staffs.py` writes notation staffs and
+  `oud/importers/musicxml_staffs.py` reads them back. `MelodyEvent` has
+  `fermata`, `slur_start` and `slur_end` (`petrucci/core/model.py`), which are
+  not written yet.
+- Do: write `<notations><fermata/></notations>` and
+  `<slur type="start|stop" number="1"/>` inside the note's `notations`
+  element (after any `tied`), and read them back into the same fields.
+- Acceptance: extend `_layered_piece` and `_staffs` in
+  `tests/test_layered_scores.py` with a fermata and a slur pair; the MusicXML
+  round-trip test still passes.
 
 ### S10. Document the supported historical-notation matrix
 
-- Add a table to `docs/supported-behavior.md` listing each historical construct
-  as supported, partial, experimental, or unsupported, with the test that proves
-  it. Enforcement is part of `C13`.
+- Add a table to `docs/supported-behavior.md` that lists each historical
+  construct as supported, partial, experimental or unsupported, with the test
+  that proves it. Follow the table format of `docs/tab-format.md`. Enforcement
+  is part of `C13`; this task is documentation only.
+
+## Blocked tasks (need data, tools, a host, or design judgement)
+
+Not suitable for unattended work: each needs something the cloud environment
+does not have, or open-ended judgement.
 
 ### S11. Engraving-quality matrix coverage
 
@@ -438,11 +520,13 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
   tablature rhythm flags, and mixed vocal-plus-lute systems. Assert the generated
   LilyPond structure (raster comparisons belong to `C12`).
 - Evaluate public CMME and Measuring Polyphony examples: record each fixture's
-  license and expected interpretation before any is used.
+  license and expected interpretation before any is used. **Needs** a licensing
+  judgement per source.
 
 ### S14. Advanced terminal engraving review (experimental modes)
 
 Opt-in renderers only; the default ASCII and pretty modes are unaffected.
+**Needs** visual review on real terminals and fonts.
 
 - Assess dark/light semantic colour palettes, mixed-role cell readability, ANSI
   output, and colour-independent duration recognition.
