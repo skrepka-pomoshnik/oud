@@ -1156,7 +1156,7 @@ Technical change log. Keep short, append newest on top.
 - Continued command-layer split: extracted file/source/ascii write handlers into `oud/editor/services/io/files.py` and kept thin wrappers in `oud/editor/commands/dispatch.py`.
 - Kept compatibility for existing tests/monkeypatch paths by preserving public `command_ops` entrypoints.
 - Re-ran full quality under `.venv`: `ruff`, `ty`, and `pytest` all pass (`233 passed`).
-- Added `/Users/s/Documents/Python/frnm/DOCS.md` with full current feature/usage reference and workflows.
+- Added `DOCS.md` with full current feature/usage reference and workflows.
 - Started command-layer split by extracting `:set` and style-conversion logic into `oud/editor/commands/handlers/settings.py` (slimming `command_ops.py`).
 - Added Vim word-search parity in normal mode: `*`, `#`, `n`, `N`.
 - Added `%` jump for tab matching (slur/tie/hold endpoints and repeat start/end markers).
