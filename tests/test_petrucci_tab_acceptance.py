@@ -66,10 +66,14 @@ def test_extra_bass_course_transaction_and_keyscript_per_style(
     assert any(line.lstrip().startswith("d|") and symbol in line.split("|", 1)[1] for line in render_lines(state))
 
 
-@pytest.mark.parametrize(("style", "symbols"), [("french", ("a", "c")), ("italian", ("0", "2"))])
+@pytest.mark.parametrize(
+    ("style", "symbols", "columns"),
+    [("french", ("a", "c"), (1, 3)), ("italian", ("0", "2"), (6, 4))],
+)
 def test_repeated_chord_transaction_round_trips_through_tab(
     style: str,
     symbols: tuple[str, str],
+    columns: tuple[int, int],
     tmp_path: Path,
 ) -> None:
     piece, document = _transaction_document(style)
@@ -85,9 +89,9 @@ def test_repeated_chord_transaction_round_trips_through_tab(
 
     assert _chord_notes(piece) == [[(1, 0), (3, 2)], [(1, 0), (3, 2)]]
     text = export_tab(piece, {}, {}, 12, settings={"style": style})
-    # Event lines are a rhythm flag followed by one cell per course.
+    # Event lines are a rhythm flag followed by one position per course; Italian lists the lowest course first.
     events = [line for line in text.splitlines() if line[:1].isdigit()]
-    assert [(line[1], line[3]) for line in events] == [symbols, symbols]
+    assert [(line[columns[0]], line[columns[1]]) for line in events] == [symbols, symbols]
     path = tmp_path / f"repeated-{style}.tab"
     path.write_text(text, encoding="utf-8")
     reopened = load_tab(str(path), strings=7)

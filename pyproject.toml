@@ -43,6 +43,7 @@ addopts = "--cov=petrucci"
 pythonpath = ["."]
 markers = [
   "ft3_corpus: needs the local Gerbode FT3 corpus; skipped when it is missing",
+  "tab_program: needs the original tab program in TAB_PROGRAM; skipped when it is unset",
 ]
 
 [tool.coverage.run]
