@@ -27,7 +27,6 @@ def test_save_and_load_settings(tmp_path) -> None:
         "charstyle": "board",
         "midipatch": "12",
         "tempo": "120",
-        "grid": "on",
         "showdur": "off",
         "showextras": "off",
         "showtactus": "on",
@@ -61,7 +60,6 @@ def test_save_and_load_settings(tmp_path) -> None:
     assert loaded["charstyle"] == "board"
     assert loaded["midipatch"] == "12"
     assert loaded["tempo"] == "120"
-    assert loaded["grid"] == "on"
     assert loaded["showdur"] == "off"
     assert loaded["showextras"] == "off"
     assert loaded["showtactus"] == "on"

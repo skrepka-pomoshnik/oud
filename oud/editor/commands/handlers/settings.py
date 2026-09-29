@@ -41,7 +41,6 @@ META_PRESETS: dict[str, dict[str, str]] = {
 _BOOL_KEYS = {
     "countdots",
     "flagredundant",
-    "grid",
     "showdur",
     "showspans",
     "showtuplets",
