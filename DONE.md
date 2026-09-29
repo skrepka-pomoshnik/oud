@@ -1,5 +1,141 @@
 # DONE
 
+## Backlog split into complex and simple work (2026-09-29)
+
+- Rewrote `TODO.md` as open work only, split into complex tasks (`C1`–`C14`,
+  owned by Claude) and simple tasks (`S1`–`S17`, open to any contributor). Each
+  item lists files, steps, acceptance, and dependencies. The split criteria are
+  stated at the top of `TODO.md`.
+- New items found while auditing the code:
+  - `S1`: a fresh clone fails the gate. 71 tests need gitignored Gerbode FT3
+    payloads, and coverage drops to 94.83% (floor 95%).
+  - `C7`: `apply_note_input` has no caller in `oud/`, so the editor cannot type
+    standard notes. Native TAB has no notation-part storage yet.
+  - `C4`: the editor grid maps (`overrides`, `durations`, `dotted`) are read by
+    about 40 modules, including exports and playback, not only the editor.
+  - `S6`: `oud/exports/export_tab.py` writes a meter line for every bar, which
+    is the cause of the repeated `S6/4` on save.
+- Validation: `./scripts/quality.sh` on this clean checkout. Architecture,
+  Ruff, format, and Ty pass; pytest has 1,752 passed, 71 failed (all missing
+  local FT3 payloads), and 48 skipped.
+- The completed items below were checked off in `TODO.md` but not yet recorded
+  here. They are moved verbatim.
+
+### P0: Petrucci reusable notation library
+- [x] Preserve exact pickup and irregular-measure extents in the canonical score and flow adapter.
+  - Measure boundaries use whole-note units; aligned staffs reject conflicting extents.
+- [x] Build one union of exact onset anchors per measure and consume it across every staff.
+  - Staff-local collision widths may enlarge a shared slot but may not move simultaneous events independently.
+- [x] Retain logical onset geometry beyond the viewport and clip only paintable span segments.
+  - Ties, slurs, and glissandi must expose continuation geometry when an endpoint is clipped.
+- [x] Add typed written-duration spelling independent of reciprocal denominators.
+  - `DurationSpelling` covers breve through 128th values and four augmentation dots.
+- [x] Preindex effective staff state and semantic frame cells with object-owned lifetimes.
+  - Do not add global unbounded caches or repeated full-frame identity scans.
+- [x] Expose a public proportional timeline projection with explicit origin and scale.
+  - Return exact event/segment positions, measure boundaries, viewport clipping, and collision diagnostics.
+  - [x] Publish exact `TimelineProjectionRequest` and identity-preserving measure/event/span projection records.
+  - [x] Keep requested scale fixed and report distinct onsets that round into one visible staff cell.
+  - [x] Make the notation engraver consume these anchors for notes, beams, ties, slurs, ledger lines, and accidentals before painting.
+- [x] Expose public written-pitch and continuous-pitch staff projection against the same geometry contract.
+  - Cover treble/bass clefs, clef changes, accidentals, timeline positions, and viewport offsets.
+- [x] Migrate engraving duration decisions to `DurationSpelling` and render breve/dotted-breve notes and rests.
+  - Add irregular-measure, semantic-cell, terminal-clipping, and no-tied-whole-note regressions.
+- [x] Add bounded performance regressions for repeated layout, scrolling, resizing, batched lookup, and score replacement.
+  - Record workload size and ceilings; performance claims without measurements do not close this gate.
+- [x] Add display-only meter visibility for 3/4, 6/8, 4/2, and mid-score meter changes.
+  - Preserve meter, validation, beaming, event timing, and reserved preamble/change spacing.
+
+### P0: Petrucci reusable accompaniment data (deferred assessment)
+- [x] Assess an optional pure canonical-score performance projection with stable part/voice/source IDs.
+  - Keep MIDI serialization, TiMidity processes, transport, latency, and lesson policy outside Petrucci.
+  - Assessment and prerequisite model gaps are recorded in `docs/petrucci-voce-handoff.md`; implementation is deferred.
+
+### P1.1: Full-score presentation
+- [x] Add explicit `score` and `staff` viewer modes for imported scores.
+  - At 120x40, `score` mode renders every mapped tablature, notation, and lyric
+    staff together when they fit.
+  - At 80x24, vertical scrolling reaches every staff without dropping content;
+    `staff` mode remains the compact focused view.
+  - Preserve source staff label/index, bar, cursor, playback position, filename,
+    document mode, and write target across mode changes and resize.
+  - Cover solo, mixed song, four-part vocal, vocal-only, and duet FT3 files at
+    80x24 and 120x40.
+- [x] Add navigation suitable for long read-only scores.
+  - Support previous/next system and section/page jumps without changing the
+    logical score cursor.
+  - Show current section/page and system range in status or `:info` when the FT3
+    contains that data.
+
+### P1.1: Format confidence
+- [x] Expand the deterministic, stratified compatibility manifest from 263 to
+  300 public FT3 files with a fixed one-time selection, checksums, metadata,
+  zero semantic-audit residuals, and no committed downloaded payloads.
+- [x] Decode every FT3 semantic variant found across the direct composer-index audit.
+  - The 14 formerly unresolved files are fixed as the v8 corpus: source layout,
+    exercise labels, editorial text, later fingering/bracket/barre variants, and
+    one-staff notation-only mapping are now typed without fake tablature notes.
+- [x] Add LilyPond/MuseScore-inspired semantic regression cases for partial and
+  grace beams, grouped tuplets, cross-system ties/slurs, fermatas, ornaments,
+  endings, and repeat barlines without vendoring upstream fixtures.
+
+### P1.1: Playback and acceptance
+- [x] Play all mapped voices and staffs with synchronized cursor movement.
+  - Compare MIDI note-on events, voice/channel assignment, repeats/endings,
+    tempo, and start-bar behavior for the representative viewer matrix.
+  - Keep pause/stop/restart and missing-synth diagnostics deterministic; never
+    report playback success when no player started.
+- [x] Make `lyricmode=current` follow the active stanza automatically while
+  `playverses=all`; preserve an explicitly selected `lyricverse` while stopped.
+
+### P1.2: Gerbode lute and note typing parity
+- [x] Add one extra-bass-course transaction and keyscript fixture per style.
+- [x] Add one repeated-chord transaction fixture per style.
+- [x] Add one string-movement fixture proving other courses remain unchanged.
+- [x] Add one attachment-retention fixture for replacement and deletion.
+- [x] Add one undo/redo fixture for a mixed note, chord, and rest transaction.
+- [x] Add deterministic operation-sequence tests that compare canonical state,
+  rendered semantics, TAB save/reopen, and LilyPond/MIDI export. Keep compact
+  one-feature fixtures for failures; do not vendor MuseScore or LilyPond
+  fixtures.
+- [x] Curate source-supported excerpts from the fixed 100-score Gerbode corpus
+  covering tablature, bass courses, chords/rests, polyphonic notation, lyrics,
+  and ornaments. Checked-in expectations cover terminal rendering, TAB
+  save/reopen semantics, LilyPond, MIDI, and published-score observations
+  without committing external FT3 or PDF payloads.
+- [x] Extend curated Petrucci acceptance with a checksum-verified Gerbode score
+  containing a canonical tie and compare its render/exports with the published
+  two-page score.
+
+### P1.4: Linked Petrucci and LilyPond engraving
+- [x] Drive Petrucci proof assertions and LilyPond export assertions from the
+  same matrix instead of maintaining backend-specific fixture inventories.
+- [x] Translate the remaining applicable LilyPond 2.24.4 and MuseScore 4.6.0
+  regressions into small legal fixtures that record provenance and the borrowed
+  invariant rather than upstream output bytes. Existing translated invariants
+  are registered in `upstream_microcases` and exercised by the layout tests.
+- [x] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
+  internal representation.
+  - Verified 2026-09-13: no LilyPond importer exists under `oud/importers/`; `.ly`
+    is produced at the export boundary and is not a Petrucci model input.
+- [x] Require generated `.ly` files to compile with the supported LilyPond
+  version without errors or undocumented warnings. The fixed external
+  `ft3-regression.json` manifest is exported and compiled with 2.26 when
+  available; 2.24 remains a separate compatibility smoke target.
+
+### P3: Secondary release work
+- [x] Ship a real `oud(1)` manual page that works with `man oud`.
+  - Maintain `man/oud.1.scd` as the readable source and commit generated
+    `man/oud.1` roff output.
+  - Cover synopsis, options/subcommands, files, environment, exit status,
+    examples, diagnostics, and see-also references.
+  - Add reproducible build and user-local installation under
+    `~/.local/share/man/man1` without requiring sudo.
+  - Validate with `mandoc -T lint man/oud.1` and `man -l man/oud.1` when
+    available. The repository build uses `scdoc`; `mandoc` is optional.
+  - Keep README as the quick-start page and the man page as the exhaustive
+    command reference.
+
 ## Editor UI: rests, Ctrl-C and the full key table (2026-09-27)
 
 - Empty bars round-trip. A chord-less bar with an explicit line such as `Sc`
