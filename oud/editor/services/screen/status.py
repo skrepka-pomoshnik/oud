@@ -137,8 +137,15 @@ def status_model(
     )
 
 
-def prompt_text(state: EditorState) -> str:
+ELLIPSIS_LEFT = "<"
+
+
+def prompt_text(state: EditorState, width: int = 0) -> str:
+    """The command or search prompt; too wide for ``width``, it shows its end, where typing happens."""
+
     prompt = f":{state.cmdline}" if state.mode == Mode.COMMAND else f"/{state.searchline}"
+    if 0 < width < len(prompt):
+        return ELLIPSIS_LEFT + prompt[-(width - 1) :] if width > 1 else prompt[-width:]
     return _join((prompt, state.visible_message), GROUP_GAP)
 
 
@@ -151,10 +158,11 @@ def status_row_text(
 ) -> str:
     """The status row as text; the command and search prompts replace it while active."""
 
+    row_width = state.screen_width if width is None else width
     if state.mode in _PROMPT_MODES:
-        return prompt_text(state)
+        return prompt_text(state, row_width)
     model = status_model(state, duration=duration, meter=meter)
-    return render_status(model, state.screen_width if width is None else width)
+    return render_status(model, row_width)
 
 
 def status_line(state: EditorState) -> str:
