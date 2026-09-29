@@ -7,6 +7,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from petrucci.core.model import Bar, Piece
 from petrucci.core.music.time import parse_time_signature_value
+from petrucci.core.music.tuning import default_tuning_pitches
 from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
@@ -16,11 +17,17 @@ MUSICXML_DOCTYPE = (
 )
 
 DIVISIONS = 480
+SOFTWARE = "Oud"
+# Oud-only facts MusicXML has no element for, kept as identification fields.
+STYLE_FIELD = "oud-style"
+AUTHOR_FIELD = "oud-author"
+TUNING_FIELD = "oud-tuning"
+_CUT_TIME = (2, 2)
+_SINGLE_NUMBER_BEAT_TYPE = 4
 
 
 def _default_tuning(strings: int) -> list[int]:
-    defaults = "g4d4a3f3c3g2f2e2d2c2"
-    return _parse_tuning(defaults)[:strings]
+    return default_tuning_pitches(strings)
 
 
 def _note_type_to_denom(note_type: int) -> int:
@@ -99,7 +106,48 @@ def _time_symbol_attr(raw_time: str) -> str | None:
         return "common"
     if text in {"C|", "C/"}:
         return "cut"
+    if text.isdigit():
+        return "single-number"
     return None
+
+
+def _append_time(attributes: Element, bar: Bar, settings: dict[str, str]) -> None:
+    raw = _raw_time_sig_for_bar(bar, settings)
+    symbol = _time_symbol_attr(raw)
+    beats, beat_type = _time_for_bar(bar, settings)
+    if symbol == "cut":
+        beats, beat_type = _CUT_TIME
+    elif symbol == "single-number":
+        beats, beat_type = int(raw.strip()), _SINGLE_NUMBER_BEAT_TYPE
+    time = SubElement(attributes, "time")
+    if symbol:
+        time.set("symbol", symbol)
+    SubElement(time, "beats").text = str(beats)
+    SubElement(time, "beat-type").text = str(beat_type)
+
+
+def _append_tempo(measure: Element, tempo: int) -> None:
+    direction = SubElement(measure, "direction", placement="above")
+    metronome = SubElement(SubElement(direction, "direction-type"), "metronome")
+    SubElement(metronome, "beat-unit").text = "quarter"
+    SubElement(metronome, "per-minute").text = str(tempo)
+    SubElement(direction, "sound", tempo=str(tempo))
+
+
+def _append_identification(root: Element, piece: Piece, style: str, tuning: str) -> None:
+    identification = SubElement(root, "identification")
+    if piece.composer:
+        creator = SubElement(identification, "creator", type="composer")
+        creator.text = piece.composer
+    encoding = SubElement(identification, "encoding")
+    SubElement(encoding, "software").text = SOFTWARE
+    fields = ((STYLE_FIELD, style), (AUTHOR_FIELD, piece.author), (TUNING_FIELD, tuning))
+    if not any(value for _name, value in fields):
+        return
+    miscellaneous = SubElement(identification, "miscellaneous")
+    for name, value in fields:
+        if value:
+            SubElement(miscellaneous, "miscellaneous-field", name=name).text = value
 
 
 def _key_name(value: str) -> str:
@@ -319,13 +367,7 @@ def _append_first_measure_attributes(
     SubElement(attributes, "divisions").text = str(DIVISIONS)
     key = SubElement(attributes, "key")
     SubElement(key, "fifths").text = str(_key_fifths(settings.get("key") or piece.key or "C"))
-    beats, beat_type = _time_for_bar(bar, settings)
-    time = SubElement(attributes, "time")
-    symbol = _time_symbol_attr(_raw_time_sig_for_bar(bar, settings))
-    if symbol:
-        time.set("symbol", symbol)
-    SubElement(time, "beats").text = str(beats)
-    SubElement(time, "beat-type").text = str(beat_type)
+    _append_time(attributes, bar, settings)
     clef = SubElement(attributes, "clef")
     SubElement(clef, "sign").text = "TAB"
     SubElement(clef, "line").text = "5"
@@ -347,14 +389,7 @@ def _append_first_measure_attributes(
 def _append_time_change(measure: Element, bar: Bar, settings: dict[str, str]) -> None:
     if not bar.time_sig:
         return
-    parsed = _time_for_bar(bar, settings)
-    attributes = SubElement(measure, "attributes")
-    time = SubElement(attributes, "time")
-    symbol = _time_symbol_attr(_raw_time_sig_for_bar(bar, settings))
-    if symbol:
-        time.set("symbol", symbol)
-    SubElement(time, "beats").text = str(parsed[0])
-    SubElement(time, "beat-type").text = str(parsed[1])
+    _append_time(SubElement(measure, "attributes"), bar, settings)
 
 
 def _repeat_words(repeat: str) -> str | None:
@@ -653,6 +688,9 @@ def _append_musicxml_measure_prefix(
             bar,
             pitch_for_string,
         )
+        tempo = piece.tempo or settings.get("tempo", "")
+        if str(tempo).isdigit() and int(tempo) > 0:
+            _append_tempo(measure, int(tempo))
     else:
         _append_time_change(measure, bar, settings)
     return measure, repeat
@@ -717,15 +755,11 @@ def _musicxml_text(
     settings_map = settings or {}
     pitch_for_string, style = _musicxml_pitch_context(piece, settings_map)
     title = piece.title or "Untitled"
-    composer = piece.composer or piece.author or "Unknown"
 
     root = Element("score-partwise", version="3.1")
     work = SubElement(root, "work")
     SubElement(work, "work-title").text = title
-    identification = SubElement(root, "identification")
-    creator = SubElement(identification, "creator")
-    creator.set("type", "composer")
-    creator.text = composer
+    _append_identification(root, piece, style, piece.tuning or settings_map.get("tuning", ""))
     part_list = SubElement(root, "part-list")
     score_part = SubElement(part_list, "score-part", id="P1")
     SubElement(score_part, "part-name").text = "Lute"
