@@ -36,6 +36,7 @@ diagnostics. Existing output files are refused unless `-f` is explicit:
 ```bash
 uv run oud ascii score.ft3 --bars 1:8
 uv run oud convert score.ft3 score.musicxml
+uv run oud convert score.tab      # no output path: writes score.musicxml beside the input
 uv run oud convert score.ft3 score.pdf
 printf '%s\n' '-C' 'b' '0a-----' 'e' \
   | uv run oud convert - - --input-format tab --format lilypond
@@ -67,7 +68,7 @@ Set with:
 
 ### Vim profile (core)
 
-- Move: `h j k l` (cell/row step)
+- Move: `h j k l` (event/row step; `h`/`l` also visit the append slot of an unfinished bar)
 - Row jump: `J` / `K` (next/previous rendered row, preserves row offset)
 - Insert: `i` or `Enter`
 - Replace once: `r`
@@ -104,6 +105,29 @@ creates a new bar.
 
 ## 5) Entering Notes
 
+The cursor rests on an event of the bar (a chord, a single note, or a rest) or
+on the bar's append slot after its last event. A bar that already fills its
+meter has no append slot. `h`/`l` step one event, however densely the bar is
+drawn, so a bar of sixteenths or thirty-seconds is visited event by event.
+
+In insert mode:
+
+- A fret on the append slot adds an event with the current duration; if it would
+  not fit in the bar's meter, it goes to the next bar. The cursor moves on.
+- A fret on an event sets that course's note and keeps the event's duration and
+  the other courses. To build a chord, step back onto the event (`h` or an arrow)
+  and type on another course.
+- `z` adds a rest, or turns the event under the cursor into a rest.
+- A duration key or `.` changes the event under the cursor, or the event just
+  typed when the cursor is on the append slot, and becomes the current duration.
+- `x`, `Space`, `Backspace` and `Delete` remove the course's note; an event left
+  without notes, or a rest, is removed and later events move earlier.
+- `R` (replace mode) changes existing notes only and does not move.
+
+Every keystroke that edits is one undo step. The status row shows the bar, the
+beat from the event's onset and the bar's own meter, and `len:` with the duration
+of the event under the cursor (the current typing duration on the append slot).
+
 ## 5.1 French tablature
 
 - Frets by letters (`a..`), with historical mapping rules.
@@ -135,14 +159,14 @@ French insert-mode digit mapping:
 
 Italian mode keeps numeric fret entry; type `;` then `1`..`7` to set a duration.
 
-Durations are tracked per onset column and rendered according to current flag style/redundancy settings.
+Durations belong to events and are rendered according to the current flag style and redundancy settings.
 
 ## 6) Core Commands
 
 ## 6.1 File and session
 
 - `:e <path>` open file
-- `:w [path]` write TAB; new/imported documents prompt for a `.tab` destination
+- `:w [path]` save; the extension picks the format: `.musicxml`/`.xml` (the default) or `.tab` (the original `tab` program's format, see `docs/tab-format.md`). New and imported documents prompt for a destination: `untitled.musicxml` for a new document, the source name with `.musicxml` for FT3 or TAB, and `name.oud.musicxml` for MusicXML that Oud did not write, so that file is never overwritten by default. `oud new.musicxml` or `oud new.tab` on a missing file pre-fills that name. Nothing is written until you confirm. MusicXML that Oud wrote reopens as a native document and `:w` saves back to it; `.tab` documents keep saving to their `.tab`.
 - `:wa [path]` / `:wascii [path]` write ASCII snapshot/export
 - `:wq`, `:x` write + quit
 - `:q!` force quit
@@ -218,7 +242,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 ### Commonly used keys
 
 - Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
-- Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
+- Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
 - Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`, `lypapersize=letter|a4`, `lysourceheading=on|off`
@@ -273,10 +297,10 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 ## 9.1 Edit a TAB or tab-only FT3 projection, export PDF
 
 1. Open: `:e file.ft3`
-2. Check the persistent document label. `FT3 EDIT:choose :w path` is an editable projection awaiting a TAB save target; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
+2. Check the persistent document label. `FT3 EDIT:name.musicxml` is an editable projection with its suggested save target. FT3 scores with notation staffs (voices, lyrics) are editable too: you edit the tablature, bar inserts and deletes keep the other staffs aligned, and `:w name.musicxml` saves the tablature and the notation staffs (pitch, rhythm, rests, ties, lyrics; FT3 comment and layout rows stay in the source). Saving such a score to `.tab` is refused until `C15` adds a sidecar. `FT3 VIEW` (read-only) remains for duet scores, which keep two lute parts in one bar list, and for scores without tablature.
 3. Edit in `insert` mode (`i`).
 4. Check bar rhythm: `:verify`.
-5. Save with `:w`; imported files prompt for an explicit `.tab` destination and leave the FT3 source unchanged.
+5. Save with `:w`; imported files prompt for a destination (MusicXML by default, or `.tab`) and leave the FT3 source unchanged.
 6. Export LilyPond with `:lilypond out.ly` or build PDF with `:pdf`.
 
 ## 9.2 Fast TAB cleanup and reflow
@@ -302,7 +326,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - Some advanced historical symbols/layouts are partial or pending.
 - FT3/JT* are proprietary import formats; support is validated against fixed external manifests rather than every historical producer version.
 - The focused regression manifest and both fixed 75-file samples pass the unresolved-semantics audit without warnings (150 fixed external files total). This is not general FT3 or Fronimo parity; exact source engraving coordinates are reflowed.
-- FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
+- FT3 is import-only. FT3 scores with tablature are editable (notation staves stay aligned and save to MusicXML); duet scores and scores without tablature are read-only until every visible layer can round-trip.
 - The status line always distinguishes the source document from its confirmed TAB write target.
 - Auto layout applies collision widths before justifying, keeps final/manual/capped systems at readable natural widths, and shows a clipped preview only when at least half of the next system fits.
 
@@ -388,6 +412,7 @@ Petrucci has two entry paths:
 - `typeset_piece(...)` preserves Oud tablature behavior.
 - `typeset_score(...)` renders source-independent immutable notation records.
 - `apply_note_input(...)` applies an atomic, source-independent note transaction.
+- `apply_tab_mutation(...)` applies an atomic tablature transaction at exact onsets.
 
 The canonical score result contains text, `ScoreLayout`, structural roles,
 source IDs, `cells_for(id)`, and indexed `cells_for_many(ids)`. Consumers own selection, playback, grading,

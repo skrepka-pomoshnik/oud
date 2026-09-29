@@ -36,11 +36,24 @@ def _has_non_tab_score_content(piece: Piece) -> bool:
     return bool(imported and imported.staffs) or is_duet_score_piece(piece)
 
 
-def classify_document(path: str | None, piece: Piece) -> DocumentMode:
+def _view_only_score(piece: Piece) -> bool:
+    # A duet keeps two lute parts in one bar list, and a score without
+    # tablature has nothing to edit; both stay view-only.
+    return is_duet_score_piece(piece) or not any(bar.chords or bar.notes for bar in piece.bars)
+
+
+MUSICXML_SUFFIX = ".musicxml"
+NEW_DOCUMENT_PATH = "untitled.musicxml"
+# Suffix for an edited copy of MusicXML that Oud did not write: Oud keeps only
+# its tablature part, so saving over the source could lose other parts.
+FOREIGN_MUSICXML_COPY = ".oud.musicxml"
+
+
+def classify_document(path: str | None, piece: Piece, *, oud_musicxml: bool = False) -> DocumentMode:
     fmt = source_format(path)
-    if fmt in {"new", "tab"}:
+    if fmt in {"new", "tab"} or (fmt == "musicxml" and oud_musicxml):
         return DocumentMode.NATIVE
-    if fmt == "ft3" and _has_non_tab_score_content(piece):
+    if fmt == "ft3" and _has_non_tab_score_content(piece) and _view_only_score(piece):
         return DocumentMode.IMPORTED_READ_ONLY
     return DocumentMode.IMPORTED_PROJECTION
 
@@ -50,11 +63,13 @@ def configure_document(
     path: str | None,
     *,
     forced_read_only: bool = False,
+    oud_musicxml: bool = False,
 ) -> None:
     state.path = path
     state.source_format = source_format(path)
-    state.document_mode = classify_document(path, state.piece)
-    state.write_path = path if state.source_format == "tab" else None
+    state.document_mode = classify_document(path, state.piece, oud_musicxml=oud_musicxml)
+    state.write_path = path if path and state.document_mode is DocumentMode.NATIVE else None
+    state.suggested_write_path = None
     state.forced_read_only = forced_read_only
     state.read_only = forced_read_only or state.document_mode is DocumentMode.IMPORTED_READ_ONLY
     state.pending_overwrite_path = None
@@ -92,7 +107,7 @@ def document_status_label(state: EditorState) -> str:
         target = Path(state.write_path or default_write_path(state)).name
         return f"{fmt} EDIT:{target}"
     if state.write_path:
-        return "TAB"
+        return "TAB" if state.write_path.lower().endswith(".tab") else "MUSICXML"
     return f"NEW:{Path(default_write_path(state)).name}"
 
 
@@ -100,8 +115,11 @@ def default_write_path(state: EditorState) -> str:
     """Return a safe suggested TAB target without claiming it is established."""
 
     if state.path:
-        return str(Path(state.path).with_suffix(".tab"))
-    return "untitled.tab"
+        source = Path(state.path)
+        if state.source_format == "musicxml":
+            return str(source.with_name(source.stem + FOREIGN_MUSICXML_COPY))
+        return str(source.with_suffix(MUSICXML_SUFFIX))
+    return state.suggested_write_path or NEW_DOCUMENT_PATH
 
 
 def display_path(state: EditorState) -> str:

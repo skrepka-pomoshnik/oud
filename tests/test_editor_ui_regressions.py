@@ -5,25 +5,26 @@ from __future__ import annotations
 import curses
 import os
 import signal
+from fractions import Fraction
 from pathlib import Path
 from typing import cast
 
 import pytest
-from helpers_keyscript import keyscript_state, press_keys
+from helpers_keyscript import keyscript_state, press_keys, tab_events
 
 from oud.editor.core.feedback.messages import READ_ONLY_VIEWER
 from oud.editor.core.state import EditorState
+from oud.editor.editing.primitives.tablature import french_to_fret
 from oud.editor.editing.primitives.undo import redo, undo
 from oud.editor.interaction.dispatch import actions
 from oud.editor.interaction.dispatch.controller import handle_key
 from oud.editor.services.io.files import cmd_write
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.status import status_line
 from oud.exports.export_tab import export_tab
 from oud.exports.midi.projection import build_playback_timeline
 from oud.presentation.tui import loop
 from oud.presentation.tui.commands import apply_command
 from oud.settings import SettingsFileError, load_settings, save_settings
-from petrucci.input.tablature.input import REST_OVERRIDE, editor_fret_at
 
 CTRL_A = 1
 CTRL_C = 3
@@ -48,8 +49,7 @@ def test_insert_types_high_french_frets_without_quitting(fret: str, value: int) 
 
     assert _press(state, fret) is True
     assert state.mode == "insert"
-    decoded = editor_fret_at(state.overrides, state.durations, bar_index=0, string_index=0, column=0, style="french")
-    assert decoded == value
+    assert tab_events(state) == [("4", [(1, value)])]
 
 
 @pytest.mark.parametrize("style", ["french", "italian"])
@@ -57,8 +57,7 @@ def test_insert_z_is_the_rest_key_in_every_style(style: str) -> None:
     state = keyscript_state(style=style)
     press_keys(state, ["i", "z"])
 
-    assert state.overrides[(0, 0, 0)] == REST_OVERRIDE
-    assert state.durations[(0, 0, 0)] == state.current_duration
+    assert tab_events(state) == [(str(state.current_duration), [])]
 
 
 def test_insert_ctrl_c_still_quits_an_unmodified_buffer() -> None:
@@ -84,9 +83,8 @@ def test_french_rest_is_written_as_flag_only_tab_line() -> None:
     text = export_tab(state.piece, state.overrides, state.durations, state.bar_width, settings=state.settings)
 
     lines = text.splitlines()
-    assert "0------" in lines
-    assert "0a-----" in lines
-    assert "0r-----" not in lines
+    assert "R0" in lines
+    assert "0a" in lines
 
 
 def test_french_rest_advances_playback_time() -> None:
@@ -354,11 +352,11 @@ def test_visual_mode_is_reported_once() -> None:
 def test_replace_mode_letters_replace_frets_instead_of_moving(keys: str, fret: str) -> None:
     state = keyscript_state(style="french", settings_override={"keys": keys})
     press_keys(state, ["i", "c", 27])
-    state.cursor_col = 0
+    state.cursor_onset = Fraction(0)
 
     press_keys(state, ["R", fret])
 
-    assert state.overrides[(0, 0, 0)] == fret
+    assert tab_events(state) == [("4", [(1, french_to_fret(fret))])]
 
 
 def _tab_file(tmp_path: Path, body: str) -> Path:
@@ -370,7 +368,7 @@ def _tab_file(tmp_path: Path, body: str) -> Path:
 def test_tab_flag_only_line_imports_as_timed_rest(tmp_path: Path) -> None:
     from oud.importers.tab import load_tab  # noqa: PLC0415
 
-    piece = load_tab(str(_tab_file(tmp_path, "1\n0a-----\n0-c----\n")))
+    piece = load_tab(str(_tab_file(tmp_path, "1\n0a\n0 c\n")))
 
     chords = piece.bars[0].chords
     # Flag 1 is an eighth, 0 a quarter.
@@ -397,7 +395,7 @@ def test_tab_rest_round_trips_through_save_and_reopen(tmp_path: Path) -> None:
         reopened.piece, reopened.overrides, reopened.durations, reopened.bar_width, settings=reopened.settings
     )
     for text in (target.read_text(encoding="utf-8"), resaved):
-        assert "\nb\nSc\n0------\n0a-----\n" in text
+        assert "\nb\nSC\nR0\n0a\n" in text
 
 
 def test_imported_tab_rest_delays_following_notes_in_playback(tmp_path: Path) -> None:
@@ -528,13 +526,13 @@ def test_every_loop_exit_stops_playback(monkeypatch: pytest.MonkeyPatch) -> None
 def test_capital_p_pastes_bars_before_and_never_builds_pdf() -> None:
     state = keyscript_state()
     state.piece.bars.extend(type(state.piece.bars[0])() for _ in range(2))
-    press_keys(state, ["i", "a", 27, "y", "y", "l", "w"])
+    press_keys(state, ["i", "a", 27, "y", "y", "w"])
     assert state.cursor_bar == 1
 
     press_keys(state, ["P"])
 
     assert len(state.piece.bars) == 4
-    assert state.overrides[(1, 0, 0)] == "a"
+    assert tab_events(state, 1) == [("4", [(1, 0)])]
     assert state.pdf_job is None
 
 

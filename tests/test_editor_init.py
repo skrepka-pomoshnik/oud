@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from oud.editor.services.bootstrap import init_state
+from oud.editor.services.io.files import cmd_write_default
 from petrucci.core.model import Piece
 
 
@@ -18,11 +21,38 @@ def test_init_state_missing_path_defaults_to_8_bars(tmp_path: Path) -> None:
     assert len(state.piece.bars) == 8
 
 
+def test_init_state_missing_tab_path_starts_a_new_document(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.toml"
+    missing = tmp_path / "new_piece.tab"
+    state = init_state(str(missing), config_path=str(cfg))
+    assert len(state.piece.bars) == 8
+    assert state.tab_data is None
+    assert state.piece.import_warnings == []
+    assert state.piece.title == "new_piece"
+    assert (state.path, state.write_path) == (None, None)
+    assert not missing.exists()
+
+
+def test_first_write_of_a_new_tab_asks_with_the_requested_name(tmp_path: Path) -> None:
+    missing = tmp_path / "new_piece.tab"
+    state = init_state(str(missing), config_path=str(tmp_path / "config.toml"))
+
+    assert not cmd_write_default(state, "")
+    assert state.cmdline == f"w {missing}"
+    assert not missing.exists()
+
+    assert cmd_write_default(state, state.cmdline.removeprefix("w "))
+    assert missing.is_file()
+    assert state.write_path == str(missing)
+
+
+@pytest.mark.ft3_corpus
 def test_init_state_preserves_inferred_ft3_extra_courses() -> None:
     state = init_state("tests/fixtures/ft3/corpus/pavan_01_8C.ft3", config_path="config.toml")
     assert state.piece.strings >= 8
 
 
+@pytest.mark.ft3_corpus
 def test_init_state_loads_represented_ft3_text_without_warning() -> None:
     state = init_state("tests/fixtures/ft3/corpus/can_she_excuse.ft3", config_path="config.toml")
     assert state.message == ""

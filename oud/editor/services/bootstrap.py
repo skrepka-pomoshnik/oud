@@ -7,17 +7,23 @@ from oud.editor.core.feedback.messages import READ_ONLY_VIEWER, MessageLevel
 from oud.editor.core.state import EditorState
 from oud.editor.services.io.loading import import_warning_summary, load_piece_data
 from oud.importers.ft3 import build_durations
+from oud.importers.musicxml import musicxml_file_written_by_oud
 from oud.importers.tab import load_tab_data
 from oud.settings import DEFAULT_SETTINGS, load_settings
 from petrucci.core.model import Bar, Piece
 from petrucci.core.music.tuning import tuning_count
 
+NEW_DOCUMENT_SUFFIXES = (".tab", ".musicxml", ".xml")
 _MIN_PIECE_STRINGS = 4
 _MAX_PIECE_STRINGS = 7
 
 
 def _invalid_source(path: str | None, piece: Piece) -> bool:
     return bool(path and (Path(path).is_dir() or (piece.import_warnings and not piece.bars)))
+
+
+def _is_new_document(path: str | None) -> bool:
+    return bool(path and path.lower().endswith(NEW_DOCUMENT_SUFFIXES) and not Path(path).exists())
 
 
 def _ensure_initial_bars(piece: Piece, settings: dict[str, str]) -> None:
@@ -41,7 +47,9 @@ def _apply_piece_metadata(state: EditorState) -> None:
     state.settings["tuning"] = piece.tuning
     tuned_strings = tuning_count(piece.tuning)
     if tuned_strings:
-        piece.strings = tuned_strings
+        # Never hide a course that carries notes: saving writes only piece.strings courses.
+        used = [note.string for bar in piece.bars for chord in bar.chords for note in chord.notes]
+        piece.strings = max([tuned_strings, *used])
 
 
 def _setting_int(settings: dict[str, str], key: str, fallback_key: str) -> int:
@@ -89,19 +97,26 @@ def init_state(
     read_only: bool = False,
 ) -> EditorState:
     settings = load_settings(config_path)
-    requested_path = path
-    piece, overrides, durations, dotted, bar_width = load_piece_data(path)
-    invalid_source = _invalid_source(requested_path, piece)
+    # A missing .tab path names a new document: nothing is written until the
+    # first :w, which asks for the destination with this path filled in.
+    new_tab = _is_new_document(path)
+    piece, overrides, durations, dotted, bar_width = load_piece_data(None if new_tab else path)
+    if new_tab:
+        piece.title = Path(str(path)).stem
+    invalid_source = new_tab or _invalid_source(path, piece)
     _ensure_initial_bars(piece, settings)
 
     state = EditorState(piece, settings, config_path=config_path)
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
-    if path and path.lower().endswith(".tab"):
+    if path and path.lower().endswith(".tab") and Path(path).is_file():
         state.tab_data = load_tab_data(path)
     valid_path = None if invalid_source else path
-    configure_document(state, valid_path, forced_read_only=read_only)
+    oud_musicxml = bool(valid_path) and musicxml_file_written_by_oud(str(valid_path))
+    configure_document(state, valid_path, forced_read_only=read_only, oud_musicxml=oud_musicxml)
+    if new_tab:
+        state.suggested_write_path = path
     _apply_piece_metadata(state)
     _apply_path_defaults(state, path)
     _apply_spacing(state, bar_width)

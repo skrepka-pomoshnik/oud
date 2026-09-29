@@ -9,11 +9,22 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.core.model import (
+    Bar,
+    Chord,
+    ImportedBarContent,
+    ImportedScore,
+    ImportedStaff,
+    LyricEvent,
+    MelodyEvent,
+    Note,
+    Piece,
+)
 from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
     EventKind,
+    KeySignature,
     LyricSyllable,
     NotationEvent,
     NotationMeasure,
@@ -25,6 +36,7 @@ from petrucci.core.score import (
     SpanKind,
     StemDirection,
     TimeSignature,
+    TupletRatio,
     WrittenPitch,
     pitch_from_midi,
 )
@@ -72,7 +84,13 @@ def _event(
     )
 
 
-def _piece_with_tab(*, repeat: str | None = None, ending_numbers: tuple[int, ...] = ()) -> Piece:
+def _piece_with_tab(
+    *,
+    repeat: str | None = None,
+    ending_numbers: tuple[int, ...] = (),
+    fermata: bool = False,
+    time_sig: str | None = None,
+) -> Piece:
     chord = Chord(
         note_type=4,
         dotted=False,
@@ -81,7 +99,7 @@ def _piece_with_tab(*, repeat: str | None = None, ending_numbers: tuple[int, ...
     )
     return Piece(
         title="Matrix proof",
-        bars=[Bar(chords=[chord], repeat=repeat, ending_numbers=ending_numbers)],
+        bars=[Bar(chords=[chord], repeat=repeat, ending_numbers=ending_numbers, fermata=fermata, time_sig=time_sig)],
         strings=6,
     )
 
@@ -220,7 +238,76 @@ def _repeat_fixture() -> MatrixFixture:
     return MatrixFixture(score, piece, {}, {}, {}, [], [])
 
 
+def _single_measure_fixture(
+    score_id: str,
+    piece: Piece,
+    *,
+    settings: dict[str, str] | None = None,
+    **measure_options: Any,
+) -> MatrixFixture:
+    events = measure_options.pop("events", (_event(f"{score_id}-1", 0, 60), _event(f"{score_id}-2", 1, 62)))
+    measure = NotationMeasure(f"{score_id}-measure", 1, events, **measure_options)
+    score = NotationScore(
+        id=score_id, staffs=(NotationStaff(id=f"{score_id}-staff", label="Lute", measures=(measure,)),)
+    )
+    return MatrixFixture(score, piece, settings or {}, {}, {}, [], [])
+
+
+def _fermata_fixture() -> MatrixFixture:
+    events = (_event("fermata-1", 0, 60, fermata=True), _event("fermata-2", 1, 62))
+    return _single_measure_fixture(
+        "fermata", _piece_with_tab(fermata=True), events=events, time_signature=TimeSignature(2, 4)
+    )
+
+
+def _cut_time_fixture() -> MatrixFixture:
+    return _single_measure_fixture("cut-time", _piece_with_tab(time_sig="C|"), time_signature=TimeSignature(2, 2))
+
+
+def _key_signature_fixture() -> MatrixFixture:
+    return _single_measure_fixture(
+        "key-signature",
+        _piece_with_tab(),
+        settings={"key": "G"},
+        time_signature=TimeSignature(2, 4),
+        key_signature=KeySignature(1),
+    )
+
+
+def _tuplet_fixture() -> MatrixFixture:
+    triplet = TupletRatio(3, 2)
+    events = (
+        *tuple(
+            NotationEvent(
+                f"tuplet-{index}",
+                Fraction(index, 12),
+                Fraction(1, 12),
+                EventKind.NOTE,
+                (pitch_from_midi(60 + index),),
+                tuplet=triplet,
+            )
+            for index in range(3)
+        ),
+        _event("tuplet-4", 1, 65),
+    )
+    measure = NotationMeasure("tuplet-measure", 1, events, time_signature=TimeSignature(2, 4))
+    score = NotationScore(id="tuplet", staffs=(NotationStaff(id="tuplet-staff", label="Voice", measures=(measure,)),))
+    melody = [MelodyEvent("c", index, note_type=5, tuplet_actual=3, tuplet_normal=2) for index in range(3)]
+    melody.append(MelodyEvent("f", 3, note_type=4))
+    staff = ImportedStaff(
+        kind="note", label="Voice", bars=[ImportedBarContent(0, melody_events=melody, time_sig="2/4")]
+    )
+    chords = [Chord(4, False, None, [Note(1, 0, 0)]) for _ in range(2)]
+    piece = Piece(title="Tuplet", bars=[Bar(chords=chords, time_sig="2/4")], strings=6)
+    piece.imported_score = ImportedScore("ft3", [staff])
+    return MatrixFixture(score, piece, {"showmelody": "on"}, {}, {}, [], [])
+
+
 _FIXTURE_BUILDERS: dict[str, Callable[[], MatrixFixture]] = {
+    "tuplet-triplet": _tuplet_fixture,
+    "fermata": _fermata_fixture,
+    "cut-time": _cut_time_fixture,
+    "key-signature": _key_signature_fixture,
     "tab-registration-and-rhythm": _tab_fixture,
     "voice-lute-lyrics": _voice_lute_fixture,
     "polyphonic-collisions": _polyphonic_fixture,

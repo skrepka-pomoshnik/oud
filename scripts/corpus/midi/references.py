@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -21,6 +22,7 @@ class ReferenceFetch:
     url: str
     path: Path
     detail: str | None = None
+    sha256: str | None = None
 
 
 def companion_midi_url(ft3_url: str) -> str:
@@ -65,7 +67,7 @@ def fetch_reference(ft3_url: str, cache_root: Path, *, refresh: bool = False) ->
     missing_marker = path.with_suffix(f"{path.suffix}.missing")
     if path.exists() and not refresh:
         status: ReferenceStatus = "cached" if path.stat().st_size else "empty"
-        return ReferenceFetch(status, url, path)
+        return ReferenceFetch(status, url, path, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
     if missing_marker.exists() and not refresh:
         return ReferenceFetch("missing", url, path, "cached HTTP 404")
     request = Request(url, headers={"User-Agent": "oud-midi-corpus-audit"})  # noqa: S310
@@ -82,4 +84,4 @@ def fetch_reference(ft3_url: str, cache_root: Path, *, refresh: bool = False) ->
     _write_atomic(path, payload)
     missing_marker.unlink(missing_ok=True)
     status = "downloaded" if payload else "empty"
-    return ReferenceFetch(status, url, path)
+    return ReferenceFetch(status, url, path, sha256=hashlib.sha256(payload).hexdigest())

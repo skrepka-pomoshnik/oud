@@ -29,8 +29,14 @@ Triplet = tuple[int, int, int]
 Pair = tuple[int, int]
 
 
+# Rows kept free below the last system.
+_BOTTOM_MARGIN = 1
+
+
 @dataclass(frozen=True)
 class DuetRenderRequest:
+    """Duet render request; ``height`` counts the rows available for the score."""
+
     piece: Piece
     width: int
     height: int
@@ -245,6 +251,7 @@ def _render_payload(
         cursor_bar=state.cursor_bar,
         cursor_string=request.cursor_string,
         cursor_col=request.cursor_col,
+        cursor_event=None,
         bar_width=request.bar_width,
         overrides=payload.overrides,
         durations=payload.durations,
@@ -338,7 +345,7 @@ class _DuetRenderer:
                 double_stems=request.double_stems,
             )
         )
-        available = max(0, request.height - 2 - (request.header_row + 2))
+        available = max(0, request.height - _BOTTOM_MARGIN - (request.header_row + 2))
         local_playback: PlaybackOverlayCache | None = {} if request.playback_cache is not None else None
         local_maps: dict[int, list[int]] | None = {} if request.cursor_display_maps is not None else None
         state = _SystemState(
@@ -425,7 +432,7 @@ class _DuetRenderer:
         block = content_height + 1
         pair_height = block * 2
         base_header = request.header_row + 1
-        available = max(0, request.height - 2 - base_header)
+        available = max(0, request.height - _BOTTOM_MARGIN - base_header)
         systems = _system_slots(available, pair_height, allow_partial=False)
         current = max(0, logical_offset)
         total = max(len(payload.piece.bars) for payload in payloads)

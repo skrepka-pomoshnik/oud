@@ -5,27 +5,20 @@ import os
 import signal
 from types import FrameType
 
-from oud.editor.commands.help import help_lines
 from oud.editor.core.feedback.transient import decay_transient_message
-from oud.editor.core.input.modes import Mode
-from oud.editor.navigation.view.focus import current_view_staff
 from oud.editor.navigation.view.state import view_commit_frame, view_merge_dirty, view_resize
 from oud.editor.navigation.viewport import ensure_cursor_visible
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.media.jobs import drain_background_messages
 from oud.editor.services.media.midi import stop_midi
 from oud.editor.services.media.playback import update_playback_animation
-from oud.editor.services.status import status_line
-from oud.exports.export_tab import export_ascii
+from oud.editor.services.screen.compose import compose_editor_frame
 from oud.presentation.tui.controller import handle_key as handle_key_impl
 from oud.presentation.tui.input import handle_command as handle_command_input
 from oud.presentation.tui.input import handle_search as handle_search_input
 from oud.presentation.tui.keycodes import keycodes_from_curses
 from oud.presentation.ui.adapter import CursesScreen, apply_theme_background, contrast_attr, theme_attr
-from petrucci.adapters.duet import is_duet_score_piece
-from petrucci.rendering.api import render_piece
 from petrucci.terminal.canvas.framebuffer import (
-    FrameBuffer,
     draw_frame_rows,
     frame_diff_rows,
     overlay_dirty_rows,
@@ -131,75 +124,9 @@ def _try_playback_overlay(state, screen, *, viewport_changed: bool) -> bool:
 
 
 def _render_full_frame(state, *, height: int, width: int, screen) -> bool:
-    ascii_preview_lines = (
-        export_ascii(
-            state.piece,
-            state.overrides,
-            state.durations,
-            state.bar_width,
-            settings=state.settings,
-            ornaments=state.ornaments,
-            annotations=state.annotations,
-            slurs=state.slurs,
-            ties=state.ties,
-            holds=state.holds,
-        ).splitlines()
-        if state.ascii_preview
-        else None
-    )
-    frame_buffer = FrameBuffer(height, width)
-    focused_staff = current_view_staff(state)
-    state.display_cursor_maps.clear()
-    playback_cache: dict[tuple[int, int], list[tuple[int, int, str, int]]] | None = (
-        {} if not is_duet_score_piece(state.piece) and state.piece.imported_score is None else None
-    )
-    render_piece(
-        frame_buffer,
-        state.piece,
-        state.bar_offset,
-        state.cursor_bar,
-        state.cursor_string,
-        cursor_col=state.cursor_col,
-        bar_width=state.bar_width,
-        overrides=state.overrides,
-        durations=state.durations,
-        ornaments=state.ornaments,
-        annotations=state.annotations,
-        highlights=state.highlights,
-        dotted=state.dotted,
-        slurs=state.slurs,
-        ties=state.ties,
-        holds=state.holds,
-        mode=state.mode,
-        cmdline=state.cmdline,
-        message=state.visible_message,
-        status_line=status_line(state),
-        searchline=state.searchline,
-        settings=state.settings,
-        ascii_lines=ascii_preview_lines,
-        stave_breaks=state.stave_breaks,
-        plugin_title=state.plugin_title,
-        plugin_items=[f"{item.title}{'/' if item.is_dir else ''}" for item in state.plugin_items],
-        plugin_index=state.plugin_index,
-        plugin_offset=state.plugin_offset,
-        help_offset=state.info_offset
-        if state.mode == "info"
-        else state.notes_offset
-        if state.mode == "notes"
-        else state.help_offset,
-        playback_bar=None if playback_cache is not None else state.playback_bar,
-        playback_col=None if playback_cache is not None else state.playback_col,
-        playback_markers=None if playback_cache is not None else state.playback.markers,
-        playback_cache=playback_cache,
-        cursor_display_maps=state.display_cursor_maps,
-        message_level=state.visible_message_level.value,
-        focused_imported_staff_index=(
-            focused_staff.source_index if not focused_staff.key.startswith("duet-") else None
-        ),
-        playback_verse=state.playback.verse,
-        help_lines=help_lines(state) if state.mode == Mode.HELP else (),
-    )
-    base_frame = frame_buffer.snapshot()
+    composed = compose_editor_frame(state, height=height, width=width)
+    playback_cache = composed.playback_cache
+    base_frame = composed.frame
     state.last_base_frame = base_frame
     state.playback_overlay_cache = playback_cache
     rerender_for_playback_scroll = False

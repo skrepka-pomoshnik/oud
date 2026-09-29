@@ -1,6 +1,5 @@
 from oud.editor.commands.dispatch import convert_overrides
 from oud.editor.core.state import EditorState
-from oud.editor.editing.primitives.edits import apply_duration
 from oud.editor.services.validation.verify import bar_duration_sum
 from oud.presentation.tui.commands import _parse_time_sig_value, _tuning_preset, apply_command
 from petrucci.core.model import Bar, Chord, Note, Piece
@@ -46,14 +45,6 @@ def test_bar_duration_sum_with_durations() -> None:
     state.durations[(0, 0, 2)] = 8
     total = bar_duration_sum(state, 0, default_duration=4)
     assert total == 2.5
-
-
-def test_apply_duration_replaces_column() -> None:
-    state = _state()
-    state.durations[(0, 1, 0)] = 4
-    apply_duration(state, (0, 0, 0), 8)
-    assert state.durations[(0, 0, 0)] == 8
-    assert state.durations[(0, 1, 0)] == 4
 
 
 def test_convert_overrides_updates_message() -> None:

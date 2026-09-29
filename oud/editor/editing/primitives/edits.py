@@ -2,23 +2,24 @@ from __future__ import annotations
 
 import copy
 from contextlib import contextmanager
+from fractions import Fraction
 
 from oud.editor.core.state import EditorState, UndoAction, UndoGroupFrame
-from petrucci.input.tablature.mutation import (
+from petrucci.input.tablature.grid import (
     EditableTablature,
-    TabEditTransaction,
     TabMutation,
+    set_tab_cell,
+)
+from petrucci.input.tablature.mutation import (
+    TabDocument,
+    TabEditTransaction,
     TabMutationResult,
     apply_tab_mutation,
-    clear_tab_cell,
-    clear_tab_note,
-    set_tab_cell,
-    set_tab_duration,
 )
 
 
-def _cursor_snapshot(state: EditorState) -> tuple[int, int, int]:
-    return (state.cursor_bar, state.cursor_string, state.cursor_col)
+def _cursor_snapshot(state: EditorState) -> tuple[int, int, Fraction]:
+    return (state.cursor_bar, state.cursor_string, state.cursor_onset)
 
 
 def _mark_modified_from_clean_depth(state: EditorState) -> None:
@@ -108,26 +109,31 @@ def apply_override(state: EditorState, key: tuple[int, int, int], ch: str) -> No
     _record_tab_mutation(state, set_tab_cell(_editable_tablature(state), key, ch))
 
 
-def apply_duration(state: EditorState, key: tuple[int, int, int], dur: int) -> None:
-    _record_tab_mutation(state, set_tab_duration(_editable_tablature(state), key, dur))
-
-
 def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -> TabMutationResult:
+    """Apply an onset transaction to the bar chords as one undo step."""
+
+    document = TabDocument(
+        state.piece.bars,
+        state.piece.strings,
+        state.settings.get("style") or state.piece.style or "french",
+        default_meter=state.settings.get("time"),
+    )
+    result = apply_tab_mutation(document, transaction)
     with undo_group(state, label="tab-transaction"):
-        result = apply_tab_mutation(_editable_tablature(state), transaction)
-        for mutation in result.changes:
-            _record_tab_mutation(state, mutation)
+        for delta in result.changes:
+            record_action(
+                state,
+                UndoAction(
+                    kind="chords",
+                    data={
+                        "bar": delta.bar_index,
+                        "prev": list(delta.before),
+                        "new": copy.deepcopy(list(delta.after)),
+                        "mirror_notes": True,
+                    },
+                ),
+            )
     return result
-
-
-def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:
-    with undo_group(state, label="clear-cell"):
-        _record_tab_mutation(state, clear_tab_cell(_editable_tablature(state), (bar, string, col)))
-
-
-def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:
-    with undo_group(state, label="clear-cell-note"):
-        _record_tab_mutation(state, clear_tab_note(_editable_tablature(state), (bar, string, col)))
 
 
 def _editable_tablature(state: EditorState) -> EditableTablature:
@@ -157,24 +163,3 @@ def _record_tab_mutation(state: EditorState, mutation: TabMutation) -> None:
         )
     for delta in mutation.cells:
         record_undo(state, "override", delta.key, delta.before, delta.after)
-    for delta in mutation.rhythms:
-        record_action(
-            state,
-            UndoAction(
-                kind="duration_col",
-                data={
-                    "bar": delta.bar_index,
-                    "col": delta.column,
-                    "prev": dict(delta.before),
-                    "new": dict(delta.after),
-                },
-            ),
-        )
-    for delta in mutation.dots:
-        record_action(
-            state,
-            UndoAction(
-                kind="dotted",
-                data={"key": delta.key, "prev": delta.before, "new": delta.after},
-            ),
-        )

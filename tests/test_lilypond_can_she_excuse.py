@@ -1,5 +1,7 @@
 from fractions import Fraction
 
+import pytest
+
 from oud.exports.lilypond import lilypond_text
 from oud.exports.lilypond.registration import build_lilypond_registration
 from oud.importers.ft3 import load_ft3
@@ -8,6 +10,7 @@ from oud.settings import DEFAULT_SETTINGS
 CAN_SHE_EXCUSE = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
 
 
+@pytest.mark.ft3_corpus
 def test_can_she_excuse_decodes_registered_two_verse_rows() -> None:
     piece = load_ft3(CAN_SHE_EXCUSE)
 
@@ -17,6 +20,7 @@ def test_can_she_excuse_decodes_registered_two_verse_rows() -> None:
     assert piece.bars[14].lyrics == ["no fruit I", "can grant- ed"]
 
 
+@pytest.mark.ft3_corpus
 def test_can_she_excuse_uses_five_bar_gerbode_registration() -> None:
     piece = load_ft3(CAN_SHE_EXCUSE)
     registration = build_lilypond_registration(piece, dict(DEFAULT_SETTINGS))
@@ -27,6 +31,7 @@ def test_can_she_excuse_uses_five_bar_gerbode_registration() -> None:
     assert registration.measure_durations == (Fraction(3, 4),) * 40
 
 
+@pytest.mark.ft3_corpus
 def test_can_she_excuse_lilypond_has_registered_lute_publication_policy() -> None:
     piece = load_ft3(CAN_SHE_EXCUSE)
     text = lilypond_text(piece, {}, {}, 12, settings=dict(DEFAULT_SETTINGS))

@@ -1,3 +1,5 @@
+from fractions import Fraction
+
 import pytest
 
 from oud.editor.core.coordinates import MAX_KEY_COUNT
@@ -8,13 +10,20 @@ from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.undo import undo
 from oud.editor.interaction.normal.actions import handle_normal
 from oud.editor.navigation import motions
-from oud.editor.services.status import status_line
-from petrucci.core.model import Bar, Piece
+from oud.editor.services.screen.status import status_line
+from petrucci.core.model import Bar, Chord, Note, Piece
+
+
+def _eighths() -> Bar:
+    """A full 4/4 bar of eighths on course 1; its event columns are 0..7 at bar width 8."""
+
+    return Bar(chords=[Chord(5, False, None, [Note(1, fret, 0)]) for fret in range(8)])
 
 
 def _state() -> EditorState:
-    piece = Piece(title="T", bars=[Bar() for _ in range(8)], strings=6)
+    piece = Piece(title="T", bars=[_eighths() for _ in range(8)], strings=6)
     settings = {
+        "time": "4/4",
         "style": "french",
         "keys": "vim+arrows",
         "barsperline": "3",
@@ -192,14 +201,14 @@ def test_oversized_counted_motion_stops_at_read_only_boundary(monkeypatch: pytes
     state.cursor_col = state.bar_width - 1
     calls = 0
 
-    original = motions._target_move_visual
+    original = motions.target_move_right
 
-    def counted_target(current: EditorState, delta: int, *, geometry_cache=None):
+    def counted_target(current: EditorState) -> motions.CursorMotionTarget:
         nonlocal calls
         calls += 1
-        return original(current, delta, geometry_cache=geometry_cache)
+        return original(current)
 
-    monkeypatch.setattr(motions, "_target_move_visual", counted_target)
+    monkeypatch.setattr(motions, "target_move_right", counted_target)
     for _ in range(100):
         handle_normal(state, ord("9"))
     handle_normal(state, ord("l"))
@@ -334,38 +343,35 @@ def test_counted_dd_deletes_multiple_bars_and_clears_count() -> None:
     assert state.cursor_col == 1
 
 
+def _course_one_frets(state: EditorState, bar: int = 0) -> list[int]:
+    return [note.fret for chord in state.piece.bars[bar].chords for note in chord.notes if note.string == 1]
+
+
 def test_counted_x_is_single_grouped_undo() -> None:
     state = _state()
-    state.overrides[(0, 0, 0)] = "a"
-    state.overrides[(0, 0, 1)] = "b"
-    state.overrides[(0, 0, 2)] = "c"
-    state.durations[(0, 0, 0)] = 4
-    state.durations[(0, 0, 1)] = 4
-    state.durations[(0, 0, 2)] = 4
     handle_normal(state, ord("3"))
     handle_normal(state, ord("x"))
-    assert (0, 0, 0) not in state.overrides
-    assert (0, 0, 1) not in state.overrides
-    assert (0, 0, 2) not in state.overrides
+    assert _course_one_frets(state) == [3, 4, 5, 6, 7]
     assert len(state.undo_stack) == 1
     assert state.undo_stack[-1].kind == "group"
     undo(state, config_path=state.config_path)
-    assert state.overrides[(0, 0, 0)] == "a"
-    assert state.overrides[(0, 0, 1)] == "b"
-    assert state.overrides[(0, 0, 2)] == "c"
+    assert _course_one_frets(state) == list(range(8))
 
 
 def test_counted_x_advances_by_note_slots() -> None:
     state = _state()
-    state.overrides[(0, 0, 0)] = "a"
-    state.overrides[(0, 0, 3)] = "b"
-    state.overrides[(0, 0, 6)] = "c"
-    state.durations[(0, 0, 0)] = 4
-    state.durations[(0, 0, 3)] = 4
-    state.durations[(0, 0, 6)] = 4
+    state.piece.bars[0] = Bar(
+        chords=[
+            Chord(4, False, None, [Note(1, 0, 0), Note(2, 0, 0)]),
+            Chord(4, False, None, [Note(2, 1, 0)]),
+            Chord(4, False, None, [Note(1, 2, 0), Note(2, 2, 0)]),
+            Chord(4, False, None, [Note(1, 3, 0), Note(2, 3, 0)]),
+        ],
+    )
     handle_normal(state, ord("3"))
     handle_normal(state, ord("x"))
-    assert state.overrides == {}
+    assert _course_one_frets(state) == []
+    assert len(state.piece.bars[0].chords) == 4
 
 
 def test_word_search_and_mark_handlers_clear_stale_count() -> None:
@@ -383,12 +389,11 @@ def test_word_search_and_mark_handlers_clear_stale_count() -> None:
 def test_read_only_blocks_insert_and_delete() -> None:
     state = _state()
     state.read_only = True
-    state.overrides[(0, 0, 0)] = "a"
     handle_normal(state, ord("i"))
     assert state.mode == "normal"
     assert "Read-only" in state.message
     handle_normal(state, ord("x"))
-    assert state.overrides[(0, 0, 0)] == "a"
+    assert _course_one_frets(state) == list(range(8))
 
 
 def test_visual_mode_yanks_selected_rows_slice_with_v() -> None:
@@ -397,8 +402,6 @@ def test_visual_mode_yanks_selected_rows_slice_with_v() -> None:
     state.cursor_bar = 0
     state.cursor_string = 0
     state.cursor_col = 1
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 1, 2)] = "b"
 
     handle_normal(state, ord("v"))
     assert state.mode == "visual"
@@ -408,10 +411,7 @@ def test_visual_mode_yanks_selected_rows_slice_with_v() -> None:
 
     assert state.mode == "normal"
     assert state.yanked_rows is not None
-    assert len(state.yanked_rows) == 2
-    snippets = [snippet for (_bar, _row, snippet) in state.yanked_rows]
-    assert any("a" in snippet for snippet in snippets)
-    assert any("b" in snippet for snippet in snippets)
+    assert [snippet for (_bar, _row, snippet) in state.yanked_rows] == ["bc", "--"]
 
 
 def test_visual_line_mode_yanks_full_row_block_with_v() -> None:
@@ -420,9 +420,6 @@ def test_visual_line_mode_yanks_full_row_block_with_v() -> None:
     state.cursor_bar = 0
     state.cursor_string = 0
     state.cursor_col = 1
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 1, 2)] = "b"
-    state.overrides[(0, 2, 3)] = "c"
 
     handle_normal(state, ord("V"))
     assert state.mode == "visual_line"
@@ -438,38 +435,25 @@ def test_visual_line_mode_yanks_full_row_block_with_v() -> None:
 
 def test_visual_mode_deletes_selected_cells_and_yanks() -> None:
     state = _state()
-    state.bar_width = 8
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 0, 2)] = "b"
-    state.overrides[(0, 0, 3)] = "c"
-    state.durations[(0, 0, 1)] = 4
-    state.durations[(0, 0, 2)] = 4
-    state.durations[(0, 0, 3)] = 4
     state.cursor_col = 1
     handle_normal(state, ord("v"))
     handle_normal(state, ord("l"))
     handle_normal(state, ord("d"))
     assert state.mode == "normal"
-    assert (0, 0, 1) not in state.overrides
-    assert (0, 0, 2) not in state.overrides
-    assert state.overrides[(0, 0, 3)] == "c"
+    assert _course_one_frets(state) == [0, 3, 4, 5, 6, 7]
     assert state.yanked_rows is not None
-    assert state.yanked_rows[0][2] == "ab"
+    assert state.yanked_rows[0][2] == "bc"
 
 
 def test_visual_change_deletes_and_enters_insert() -> None:
     state = _state()
-    state.bar_width = 8
-    state.overrides[(0, 0, 1)] = "a"
-    state.overrides[(0, 0, 2)] = "b"
     state.cursor_col = 1
     handle_normal(state, ord("v"))
     handle_normal(state, ord("l"))
     handle_normal(state, ord("c"))
     assert state.mode == "insert"
-    assert (0, 0, 1) not in state.overrides
-    assert (0, 0, 2) not in state.overrides
-    assert state.cursor_col == 1
+    assert _course_one_frets(state) == [0, 3, 4, 5, 6, 7]
+    assert state.cursor_onset == Fraction(1, 8)
 
 
 def test_visual_mode_play_loops_selected_bar_range(monkeypatch) -> None:

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import zipfile
 from collections.abc import Sequence
+from fractions import Fraction
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from oud.exports.musicxml_staffs import append_measure_rest, append_notation_parts
 from petrucci.core.model import Bar, Piece
 from petrucci.core.music.time import parse_time_signature_value
+from petrucci.core.music.tuning import default_tuning_pitches
 from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
@@ -16,11 +19,17 @@ MUSICXML_DOCTYPE = (
 )
 
 DIVISIONS = 480
+SOFTWARE = "Oud"
+# Oud-only facts MusicXML has no element for, kept as identification fields.
+STYLE_FIELD = "oud-style"
+AUTHOR_FIELD = "oud-author"
+TUNING_FIELD = "oud-tuning"
+_CUT_TIME = (2, 2)
+_SINGLE_NUMBER_BEAT_TYPE = 4
 
 
 def _default_tuning(strings: int) -> list[int]:
-    defaults = "g4d4a3f3c3g2f2e2d2c2"
-    return _parse_tuning(defaults)[:strings]
+    return default_tuning_pitches(strings)
 
 
 def _note_type_to_denom(note_type: int) -> int:
@@ -99,7 +108,48 @@ def _time_symbol_attr(raw_time: str) -> str | None:
         return "common"
     if text in {"C|", "C/"}:
         return "cut"
+    if text.isdigit():
+        return "single-number"
     return None
+
+
+def _append_time(attributes: Element, bar: Bar, settings: dict[str, str]) -> None:
+    raw = _raw_time_sig_for_bar(bar, settings)
+    symbol = _time_symbol_attr(raw)
+    beats, beat_type = _time_for_bar(bar, settings)
+    if symbol == "cut":
+        beats, beat_type = _CUT_TIME
+    elif symbol == "single-number":
+        beats, beat_type = int(raw.strip()), _SINGLE_NUMBER_BEAT_TYPE
+    time = SubElement(attributes, "time")
+    if symbol:
+        time.set("symbol", symbol)
+    SubElement(time, "beats").text = str(beats)
+    SubElement(time, "beat-type").text = str(beat_type)
+
+
+def _append_tempo(measure: Element, tempo: int) -> None:
+    direction = SubElement(measure, "direction", placement="above")
+    metronome = SubElement(SubElement(direction, "direction-type"), "metronome")
+    SubElement(metronome, "beat-unit").text = "quarter"
+    SubElement(metronome, "per-minute").text = str(tempo)
+    SubElement(direction, "sound", tempo=str(tempo))
+
+
+def _append_identification(root: Element, piece: Piece, style: str, tuning: str) -> None:
+    identification = SubElement(root, "identification")
+    if piece.composer:
+        creator = SubElement(identification, "creator", type="composer")
+        creator.text = piece.composer
+    encoding = SubElement(identification, "encoding")
+    SubElement(encoding, "software").text = SOFTWARE
+    fields = ((STYLE_FIELD, style), (AUTHOR_FIELD, piece.author), (TUNING_FIELD, tuning))
+    if not any(value for _name, value in fields):
+        return
+    miscellaneous = SubElement(identification, "miscellaneous")
+    for name, value in fields:
+        if value:
+            SubElement(miscellaneous, "miscellaneous-field", name=name).text = value
 
 
 def _key_name(value: str) -> str:
@@ -289,10 +339,42 @@ def _add_note(
     )
 
 
-def _add_barline(measure: Element, *, location: str, style: str, repeat: str | None = None) -> None:
+def _ending_text(numbers: tuple[int, ...]) -> str:
+    return ", ".join(str(number) for number in numbers)
+
+
+def _ending_start(bars: list[Bar], index: int) -> str | None:
+    """Ending numbers when bar ``index`` opens a volta (a run of bars with the same ending numbers)."""
+
+    numbers = bars[index].ending_numbers
+    if not numbers or (index > 0 and bars[index - 1].ending_numbers == numbers):
+        return None
+    return _ending_text(numbers)
+
+
+def _ending_stop(bars: list[Bar], index: int) -> str | None:
+    numbers = bars[index].ending_numbers
+    if not numbers or (index + 1 < len(bars) and bars[index + 1].ending_numbers == numbers):
+        return None
+    return _ending_text(numbers)
+
+
+def _add_barline(
+    measure: Element,
+    *,
+    location: str,
+    style: str | None,
+    repeat: str | None = None,
+    ending: tuple[str, str] | None = None,
+) -> None:
     barline = SubElement(measure, "barline")
     barline.set("location", location)
-    SubElement(barline, "bar-style").text = style
+    if style is not None:
+        SubElement(barline, "bar-style").text = style
+    if ending is not None:
+        ending_node = SubElement(barline, "ending")
+        ending_node.set("number", ending[0])
+        ending_node.set("type", ending[1])
     if repeat is not None:
         repeat_node = SubElement(barline, "repeat")
         repeat_node.set("direction", repeat)
@@ -302,10 +384,12 @@ def _barline_style(value: str | None) -> str:
     mapping = {
         "|": "regular",
         "||": "light-light",
+        "|.": "light-heavy",
         ":": "dotted",
         " ": "none",
     }
-    return mapping.get((value or "|").strip(), "regular")
+    key = "|" if value is None else (value.strip() or value)  # a blank barline (" ") is `none`
+    return mapping.get(key, "regular")
 
 
 def _append_first_measure_attributes(
@@ -319,13 +403,7 @@ def _append_first_measure_attributes(
     SubElement(attributes, "divisions").text = str(DIVISIONS)
     key = SubElement(attributes, "key")
     SubElement(key, "fifths").text = str(_key_fifths(settings.get("key") or piece.key or "C"))
-    beats, beat_type = _time_for_bar(bar, settings)
-    time = SubElement(attributes, "time")
-    symbol = _time_symbol_attr(_raw_time_sig_for_bar(bar, settings))
-    if symbol:
-        time.set("symbol", symbol)
-    SubElement(time, "beats").text = str(beats)
-    SubElement(time, "beat-type").text = str(beat_type)
+    _append_time(attributes, bar, settings)
     clef = SubElement(attributes, "clef")
     SubElement(clef, "sign").text = "TAB"
     SubElement(clef, "line").text = "5"
@@ -347,14 +425,7 @@ def _append_first_measure_attributes(
 def _append_time_change(measure: Element, bar: Bar, settings: dict[str, str]) -> None:
     if not bar.time_sig:
         return
-    parsed = _time_for_bar(bar, settings)
-    attributes = SubElement(measure, "attributes")
-    time = SubElement(attributes, "time")
-    symbol = _time_symbol_attr(_raw_time_sig_for_bar(bar, settings))
-    if symbol:
-        time.set("symbol", symbol)
-    SubElement(time, "beats").text = str(parsed[0])
-    SubElement(time, "beat-type").text = str(parsed[1])
+    _append_time(SubElement(measure, "attributes"), bar, settings)
 
 
 def _repeat_words(repeat: str) -> str | None:
@@ -590,6 +661,17 @@ def _append_musicxml_override_notes(
         remaining_fermata = False
 
 
+def _effective_meter(piece: Piece, bar_index: int, settings: dict[str, str]) -> Fraction:
+    """The meter in force in a bar: its own, else the latest earlier one, else the setting."""
+
+    for bar in reversed(piece.bars[: bar_index + 1]):
+        if bar.time_sig:
+            beats, unit = _time_for_bar(bar, settings)
+            return Fraction(beats, unit)
+    beats, unit = _time_for_bar(piece.bars[bar_index], settings)
+    return Fraction(beats, unit)
+
+
 def _append_musicxml_measure_notes(
     measure: Element,
     bar: Bar,
@@ -601,6 +683,7 @@ def _append_musicxml_measure_notes(
     style: str,
     dotted: set[tuple[int, int]] | None,
     pitch_for_string: list[int],
+    settings: dict[str, str],
 ) -> None:
     if bar.chords:
         _append_musicxml_chord_notes(
@@ -622,6 +705,9 @@ def _append_musicxml_measure_notes(
         pitch_for_string=pitch_for_string,
         fermata_pending=bool(bar.fermata),
     )
+    if measure.find("note") is None:
+        # An empty bar needs a measure rest, or other programs show nothing.
+        append_measure_rest(measure, _effective_meter(piece, bar_index, settings), DIVISIONS)
 
 
 def _append_musicxml_measure_prefix(
@@ -632,12 +718,20 @@ def _append_musicxml_measure_prefix(
     *,
     settings: dict[str, str],
     pitch_for_string: list[int],
-    carry_repeat_forward: bool,
 ) -> tuple[Element, str]:
     measure = SubElement(part, "measure", number=str(bar_number))
-    if carry_repeat_forward:
-        _add_barline(measure, location="left", style="heavy-light", repeat="forward")
     repeat = (bar.repeat or "").strip()
+    # `.:` and `:|:` put the repeat dots at the left barline of this bar (as FT3 and the renderer do).
+    forward = repeat in (".:", ":|:")
+    ending_start = _ending_start(piece.bars, bar_number - 1)
+    if forward or ending_start:
+        _add_barline(
+            measure,
+            location="left",
+            style="heavy-light" if forward else None,
+            repeat="forward" if forward else None,
+            ending=(ending_start, "start") if ending_start else None,
+        )
     if repeat:
         _add_repeat_directions(measure, repeat)
     repeat_words = _repeat_words(repeat)
@@ -653,18 +747,27 @@ def _append_musicxml_measure_prefix(
             bar,
             pitch_for_string,
         )
+        tempo = piece.tempo or settings.get("tempo", "")
+        if str(tempo).isdigit() and int(tempo) > 0:
+            _append_tempo(measure, int(tempo))
     else:
         _append_time_change(measure, bar, settings)
     return measure, repeat
 
 
-def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str) -> bool:
-    carry_repeat_forward = repeat in (".:", ":|:")
+def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str, ending_stop: str | None) -> None:
     right_repeat = "backward" if repeat in (":.", ":|:") else None
     bar_style = "light-heavy" if right_repeat else _barline_style(bar.barline)
     if repeat or bar.barline:
-        _add_barline(measure, location="right", style=bar_style, repeat=right_repeat)
-    return carry_repeat_forward
+        _add_barline(
+            measure,
+            location="right",
+            style=bar_style,
+            repeat=right_repeat,
+            ending=(ending_stop, "stop") if ending_stop else None,
+        )
+    elif ending_stop:
+        _add_barline(measure, location="right", style=None, ending=(ending_stop, "stop"))
 
 
 def _append_musicxml_measure(
@@ -679,8 +782,7 @@ def _append_musicxml_measure(
     style: str,
     dotted: set[tuple[int, int]] | None,
     pitch_for_string: list[int],
-    carry_repeat_forward: bool,
-) -> bool:
+) -> None:
     measure, repeat = _append_musicxml_measure_prefix(
         part,
         piece,
@@ -688,7 +790,6 @@ def _append_musicxml_measure(
         bar_index + 1,
         settings=settings,
         pitch_for_string=pitch_for_string,
-        carry_repeat_forward=carry_repeat_forward,
     )
     _append_musicxml_measure_notes(
         measure,
@@ -700,8 +801,9 @@ def _append_musicxml_measure(
         style=style,
         dotted=dotted,
         pitch_for_string=pitch_for_string,
+        settings=settings,
     )
-    return _finish_musicxml_measure(measure, bar, repeat)
+    _finish_musicxml_measure(measure, bar, repeat, _ending_stop(piece.bars, bar_index))
 
 
 def _musicxml_text(
@@ -717,23 +819,18 @@ def _musicxml_text(
     settings_map = settings or {}
     pitch_for_string, style = _musicxml_pitch_context(piece, settings_map)
     title = piece.title or "Untitled"
-    composer = piece.composer or piece.author or "Unknown"
 
     root = Element("score-partwise", version="3.1")
     work = SubElement(root, "work")
     SubElement(work, "work-title").text = title
-    identification = SubElement(root, "identification")
-    creator = SubElement(identification, "creator")
-    creator.set("type", "composer")
-    creator.text = composer
+    _append_identification(root, piece, style, piece.tuning or settings_map.get("tuning", ""))
     part_list = SubElement(root, "part-list")
     score_part = SubElement(part_list, "score-part", id="P1")
     SubElement(score_part, "part-name").text = "Lute"
     part = SubElement(root, "part", id="P1")
 
-    carry_repeat_forward = False
     for bar_index, bar in enumerate(piece.bars):
-        carry_repeat_forward = _append_musicxml_measure(
+        _append_musicxml_measure(
             part,
             piece,
             bar,
@@ -744,9 +841,15 @@ def _musicxml_text(
             style=style,
             dotted=dotted,
             pitch_for_string=pitch_for_string,
-            carry_repeat_forward=carry_repeat_forward,
         )
 
+    append_notation_parts(
+        root,
+        part_list,
+        piece,
+        divisions=DIVISIONS,
+        append_time=lambda attributes, bar: _append_time(attributes, bar, settings_map),
+    )
     xml_bytes = tostring(root, encoding="utf-8")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + MUSICXML_DOCTYPE + "\n" + xml_bytes.decode("utf-8") + "\n"
 

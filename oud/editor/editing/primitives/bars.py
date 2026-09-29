@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 from typing import TypeVar
 
 from oud.editor.core.state import BarSnapshot, EditorState
-from petrucci.core.model import Bar
+from petrucci.core.model import Bar, ImportedBarContent, Piece
 
 T = TypeVar("T")
 
@@ -111,6 +112,53 @@ def _shift_marks(
     return updated
 
 
+def _shift_imported(piece: Piece, start: int, delta: int, *, remove_index: int | None = None) -> None:
+    """Keep notation staffs aligned with the tablature: they pair by ``source_bar_index``."""
+
+    imported = piece.imported_score
+    if imported is None:
+        return
+    for staff in imported.staffs:
+        kept: list[ImportedBarContent] = []
+        for content in staff.bars:
+            if content.source_bar_index == remove_index:
+                continue
+            if content.source_bar_index >= start:
+                content.source_bar_index += delta
+            kept.append(content)
+        staff.bars = kept
+    imported.source_records = [
+        record if record.source_bar_index < start else replace(record, source_bar_index=record.source_bar_index + delta)
+        for record in imported.source_records
+        if record.source_bar_index != remove_index
+    ]
+
+
+def _imported_contents(piece: Piece, index: int) -> list[tuple[int, ImportedBarContent]]:
+    imported = piece.imported_score
+    if imported is None:
+        return []
+    return [
+        (staff_index, copy.deepcopy(content))
+        for staff_index, staff in enumerate(imported.staffs)
+        for content in staff.bars
+        if content.source_bar_index == index
+    ]
+
+
+def _restore_imported(piece: Piece, index: int, contents: list[tuple[int, ImportedBarContent]]) -> None:
+    imported = piece.imported_score
+    if imported is None:
+        return
+    for staff in imported.staffs:
+        staff.bars = [content for content in staff.bars if content.source_bar_index != index]
+    for staff_index, content in contents:
+        if staff_index < len(imported.staffs):
+            staff = imported.staffs[staff_index]
+            staff.bars.append(replace(copy.deepcopy(content), source_bar_index=index))
+            staff.bars.sort(key=lambda item: item.source_bar_index)
+
+
 def snapshot_bar(state: EditorState, index: int) -> BarSnapshot:
     bar = copy.deepcopy(state.piece.bars[index])
     overrides = {k: v for k, v in state.overrides.items() if k[0] == index}
@@ -137,6 +185,7 @@ def snapshot_bar(state: EditorState, index: int) -> BarSnapshot:
         "holds": holds,
         "glisses": glisses,
         "marks": marks,
+        "imported": _imported_contents(state.piece, index),
     }
 
 
@@ -162,6 +211,8 @@ def clear_bar_contents(state: EditorState, index: int) -> None:
 def restore_bar_snapshot(state: EditorState, index: int, snapshot: BarSnapshot) -> None:
     if "bar" in snapshot:
         state.piece.bars[index] = copy.deepcopy(snapshot["bar"])
+    if "imported" in snapshot:
+        _restore_imported(state.piece, index, snapshot["imported"])
     _remove_bar_entries(state, index)
     state.overrides.update(snapshot["overrides"])
     state.durations.update(snapshot["durations"])
@@ -180,6 +231,7 @@ def restore_bar_snapshot(state: EditorState, index: int, snapshot: BarSnapshot) 
 def insert_bar(state: EditorState, index: int) -> None:
     index = max(0, min(index, len(state.piece.bars)))
     state.piece.bars.insert(index, Bar())
+    _shift_imported(state.piece, index, 1)
     state.overrides = _shift_triplet_dict(state.overrides, index, 1)
     state.durations = _shift_triplet_dict(state.durations, index, 1)
     state.highlights = _shift_triplet_set(state.highlights, index, 1)
@@ -216,6 +268,7 @@ def delete_bar(state: EditorState, index: int) -> None:
         return
     index = max(0, min(index, len(state.piece.bars) - 1))
     state.piece.bars.pop(index)
+    _shift_imported(state.piece, index + 1, -1, remove_index=index)
     state.overrides = _shift_triplet_dict(state.overrides, index + 1, -1, remove_index=index)
     state.durations = _shift_triplet_dict(state.durations, index + 1, -1, remove_index=index)
     state.highlights = _shift_triplet_set(state.highlights, index + 1, -1, remove_index=index)

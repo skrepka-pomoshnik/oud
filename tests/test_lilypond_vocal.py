@@ -127,6 +127,7 @@ def test_export_lilypond_emits_imported_vocal_only_staffgroup(tmp_path) -> None:
     assert '\\tiny "+"' in text
 
 
+@pytest.mark.ft3_corpus
 def test_export_lilypond_emits_every_imported_polyphonic_staff(tmp_path) -> None:
     piece = load_ft3("tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse_4_part.ft3")
     path = tmp_path / "four_part.ly"
@@ -583,6 +584,7 @@ def test_export_lilypond_real_ft3_smoke_matrix_if_available(tmp_path, src_name: 
     assert "\\bar " in text
 
 
+@pytest.mark.ft3_corpus
 def test_export_lilypond_registers_dense_felice_score_like_gerbode(tmp_path) -> None:
     piece = load_ft3("tests/fixtures/ft3/corpus/01_felice_fu_quel_anon.ft3")
     path = tmp_path / "felice.ly"

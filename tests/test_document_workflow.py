@@ -4,17 +4,17 @@ from pathlib import Path
 
 import pytest
 
-from oud.editor.commands.help import help_lines
 from oud.editor.core.document import DocumentMode
 from oud.editor.core.feedback.messages import MessageLevel, infer_message_level
+from oud.editor.core.input.help import help_lines
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write_ascii
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.pages import paint_page
+from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.input import handle_command
-from petrucci.rendering.primitives.helpers import render_help
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
-from tests.helpers_keyscript import press_keys
+from tests.helpers_keyscript import press_keys, tab_events
 
 PURE_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
 MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
@@ -32,6 +32,7 @@ def _submit_command_path(state, path: Path, config_path: str) -> None:
     handle_command(state, 10, apply)
 
 
+@pytest.mark.ft3_corpus
 def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
 
@@ -41,9 +42,10 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert projection.write_path is None
     assert projection.visible_message == ""
 
+    # Tablature with notation staffs is editable and saves to MusicXML with those staffs.
     mixed = init_state(MIXED_FT3, config_path=config)
-    assert mixed.document_mode is DocumentMode.IMPORTED_READ_ONLY
-    assert mixed.read_only is True
+    assert mixed.document_mode is DocumentMode.IMPORTED_PROJECTION
+    assert mixed.read_only is False
     assert mixed.visible_message == ""
     assert mixed.visible_message_level is MessageLevel.INFO
 
@@ -62,6 +64,7 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert tab.write_path == TAB_FILE
 
 
+@pytest.mark.ft3_corpus
 def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     source = tmp_path / "source.ft3"
@@ -81,6 +84,7 @@ def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
     assert source.with_suffix(".tab").exists()
 
 
+@pytest.mark.ft3_corpus
 def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     target = tmp_path / "projection.tab"
@@ -109,6 +113,7 @@ def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -
     assert state.write_path == str(target)
 
 
+@pytest.mark.ft3_corpus
 @pytest.mark.parametrize("command", ["wq", "x"])
 def test_write_quit_prefills_sibling_destination_before_write(
     tmp_path: Path,
@@ -148,10 +153,11 @@ def test_new_target_requires_overwrite_confirmation(tmp_path: Path) -> None:
     assert state.write_path == str(target)
 
 
-def test_mixed_ft3_blocks_editing_but_allows_ascii_export(tmp_path: Path) -> None:
+@pytest.mark.ft3_corpus
+def test_duet_ft3_blocks_editing_but_allows_ascii_export(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     output = tmp_path / "view.txt"
-    state = init_state(MIXED_FT3, config_path=config)
+    state = init_state(DUET_FT3, config_path=config)
 
     press_keys(state, ["i", "a", 27])
     assert state.modified is False
@@ -172,6 +178,7 @@ def test_ascii_export_does_not_mark_score_saved(tmp_path: Path) -> None:
     assert state.message.startswith("Exported ASCII")
 
 
+@pytest.mark.ft3_corpus
 def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: Path) -> None:
     state = init_state(PURE_FT3, config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80
@@ -193,7 +200,7 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
     config = str(tmp_path / "config.toml")
     state = init_state(None, config_path=config)
     screen = FrameBuffer(24, 80)
-    render_help(screen, "help  j/k scroll  q close", 0, 0, help_lines(state))
+    paint_page(screen, help_lines(state), offset=0, status="help  j/k scroll  q close", status_attr=0)
     visible_help = "\n".join(line.rstrip() for line in screen.snapshot().lines[:-1])
 
     assert "Open/create  oud [FILE] / oud" in visible_help
@@ -206,9 +213,9 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
 
     target = tmp_path / "first-score.tab"
     press_keys(state, ["i", "a", 27])
-    assert state.overrides == {(0, 0, 0): "a"}
+    assert tab_events(state) == [("4", [(1, 0)])]
     press_keys(state, ["u"])
-    assert state.overrides == {}
+    assert tab_events(state) == []
 
     apply_command(state, f"w {target}", config)
     assert target.exists()
@@ -218,8 +225,9 @@ def test_visible_help_drives_a_safe_first_score_workflow(tmp_path: Path) -> None
         apply_command(state, "q", config)
 
 
+@pytest.mark.ft3_corpus
 def test_read_only_focus_uses_status_without_redundant_notice(tmp_path: Path) -> None:
-    state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
+    state = init_state(DUET_FT3, config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80
 
     assert state.persistent_notice == ""

@@ -1,5 +1,556 @@
 # DONE
 
+## S32: LilyPond tuplets from melody events (2026-09-29)
+
+- Triplets (and other tuplets) in an imported notation staff export as `\\tuplet A/N { ... }` blocks (each block takes up to `actual` consecutive members of one ratio, so two adjacent triplets are two blocks); a tuplet member counts its written value times `normal/actual`, so the bar needs no `\\scaleDurations`. They were plain eighths inside a scaling fudge before. Plain pieces cannot hold tuplets yet (`C17` step 2).
+- Validation: `tests/test_lilypond_tuplets.py` (block, two blocks, untouched bars, duration rule); the new `tuplet-triplet` matrix case (10 cases, 7 microcases). Gate below.
+
+## S11: engraving matrix cases for fermata, cut time and key signature (2026-09-29)
+
+- The matrix has three source-independent cases (`fermata`, `cut-time`, `key-signature`, marked `"origin": "oud"`) with their builders, microcases, proof roles and LilyPond tokens (`scripts.ufermata`, `\\time 2/2`, `\\key g \\major`); the tokens were taken from real exports, and a wrong token is detected. The profile test accepts an empty `upstream` list only for such cases.
+- The planned `tuplet-triplet` case was not written: the LilyPond exporter writes no tuplets at all (it scales durations), so the tuplet row of `docs/supported-behavior.md` is now Partial and the case moved to `S32`.
+- Validation: `tests/test_lilypond_engraving_profile.py` (9 cases, 6 microcases).
+
+## S23: fingerings and harmonics on notation staves in MusicXML (2026-09-29)
+
+- `MelodyEvent.fingering` and `harmonic` are written inside `notations/technical` (`fingering`, `harmonic`) and read back. They carry no string or fret, so `_technical_count` never takes a fingered standard staff for the tablature part; a test pins that with a standard part that has more fingerings than the tab part has notes.
+- Validation: the layered-score round trip (a harmonic and a fingering) and `tests/test_musicxml_import_warnings.py`; the schema test validates the output. Gate below.
+
+## S22: beams on notation staves in MusicXML (2026-09-29)
+
+- `MelodyEvent.beam` (`start`, `continue`, `end`) is written as `<beam number="1">begin|continue|end</beam>` (after the rhythm elements, before `notations`, as the schema orders them) and read back; other beam levels are ignored.
+- Validation: the layered-score round trip in `tests/test_layered_scores.py` now has a beamed pair and a three-note group, and a test checks that only beamed notes get a `<beam>`. The schema test validates the result. Gate: 1,921 passed.
+
+## S20: the grid primitives only tests used are deleted (2026-09-29)
+
+- Deleted `apply_duration`, `clear_cell`, `clear_cell_note` (`oud/editor/editing/primitives/edits.py`), `set_tab_duration`, `clear_tab_cell`, `clear_tab_note` and their helpers, `TabRhythmDelta`, `TabDotDelta` and the dead `rhythms`/`dots` branches of `_record_tab_mutation` (`petrucci/input/tablature/grid.py` went from 290 lines to about 150). Kept: `apply_override`/`set_tab_cell` (used by `:transpose`, replaced by `C8`), the chord helpers, and the undo handlers for `duration`, `duration_col` and `dotted` (replaced by `C5`).
+- Validation: the tests that existed only for the deleted code are removed; nothing else was weakened. Gate: 1,920 passed.
+
+## S21: the obsolete grid setting is removed (2026-09-29)
+
+- `grid` was only displayed and saved; nothing read it. It is gone from the defaults, the boolean keys, the settings page and the user guide. An old config with `grid = ...` loads without it, and `:set grid=on` answers `Unknown set key: grid`.
+- Validation: `tests/test_tui_commands_exec.py::test_the_obsolete_grid_setting_is_gone`; other tests that used `grid` as their example boolean now use `showdur`.
+
+## S31: measure rests for empty bars in MusicXML (2026-09-29)
+
+- An empty bar in the tablature part is written as `<rest measure="yes"/>` with the duration of the meter in force (its own, else the latest earlier one). A whole-measure rest in any MusicXML file reads as an empty bar, not as a rest chord; a real rest is still a rest chord. `append_measure_rest` in `oud/exports/musicxml_staffs.py` is shared with the notation staves.
+- Validation: `tests/test_musicxml_roundtrip.py` (empty bar round trip and inherited 3/4 duration, foreign measure rest, real rest); the schema test validates the edge piece's empty bar. Gate: 1,924 passed.
+
+## S30: tuplets are read by their written value (2026-09-29)
+
+- A tablature note with `time-modification` takes its value from its `<type>` and `<dot>` instead of its duration. Three triplet eighths were read as dotted 16ths and a 2/4 bar measured 17/32; it now reads three eighths (5/8, so the status row shows the meter difference) and warns `MusicXML: N tuplet groups were read without tuplet timing`. Real tuplet timing is `C17` step 2.
+- Validation: `tests/test_musicxml_import_warnings.py` (one and two groups, bar length, a bar without tuplets unchanged). Gate: 1,921 passed.
+
+## S29: grace notes no longer merge into chords on MusicXML import (2026-09-29)
+
+- A `<grace/>` note in the tablature part is skipped instead of joining the chord at its onset (a whole note preceded by a grace note read as two notes). The import warns `MusicXML: N grace notes were not read`.
+- Validation: `tests/test_musicxml_import_warnings.py` (one grace note, two).
+
+## S28: MusicXML import warns when it drops notes (2026-09-29)
+
+- Pitched notes that no string and fret describe (other parts, untabbed staves) are counted in an informational import warning, `MusicXML: N notes without tablature were not read`. Files Oud wrote (their extra parts are read) get no warning. `oud convert` treats `MusicXML: ` warnings as informational and still converts (`is_informational_warning`).
+- Validation: `tests/test_musicxml_import_warnings.py` (standard-only, two parts, singular, tab-only, Oud's layered file, conversion still writes). Gate: 1,916 passed.
+
+## S27: volta endings in MusicXML (2026-09-29)
+
+- `Bar.ending_numbers` is written as `<ending number="1, 2" type="start">` on the left barline of the first bar of a run of bars with the same numbers and `type="stop"` on the right barline of the last one, and read back with the volta carried over the bars in between. Adjacent runs with the same numbers are one volta.
+- Validation: `tests/test_musicxml_roundtrip.py` (five run shapes, start and stop positions); the schema test's edge piece now has endings and validates. Gate below.
+
+## S26: bar marks the exporter writes are read back (2026-09-29)
+
+- Bar fermatas (on the first note), dynamics (`dynamics` or `words`, never the repeat words) and closing barline styles (`||`, `:`, blank, and the final `|.`, which used to be written as a plain barline) now round-trip through MusicXML. A blank barline was also written as a plain one because the value was stripped first.
+- Validation: `tests/test_musicxml_roundtrip.py` (one test per field). The schema test still passes. Gate: 1,904 passed.
+
+## S25: a save names the marks it cannot keep (2026-09-29)
+
+- After a successful `:w`, the message ends with `(not saved: 1 slur, 1 ornament)` when slurs, ties, holds, glissandi, ornaments, annotations or highlights exist; neither MusicXML nor TAB stores them yet (`C17`). The counting lives in `oud/editor/services/io/dropped.py`.
+- Validation: `tests/test_musicxml_default_save.py` (both formats, no marks, per-kind counts). Gate: 1,892 passed.
+
+## MusicXML checked against the W3C schema; repeat start fixed (2026-09-29)
+
+- New `tests/test_musicxml_schema.py` validates Oud's MusicXML with
+  `xmllint --schema` against the W3C 4.1 schema (needs `xmllint` and
+  `MUSICXML_SCHEMA_DIR`; skips otherwise). All output validates; the 11 official
+  examples validate with the same setup. Exported pitches equal tuning plus
+  fret, and the official tablature example reads back exactly.
+- Bug fixed: a start repeat (`.:`, `:|:`) was written into the next measure, so
+  it moved one bar later on every save and reopen. It is now written at the left
+  barline of its own bar, and the reader recognises a bar with both a forward and
+  a backward repeat.
+- Correction to the C16 step 1 entry: that round trip covered chords, rests,
+  meters, tuning, tempo, style and author, not bar-level marks. Endings, barline
+  styles, fermatas, dynamics, keys and system breaks do not round trip, and
+  editor-side slurs, ties, holds, ornaments and annotations are never saved.
+- `docs/musicxml-support.md` records what Oud writes and reads, per field, with
+  the gaps. Tasks: `C17`, `S25` to `S31` in `TODO.md`.
+- Validation: `tests/test_musicxml_roundtrip.py` (repeat markers over three
+  saves; forward repeat at the left of its own measure). Gate: 1,888 passed.
+
+## S10: the historical-notation matrix (2026-09-29)
+
+- `docs/supported-behavior.md` has a table of historical constructs (mensuration and proportion signs, cut time, repeats and endings, fermatas, tuplets, grace notes, clefs and keys, dots) marked supported, partial or unsupported, with the test that proves each supported row; coloration, ligatures, perfection and alteration, ficta, custos, C clefs, interpreted durations and alternative interpretations are listed as unsupported. Every named test was checked to exist. Rejecting unsupported constructs visibly stays in `C13`.
+
+## S9: companion MIDI checksums (2026-09-29)
+
+- Each companion MIDI reference and audit record carries the file's SHA-256. `python -m scripts.corpus.midi --expect <earlier report>` reads the checksums of an earlier run; a reference whose checksum differs is reported `reference_stale` (`stale companion MIDI: <path>`) and is not compared.
+- Validation: `tests/test_corpus_midi.py` (cached checksum, matching checksum, altered file, checksums read from a report), all with small files in `tmp_path`. Gate: 1,884 passed.
+
+## S19: fermatas and slurs on notation staves in MusicXML (2026-09-29)
+
+- Notation staves write `<fermata/>` and `<slur type=start|stop>` inside the note's `notations`, and the importer reads them back into `fermata`, `slur_start` and `slur_end`.
+- Validation: the layered-score MusicXML round trip in `tests/test_layered_scores.py` now includes a slur pair and a fermata. Gate: 1,880 passed.
+
+## S8: one label for the tablature staff (2026-09-29)
+
+- `TAB_STAFF_LABEL` (`petrucci/adapters/piece_view.py`) is the single source for the drawn staff label and the focus lane, which used to read `Tab` while the staff read `lute`.
+- Validation: `tests/test_view_focus.py` (status `focus:` equals the drawn label in the viewer); the corpus focus tests use the constant.
+
+## S7: the tablature staff label no longer overwrites the staff (2026-09-29)
+
+- Petrucci's mixed view drew the `lute` label at `max(0, x - 5)`, over the first barline and staff lines. The tab bars are now drawn after the label column the layout already reserves for the tablature staff (lined up with the notation staves above), and the label is drawn inside that column.
+- Validation: `tests/test_layered_scores.py` (staff intact and label in its own column at 80x24 and 120x40; no label on a solo piece).
+
+## S18: oud convert without an output path (2026-09-29)
+
+- `oud convert x.tab` writes `x.musicxml` beside the input. An existing output still needs `--force`. Input `-` needs an explicit output, and a `.musicxml` input is refused (the default output would replace it, even with `--force`).
+- Validation: `tests/test_cli_contract.py` (default output, refusal to overwrite, stdin, same-name input).
+
+## S5: no col: in the status row (2026-09-29)
+
+- `parse_time_signature_value` reads cut time (`C|`, `c|`, `C/`) as 2/2, so a cut-time bar shows `beat:k/2` (it used to fall back to 4/4 in exports as well). A meter with no beat structure (`3`) shows `ev:<k>/<n>`, the cursor's stop among the bar's stops, instead of `col:`.
+- Validation: `tests/test_petrucci_time.py`; `tests/test_editor_status_row.py` (cut time, unparseable meter). Gate: 1,874 passed.
+
+## S4: the status row names a bar's length problem (2026-09-29)
+
+- `bar_meter_marker` returns `meter:<length> of <meter>` (length in whole notes, meter as written) instead of `M`: `meter:1/2 of 3/4` is a 3/4 bar holding two quarters, `meter:1/1 of 3/4` an overfull one. Full and empty bars, and unknown meters, show nothing.
+- Validation: `tests/test_editor_status_row.py` (full, underfull and overfull 3/4 bars, 6/8, empty). Gate: 1,860 passed.
+
+## S3: the help overlay and the pager share one text (2026-09-29)
+
+- The overlay and the `less` pager both print `help_lines(state)`; a test now locks that for every key style (`vim`, `vim+arrows`, `casual`, `casual+arrows`). No production change was needed.
+- Validation: `tests/test_keymap_table.py::test_the_pager_shows_the_same_help_as_the_overlay`.
+
+## S2: long prompts keep their end visible (2026-09-29)
+
+- `prompt_text` takes the row width; a command or search prompt wider than the row shows `<` and its last `width - 1` characters, so a long Save As path stays editable at 80 columns. The message is dropped while the prompt overflows.
+- Validation: `tests/test_editor_status_row.py` (120-character command at width 80, one more typed character, long search, short command). Gate: 1,854 passed.
+
+## C15: TAB saves keep what Oud does not model (2026-09-29)
+
+- Reading a file in the `tab` program's syntax keeps, verbatim: each chord's
+  line (ornaments, fingerings, slurs, `M` music and `T` text on it), lines the
+  model does not represent at their place in the bar (text, `M`/`MG`, keys,
+  fermatas, page and layout commands, comments, options, `$` settings), each
+  bar's closing barline variant and meter spelling, and the header. New model
+  fields: `Chord.source_text`, `Bar.source` (`SourceText`), and
+  `Piece.source_header`.
+- Writing reuses a chord line while it still decodes to the chord (same
+  rhythm and notes, reading `x` after the previous chord), a meter line while it
+  reads as the bar's meter, and the header while title, composer, author,
+  tuning and tempo are unchanged. Edited content is regenerated; an edited
+  chord loses its marks (next C15 step). `-milan` files are regenerated in the
+  default Italian order. `{…}` blocks inside the music no longer overwrite the
+  author.
+- Validation: `tests/test_tab_preservation.py`: a file with comments,
+  options, settings, three title blocks, ornaments, fingerings, grids, a rest,
+  a triplet, text, music lines, clef and key lines and barline variants saves
+  byte-identically after the header, also through the editor; saving twice
+  changes nothing; an edited chord is regenerated while the rest is kept.
+  Gate: 1,852 passed, 126 skipped.
+
+## FT3 scores with notation staffs are editable (C16) (2026-09-29)
+
+- FT3 scores with tablature and notation staffs (voices, lyrics) open as
+  editable projections instead of read-only views. Duet scores and scores
+  without tablature stay view-only.
+- Bar inserts and deletes renumber the notation staffs' `source_bar_index`, so
+  staffs stay aligned with the tablature; undo restores the deleted staff
+  content.
+- MusicXML save writes each note staff as its own part (new
+  `oud/exports/musicxml_staffs.py`): pitch, rhythm with dots and tuplets,
+  rests, ties, and lyrics with syllabic and extenders. MusicXML that Oud wrote
+  reads those parts back (`oud/importers/musicxml_staffs.py`), so reopening and
+  re-saving keeps them. The save message names how many staffs were written.
+- Saving such a score to `.tab` is refused with a message instead of dropping
+  the staffs (the `C15` sidecar will replace the refusal).
+- Validation: `tests/test_layered_scores.py` (classification, MusicXML save and
+  native reopen of staffs and lyrics, TAB refusal, bar insert/delete alignment
+  and undo). The corpus workflow tests now expect mixed FT3 to be editable and
+  use the duet score for view-only behaviour (they skip without the corpus
+  here). Gate: 1,847 passed, 126 skipped.
+
+## C16 steps 2–3: MusicXML is the default save format (trial) (2026-09-29)
+
+- `:w` picks the format from the extension: `.musicxml`/`.xml` or `.tab`;
+  anything else is refused. New documents offer `untitled.musicxml`; FT3 and
+  TAB projections offer the source name with `.musicxml`; MusicXML that Oud
+  did not write offers `name.oud.musicxml`, so it is never overwritten by
+  default (Oud keeps only its tablature part). `oud new.musicxml` on a missing
+  file pre-fills that name.
+- MusicXML with Oud's software mark reopens (at start or with `:e`) as a native
+  document and `:w` saves back to it. `.tab` documents keep saving to `.tab`.
+  The status label shows `MUSICXML` or `TAB` for the save target.
+- Validation: `tests/test_musicxml_default_save.py` (new document save and
+  native reopen and re-save, missing path, foreign file protection, `:e`, TAB
+  documents, refused suffix). Gate: 1,843 passed, 126 skipped.
+
+## C16 step 1: lossless MusicXML round trip (2026-09-29)
+
+- MusicXML written by Oud now reads back with identical chords, rests at their
+  own onsets (a mid-bar rest used to merge into the note before it), per-bar
+  meters including C, cut C (was written as the default meter) and single
+  numbers, tuning, tempo (`metronome` + `sound tempo`), French or Italian style,
+  and author. Oud-only facts go into `identification/miscellaneous`
+  (`oud-style`, `oud-author`, `oud-tuning`); `encoding/software` is `Oud`.
+- The exporter no longer invents an "Unknown" composer, and its default staff
+  tuning was reversed (C2…C3 for a 6-course lute); it now uses the
+  Renaissance G tuning.
+- Foreign MusicXML: tuning comes from `staff-tuning`, tempo from `sound`, style
+  from `show-frets="letters"`; only first-voice rests become events.
+- Validation: `tests/test_musicxml_roundtrip.py` (both styles with bass courses,
+  rests, dots, meter changes, metadata; every repo TAB file). The MusicXML
+  golden gained only the identification block. Gate: 1,837 passed.
+
+## TAB saves in the original program's syntax (C15 step, S6) (2026-09-29)
+
+- `oud/exports/export_tab.py` writes what the `tab` program reads: spaces for
+  empty courses instead of `-` (drawn as bars by the program), no forced `-C`,
+  `R` rest lines, bass courses in position 7, `Nxx` high frets, Italian digits
+  lowest course first with `!x` and `$numstyle=italian`, `-tuning` in the
+  program's notation, and `SC`/`Sc`/`S34`/`S12-8` meters. Systems open with
+  `b`, bars end with `b`, and blank lines follow the piece's system breaks (every
+  4 bars by default); the reader turns blank lines in the program's files into
+  system breaks. Tempo, and a tuning without an exact `-tuning` spelling, go
+  into comments that the program ignores and Oud reads back.
+- S6: meter lines only on the first bar, on changes, and on empty bars, so
+  saving is idempotent.
+- Italian frets 11–30 are now saved (`Nxx`) instead of refusing the save.
+- Validation: `tests/test_tab_export_original.py` (chord lines, rests, bass,
+  high and Italian frets, meters, tuning, refusal, read-back identity in both
+  styles, systems, meter lines, idempotent save of every repo TAB file). The
+  `tab_program` integration test passes with the program built from
+  github.com/mandovinnie/Lute-Tab; `examples/triste.tab` renders in it without
+  errors, four bars per system. Gate: 1,830 passed, 126 skipped.
+
+## TAB files from the original program open without data loss (2026-09-29)
+
+- Chord lines follow the `tab` program's reader (new
+  `oud/importers/tab_syntax.py`). Bass courses in position 7 (`a`, `/a`,
+  `//a`, `///a`, `s`, `t`, digits 4–6) are read, and the course count grows to
+  the highest used course, so opening a 10-course file no longer drops its
+  bass notes, and saving no longer erases them. Rest lines (`R2`), `j`, triplet
+  lines (with a warning that tuplet timing is not modelled), `Nxx`, Italian
+  `!x`/`y`/`z` and course order, and thick barlines (`B`, `.bb.`) are read.
+  Prefix and postfix symbols no longer push notes onto the wrong course, and
+  a modifier after the flag (`2-a`) is no longer taken for course 1.
+- `-tuning` in the program's notation is converted to scientific pitch. The
+  `guitar`, `dminor`/`baroque*`, `sharp`, and `flat` presets had been copied
+  from the program's notation and played with inverted octaves; they are now
+  scientific pitch.
+- Files Oud wrote (`% Generated by oud`) keep their earlier meaning.
+- `docs/tab-format.md` records the format, Oud's earlier dialect, and the
+  support table.
+- Validation: `tests/test_tab_import_original.py` (16 cases, all failing before
+  except the legacy ones), including open → save → reopen of bass courses and
+  rests. A mixed sample matched `tab -v` from the program built from
+  github.com/mandovinnie/Lute-Tab. Gate: 1,813 passed, 125 skipped, coverage
+  95.09%.
+
+## New .tab files ask on the first write (2026-09-29)
+
+- `oud new.tab` on a missing file opens an empty document titled `new` with no
+  "Missing file" warning. The first `:w` opens the Save As prompt pre-filled with
+  `new.tab`; Enter writes it. Before, the prompt offered `untitled.tab`.
+- Validation: `tests/test_editor_init.py` covers the new document and the
+  pre-filled first write (failed before the change).
+
+## C3: onset cursor and one edit path (2026-09-29)
+
+- The editor cursor is `(bar, cursor_onset, course)`: an exact `Fraction` onset
+  in whole notes. Stops are the bar's event onsets plus an append slot when the
+  bar is not full or its meter is unknown. `h`/`l`, note motions, bar motions,
+  row jumps, `:col`, find and search move between stops; `cursor_col` is derived
+  from the drawn layout.
+- New `oud/editor/editing/tab/typing.py` routes French letters, Italian numbers,
+  bass courses, rests, durations, dots, replace mode and delete through
+  `apply_tab_transaction`. A note that would overflow the bar starts the next
+  bar. Each typed note is one undo step; undo restores the onset. Visual delete
+  is one transaction.
+- `_flatten_chords_to_grid`, `enter_fret`, `enter_grid_fret` and the float
+  rhythm module are deleted. Editing an imported bar keeps its chords, dots and
+  flags; `bar.notes` mirrors the chords after every edit.
+- The renderer takes `cursor_event`, so the cursor is exact in dense bars whose
+  grid is wider than the bar. The status beat comes from the onset and the bar's
+  own meter; `len:` shows the event duration (with `.` when dotted).
+- Validation: `tests/test_onset_typing.py` types a bar of sixteen 16ths and a
+  bar of thirty-two 32nds and steps the cursor across every event with strictly
+  increasing drawn columns (fails without `cursor_event`). Motion, keyscript,
+  undo, visual-delete and imported-bar tests were rewritten on onsets. Gate:
+  1,796 passed, 125 skipped, coverage 95.09%.
+- Follow-ups moved to `C4`: layout of incomplete bars against the meter, the
+  obsolete `grid` setting, test-only grid primitives, duet `cursor_event`.
+
+## C2: tablature edits at exact onsets (2026-09-29)
+
+- `petrucci.input.tablature.mutation` is now a chord-based contract. A bar's
+  events are its `Chord` list; onsets are whole notes from the bar start, so they
+  are exact in every meter. Before, `TabPosition.onset` was a column divided by
+  the grid width and only matched musical time in 4/4.
+- `TabDocument` (bars, courses, style, default meter) replaces
+  `EditableTablature` in the public API. `TabEdit` takes a typed `TabDuration`
+  (denominator and dot) or `None` to keep an event's duration, and an `insert`
+  flag. Intents: note, chord, rest, delete, and the new duration change.
+- Edits may not lengthen a bar past its effective meter; source bars that
+  already overflow can still be edited without growing. Rejections carry stable
+  codes (`not-an-onset`, `beyond-content`, `no-event`, `missing-duration`,
+  `bar-overflow`, `invalid-fret`, `invalid-position`) and the operation index,
+  and restore every bar. Chord entry keeps the other courses and the edited
+  note's fingerings and ornaments. A duration change clears the source flag
+  marker, which described the old duration.
+- The editor's column-grid primitives moved to `petrucci.input.tablature.grid`
+  and left the top-level `petrucci` exports. The Italian fret key writes the
+  grid through `enter_fret` until C3 moves typing to onsets.
+- Oud's `apply_tab_transaction` applies the new contract to the bar chords and
+  records one undo step.
+- Validation: new contract tests cover appending, onsets in 3/8, replacement
+  with and without a duration, attachment retention, insertion, course and
+  event deletion, note/rest replacement, dotting, per-bar deltas, meter limits,
+  overfull source bars, meter inheritance, rejection codes, and atomicity. The
+  P1.2 fixtures (bass course, repeated chord, attachment retention, mixed undo,
+  deterministic operation sequence) now assert chords and TAB round trips.
+  `./scripts/quality.sh` passes: 1,822 passed, 119 skipped, 95.33% coverage.
+
+## C1: editor chrome out of Petrucci, typed status row (2026-09-29)
+
+- Completes `C1` (the chrome move is recorded in the entry below).
+- Added `StatusModel` in `oud/editor/services/screen/status.py` with identity,
+  position, meter marker, message and level, pending keys, duration, and mode.
+  - Identity and position start at the left edge. Pending count and keys (and
+    the insert prefix while inserting), `len:`, and the mode end at the right
+    edge, so moving the cursor or changing bars does not move them.
+  - The message sits between the two groups. It no longer hides `len:`.
+  - When the row is too narrow, identity, duration, pending keys, meter, and
+    position are dropped in that order, then the message is cut; the mode stays.
+  - The row is padded to the screen width minus the last column (curses errors
+    when the bottom-right cell is written), so reverse video spans the row.
+- Every status row goes through the model: score, help, info and notes pages
+  (which now show their mode), the plugin browser, and the ASCII preview. The
+  command and search prompts keep their own line (`prompt_text`).
+- Pending counts and keys (`3d`, `g`) are now visible; before, nothing showed a
+  half-typed command.
+- The README screenshot is regenerated from the real editor frame. The old
+  image had the status text written over a line of tablature.
+- Validation: against the 441-frame baseline, every score row, playback overlay
+  cache, and cursor map is identical; only status rows changed (350 frames).
+  New tests pin the left and right anchors, stable right segments while the
+  cursor moves, pending keys, the insert prefix, the exact drop order at each
+  width, message cutting, and the empty last column. `./scripts/quality.sh`
+  passes: 1,803 passed, 119 skipped, 95.25% coverage.
+
+## C1 (part): editor chrome moved out of Petrucci (2026-09-29)
+
+- Petrucci's `render_piece` now paints score content into every row of the
+  screen it is given and returns `PieceView.NOTATION` or `PieceView.TABLATURE`.
+  It lost 13 editor-only arguments (mode, prompts, message, status line, ASCII
+  preview, plugin browser, help page). `petrucci/rendering/system/status.py`,
+  the page painters, the info/notes page content, and Petrucci's lookup of the
+  `oud` package version are gone. `TypesetOptions.include_status` is removed.
+- New `oud/editor/services/screen`:
+  - `compose.py` builds every editor frame, for the TUI loop and the ASCII
+    screen export.
+  - `status.py` (moved from `services/status.py`) composes the status row and
+    its attributes.
+  - `rhythm.py` holds the tablature `len:` and meter `M` diagnostics.
+  - `pages.py` holds the help, info, notes, plugin, and ASCII-preview pages; one
+    page painter replaces three copies.
+- `commands/help.py` moved to `core/input/help.py`, next to the key table it
+  describes, so screen composition does not import `commands`.
+- The README screenshot script renders the real editor screen through the Oud
+  composer.
+- Behavior changes:
+  - `:w ascii` and `oud ascii` snapshots in help mode or ASCII-preview mode now
+    show what the screen shows (the old snapshot showed an empty help page and
+    ignored the preview).
+  - `test_tab_snippet_spans_and_ornament_markers_keep_alignment_dense` only
+    passed because `"o"` matched "normal" in the old status row. Its ornaments
+    sat on grid columns without chords. They now sit on chord columns and the
+    test asserts `b*` and `co` in the tablature rows.
+- Validation: a baseline script rendered 441 frames (7 documents including
+  TAB, new, melody-only, and duet; 21 modes and states; 80x24, 120x40, 40x12)
+  before and after. Text, attributes, playback overlay caches, and cursor maps
+  are identical. New tests cover composition, pages, status attributes, the
+  hidden bottom panel, the ASCII snapshot, and a boundary check that
+  `render_piece` takes no editor-only argument. `./scripts/quality.sh` passes:
+  1,795 passed, 119 skipped, 95.25% coverage.
+
+## Opening a missing `.tab` path no longer crashes (2026-09-29)
+
+- `oud new.tab` raised `FileNotFoundError` at startup because `init_state` read
+  the TAB source text before checking that the file exists. A missing `.tab`
+  now opens as a new document with the same "Missing file" import warning a
+  missing `.ft3` already gives. Whether a named new path should also become the
+  write target is left as a product decision.
+- Validation: regression test
+  `test_init_state_missing_tab_path_starts_a_new_document` failed before the fix
+  and passes after; `./scripts/quality.sh` passes (1,781 passed, 119 skipped,
+  95.22% coverage).
+
+## Gate passes without the local FT3 corpus (S1, 2026-09-29)
+
+- Added the `ft3_corpus` pytest marker (registered in `pyproject.toml`) and a
+  `tests/conftest.py` hook that skips marked tests when
+  `tests/fixtures/ft3/corpus` holds no `.ft3` file. Marked the 51 test functions
+  (71 cases) that failed on a fresh clone. With the corpus present they run as
+  before. The existing manifest-based skips were left in place because they
+  check the exact manifest payloads.
+- Restored coverage without the corpus instead of lowering the floor:
+  - `tests/test_petrucci_note_input_rejections.py` covers every note-input
+    rejection code (unknown staff/measure/event/span/lyric, invalid and
+    duplicate IDs, chord targets, duplicate pitches, pitch index, position
+    mismatch, invalid ties and slurs, wrong span kind, lyric collision, invalid
+    lyric), plus duration keeping on chord stacking, styled replacement, and
+    onset-ordered insertion. Each rejection leaves the score unchanged.
+  - `tests/test_tab_policy.py` covers out-of-range French fret labels, string
+    label fallbacks, time-signature cue rows per style, and meter-change cues.
+- Validation: `./scripts/quality.sh` passes on a clean checkout without FT3
+  payloads: 1,780 passed, 119 skipped, 95.22% Petrucci coverage.
+
+## Backlog split into complex and simple work (2026-09-29)
+
+- Rewrote `TODO.md` as open work only, split into complex tasks (`C1`–`C14`,
+  owned by Claude) and simple tasks (`S1`–`S17`, open to any contributor). Each
+  item lists files, steps, acceptance, and dependencies. The split criteria are
+  stated at the top of `TODO.md`.
+- New items found while auditing the code:
+  - `S1`: a fresh clone fails the gate. 71 tests need gitignored Gerbode FT3
+    payloads, and coverage drops to 94.83% (floor 95%).
+  - `C7`: `apply_note_input` has no caller in `oud/`, so the editor cannot type
+    standard notes. Native TAB has no notation-part storage yet.
+  - `C4`: the editor grid maps (`overrides`, `durations`, `dotted`) are read by
+    about 40 modules, including exports and playback, not only the editor.
+  - `S6`: `oud/exports/export_tab.py` writes a meter line for every bar, which
+    is the cause of the repeated `S6/4` on save.
+- Validation: `./scripts/quality.sh` on this clean checkout. Architecture,
+  Ruff, format, and Ty pass; pytest has 1,752 passed, 71 failed (all missing
+  local FT3 payloads), and 48 skipped.
+- The completed items below were checked off in `TODO.md` but not yet recorded
+  here. They are moved verbatim.
+
+### P0: Petrucci reusable notation library
+- [x] Preserve exact pickup and irregular-measure extents in the canonical score and flow adapter.
+  - Measure boundaries use whole-note units; aligned staffs reject conflicting extents.
+- [x] Build one union of exact onset anchors per measure and consume it across every staff.
+  - Staff-local collision widths may enlarge a shared slot but may not move simultaneous events independently.
+- [x] Retain logical onset geometry beyond the viewport and clip only paintable span segments.
+  - Ties, slurs, and glissandi must expose continuation geometry when an endpoint is clipped.
+- [x] Add typed written-duration spelling independent of reciprocal denominators.
+  - `DurationSpelling` covers breve through 128th values and four augmentation dots.
+- [x] Preindex effective staff state and semantic frame cells with object-owned lifetimes.
+  - Do not add global unbounded caches or repeated full-frame identity scans.
+- [x] Expose a public proportional timeline projection with explicit origin and scale.
+  - Return exact event/segment positions, measure boundaries, viewport clipping, and collision diagnostics.
+  - [x] Publish exact `TimelineProjectionRequest` and identity-preserving measure/event/span projection records.
+  - [x] Keep requested scale fixed and report distinct onsets that round into one visible staff cell.
+  - [x] Make the notation engraver consume these anchors for notes, beams, ties, slurs, ledger lines, and accidentals before painting.
+- [x] Expose public written-pitch and continuous-pitch staff projection against the same geometry contract.
+  - Cover treble/bass clefs, clef changes, accidentals, timeline positions, and viewport offsets.
+- [x] Migrate engraving duration decisions to `DurationSpelling` and render breve/dotted-breve notes and rests.
+  - Add irregular-measure, semantic-cell, terminal-clipping, and no-tied-whole-note regressions.
+- [x] Add bounded performance regressions for repeated layout, scrolling, resizing, batched lookup, and score replacement.
+  - Record workload size and ceilings; performance claims without measurements do not close this gate.
+- [x] Add display-only meter visibility for 3/4, 6/8, 4/2, and mid-score meter changes.
+  - Preserve meter, validation, beaming, event timing, and reserved preamble/change spacing.
+
+### P0: Petrucci reusable accompaniment data (deferred assessment)
+- [x] Assess an optional pure canonical-score performance projection with stable part/voice/source IDs.
+  - Keep MIDI serialization, TiMidity processes, transport, latency, and lesson policy outside Petrucci.
+  - Assessment and prerequisite model gaps are recorded in `docs/petrucci-voce-handoff.md`; implementation is deferred.
+
+### P1.1: Full-score presentation
+- [x] Add explicit `score` and `staff` viewer modes for imported scores.
+  - At 120x40, `score` mode renders every mapped tablature, notation, and lyric
+    staff together when they fit.
+  - At 80x24, vertical scrolling reaches every staff without dropping content;
+    `staff` mode remains the compact focused view.
+  - Preserve source staff label/index, bar, cursor, playback position, filename,
+    document mode, and write target across mode changes and resize.
+  - Cover solo, mixed song, four-part vocal, vocal-only, and duet FT3 files at
+    80x24 and 120x40.
+- [x] Add navigation suitable for long read-only scores.
+  - Support previous/next system and section/page jumps without changing the
+    logical score cursor.
+  - Show current section/page and system range in status or `:info` when the FT3
+    contains that data.
+
+### P1.1: Format confidence
+- [x] Expand the deterministic, stratified compatibility manifest from 263 to
+  300 public FT3 files with a fixed one-time selection, checksums, metadata,
+  zero semantic-audit residuals, and no committed downloaded payloads.
+- [x] Decode every FT3 semantic variant found across the direct composer-index audit.
+  - The 14 formerly unresolved files are fixed as the v8 corpus: source layout,
+    exercise labels, editorial text, later fingering/bracket/barre variants, and
+    one-staff notation-only mapping are now typed without fake tablature notes.
+- [x] Add LilyPond/MuseScore-inspired semantic regression cases for partial and
+  grace beams, grouped tuplets, cross-system ties/slurs, fermatas, ornaments,
+  endings, and repeat barlines without vendoring upstream fixtures.
+
+### P1.1: Playback and acceptance
+- [x] Play all mapped voices and staffs with synchronized cursor movement.
+  - Compare MIDI note-on events, voice/channel assignment, repeats/endings,
+    tempo, and start-bar behavior for the representative viewer matrix.
+  - Keep pause/stop/restart and missing-synth diagnostics deterministic; never
+    report playback success when no player started.
+- [x] Make `lyricmode=current` follow the active stanza automatically while
+  `playverses=all`; preserve an explicitly selected `lyricverse` while stopped.
+
+### P1.2: Gerbode lute and note typing parity
+- [x] Add one extra-bass-course transaction and keyscript fixture per style.
+- [x] Add one repeated-chord transaction fixture per style.
+- [x] Add one string-movement fixture proving other courses remain unchanged.
+- [x] Add one attachment-retention fixture for replacement and deletion.
+- [x] Add one undo/redo fixture for a mixed note, chord, and rest transaction.
+- [x] Add deterministic operation-sequence tests that compare canonical state,
+  rendered semantics, TAB save/reopen, and LilyPond/MIDI export. Keep compact
+  one-feature fixtures for failures; do not vendor MuseScore or LilyPond
+  fixtures.
+- [x] Curate source-supported excerpts from the fixed 100-score Gerbode corpus
+  covering tablature, bass courses, chords/rests, polyphonic notation, lyrics,
+  and ornaments. Checked-in expectations cover terminal rendering, TAB
+  save/reopen semantics, LilyPond, MIDI, and published-score observations
+  without committing external FT3 or PDF payloads.
+- [x] Extend curated Petrucci acceptance with a checksum-verified Gerbode score
+  containing a canonical tie and compare its render/exports with the published
+  two-page score.
+
+### P1.4: Linked Petrucci and LilyPond engraving
+- [x] Drive Petrucci proof assertions and LilyPond export assertions from the
+  same matrix instead of maintaining backend-specific fixture inventories.
+- [x] Translate the remaining applicable LilyPond 2.24.4 and MuseScore 4.6.0
+  regressions into small legal fixtures that record provenance and the borrowed
+  invariant rather than upstream output bytes. Existing translated invariants
+  are registered in `upstream_microcases` and exercised by the layout tests.
+- [x] Keep LilyPond export-only: do not add a LilyPond parser or use `.ly` as an
+  internal representation.
+  - Verified 2026-09-13: no LilyPond importer exists under `oud/importers/`; `.ly`
+    is produced at the export boundary and is not a Petrucci model input.
+- [x] Require generated `.ly` files to compile with the supported LilyPond
+  version without errors or undocumented warnings. The fixed external
+  `ft3-regression.json` manifest is exported and compiled with 2.26 when
+  available; 2.24 remains a separate compatibility smoke target.
+
+### P3: Secondary release work
+- [x] Ship a real `oud(1)` manual page that works with `man oud`.
+  - Maintain `man/oud.1.scd` as the readable source and commit generated
+    `man/oud.1` roff output.
+  - Cover synopsis, options/subcommands, files, environment, exit status,
+    examples, diagnostics, and see-also references.
+  - Add reproducible build and user-local installation under
+    `~/.local/share/man/man1` without requiring sudo.
+  - Validate with `mandoc -T lint man/oud.1` and `man -l man/oud.1` when
+    available. The repository build uses `scdoc`; `mandoc` is optional.
+  - Keep README as the quick-start page and the man page as the exhaustive
+    command reference.
+
 ## Editor UI: rests, Ctrl-C and the full key table (2026-09-27)
 
 - Empty bars round-trip. A chord-less bar with an explicit line such as `Sc`

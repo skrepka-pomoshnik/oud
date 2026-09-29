@@ -12,7 +12,7 @@ oud(1) | terminal lute tablature editor and viewer
 
 **oud** **ascii** *INPUT* [*-o* *OUTPUT*] [*--bars* *N|START:END*] [*-f*]
 
-**oud** **convert** *INPUT* *OUTPUT* [*--input-format* *FORMAT*] [*--format* *FORMAT*] [*-f*]
+**oud** **convert** *INPUT* [*OUTPUT*] [*--input-format* *FORMAT*] [*--format* *FORMAT*] [*-f*]
 
 # DESCRIPTION
 
@@ -20,9 +20,13 @@ oud(1) | terminal lute tablature editor and viewer
 TAB, FT3, and supported MusicXML/MXL files, provides a compact terminal proof,
 and exports TAB, ASCII, MIDI, LilyPond, PDF, MusicXML, and MXL.
 
-FT3 is import-only. A tab-only FT3 opens as an editable projection and writes
-to a separate TAB file. Scores with vocal, notation, or duet material open in
-read-only viewer mode so unsupported layers cannot disappear on save.
+MusicXML is the default save format. TAB files (the original **tab** program's
+format) are read and written in full. FT3 is import-only: a score with
+tablature opens editable, with its notation staves kept aligned and saved to
+MusicXML, and never changes the source. Duet scores and scores without
+tablature open in read-only viewer mode so visible material cannot disappear on
+save. A save names the marks it cannot keep; an import names the notes it did
+not read.
 
 Text conversion can read from or write to **-**. MIDI, MXL, and PDF conversion
 require filesystem paths. PDF conversion retains the generated LilyPond source
@@ -49,7 +53,8 @@ described under *FILES*.
 
 The **tui** subcommand opens the interactive editor. **ascii** renders a text
 snapshot; *INPUT* must be a path. **convert** selects the output format from
-the output suffix unless **--format** is supplied. When either stream endpoint
+the output suffix unless **--format** is supplied; without *OUTPUT* it writes
+*INPUT* with the suffix **.musicxml**. When either stream endpoint
 is **-**, specify the other format explicitly with **--input-format** or
 **--format** as required.
 
@@ -67,8 +72,9 @@ and digits are frets and **z** enters a rest.
 
 **:w** [*PATH*]
 
-: Write TAB. A first write opens a command prompt prefilled with a sibling or
-default TAB destination.
+: Save as MusicXML (**.musicxml**, **.xml**) or TAB (**.tab**), by the suffix. A
+first write opens a command prompt prefilled with a sibling or default
+**.musicxml** destination.
 
 **:e** *PATH*
 

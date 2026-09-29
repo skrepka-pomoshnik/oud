@@ -45,6 +45,33 @@ numeric-result API. If caller decoration later needs transport through the
 renderer, that requires a source-neutral opaque-token contract proven by more
 than one consumer.
 
+## Tablature edits
+
+`apply_tab_mutation(TabDocument, TabEditTransaction)` edits tablature bars at
+exact onsets. A bar's events are its ordered `Chord` list; a chord without notes
+is a rest. An onset is the sum of the written durations before an event, in whole
+notes from the start of the bar, so `Fraction(3, 8)` is the fourth eighth in any
+meter. The onset right after the last event is the append slot.
+
+- `NOTE` and `REST` replace the event at the onset, or append at the append slot.
+  With `insert=True` they go before the event at the onset instead.
+- `CHORD` sets one course's note and keeps the other courses and that note's
+  fingerings and ornaments.
+- `DELETE` removes one course's note, or the whole event without a course. An
+  event left without notes is removed and later events move earlier.
+- `DURATION` changes the written duration and dot.
+- `duration=None` keeps an existing event's duration; a new event needs one.
+
+An edit may not make a bar longer than its effective meter (the last stated
+`Bar.time_sig`, else `TabDocument.default_meter`); a bar that already overflowed
+in its source may still be edited without growing. Unknown meters set no limit.
+Every rejection raises `TabMutationError` with a stable `code` and the operation
+index, and leaves every bar unchanged. The result holds one before/after chord
+delta per changed bar.
+
+The Oud editor still types into a column grid (`petrucci.input.tablature.grid`)
+until its cursor moves to onsets.
+
 ## Viewports
 
 Vertical following selects `system_offset`. Horizontal following separates

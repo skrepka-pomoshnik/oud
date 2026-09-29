@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Callable, Mapping, MutableMapping, MutableSet
 from dataclasses import dataclass
+from fractions import Fraction
 from types import MappingProxyType
 from typing import TypeVar, cast
 
@@ -21,12 +22,12 @@ def _restore_action_cursor(state: EditorState, action: UndoAction, *, redo: bool
     cursor = action.data.get(key)
     if not isinstance(cursor, tuple) or len(cursor) != _CURSOR_COMPONENT_COUNT:
         return
-    if not all(isinstance(value, int) for value in cursor):
+    bar, cursor_string, onset = cursor
+    if not (isinstance(bar, int) and isinstance(cursor_string, int) and isinstance(onset, Fraction)):
         return
-    bar, cursor_string, col = cast(tuple[int, int, int], cursor)
     state.cursor_bar = bar
     state.cursor_string = cursor_string
-    state.cursor_col = col
+    state.cursor_onset = onset
     state.clamp()
 
 
@@ -148,6 +149,9 @@ def _apply_chords(context: _ApplyContext) -> None:
     bar = context.state.piece.bars[bar_index]
     value = cast(list | None, context.selected())
     bar.chords = copy.deepcopy(value) if value else []
+    if context.data.get("mirror_notes"):
+        bar.notes = [note for chord in bar.chords for note in chord.notes]
+        return
     notes_key = "new_notes" if context.redo else "prev_notes"
     if notes_key in context.data:
         notes = cast(list | None, context.data[notes_key])

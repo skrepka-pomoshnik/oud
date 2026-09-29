@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from oud.exports.export_tab import export_tab
-from oud.importers.tab import load_tab
+from oud.importers.tab import load_tab, parse_tab_text_data
 
 
 def test_tab_roundtrip_basic(tmp_path) -> None:
@@ -32,7 +32,11 @@ def test_tab_roundtrip_basic(tmp_path) -> None:
     exported = export_tab(piece, {}, {}, bar_width=8, settings={"style": "french"})
     assert "b" in exported
     assert "e" in exported
+    # An unedited source keeps its own lines, including how it spelled the tuning.
     assert "-tuning g2c3f3a3d4g4" in exported
+    reread = parse_tab_text_data(exported)
+    assert reread is not None
+    assert reread.piece.tuning == piece.tuning
     assert "{Test Piece/Composer}" in exported
 
     out_path = tmp_path / "roundtrip.tab"

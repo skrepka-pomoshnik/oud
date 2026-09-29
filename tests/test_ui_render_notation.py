@@ -35,7 +35,7 @@ class _Screen(Screen):
         self.refreshes += 1
 
 
-def _args(mode: str = "normal"):
+def _args():
     piece = Piece(title="T", bars=[Bar()], strings=6)
     return {
         "stdscr": _Screen(),
@@ -54,11 +54,6 @@ def _args(mode: str = "normal"):
         "slurs": [],
         "ties": [],
         "holds": [],
-        "mode": mode,
-        "cmdline": "",
-        "message": "",
-        "status_line": "status",
-        "searchline": "",
         "settings": {
             "style": "french",
             "showtuning": "on",
@@ -79,13 +74,7 @@ def _args(mode: str = "normal"):
             "maxbars": "2",
             "measuresstep": "10",
         },
-        "ascii_lines": None,
         "stave_breaks": set(),
-        "plugin_title": "Plugins",
-        "plugin_items": ["a"],
-        "plugin_index": 0,
-        "plugin_offset": 0,
-        "help_offset": 0,
         "playback_bar": None,
         "playback_col": None,
     }
@@ -103,7 +92,7 @@ def _render_lines(kwargs: dict) -> list[str]:
 
 
 def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="3/4"), Bar()], strings=6)
     render_piece(**kwargs)
     numeric_calls = [(y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text.strip() == "3"]
@@ -117,7 +106,7 @@ def test_render_numeric_time_signature_is_in_staff_not_on_first_string() -> None
 
 
 def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O"), Bar()], strings=6)
     kwargs["settings"]["timesigstyle"] = "numeric"
     render_piece(**kwargs)
@@ -132,7 +121,7 @@ def test_render_timesigstyle_numeric_shows_3_for_common_triple_symbol() -> None:
 
 
 def test_render_common_triple_cue_keeps_gap_before_first_melody_note() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="T",
         bars=[
@@ -163,7 +152,7 @@ def test_render_common_triple_cue_keeps_gap_before_first_melody_note() -> None:
 
 
 def test_render_cut_time_signature_cue_is_visible_in_first_bar() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(title="Cut", bars=[Bar(time_sig="C|"), Bar()], strings=6)
     render_piece(**kwargs)
     calls = [
@@ -174,7 +163,7 @@ def test_render_cut_time_signature_cue_is_visible_in_first_bar() -> None:
 
 @pytest.mark.parametrize("justify", ["compact", "smart", "stretch"])
 def test_render_italian_multi_digit_frets_do_not_glue_1_2_12(justify: str) -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="ItalianSpacing",
         bars=[
@@ -210,7 +199,7 @@ def test_render_italian_multi_digit_frets_do_not_glue_1_2_12(justify: str) -> No
 
 
 def test_render_italian_multifretspacing_collision_safe_spreads_more_than_tight() -> None:
-    base_kwargs = _args("normal")
+    base_kwargs = _args()
     base_kwargs["piece"] = Piece(
         title="ItalianSpacingPolicy",
         bars=[
@@ -260,14 +249,14 @@ def test_render_fretlabelmode_switches_italian_glyph_policy() -> None:
         style="italian",
     )
 
-    auto_kwargs = _args("normal")
+    auto_kwargs = _args()
     auto_kwargs["piece"] = piece
     auto_kwargs["settings"]["style"] = "italian"
     auto_kwargs["settings"]["showtuning"] = "off"
     auto_lines = _render_lines(auto_kwargs)
     assert any("x" in line for line in auto_lines)
 
-    letters_kwargs = _args("normal")
+    letters_kwargs = _args()
     letters_kwargs["piece"] = piece
     letters_kwargs["settings"]["style"] = "italian"
     letters_kwargs["settings"]["showtuning"] = "off"
@@ -278,7 +267,7 @@ def test_render_fretlabelmode_switches_italian_glyph_policy() -> None:
 
 
 def test_render_shows_time_signature_on_mid_system_change() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(title="T", bars=[Bar(), Bar(time_sig="3/4"), Bar()], strings=6)
     kwargs["settings"]["barsperline"] = "3"
     render_piece(**kwargs)
@@ -289,14 +278,14 @@ def test_render_shows_time_signature_on_mid_system_change() -> None:
 
 
 def test_render_draws_left_staff_barline() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     render_piece(**kwargs)
     left_bar_calls = [(y, x, text) for (y, x, text, _a) in kwargs["stdscr"].calls if text == "|" and x == 2 and y >= 2]
     assert left_bar_calls
 
 
 def test_render_new_sheet_first_note_flag_does_not_overlap_time_cue_lane() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="T",
         bars=[
@@ -333,7 +322,7 @@ def test_render_new_sheet_first_note_flag_does_not_overlap_time_cue_lane() -> No
 
 
 def test_render_override_first_note_flag_does_not_overlap_time_cue_lane() -> None:
-    kwargs = _args("insert")
+    kwargs = _args()
     kwargs["piece"] = Piece(title="T", bars=[Bar(time_sig="O")], strings=6)
     kwargs["overrides"] = {(0, 0, 0): "a"}
     kwargs["durations"] = {(0, 0, 0): 4}
@@ -362,7 +351,7 @@ def test_render_override_first_note_flag_does_not_overlap_time_cue_lane() -> Non
 
 
 def test_render_cut_time_first_bar_keeps_four_equal_attacks_visible() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="T",
         bars=[
@@ -387,7 +376,7 @@ def test_render_cut_time_first_bar_keeps_four_equal_attacks_visible() -> None:
 
 
 def test_render_repeat_glyphs_visible_on_synthetic_piece() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=39, w=121)
     kwargs["piece"] = repeat_and_meter_change_piece()
     render_piece(**kwargs)
@@ -398,7 +387,7 @@ def test_render_repeat_glyphs_visible_on_synthetic_piece() -> None:
 
 
 def test_render_repeat_words_visible_on_synthetic_piece() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=24, w=100)
     kwargs["piece"] = repeat_and_meter_change_piece()
     kwargs["piece"].bars[0].repeat = "DC al Fine"
@@ -408,7 +397,7 @@ def test_render_repeat_words_visible_on_synthetic_piece() -> None:
 
 
 def test_render_ending_cue_visible_on_synthetic_piece() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=24, w=100)
     kwargs["piece"] = Piece(
         title="T",
@@ -426,7 +415,7 @@ def test_render_ending_cue_visible_on_synthetic_piece() -> None:
 
 
 def test_render_shows_duet_score_hint_from_metadata() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Spanish Measures",
         bars=[Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])])],
@@ -441,7 +430,7 @@ def test_render_shows_duet_score_hint_from_metadata() -> None:
 
 
 def test_imported_fingering_renders_right_subscript_in_french() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="T",
         bars=[
@@ -466,7 +455,7 @@ def test_imported_fingering_renders_right_subscript_in_french() -> None:
 
 
 def test_imported_fingering_renders_right_superscript_in_italian() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="T",
         bars=[
@@ -516,7 +505,7 @@ def test_imported_fingering_render_matrix_stays_adjacent(
     justify: str,
     width: int,
 ) -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["stdscr"] = _Screen(h=24, w=width)
     kwargs["piece"] = Piece(
         title="FingeringMatrix",
@@ -550,7 +539,7 @@ def test_imported_fingering_render_matrix_stays_adjacent(
 
 
 def test_imported_open_string_left_hand_fingering_digits_are_suppressed() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="OpenSanity",
         bars=[
@@ -582,7 +571,7 @@ def test_imported_dot_left_ornament_renders_inline_as_unicode_dot(
     italian_orient: str | None,
     base: str,
 ) -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="DotLeft",
         bars=[
@@ -605,7 +594,7 @@ def test_imported_dot_left_ornament_renders_inline_as_unicode_dot(
 
 
 def test_imported_arpeggio_renders_as_inline_colon() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Arpeggio",
         bars=[
@@ -638,7 +627,7 @@ def test_imported_left_hand_plus_ornament_renders_inline(
     italian_orient: str | None,
     base: str,
 ) -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Plus",
         bars=[
@@ -660,7 +649,7 @@ def test_imported_left_hand_plus_ornament_renders_inline(
 
 
 def test_imported_barre_semantics_renders_as_left_hand_cue() -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="Barre",
         bars=[
@@ -690,7 +679,7 @@ def test_imported_right_hand_dot_fingering_renders_as_combining_mark_on_note(
     italian_orient: str | None,
     base: str,
 ) -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="RHDot",
         bars=[
@@ -723,7 +712,7 @@ def test_imported_right_hand_dots_attach_to_fingering_when_left_fingering_presen
     italian_orient: str | None,
     fingering: str,
 ) -> None:
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["piece"] = Piece(
         title="RHDot+LH",
         bars=[
@@ -756,7 +745,7 @@ def test_legacy_showextras_alias_no_longer_reserves_span_row_without_showspans(m
         captured["show_extras"] = kwargs["show_extras"]
 
     monkeypatch.setattr("petrucci.rendering.bar.legacy.render_systems", _fake_render_systems)
-    kwargs = _args("normal")
+    kwargs = _args()
     kwargs["settings"]["showextras"] = "on"
     kwargs["settings"]["showspans"] = "off"
     render_piece(**kwargs)

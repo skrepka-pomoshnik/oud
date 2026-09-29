@@ -30,6 +30,38 @@
         "voice and lute staves share one registration",
         "lyrics remain attached to the vocal staff"
       ]
+    },
+    {
+      "id": "fermata-export",
+      "case": "fermata",
+      "assertions": [
+        "a fermata sits over the note it belongs to",
+        "the export marks the bar with a fermata glyph"
+      ]
+    },
+    {
+      "id": "cut-time-export",
+      "case": "cut-time",
+      "assertions": [
+        "cut time draws a time signature in the layout",
+        "the export states 2/2"
+      ]
+    },
+    {
+      "id": "key-signature-export",
+      "case": "key-signature",
+      "assertions": [
+        "one sharp is drawn as a key signature",
+        "the export states G major"
+      ]
+    },
+    {
+      "id": "tuplet-export",
+      "case": "tuplet-triplet",
+      "assertions": [
+        "a triplet group gets one bracket over its notes",
+        "the export writes a tuplet block, not scaled durations"
+      ]
     }
   ],
   "upstream_microcases": [
@@ -231,6 +263,78 @@
           "borrowed_invariant": "dense strophic lyrics remain onset-aligned across four registered mixed-score systems"
         }
       ]
+    },
+    {
+      "id": "fermata",
+      "fixture": "fermata",
+      "origin": "oud",
+      "features": ["fermatas"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "fermata"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["scripts.ufermata"]
+      },
+      "petrucci_contract": ["a fermata is drawn for the marked event only"],
+      "lilypond_contract": ["a bar fermata exports as a fermata glyph mark"],
+      "upstream": []
+    },
+    {
+      "id": "cut-time",
+      "fixture": "cut-time",
+      "origin": "oud",
+      "features": ["cut-time", "time-signatures"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "time-signature"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\time 2/2"]
+      },
+      "petrucci_contract": ["cut time lays out as a 2/2 time signature"],
+      "lilypond_contract": ["a C| bar exports as 2/2"],
+      "upstream": []
+    },
+    {
+      "id": "key-signature",
+      "fixture": "key-signature",
+      "origin": "oud",
+      "features": ["key-signatures"],
+      "proof": {
+        "min_events": 2,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "key-signature"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\key g \\major"]
+      },
+      "petrucci_contract": ["one sharp lays out as a key signature"],
+      "lilypond_contract": ["the key setting exports as a \\key command"],
+      "upstream": []
+    },
+    {
+      "id": "tuplet-triplet",
+      "fixture": "tuplet-triplet",
+      "origin": "oud",
+      "features": ["tuplets"],
+      "proof": {
+        "min_events": 4,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "tuplet"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\tuplet 3/2"]
+      },
+      "petrucci_contract": ["a triplet group gets one bracket that spans its notes"],
+      "lilypond_contract": ["a triplet exports as a tuplet block without scaling the bar"],
+      "upstream": []
     }
   ]
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from oud.editor.core.coordinates import string_index
 from oud.editor.core.state import EditorState
-from oud.editor.navigation.motions import CursorMotionTarget, apply_motion_target
+from oud.editor.navigation.motions import CursorMotionTarget, apply_motion_target, target_at_column
 from petrucci.rendering.primitives.utils import bar_cells, bar_cells_from_chords
 
 
@@ -110,7 +110,7 @@ def target_find_motion(
     col = target_find_col(state, find_mode, target, count=count)
     if col is None:
         return None
-    return CursorMotionTarget(state.cursor_bar, col)
+    return target_at_column(state, state.cursor_bar, col)
 
 
 def target_repeat_find_motion(
@@ -123,7 +123,7 @@ def target_repeat_find_motion(
     if target is None:
         return None
     find_mode, target_char, col = target
-    return (find_mode, target_char, CursorMotionTarget(state.cursor_bar, col))
+    return (find_mode, target_char, target_at_column(state, state.cursor_bar, col))
 
 
 def perform_find(state: EditorState, find_mode: str, target: str, count: int = 1) -> bool:

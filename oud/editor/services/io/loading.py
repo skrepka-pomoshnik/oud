@@ -8,7 +8,7 @@ from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.importers.ft3 import load_ft3
-from oud.importers.musicxml import load_musicxml, load_mxl
+from oud.importers.musicxml import load_musicxml, load_mxl, musicxml_file_written_by_oud
 from oud.importers.tab import TabData, load_tab, load_tab_data
 from petrucci.core.model import Piece
 
@@ -155,7 +155,12 @@ def _commit_opened_piece(
     state.durations = durations
     state.dotted = dotted
     reset_loaded_file_state(state)
-    configure_document(state, path, forced_read_only=state.forced_read_only)
+    configure_document(
+        state,
+        path,
+        forced_read_only=state.forced_read_only,
+        oud_musicxml=musicxml_file_written_by_oud(path),
+    )
     if bar_width:
         state.bar_width = max(4, bar_width)
     state.cursor_bar = 0

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from typing import TYPE_CHECKING
+
+from petrucci.input.tablature.mutation import TabDocument, bar_content_length, bar_meter_length, event_onsets
+from petrucci.rendering.primitives.utils import chord_positions
 
 if TYPE_CHECKING:
     from oud.editor.core.state import EditorState
@@ -77,7 +81,99 @@ def clamp_cursor(state: EditorState) -> None:
     state.cursor_bar = max(0, min(state.cursor_bar, bar_count - 1))
     display_count = max(1, len(visible_string_indices(state)))
     state.cursor_string = max(0, min(state.cursor_string, display_count - 1))
-    state.cursor_col = max(0, min(state.cursor_col, state.bar_width - 1))
+    state.cursor_onset = nearest_stop(state, state.cursor_bar, state.cursor_onset)
+
+
+# Cursor stops: the cursor rests on an event onset or on the append slot after the
+# last event. The append slot exists while the bar is not full (or its meter is
+# unknown), so an empty bar has one stop at onset 0.
+
+
+def tab_document(state: EditorState) -> TabDocument:
+    style = state.settings.get("style") or state.piece.style or "french"
+    return TabDocument(
+        state.piece.bars,
+        max(1, state.piece.strings),
+        style if style in {"french", "italian"} else "french",
+        default_meter=state.settings.get("time"),
+    )
+
+
+def effective_time_signature(state: EditorState, bar_index: int) -> str:
+    """The last time signature stated at or before the bar, else the document's."""
+
+    meter = state.settings.get("time", "C")
+    for bar in state.piece.bars[: bar_index + 1]:
+        meter = bar.time_sig or meter
+    return meter
+
+
+def bar_meter(state: EditorState, bar_index: int) -> Fraction | None:
+    if not 0 <= bar_index < len(state.piece.bars):
+        return None
+    return bar_meter_length(tab_document(state), bar_index)
+
+
+def bar_is_full(state: EditorState, bar_index: int) -> bool:
+    meter = bar_meter(state, bar_index)
+    bar = state.piece.bars[bar_index]
+    return bool(bar.chords) and meter is not None and bar_content_length(bar) >= meter
+
+
+def bar_stops(state: EditorState, bar_index: int) -> tuple[Fraction, ...]:
+    if not 0 <= bar_index < len(state.piece.bars):
+        return (Fraction(0),)
+    bar = state.piece.bars[bar_index]
+    onsets = event_onsets(bar)
+    if bar_is_full(state, bar_index):
+        return onsets
+    return (*onsets, bar_content_length(bar))
+
+
+def nearest_stop(state: EditorState, bar_index: int, onset: Fraction) -> Fraction:
+    """The last stop at or before ``onset``, or the first stop."""
+
+    stops = bar_stops(state, bar_index)
+    earlier = [stop for stop in stops if stop <= onset]
+    return earlier[-1] if earlier else stops[0]
+
+
+def cursor_event(state: EditorState) -> int:
+    """Index of the event under the cursor; ``len(bar.chords)`` is the append slot."""
+
+    if not 0 <= state.cursor_bar < len(state.piece.bars):
+        return 0
+    onsets = event_onsets(state.piece.bars[state.cursor_bar])
+    return onsets.index(state.cursor_onset) if state.cursor_onset in onsets else len(onsets)
+
+
+def at_append_slot(state: EditorState) -> bool:
+    if not 0 <= state.cursor_bar < len(state.piece.bars):
+        return True
+    return cursor_event(state) == len(state.piece.bars[state.cursor_bar].chords)
+
+
+def stop_column(state: EditorState, bar_index: int, onset: Fraction) -> int:
+    """Display-grid column (``0 .. bar_width - 1``) drawn for a stop."""
+
+    if not 0 <= bar_index < len(state.piece.bars):
+        return 0
+    bar = state.piece.bars[bar_index]
+    columns = [column for column, _denom, _dot in chord_positions(bar, state.bar_width, 4)]
+    onsets = event_onsets(bar)
+    if onset in onsets:
+        return columns[onsets.index(onset)]
+    if not columns:
+        return 0
+    return min(columns[-1] + 1, max(0, state.bar_width - 1))
+
+
+def stop_at_column(state: EditorState, bar_index: int, column: int) -> Fraction:
+    """The last stop drawn at or before ``column``, or the first stop."""
+
+    stops = bar_stops(state, bar_index)
+    earlier = [stop for stop in stops if stop_column(state, bar_index, stop) <= column]
+    return earlier[-1] if earlier else stops[0]
 
 
 def consume_count(state: EditorState) -> int:

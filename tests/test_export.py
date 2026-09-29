@@ -19,11 +19,12 @@ def test_export_tab_includes_headers_and_chords() -> None:
         settings=settings,
         dotted=set(),
     )
-    assert "-tuning a4b4" in text
+    # A tuning within one octave has no unambiguous `-tuning` spelling, so it is kept in a comment.
+    assert "% tuning: a4b4" in text
     assert "{T/C}" in text
     assert "{A}" in text
     assert "b" in text
-    assert "Sc" in text
+    assert "SC" in text.splitlines()
     assert any(line.startswith("0") for line in text.splitlines())
     assert any("a" in line for line in text.splitlines())
 
@@ -38,7 +39,8 @@ def test_export_tab_writes_bar_markers() -> None:
         settings={},
         dotted=set(),
     )
-    assert text.splitlines().count("b") == 3
+    # One barline opens the system and one closes each bar, as in the program's own files.
+    assert text.splitlines().count("b") == 4
 
 
 def test_export_tab_includes_end_marker() -> None:

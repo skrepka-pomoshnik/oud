@@ -11,17 +11,17 @@ from oud.exports.export_tab import export_tab
 from oud.exports.lilypond import export_lilypond
 from oud.exports.midi import export_midi
 from oud.importers.tab import load_tab
-from petrucci import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
-from petrucci.input.tablature.input import editor_fret_at
+from petrucci import TabDuration, TabEdit, TabEditIntent, TabEditTransaction, TabPosition
 from tests.helpers_keyscript import keyscript_state, render_lines
 
 EventSignature = tuple[tuple[tuple[int, int], ...], ...]
 
 
+QUARTER = TabDuration(4)
+
+
 @dataclass(frozen=True)
 class _SequenceArtifacts:
-    cells: tuple[tuple[tuple[int, int, int], str], ...]
-    durations: tuple[tuple[tuple[int, int, int], int], ...]
     decoded_events: EventSignature
     rendered_rows: tuple[str, ...]
     tab_events: EventSignature
@@ -33,33 +33,13 @@ class _SequenceArtifacts:
 def _operation_sequence() -> TabEditTransaction:
     return TabEditTransaction(
         (
-            TabEdit(TabPosition(0, Fraction(0), 1), TabEditIntent.NOTE, fret=0, duration=4),
-            TabEdit(TabPosition(0, Fraction(0), 3), TabEditIntent.CHORD, fret=2, duration=4),
-            TabEdit(TabPosition(0, Fraction(1, 4), 7), TabEditIntent.NOTE, fret=1, duration=4),
-            TabEdit(TabPosition(0, Fraction(1, 2), 2), TabEditIntent.NOTE, fret=3, duration=4),
-            TabEdit(TabPosition(0, Fraction(3, 4), 1), TabEditIntent.NOTE, fret=5, duration=4),
+            TabEdit(TabPosition(0, Fraction(0), 1), TabEditIntent.NOTE, fret=0, duration=QUARTER),
+            TabEdit(TabPosition(0, Fraction(0), 3), TabEditIntent.CHORD, fret=2),
+            TabEdit(TabPosition(0, Fraction(1, 4), 7), TabEditIntent.NOTE, fret=1, duration=QUARTER),
+            TabEdit(TabPosition(0, Fraction(1, 2), 2), TabEditIntent.NOTE, fret=3, duration=QUARTER),
+            TabEdit(TabPosition(0, Fraction(3, 4), 1), TabEditIntent.NOTE, fret=5, duration=QUARTER),
         ),
     )
-
-
-def _decoded_editor_events(state) -> EventSignature:
-    events: list[tuple[tuple[int, int], ...]] = []
-    columns = sorted({column for bar, _string, column in state.durations if bar == 0})
-    for column in columns:
-        notes: list[tuple[int, int]] = []
-        for string in range(state.piece.strings):
-            fret = editor_fret_at(
-                state.overrides,
-                state.durations,
-                bar_index=0,
-                string_index=string,
-                column=column,
-                style=state.settings["style"],
-            )
-            if fret is not None:
-                notes.append((string + 1, fret))
-        events.append(tuple(notes))
-    return tuple(events)
 
 
 def _piece_events(piece) -> EventSignature:
@@ -114,9 +94,7 @@ def _run_sequence(style: str, directory: Path) -> _SequenceArtifacts:
 
     rendered = tuple(line.rstrip() for line in render_lines(state, width=72, height=22) if "|" in line)
     return _SequenceArtifacts(
-        cells=tuple(sorted(state.overrides.items())),
-        durations=tuple(sorted(state.durations.items())),
-        decoded_events=_decoded_editor_events(state),
+        decoded_events=_piece_events(state.piece),
         rendered_rows=rendered,
         tab_events=_piece_events(reopened),
         tab_text=tab_text,

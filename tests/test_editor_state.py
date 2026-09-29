@@ -1,3 +1,5 @@
+from fractions import Fraction
+
 from oud.editor.core.state import EditorState
 from petrucci.core.model import Bar, Piece
 
@@ -7,12 +9,12 @@ def test_clamp_bounds_cursor() -> None:
     state = EditorState(piece, {"style": "french"})
     state.cursor_bar = 5
     state.cursor_string = 9
-    state.cursor_col = 99
+    state.cursor_onset = Fraction(7)
     state.bar_width = 4
     state.clamp()
     assert state.cursor_bar == 1
     assert state.cursor_string == piece.strings - 1
-    assert state.cursor_col == 3
+    assert state.cursor_onset == 0
 
 
 def test_clamp_minimums() -> None:

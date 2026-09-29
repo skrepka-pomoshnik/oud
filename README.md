@@ -13,25 +13,36 @@ This project is vibe-coded, use it with care.
 ```text
 oud [FILE]
 oud ascii INPUT [-o OUTPUT] [--bars N|START:END] [-f]
-oud convert INPUT OUTPUT [--format FORMAT] [-f]
+oud convert INPUT [OUTPUT] [--format FORMAT] [-f]
 ```
 
 ## DESCRIPTION
 
 Minimal curses editor for Renaissance lute tablature.
 
-Current import/export focus:
+Formats:
 
-- `.tab` editing and writing
-- `.ft3` import with editable tab-only projections and canonical notation focus for read-only vocal and mixed scores
-- MIDI, LilyPond/PDF, MusicXML, and ASCII export
+- MusicXML is the default save format (`:w` offers `untitled.musicxml`). It keeps
+  tablature, tuning, tempo, repeats and endings, and the notation staves of an
+  imported score.
+- `.tab` (the original `tab` program's format, by Wayne Cripps) is read and
+  written in full: constructs Oud does not model are kept verbatim. It cannot
+  hold several staves, so a score with notation staves saves to MusicXML only.
+- `.ft3` is import-only. A score with tablature is editable, with its notation
+  staves aligned and saved to MusicXML; the source is never changed. Duet scores
+  and scores without tablature open read-only so visible material cannot
+  disappear on save.
+- MIDI, LilyPond/PDF, and ASCII export.
 
-FT3 is import-only. Editing a tab-only FT3 creates an explicit TAB write target and never changes the source. FT3 scores containing non-TAB or duet layers open read-only so visible material cannot disappear on save.
+A save names what it cannot keep, and an import names the notes it did not read.
+See `docs/tab-format.md` and `docs/musicxml-support.md`.
 
 ## DOCUMENTATION
 
 - [User and developer guide](docs/user-guide.md)
 - [FT3 format notes](docs/ft3-format.md)
+- [TAB format support](docs/tab-format.md)
+- [MusicXML support](docs/musicxml-support.md)
 - [Documentation map](docs/README.md)
 
 ## QUICK START
@@ -58,6 +69,7 @@ to replace an existing file unless `-f` is explicit:
 ```bash
 oud ascii score.ft3 --bars 1:8
 oud convert score.ft3 score.musicxml
+oud convert score.tab             # writes score.musicxml beside the input
 oud convert score.ft3 score.pdf
 printf '%s\n' '-C' 'b' '0a-----' 'e' | oud convert - - --input-format tab --format lilypond
 ```
@@ -88,7 +100,7 @@ uv run oud convert tests/fixtures/ft3/corpus/05_can_she_excuse/can_she_excuse.ft
 
 Vim-like:
 
-- `h/j/k/l` move one cell/row
+- `h/j/k/l` move one event/row (`h`/`l` also visit the append slot of an unfinished bar)
 - `J/K` jump to next/previous rendered row (same bar offset)
 - `i` insert mode, `esc` normal mode
 - `r` replace one cell (normal); in insert mode `z` enters a rest and letters/digits are frets
@@ -113,7 +125,7 @@ Casual:
 ## COMMANDS
 
 ```
-:w [path]       write .tab (first write opens a prefilled Save As command)
+:w [path]       save as .musicxml (default) or .tab; first write opens a prefilled Save As
 :wa [path]      export ascii without marking the score saved
 :e <path>       open
 :help           open help in less

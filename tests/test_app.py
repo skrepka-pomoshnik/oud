@@ -1,5 +1,7 @@
+import copy
 import curses
 import subprocess
+from fractions import Fraction
 from typing import cast
 
 from oud.editor.commands.dispatch import cmd_bar, cmd_stave
@@ -7,14 +9,14 @@ from oud.editor.commands.metadata import cmd_footnote, cmd_header_template, cmd_
 from oud.editor.core.document import configure_document
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
-from oud.editor.services.status import status_line
+from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command, apply_set_command
 from oud.presentation.tui.controller import handle_key
 from oud.presentation.tui.input import handle_command as handle_command_input
 from oud.presentation.tui.input import handle_search as handle_search_input
 from oud.presentation.tui.input import history_next, history_prev, parse_search
 from oud.presentation.tui.loop import InterruptLatch, _read_input_batch, run_loop
-from petrucci.core.model import Bar, ImportedScore, Piece
+from petrucci.core.model import Bar, Chord, ImportedScore, Piece
 from petrucci.terminal.canvas.framebuffer import Frame
 
 
@@ -35,7 +37,6 @@ def _state() -> EditorState:
         "fontstyle": "modern",
         "charstyle": "standard",
         "midipatch": "0",
-        "grid": "off",
         "showdur": "off",
         "showextras": "off",
         "showtactus": "off",
@@ -114,11 +115,13 @@ def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     configure_document(state, str(tmp_path / "example.ft3"))
     state.cursor_bar = 1
     state.cursor_string = 2
-    state.cursor_col = 3
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[])
+    state.piece.bars.append(Bar(chords=[copy.deepcopy(quarter) for _ in range(4)]))
+    state.cursor_onset = Fraction(1, 4)
     state.modified = True
     line = status_line(state)
     assert "example.ft3*" in line
-    assert "[FT3 EDIT:example.tab]" in line
+    assert "[FT3 EDIT:example.musicxml]" in line
     assert "bar:2" in line
     assert "beat:2/4" in line
     assert "str:3" in line
@@ -165,14 +168,14 @@ def test_hide_command_toggles_bottom_panel(tmp_path) -> None:
 def test_set_command_supports_vim_style_boolean_tokens(tmp_path) -> None:
     state = _state()
     cfg = str(tmp_path / "cfg.toml")
-    apply_set_command(state, "grid", cfg)
-    assert state.settings["grid"] == "on"
-    apply_set_command(state, "nogrid", cfg)
-    assert state.settings["grid"] == "off"
-    apply_set_command(state, "invgrid", cfg)
-    assert state.settings["grid"] == "on"
-    apply_set_command(state, "grid!", cfg)
-    assert state.settings["grid"] == "off"
+    apply_set_command(state, "showdur", cfg)
+    assert state.settings["showdur"] == "on"
+    apply_set_command(state, "noshowdur", cfg)
+    assert state.settings["showdur"] == "off"
+    apply_set_command(state, "invshowdur", cfg)
+    assert state.settings["showdur"] == "on"
+    apply_set_command(state, "showdur!", cfg)
+    assert state.settings["showdur"] == "off"
 
 
 def test_title_command_updates_piece() -> None:
@@ -392,7 +395,7 @@ def test_run_loop_forces_full_render_when_playback_scroll_changes_viewport(monke
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -443,7 +446,7 @@ def test_run_loop_follows_playback_advanced_during_full_render(monkeypatch) -> N
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -496,7 +499,7 @@ def test_run_loop_resamples_playback_after_full_render(monkeypatch) -> None:
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", _fake_update_playback_animation)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(
@@ -533,7 +536,7 @@ def test_run_loop_passes_playback_position_to_imported_score_renderer(monkeypatc
 
     monkeypatch.setattr("oud.presentation.tui.loop.init_state", _fake_init_state)
     monkeypatch.setattr("oud.presentation.tui.loop.update_playback_animation", lambda _state: False)
-    monkeypatch.setattr("oud.presentation.tui.loop.render_piece", _fake_render_piece)
+    monkeypatch.setattr("oud.editor.services.screen.compose.render_piece", _fake_render_piece)
 
     assert (
         run_loop(

@@ -13,12 +13,15 @@ passes.
 
 ## Root causes
 
-1. **Editing uses a second score model.** The viewer renders `NotationScore`.
-   The editor mutates `Piece.bars[].chords` plus sparse grid maps (`overrides`,
+1. **Editing used a second score model.** The viewer renders `NotationScore`.
+   The editor mutated `Piece.bars[].chords` plus sparse grid maps (`overrides`,
    `durations`, `dotted`, `slurs`, `ties`, `holds`, `glisses`) keyed by
-   `(bar, string, col)` on a fixed `bar_width` grid. The first edit in an
-   imported bar flattens its chords into the grid (`_flatten_chords_to_grid`).
-   Rhythm uses float quarter beats against the global `settings["time"]`.
+   `(bar, string, col)` on a fixed `bar_width` grid, and the first edit in an
+   imported bar flattened its chords into the grid. Since `C3` (2026-09-29)
+   every typing edit goes through the chord transaction at exact onsets and the
+   cursor is an onset. What remains: the grid maps are still read by about 40
+   modules (`C4`), and slurs, ties, holds and ornaments still live in editor
+   state instead of the model (`C17`).
 2. **Petrucci owns editor chrome.** `render_piece` takes about 40 arguments,
    including `cmdline`, `searchline`, plugin rows and mode strings. Petrucci
    builds the status line (`rendering/system/status.py`) and owns the help text.
@@ -143,36 +146,52 @@ passes.
 
 ## Phase 3: editor chrome out of Petrucci
 
-- [ ] Add an Oud `StatusModel`: identity, position, mode, pending keys and
+- [x] Add an Oud `StatusModel`: identity, position, mode, pending keys and
   count, message and level. It renders into fixed segments so the line does not
   jump, and it truncates by priority at 80 columns.
-- [ ] Replace the cryptic `M` meter marker with a named diagnostic segment
+  Done: `oud/editor/services/screen/status.py`. Identity and position start at
+  the left edge; pending keys, duration, and mode end at the right edge; the
+  message sits between. Too-narrow rows drop identity, duration, pending keys,
+  meter, and position in that order, then cut the message; the mode stays.
+- [x] Replace the cryptic `M` meter marker with a named diagnostic segment
   (`meter 5/6`) and show it only in normal mode.
-- [ ] Show one position vocabulary across TAB and FT3 projections (`beat`, not
-  `col`).
-- [ ] Scroll the command prompt horizontally so a long prefilled Save As path
-  stays editable at 80 columns.
-- [ ] Move status, prompt, info, notes, plugin and help rendering out of
+  Done as `meter:<length> of <meter>` (`meter:1/2 of 3/4`); it shows in every
+  mode of the tablature view, not only in normal mode.
+- [x] Show one position vocabulary across TAB and FT3 projections (`beat`, not
+  `col`). `beat:k/n`, or `ev:k/n` for a meter with no beat structure.
+- [x] Scroll the command prompt horizontally so a long prefilled Save As path
+  stays editable at 80 columns. The prompt shows `<` and its end.
+- [x] Move status, prompt, info, notes, plugin and help rendering out of
   `petrucci/rendering/api.py`. Petrucci returns the score frame only, and
   `render_piece` loses its editor-only arguments.
-- [ ] Choose one help surface. The in-app overlay and the `less` pager must at
-  least show identical generated content.
+  Done: `oud/editor/services/screen` composes every frame. All 441 frames of a
+  baseline (7 documents, 21 modes and states, 3 sizes) are identical in text,
+  attributes, playback cache, and cursor maps.
+- [x] Choose one help surface. The in-app overlay and the `less` pager show
+  identical generated content (a test locks it for every key style).
 
 ## Phase 4: edit on onsets through the canonical model
 
-- [ ] The cursor becomes (bar, exact onset `Fraction`, course), with an
+- [x] The cursor becomes (bar, exact onset `Fraction`, course), with an
   explicit append slot. `l`/`h` step between onsets, not justified filler
   cells. The status beat comes from the onset and the bar's own meter.
-- [ ] Route all insert, replace, delete, rest, dot and duration edits through
+  Done: `EditorState.cursor_onset`; `cursor_col` is derived. The renderer takes
+  `cursor_event`, so dense bars (16ths, 32nds) are drawn exactly.
+- [x] Route all insert, replace, delete, rest, dot and duration edits through
   `TabEditTransaction` / `apply_note_input`. The French letter path currently
   bypasses it; only Italian multi-fret uses it.
+  Done: `oud/editor/editing/tab/typing.py`; `x` and visual delete too.
 - [ ] Delete `_flatten_chords_to_grid`, the `overrides`/`durations`/`dotted`
   grid maps and float rhythm. Rhythm checks use `Fraction` and per-bar meters,
   including meter changes.
+  Progress: `_flatten_chords_to_grid` and the float rhythm primitives are gone;
+  the grid maps remain for readers until `C4`.
 - [ ] Replace untyped `UndoAction(kind: str, data: dict)` with typed
   transaction records.
-- [ ] Make TAB save idempotent against its source: unchanged bars must not gain
-  a repeated `S6/4` per system.
+- [x] Make TAB save idempotent against its source: unchanged bars must not gain
+  a repeated `S6/4` per system. Meter lines are written on the first bar, on a
+  change, and on empty bars; every repo TAB file saves byte-identically after
+  the first save.
 
 ## Phase 5: commands and state
 
@@ -186,5 +205,5 @@ passes.
 
 - [ ] At 120x40 in *Felice fu quel dì*, lute and soprano bars do not share
   horizontal bar positions within a system.
-- [ ] The `lute` staff label overwrites the start of the tablature staff.
-- [ ] The status line says `focus:Tab` while the staff label reads `lute`.
+- [x] The `lute` staff label overwrites the start of the tablature staff.
+- [x] The status line says `focus:Tab` while the staff label reads `lute`.

@@ -1,4 +1,6 @@
+import copy
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -9,6 +11,7 @@ from oud.editor.editing.primitives.tablature import french_to_fret
 from oud.editor.services.io.files import render_ascii_snapshot
 from oud.importers.tab import TabData
 from oud.presentation.tui import commands as cmd
+from oud.settings import load_settings
 from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
 from petrucci.core.music.tuning import parse_tuning_pitches
 
@@ -35,7 +38,6 @@ def _state(bars: int = 2) -> EditorState:
         "midipatch": "24",
         "tempo": "90",
         "soundfont": "",
-        "grid": "off",
         "showdur": "off",
         "showextras": "off",
         "showtactus": "off",
@@ -105,16 +107,15 @@ def test_cmd_set_and_convert(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr(cmd_ops, "save_settings", _save)
     cmd.cmd_set(
         state,
-        "strings=7 style=italian grid=on showdur=on frenchc=alt",
+        "strings=7 style=italian showdur=on frenchc=alt",
         str(tmp_path / "cfg.toml"),
     )
     assert state.settings["strings"] == "7"
     assert state.settings["style"] == "italian"
-    assert state.settings["grid"] == "on"
     assert state.settings["showdur"] == "on"
     assert state.settings["frenchc"] == "alt"
     # Document properties stay in the session; only preferences persist.
-    assert saved == {"grid": "on", "showdur": "on", "frenchc": "alt"}
+    assert saved == {"showdur": "on", "frenchc": "alt"}
     state.overrides[(0, 0, 0)] = "0"
     cmd.cmd_convert(state, "french", str(tmp_path / "cfg.toml"))
     assert state.settings["style"] == "french"
@@ -219,13 +220,17 @@ def test_cmd_pause_cursor_and_col_commands(tmp_path: Path) -> None:
     cmd.apply_command(state, "pause", str(tmp_path / "cfg.toml"))
     assert state.message == "MIDI not playing"
 
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
+    state.piece.bars[1].chords = [copy.deepcopy(quarter) for _ in range(3)]
     cmd.apply_command(state, "cursor 2 3 5", str(tmp_path / "cfg.toml"))
     assert state.cursor_bar == 1
     assert state.cursor_string == 2
-    assert state.cursor_col == 4
+    assert state.cursor_onset == Fraction(3, 4)
+    assert state.message == "Cursor 2:3:4"
 
     cmd.apply_command(state, "col 2", str(tmp_path / "cfg.toml"))
-    assert state.cursor_col == 1
+    assert state.cursor_onset == Fraction(1, 4)
+    assert state.message == "Event 2"
 
     cmd.apply_command(state, "cursor nope", str(tmp_path / "cfg.toml"))
     assert state.message.startswith("Usage: cursor")
@@ -246,7 +251,7 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "chordwrap=12 "
         "linelen=60 bargap=2 staffthick=2 fontstyle=baroque charstyle=historic "
         "title=Title author=Author composer=Composer midipatch=12 midigate=70 "
-        "soundfont=sf2 tempo=120 grid=on showextras=on showtactus=on italianorient=reverse "
+        "soundfont=sf2 tempo=120 showextras=on showtactus=on italianorient=reverse "
         "maxrepeats=30 scrollmode=page beatsnap=soft timesigstyle=fraction flaglean=left "
         "multifretspacing=separated fretlabelmode=letters "
         "minimumfret=2 maxstretch=5 restrainopenstrings=on",
@@ -277,7 +282,6 @@ def test_cmd_set_many_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert state.settings["midigate"] == "70"
     assert state.settings["soundfont"] == "sf2"
     assert state.settings["tempo"] == "120"
-    assert state.settings["grid"] == "on"
     assert state.settings["showextras"] == "on"
     assert state.settings["showtactus"] == "on"
     assert state.settings["italianorient"] == "reverse"
@@ -419,23 +423,27 @@ def test_cmd_set_deprecated_show_aliases_map_to_explicit_keys(
 
 def test_sign_commands_arpeggio_separee_and_tuplet() -> None:
     state = _state()
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
+    state.piece.bars[0].chords = [copy.deepcopy(quarter) for _ in range(4)]
     state.cursor_bar = 0
-    state.cursor_col = 3
+    state.cursor_onset = Fraction(3, 4)
+    key = (0, state.cursor_col)
+    assert key[1] > 0
 
     cmd.apply_command(state, "arpeggio on", "cfg.toml")
-    assert state.ornaments[(0, 3)] == "~"
+    assert state.ornaments[key] == "~"
     assert state.message == "Arpeggio on"
 
     cmd.apply_command(state, "separee on", "cfg.toml")
-    assert state.ornaments[(0, 3)] == ":"
+    assert state.ornaments[key] == ":"
     assert state.message == "Separee on"
 
     cmd.apply_command(state, "tuplet 3", "cfg.toml")
-    assert state.annotations[(0, 3)] == "³"
+    assert state.annotations[key] == "³"
     assert state.message == "Tuplet 3"
 
     cmd.apply_command(state, "tuplet clear", "cfg.toml")
-    assert (0, 3) not in state.annotations
+    assert key not in state.annotations
     assert state.message == "Tuplet cleared"
 
 
@@ -659,7 +667,7 @@ def test_cmd_set_tuning_baroque_alias(tmp_path: Path) -> None:
     state = _state()
     cfg = str(tmp_path / "cfg.toml")
     cmd.cmd_set(state, "tuning=baroque13", cfg)
-    assert state.settings["tuning"] == "a4b-4c4d4e4f4g4a3d3f3a2d2f2"
+    assert state.settings["tuning"] == "a1b-1c2d2e2f2g2a2d3f3a3d4f4"
 
 
 def test_cmd_bar_and_chord() -> None:
@@ -766,3 +774,16 @@ def test_cmd_vocal_clear_removes_melody_and_lyrics_from_piece() -> None:
     assert state.piece.bars[0].melody_events == []
     assert state.piece.bars[0].lyrics == []
     assert state.piece.bars[0].lyric_event_rows == []
+
+
+def test_the_obsolete_grid_setting_is_gone(tmp_path: Path) -> None:
+    config = tmp_path / "cfg.toml"
+    config.write_text('[settings]\ngrid = "on"\nshowdur = "on"\n', encoding="utf-8")
+
+    settings = load_settings(str(config))
+
+    assert "grid" not in settings
+    assert settings["showdur"] == "on"
+    state = _state()
+    cmd.cmd_set(state, "grid=on", str(config))
+    assert state.message == "Unknown set key: grid"

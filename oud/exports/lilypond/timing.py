@@ -22,8 +22,16 @@ def notated_duration(note_type: int | None, dotted: bool) -> Fraction:
     return value * Fraction(3, 2) if dotted else value
 
 
+def tuplet_factor(item: object) -> Fraction:
+    """``normal/actual`` of a tuplet member (2/3 in a triplet), else 1; chords have no tuplet fields."""
+
+    actual = getattr(item, "tuplet_actual", None)
+    normal = getattr(item, "tuplet_normal", None)
+    return Fraction(normal, actual) if actual and normal else Fraction(1)
+
+
 def timed_items_duration(items: Iterable[TimedItem], *, fallback: Fraction = Fraction()) -> Fraction:
-    duration = sum((notated_duration(item.note_type, item.dotted) for item in items), Fraction())
+    duration = sum((notated_duration(item.note_type, item.dotted) * tuplet_factor(item) for item in items), Fraction())
     return duration or fallback
 
 

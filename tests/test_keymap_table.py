@@ -10,9 +10,9 @@ import pytest
 from helpers_keyscript import keyscript_state, press_keys
 
 from oud.editor.commands.handlers.misc import show_help
-from oud.editor.commands.help import help_lines
 from oud.editor.commands.plugins.operations import PLUGIN_HANDLED_ACTIONS
 from oud.editor.core.feedback.messages import READ_ONLY_VIEWER
+from oud.editor.core.input.help import help_lines
 from oud.editor.core.input.keycodes import DEFAULT_KEYCODES
 from oud.editor.core.input.keymap import (
     ACTION_SPECS,
@@ -158,3 +158,16 @@ def test_mode_transitions_reject_unknown_modes() -> None:
 
     with pytest.raises(ValueError, match="bogus"):
         set_mode(state, "bogus")
+
+
+@pytest.mark.parametrize("keys", ["vim", "vim+arrows", "casual", "casual+arrows"])
+def test_the_pager_shows_the_same_help_as_the_overlay(keys: str) -> None:
+    state = keyscript_state(settings_override={"keys": keys})
+    shown: list[str] = []
+
+    def fake_less(argv: list[str], **_kwargs: object) -> None:
+        shown.append(Path(argv[1]).read_text(encoding="utf-8"))
+
+    show_help(state, which_fn=lambda name: f"/usr/bin/{name}", run_fn=fake_less)
+
+    assert shown == ["\n".join(help_lines(state)) + "\n"]

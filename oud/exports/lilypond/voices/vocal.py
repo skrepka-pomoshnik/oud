@@ -203,10 +203,37 @@ def _open_imported_duration_scales(
     return proportion_open, measure_scale_open
 
 
+def _tuplet_blocks(events: list[MelodyEvent]) -> tuple[dict[int, tuple[int, int]], set[int]]:
+    """Where ``\\tuplet`` blocks open and close: a block takes up to ``actual`` consecutive members of one ratio."""
+
+    opens: dict[int, tuple[int, int]] = {}
+    closes: set[int] = set()
+    index = 0
+    while index < len(events):
+        ratio = (events[index].tuplet_actual, events[index].tuplet_normal)
+        if not (ratio[0] and ratio[1]):
+            index += 1
+            continue
+        size = 1
+        while (
+            size < ratio[0]
+            and index + size < len(events)
+            and (events[index + size].tuplet_actual, events[index + size].tuplet_normal) == ratio
+        ):
+            size += 1
+        opens[index] = (ratio[0], ratio[1])
+        closes.add(index + size - 1)
+        index += size
+    return opens, closes
+
+
 def _append_imported_events(melody_body: list[str], note_bar: ImportedBarContent) -> tuple[int, tuple[int, ...]]:
     sung_onsets: list[int] = []
     beam_open = False
+    opens, closes = _tuplet_blocks(note_bar.melody_events)
     for event_index, event in enumerate(note_bar.melody_events):
+        if event_index in opens:
+            melody_body.append(f"  \\tuplet {opens[event_index][0]}/{opens[event_index][1]} {{")
         if not event.is_rest:
             sung_onsets.append(event.onset_index)
         lily = "r" if event.is_rest else _lily_note_from_event_text(event.text)
@@ -227,6 +254,8 @@ def _append_imported_events(melody_body: list[str], note_bar: ImportedBarContent
             dynamic=note_bar.dynamic if event_index == 0 else None,
         )
         melody_body.append(f"  {(lily or 'r')}{duration}{suffix}")
+        if event_index in closes:
+            melody_body.append("  }")
     return len(note_bar.melody_events), tuple(sung_onsets)
 
 

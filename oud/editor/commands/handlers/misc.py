@@ -4,23 +4,33 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable
+from fractions import Fraction
 from pathlib import Path
 
-from oud.editor.commands.help import help_lines
-from oud.editor.core.coordinates import string_index
+from oud.editor.core.coordinates import bar_stops, string_index
 from oud.editor.core.feedback.messages import MISSING_LESS
+from oud.editor.core.input.help import help_lines
 from oud.editor.core.state import EditorState
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import tuning_preset
+from petrucci.input.tablature.mutation import event_onsets
 
 
-def row_first_note_col(state: EditorState) -> int:
-    bar = state.cursor_bar
-    string = string_index(state, min(state.cursor_string, state.piece.strings - 1))
-    cols = [col for (b, s, col) in state.overrides if b == bar and s == string]
-    if not cols:
-        return 0
-    return min(cols)
+def row_first_note_onset(state: EditorState) -> Fraction:
+    """Onset of the cursor bar's first event with a note on the cursor course, else 0."""
+
+    if not 0 <= state.cursor_bar < len(state.piece.bars):
+        return Fraction(0)
+    course = string_index(state, min(state.cursor_string, state.piece.strings - 1)) + 1
+    bar = state.piece.bars[state.cursor_bar]
+    return next(
+        (
+            onset
+            for onset, chord in zip(event_onsets(bar), bar.chords, strict=True)
+            if any(note.string == course for note in chord.notes)
+        ),
+        Fraction(0),
+    )
 
 
 def tuning_preset_value(value: str) -> str | None:
@@ -60,14 +70,25 @@ def show_help(
         temp_path.unlink(missing_ok=True)
 
 
+def _move_to_stop(state: EditorState, number: int) -> None:
+    """Move to the 1-based cursor stop of the cursor bar; past the end means the last stop."""
+
+    state.clamp()
+    stops = bar_stops(state, state.cursor_bar)
+    state.cursor_onset = stops[max(0, min(number, len(stops)) - 1)]
+
+
+def _stop_number(state: EditorState) -> int:
+    return bar_stops(state, state.cursor_bar).index(state.cursor_onset) + 1
+
+
 def cmd_col(state: EditorState, args: str) -> None:
     token = args.strip()
     if not token.isdigit():
-        state.message = "Usage: col <1-based-column>"
+        state.message = "Usage: col <1-based event>"
         return
-    state.cursor_col = max(0, int(token) - 1)
-    state.clamp()
-    state.message = f"Col {state.cursor_col + 1}"
+    _move_to_stop(state, int(token))
+    state.message = f"Event {_stop_number(state)}"
 
 
 _MAX_CURSOR_PARTS = 3
@@ -78,15 +99,13 @@ _COLUMN_PART_INDEX = 3
 def cmd_cursor(state: EditorState, args: str) -> None:
     tokens = [part for part in args.replace(",", " ").split() if part]
     if not tokens or len(tokens) > _MAX_CURSOR_PARTS or any(not part.isdigit() for part in tokens):
-        state.message = "Usage: cursor <bar> [string] [col]"
+        state.message = "Usage: cursor <bar> [string] [event]"
         return
     state.cursor_bar = max(0, int(tokens[0]) - 1)
     if len(tokens) >= _STRING_PART_INDEX:
         state.cursor_string = max(0, int(tokens[1]) - 1)
-    if len(tokens) >= _COLUMN_PART_INDEX:
-        state.cursor_col = max(0, int(tokens[2]) - 1)
-    state.clamp()
-    state.message = f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{state.cursor_col + 1}"
+    _move_to_stop(state, int(tokens[2]) if len(tokens) >= _COLUMN_PART_INDEX else 1)
+    state.message = f"Cursor {state.cursor_bar + 1}:{state.cursor_string + 1}:{_stop_number(state)}"
 
 
 def cmd_verify(state: EditorState, args: str = "") -> None:
