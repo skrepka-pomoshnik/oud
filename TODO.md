@@ -18,10 +18,17 @@ Each item lists its files, steps, acceptance, and dependencies. Do not start an
 item whose dependencies are open. Every item is done only when the common gate
 passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 
+## Format goals (maintainer, 2026-09-29)
+
+- Full read support for `.tab` (the original `tab` program) and FT3.
+- MusicXML is the default save format (trial, `C16`). `.tab` keeps
+  first-class read and write support but is not the main format, because it
+  cannot hold several voices or staffs, lyrics, or tuplet timing.
+
 ## Order of work
 
 1. Editor rebuild for typing: `C4` → `C5` → `C6`.
-2. Full TAB format and the overflow sidecar: `C15`.
+2. Formats: `C16` (MusicXML default), `C15` (full TAB with sidecar).
 3. Note typing: `C7`.
 4. Transposition: `C8`.
 5. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
@@ -293,10 +300,7 @@ content to a sidecar in a format Oud already reads and writes.
 table. Every **Lost** and **Partial** row there is a step here. Reading
 without data loss and writing the program's syntax are done (see `DONE.md`).
 
-`.tab` has first-class support but is not Oud's main format, because it cannot
-hold several voices or staffs, lyrics, or tuplet timing (maintainer direction,
-2026-09-29). **Decision needed:** which format new documents save to by default
-(MusicXML is the candidate; Oud reads FT3 but does not write it).
+`.tab` has first-class support but is not Oud's main format (see Format goals).
 
 - Files: `oud/importers/tab.py`, `oud/exports/export_tab.py`,
   `oud/editor/services/io/files.py`, `oud/editor/services/io/loading.py`,
@@ -326,6 +330,29 @@ hold several voices or staffs, lyrics, or tuplet timing (maintainer direction,
   `.tab` + `.musicxml`, warns, and reopens identical; a TAB-only piece writes no
   sidecar.
 - Depends on: nothing open.
+
+### C16. MusicXML as the default save format (trial)
+
+Why complex: changes the save contract of every new document and which files
+Oud may overwrite; a lossy round trip would lose user work on every save.
+
+- Files: `oud/exports/musicxml.py`, `oud/importers/musicxml.py`,
+  `oud/editor/core/document.py`, `oud/editor/services/io/files.py`,
+  `oud/editor/services/bootstrap.py`, `docs/user-guide.md`.
+- Steps:
+  1. Ornaments, fingerings and text in the MusicXML round trip, once `C4`
+     moves them into the model (the rest of the round trip is lossless, see
+     `DONE.md`).
+  2. Save: `:w name.musicxml` writes MusicXML. New documents default to
+     `untitled.musicxml`, and `oud new.musicxml` pre-fills that name. `.tab`
+     documents keep saving to `.tab`.
+  3. Open: MusicXML that Oud wrote opens as a native document and saves back to
+     itself. Foreign MusicXML stays a projection with Save As to a new name,
+     because Oud keeps only the tablature part.
+- Acceptance: every repo TAB file and fixture survives TAB → MusicXML → Oud
+  with identical chords, meters, tuning, tempo, style and titles; a new
+  document's first `:w` offers `untitled.musicxml`; a foreign MusicXML file is
+  never overwritten without an explicit path.
 
 ---
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -34,6 +34,15 @@ _TYPE_TO_DENOM = {
     "128th": 128,
     "256th": 256,
 }
+
+_TIME_SYMBOLS = {"common": "C", "cut": "C|"}
+_FIRST_VOICE = ("", "1")
+# Identification fields Oud writes for facts MusicXML has no element for.
+_STYLE_FIELD = "oud-style"
+_AUTHOR_FIELD = "oud-author"
+_TUNING_FIELD = "oud-tuning"
+_ALTER_SIGNS = {1: "+", -1: "-"}
+OUD_SOFTWARE = "Oud"
 
 _DENOM_TO_NOTE_TYPE = {
     1: 2,
@@ -100,6 +109,11 @@ def _measure_time(measure: ET.Element) -> str | None:
         return None
     beats = _text(_child(time, "beats"))
     beat_type = _text(_child(time, "beat-type"))
+    symbol = (time.get("symbol") or "").strip().lower()
+    if symbol in _TIME_SYMBOLS:
+        return _TIME_SYMBOLS[symbol]
+    if symbol == "single-number" and beats.isdigit():
+        return beats
     if beats.isdigit() and beat_type.isdigit():
         return f"{beats}/{beat_type}"
     return None
@@ -154,38 +168,53 @@ def _rhythm_for_duration(duration: int, divisions: int) -> tuple[int, bool]:
     return note_type, dotted
 
 
-def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], int]:
-    cursor = 0
-    previous_onset = 0
-    measure_end = 0
-    notes: list[_TimedTabNote] = []
-    for node in measure:
+@dataclass
+class _Timeline:
+    """Walks one measure's notes, backups and forwards in document order."""
+
+    cursor: int = 0
+    previous_onset: int = 0
+    measure_end: int = 0
+    notes: list[_TimedTabNote] = field(default_factory=list)
+    rests: set[int] = field(default_factory=set)
+
+    def read(self, node: ET.Element) -> None:
         tag = _local(node.tag)
         if tag == "backup":
-            cursor = max(0, cursor - _duration_units(node))
-            continue
-        if tag == "forward":
-            cursor += _duration_units(node)
-            measure_end = max(measure_end, cursor)
-            continue
-        if tag != "note":
-            continue
+            self.cursor = max(0, self.cursor - _duration_units(node))
+        elif tag == "forward":
+            self.cursor += _duration_units(node)
+            self.measure_end = max(self.measure_end, self.cursor)
+        elif tag == "note":
+            self._note(node)
+
+    def _note(self, node: ET.Element) -> None:
         duration = _duration_units(node)
         is_chord = _child(node, "chord") is not None
-        onset = previous_onset if is_chord else cursor
+        onset = self.previous_onset if is_chord else self.cursor
         if not is_chord:
-            previous_onset = onset
-            cursor += duration
-        measure_end = max(measure_end, onset + duration, cursor)
+            self.previous_onset = onset
+            self.cursor += duration
+        self.measure_end = max(self.measure_end, onset + duration, self.cursor)
+        if _child(node, "rest") is not None:
+            # A rest in the main voice is an event of its own; other voices' rests only fill space.
+            if _text(_child(node, "voice")) in _FIRST_VOICE:
+                self.rests.add(onset)
+            return
         technical = _technical(node)
-        if technical is None or _child(node, "rest") is not None:
-            continue
-        notes.append(_TimedTabNote(onset, duration, technical[0], technical[1]))
-    return notes, measure_end
+        if technical is not None:
+            self.notes.append(_TimedTabNote(onset, duration, technical[0], technical[1]))
 
 
-def _group_timed_notes(notes: list[_TimedTabNote], measure_end: int, divisions: int) -> list[Chord]:
-    grouped: dict[int, dict[tuple[int, int], _TimedTabNote]] = {}
+def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], set[int], int]:
+    timeline = _Timeline()
+    for node in measure:
+        timeline.read(node)
+    return timeline.notes, timeline.rests, timeline.measure_end
+
+
+def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end: int, divisions: int) -> list[Chord]:
+    grouped: dict[int, dict[tuple[int, int], _TimedTabNote]] = {onset: {} for onset in rests}
     for note in notes:
         grouped.setdefault(note.onset, {})[(note.string, note.fret)] = note
     onsets = sorted(grouped)
@@ -221,8 +250,8 @@ def _parse_measure(measure: ET.Element, divisions: int) -> tuple[Bar, int]:
     bar = Bar()
     bar.time_sig = _measure_time(measure)
     bar.repeat = _measure_repeat(measure)
-    notes, measure_end = _timed_notes(measure)
-    bar.chords = _group_timed_notes(notes, measure_end, divisions)
+    notes, rests, measure_end = _timed_notes(measure)
+    bar.chords = _group_timed_notes(notes, rests, measure_end, divisions)
     if not bar.chords:
         rest = _rest_chord(measure)
         if rest is not None:
@@ -263,11 +292,87 @@ def _parse_musicxml_part(part: ET.Element) -> tuple[list[Bar], int]:
     return bars, strings
 
 
+def written_by_oud(root: ET.Element) -> bool:
+    identification = _child(root, "identification")
+    encoding = _child(identification, "encoding") if identification is not None else None
+    if encoding is None:
+        return False
+    return any(_text(software) == OUD_SOFTWARE for software in _children(encoding, "software"))
+
+
+def _identification_fields(root: ET.Element) -> dict[str, str]:
+    identification = _child(root, "identification")
+    miscellaneous = _child(identification, "miscellaneous") if identification is not None else None
+    if miscellaneous is None:
+        return {}
+    return {field.get("name", ""): _text(field) for field in _children(miscellaneous, "miscellaneous-field")}
+
+
+def _first_staff_details(part: ET.Element) -> ET.Element | None:
+    for measure in _children(part, "measure"):
+        attributes = _child(measure, "attributes")
+        details = _child(attributes, "staff-details") if attributes is not None else None
+        if details is not None:
+            return details
+    return None
+
+
+def _staff_tuning(details: ET.Element | None) -> str | None:
+    """Scientific pitch, bass course first: staff line 1 is the lowest course."""
+
+    if details is None:
+        return None
+    pitches: list[tuple[int, str]] = []
+    for tuning in _children(details, "staff-tuning"):
+        step = _text(_child(tuning, "tuning-step")).lower()
+        octave = _text(_child(tuning, "tuning-octave"))
+        line = (tuning.get("line") or "").strip()
+        if not step or not octave.isdigit() or not line.isdigit():
+            continue
+        alter = _text(_child(tuning, "tuning-alter"))
+        sign = _ALTER_SIGNS.get(int(alter), "") if alter.lstrip("-").isdigit() else ""
+        pitches.append((int(line), f"{step}{sign}{octave}"))
+    return "".join(pitch for _line, pitch in sorted(pitches)) or None
+
+
+def _tempo(part: ET.Element) -> int | None:
+    for sound in part.iter():
+        if _local(sound.tag) != "sound":
+            continue
+        tempo = (sound.get("tempo") or "").strip()
+        try:
+            value = round(float(tempo))
+        except ValueError:
+            continue
+        if value > 0:
+            return value
+    return None
+
+
+def _tab_style(details: ET.Element | None, fields: dict[str, str]) -> str | None:
+    if fields.get(_STYLE_FIELD):
+        return fields[_STYLE_FIELD]
+    if details is not None and (details.get("show-frets") or "").strip() == "letters":
+        return "french"
+    return None
+
+
 def _parse_piece(root: ET.Element) -> Piece:
     title, composer = _piece_metadata(root)
     part = max(_children(root, "part"), key=_technical_count, default=None)
     bars, strings = _parse_musicxml_part(part) if part is not None else ([], 6)
-    return Piece(title=title, composer=composer, bars=bars, strings=strings)
+    piece = Piece(title=title, composer=composer, bars=bars, strings=strings)
+    if part is None:
+        return piece
+    fields = _identification_fields(root)
+    details = _first_staff_details(part)
+    piece.author = fields.get(_AUTHOR_FIELD) or None
+    # Oud always writes a staff tuning (MusicXML needs one); its own field says whether the piece had one.
+    own_tuning = fields.get(_TUNING_FIELD) or None
+    piece.tuning = own_tuning if written_by_oud(root) else own_tuning or _staff_tuning(details)
+    piece.tempo = _tempo(part)
+    piece.style = _tab_style(details, fields)
+    return piece
 
 
 def load_musicxml(path: str) -> Piece:

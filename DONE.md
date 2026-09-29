@@ -1,5 +1,22 @@
 # DONE
 
+## C16 step 1: lossless MusicXML round trip (2026-09-29)
+
+- MusicXML written by Oud now reads back with identical chords, rests at their
+  own onsets (a mid-bar rest used to merge into the note before it), per-bar
+  meters including C, cut C (was written as the default meter) and single
+  numbers, tuning, tempo (`metronome` + `sound tempo`), French or Italian style,
+  and author. Oud-only facts go into `identification/miscellaneous`
+  (`oud-style`, `oud-author`, `oud-tuning`); `encoding/software` is `Oud`.
+- The exporter no longer invents an "Unknown" composer, and its default staff
+  tuning was reversed (C2…C3 for a 6-course lute); it now uses the
+  Renaissance G tuning.
+- Foreign MusicXML: tuning comes from `staff-tuning`, tempo from `sound`, style
+  from `show-frets="letters"`; only first-voice rests become events.
+- Validation: `tests/test_musicxml_roundtrip.py` (both styles with bass courses,
+  rests, dots, meter changes, metadata; every repo TAB file). The MusicXML
+  golden gained only the identification block. Gate: 1,837 passed.
+
 ## TAB saves in the original program's syntax (C15 step, S6) (2026-09-29)
 
 - `oud/exports/export_tab.py` writes what the `tab` program reads: spaces for
