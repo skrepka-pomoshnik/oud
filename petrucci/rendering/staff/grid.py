@@ -326,7 +326,7 @@ def _draw_cursor(
         return
     else:
         source_col = _scale_col(cursor_col, bar_width, grid_width) if bar.chords else cursor_col
-    scaled_col = grid_map[source_col]
+    scaled_col = grid_map[source_col] if source_col < len(grid_map) else grid_map[-1] + 1
     cell_idx = draw_pad + scaled_col
     if 0 <= cell_idx < len(row_text):
         safe_addstr(stdscr, y, bar_x + cell_idx, row_text[cell_idx], A_REVERSE)

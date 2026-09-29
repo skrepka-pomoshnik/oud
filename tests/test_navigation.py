@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from oud.editor.core.coordinates import cursor_event
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.normal.actions import handle_normal
@@ -18,6 +16,7 @@ from oud.editor.navigation.steps import (
 )
 from oud.editor.services.bootstrap import init_state
 from petrucci.core.model import Bar, Chord, Note, Piece
+from tests.helpers_ft3 import write_galliard
 from tests.helpers_regression_cases import multi_bar_spacing_piece, regression_state
 
 
@@ -65,42 +64,32 @@ def test_note_movement_prefers_notes_on_current_string() -> None:
     assert state.cursor_col == 4
 
 
-def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
-    root = Path(__file__).resolve().parents[1]
-    state = init_state(
-        str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
-        config_path="config.toml",
-    )
+def test_visual_move_right_skips_duplicate_render_column_in_dense_bar(tmp_path: Path) -> None:
+    state = init_state(str(write_galliard(tmp_path)), config_path="config.toml")
     state.settings["layout"] = "auto"
-    state.settings["justify"] = "stretch"
+    state.settings["justify"] = "packed"
     state.settings["beatsnap"] = "off"
     state.settings["barpad"] = "1"
-    state.screen_width = 90
-    state.cursor_bar = 3
-    content = bar_content_width_for_cursor(state, 3)
-    mapping = cursor_display_map_for_bar(state, 3, content)
+    state.screen_width = 20  # a narrow, packed terminal draws neighbouring columns in one cell
+    state.cursor_bar = 1
+    content = bar_content_width_for_cursor(state, 1)
+    mapping = cursor_display_map_for_bar(state, 1, content)
     dup = next((idx for idx in range(len(mapping) - 1) if mapping[idx] == mapping[idx + 1]), None)
-    if dup is None:
-        return
+    assert dup is not None
     state.cursor_col = dup
     move_right_visual(state)
-    assert state.cursor_bar == 3
+    assert state.cursor_bar == 1
     assert mapping[state.cursor_col] != mapping[dup]
 
 
-@pytest.mark.ft3_corpus
-def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
-    root = Path(__file__).resolve().parents[1]
-    state = init_state(
-        str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
-        config_path="config.toml",
-    )
+def test_four_l_presses_step_four_events(tmp_path: Path) -> None:
+    state = init_state(str(write_galliard(tmp_path)), config_path="config.toml")
     state.settings["layout"] = "auto"
     state.settings["justify"] = "stretch"
     state.settings["beatsnap"] = "off"
     state.settings["barpad"] = "1"
     state.screen_width = 120
-    state.cursor_bar = 0
+    state.cursor_bar = 1
     state.cursor_string = 1
     state.cursor_col = 0
     for _ in range(4):
@@ -108,12 +97,8 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     assert cursor_event(state) == 4
 
 
-def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode() -> None:
-    root = Path(__file__).resolve().parents[1]
-    state = init_state(
-        str(root / "examples" / "26_lachrimae_galliard_in_G.ft3"),
-        config_path="config.toml",
-    )
+def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode(tmp_path: Path) -> None:
+    state = init_state(str(write_galliard(tmp_path)), config_path="config.toml")
     state.settings["layout"] = "auto"
     state.settings["justify"] = "smart"
     state.settings["barpad"] = "1"

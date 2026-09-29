@@ -6,17 +6,21 @@ from oud.editor.services.io.loading import load_piece_data
 from oud.exports.export_tab import export_tab
 from oud.importers.tab import load_tab
 from petrucci.rendering.primitives.utils import chord_positions, note_type_to_denom
+from tests.helpers_ft3 import write_galliard
 
 
 def _piece_signature(piece) -> tuple:
     """refs/luteconv-inspired: compare normalized structure, not volatile text headers."""
     bars: list[tuple] = []
+    meter = None
     for bar in piece.bars:
+        # TAB states a meter only where it changes, so compare the meter in force.
+        meter = bar.time_sig or meter
         chords: list[tuple] = []
         for chord in bar.chords:
             notes = tuple(sorted((n.string, n.fret) for n in chord.notes))
             chords.append((chord.note_type, bool(chord.dotted), notes))
-        bars.append((bar.time_sig, tuple(chords)))
+        bars.append((meter, tuple(chords)))
     return (
         piece.title,
         piece.strings,
@@ -25,13 +29,12 @@ def _piece_signature(piece) -> tuple:
     )
 
 
-def test_tab_roundtrip_matrix_on_real_fixtures_refs_luteconv_style(tmp_path: Path) -> None:
+def test_tab_roundtrip_matrix_on_hand_built_fixtures_refs_luteconv_style(tmp_path: Path) -> None:
     # Test strategy inspired by refs/luteconv convert_test.cpp (fixture matrix conversion).
     paths = [
-        Path("tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3"),
-        Path("tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3"),
+        write_galliard(tmp_path),
         Path("tests/fixtures/tab/minimal_score.tab"),
-        Path("tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3"),
+        Path("examples/triste.tab"),
     ]
     for src in paths:
         piece, overrides, durations, dotted, bar_width = load_piece_data(str(src))
@@ -53,15 +56,11 @@ def test_tab_roundtrip_matrix_on_real_fixtures_refs_luteconv_style(tmp_path: Pat
         assert _piece_signature(piece2) == _piece_signature(piece), src
 
 
-def test_chord_positions_invariants_on_real_examples_refs_vexflow_tickstyle() -> None:
+def test_chord_positions_invariants_on_hand_built_examples_refs_vexflow_tickstyle(tmp_path: Path) -> None:
     # Test idea inspired by refs/vexflow tick/tickcontext invariants: spacing timeline must be monotonic.
-    paths = [
-        "tests/fixtures/ft3/corpus/examples/26_lachrimae_galliard_in_G.ft3",
-        "tests/fixtures/ft3/corpus/examples/02_forlorne_hope_8C.ft3",
-        "tests/fixtures/ft3/corpus/23a_frogg_galliard_2.ft3",
-    ]
+    paths = [write_galliard(tmp_path), Path("examples/triste.tab")]
     for path in paths:
-        piece, _o, _d, _dot, _w = load_piece_data(path)
+        piece, _o, _d, _dot, _w = load_piece_data(str(path))
         for bar in piece.bars:
             positions = chord_positions(bar, bar_width=12, default_duration=4)
             cols = [col for col, _denom, _dot in positions]

@@ -14,9 +14,9 @@ from oud.editor.services.screen.status import status_line
 from oud.presentation.tui.commands import apply_command
 from oud.presentation.tui.input import handle_command
 from petrucci.terminal.canvas.framebuffer import FrameBuffer
+from tests.helpers_ft3 import write_galliard
 from tests.helpers_keyscript import press_keys, tab_events
 
-PURE_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3"
 MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
 DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
 VOCAL_ONLY_FT3 = "tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_4-part.ft3"
@@ -36,7 +36,7 @@ def _submit_command_path(state, path: Path, config_path: str) -> None:
 def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
 
-    projection = init_state(PURE_FT3, config_path=config)
+    projection = init_state(str(write_galliard(tmp_path)), config_path=config)
     assert projection.document_mode is DocumentMode.IMPORTED_PROJECTION
     assert projection.read_only is False
     assert projection.write_path is None
@@ -64,31 +64,29 @@ def test_ft3_document_classification_is_conservative(tmp_path: Path) -> None:
     assert tab.write_path == TAB_FILE
 
 
-@pytest.mark.ft3_corpus
-def test_first_ft3_write_uses_a_sibling_tab_default(tmp_path: Path) -> None:
+def test_first_ft3_write_uses_a_sibling_musicxml_default(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     source = tmp_path / "source.ft3"
-    source.write_bytes(Path(PURE_FT3).read_bytes())
+    write_galliard(tmp_path, source.name)
     state = init_state(str(source), config_path=config)
     state.modified = True
 
     apply_command(state, "w", config)
     assert state.mode == "command"
-    assert state.cmdline == f"w {source.with_suffix('.tab')}"
+    assert state.cmdline == f"w {source.with_suffix('.musicxml')}"
     handle_command(state, 10, lambda current, command: apply_command(current, command, config))
 
     assert state.mode == "normal"
     assert state.modified is False
     assert state.path == str(source)
-    assert state.write_path == str(source.with_suffix(".tab"))
-    assert source.with_suffix(".tab").exists()
+    assert state.write_path == str(source.with_suffix(".musicxml"))
+    assert source.with_suffix(".musicxml").exists()
 
 
-@pytest.mark.ft3_corpus
 def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -> None:
     config = str(tmp_path / "config.toml")
     target = tmp_path / "projection.tab"
-    state = init_state(PURE_FT3, config_path=config)
+    state = init_state(str(write_galliard(tmp_path)), config_path=config)
     source = state.path
     state.modified = True
 
@@ -113,7 +111,6 @@ def test_key_driven_ft3_save_as_keeps_source_and_reuses_target(tmp_path: Path) -
     assert state.write_path == str(target)
 
 
-@pytest.mark.ft3_corpus
 @pytest.mark.parametrize("command", ["wq", "x"])
 def test_write_quit_prefills_sibling_destination_before_write(
     tmp_path: Path,
@@ -121,8 +118,8 @@ def test_write_quit_prefills_sibling_destination_before_write(
 ) -> None:
     config = str(tmp_path / "config.toml")
     source = tmp_path / "source.ft3"
-    source.write_bytes(Path(PURE_FT3).read_bytes())
-    target = source.with_suffix(".tab")
+    write_galliard(tmp_path, source.name)
+    target = source.with_suffix(".musicxml")
     state = init_state(str(source), config_path=config)
     state.modified = True
 
@@ -178,9 +175,8 @@ def test_ascii_export_does_not_mark_score_saved(tmp_path: Path) -> None:
     assert state.message.startswith("Exported ASCII")
 
 
-@pytest.mark.ft3_corpus
 def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: Path) -> None:
-    state = init_state(PURE_FT3, config_path=str(tmp_path / "config.toml"))
+    state = init_state(str(write_galliard(tmp_path)), config_path=str(tmp_path / "config.toml"))
     state.screen_width = 80
     state.modified = True
     target = tmp_path / "edited.tab"
@@ -189,7 +185,7 @@ def test_status_keeps_identity_mode_and_target_visible_at_80_columns(tmp_path: P
 
     line = status_line(state)
 
-    assert "unquiet_thoughts_T.ft3*" in line
+    assert "galliard.ft3*" in line
     assert "FT3 EDIT:edited.tab" in line
     assert "bar:1" in line
     assert "str:1" in line

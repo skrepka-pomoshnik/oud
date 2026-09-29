@@ -162,7 +162,8 @@ def _cursor_grid_col(context: SystemRenderContext, bar, basics, *, abs_bar: int)
     columns = [column for column, _denom, _dot in basics.chord_positions]
     if context.cursor_event < len(columns):
         return columns[context.cursor_event]
-    return min(columns[-1] + 1, basics.grid_width - 1)
+    # The append slot follows the last event; it can lie one past the grid when the last event fills it.
+    return columns[-1] + 1
 
 
 def _render_bar(

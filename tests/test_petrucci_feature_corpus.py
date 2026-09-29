@@ -122,6 +122,16 @@ def _tab_projection(piece: Piece) -> tuple[object, ...]:
     )
 
 
+def _tab_projection_with_meter_in_force(piece: Piece) -> tuple[object, ...]:
+    # TAB states a meter only where it changes, so a reopened score carries none on repeated bars.
+    meter = None
+    bars = []
+    for bar, (_time_sig, chords) in zip(piece.bars, _tab_projection(piece), strict=True):
+        meter = bar.time_sig or meter
+        bars.append((meter, chords))
+    return tuple(bars)
+
+
 def _projection_digest(piece: Piece) -> str:
     encoded = json.dumps(_tab_projection(piece), ensure_ascii=True, separators=(",", ":"))
     return _digest(encoded)
@@ -218,6 +228,6 @@ def test_curated_render_exports_and_tab_reopen_match_goldens(
         assert _digest(rendered) == goldens["render_sha256"]
         assert _digest(tab_text) == goldens["tab_sha256"]
         assert _projection_digest(piece) == goldens["tab_projection_sha256"]
-        assert _tab_projection(reopened) == _tab_projection(piece)
+        assert _tab_projection_with_meter_in_force(reopened) == _tab_projection_with_meter_in_force(piece)
         assert _digest(lilypond_path.read_text(encoding="utf-8")) == goldens["lilypond_sha256"]
         assert _digest(midi_path.read_bytes()) == goldens["midi_sha256"]

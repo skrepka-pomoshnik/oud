@@ -162,6 +162,8 @@ def _grid_display_map(
     content = max(1, content_width)
     mapping: list[int] = []
     prev = 0
+    # The cell after the last event is the bar's append slot; it keeps a cell of its own.
+    append_col = max(src_to_dest, default=-1) + 1
     for grid_col in range(width):
         is_event_col = grid_col in src_to_dest
         dest = src_to_dest.get(grid_col, _scale_col(grid_col, width, content))
@@ -169,6 +171,8 @@ def _grid_display_map(
         if grid_col > 0 and dest < prev:
             dest = prev
         if (not is_event_col) and grid_col > 0 and dest > prev + 1:
+            dest = prev + 1
+        if grid_col == append_col and grid_col > 0 and dest == prev and prev + 1 < content:
             dest = prev + 1
         mapping.append(dest)
         prev = dest
