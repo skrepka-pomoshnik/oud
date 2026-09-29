@@ -44,6 +44,7 @@ pythonpath = ["."]
 markers = [
   "ft3_corpus: needs the local Gerbode FT3 corpus; skipped when it is missing",
   "tab_program: needs the original tab program in TAB_PROGRAM; skipped when it is unset",
+  "musicxml_schema: needs xmllint and MUSICXML_SCHEMA_DIR (the W3C schema folder); skipped when unset",
 ]
 
 [tool.coverage.run]

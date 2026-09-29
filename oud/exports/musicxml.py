@@ -668,12 +668,12 @@ def _append_musicxml_measure_prefix(
     *,
     settings: dict[str, str],
     pitch_for_string: list[int],
-    carry_repeat_forward: bool,
 ) -> tuple[Element, str]:
     measure = SubElement(part, "measure", number=str(bar_number))
-    if carry_repeat_forward:
-        _add_barline(measure, location="left", style="heavy-light", repeat="forward")
     repeat = (bar.repeat or "").strip()
+    # `.:` and `:|:` put the repeat dots at the left barline of this bar (as FT3 and the renderer do).
+    if repeat in (".:", ":|:"):
+        _add_barline(measure, location="left", style="heavy-light", repeat="forward")
     if repeat:
         _add_repeat_directions(measure, repeat)
     repeat_words = _repeat_words(repeat)
@@ -697,13 +697,11 @@ def _append_musicxml_measure_prefix(
     return measure, repeat
 
 
-def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str) -> bool:
-    carry_repeat_forward = repeat in (".:", ":|:")
+def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str) -> None:
     right_repeat = "backward" if repeat in (":.", ":|:") else None
     bar_style = "light-heavy" if right_repeat else _barline_style(bar.barline)
     if repeat or bar.barline:
         _add_barline(measure, location="right", style=bar_style, repeat=right_repeat)
-    return carry_repeat_forward
 
 
 def _append_musicxml_measure(
@@ -718,8 +716,7 @@ def _append_musicxml_measure(
     style: str,
     dotted: set[tuple[int, int]] | None,
     pitch_for_string: list[int],
-    carry_repeat_forward: bool,
-) -> bool:
+) -> None:
     measure, repeat = _append_musicxml_measure_prefix(
         part,
         piece,
@@ -727,7 +724,6 @@ def _append_musicxml_measure(
         bar_index + 1,
         settings=settings,
         pitch_for_string=pitch_for_string,
-        carry_repeat_forward=carry_repeat_forward,
     )
     _append_musicxml_measure_notes(
         measure,
@@ -740,7 +736,7 @@ def _append_musicxml_measure(
         dotted=dotted,
         pitch_for_string=pitch_for_string,
     )
-    return _finish_musicxml_measure(measure, bar, repeat)
+    _finish_musicxml_measure(measure, bar, repeat)
 
 
 def _musicxml_text(
@@ -766,9 +762,8 @@ def _musicxml_text(
     SubElement(score_part, "part-name").text = "Lute"
     part = SubElement(root, "part", id="P1")
 
-    carry_repeat_forward = False
     for bar_index, bar in enumerate(piece.bars):
-        carry_repeat_forward = _append_musicxml_measure(
+        _append_musicxml_measure(
             part,
             piece,
             bar,
@@ -779,7 +774,6 @@ def _musicxml_text(
             style=style,
             dotted=dotted,
             pitch_for_string=pitch_for_string,
-            carry_repeat_forward=carry_repeat_forward,
         )
 
     append_notation_parts(

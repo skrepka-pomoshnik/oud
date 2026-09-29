@@ -35,7 +35,7 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 6. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow;
-S11 and S20–S23 need nothing outside the repository.
+S11, S20–S23 and S25–S31 need nothing outside the repository.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
@@ -349,9 +349,10 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
   `oud/editor/core/document.py`, `oud/editor/services/io/files.py`,
   `oud/editor/services/bootstrap.py`, `docs/user-guide.md`.
 - Steps:
-  1. Ornaments, fingerings and text in the MusicXML round trip, once `C4`
-     moves them into the model (the rest of the round trip is lossless, see
-     `DONE.md`).
+  1. Round-trip gaps: chords, rests, meters, tuning, tempo, style, author and
+     repeats round trip; endings, barline styles, fermatas, dynamics, keys,
+     system breaks and all editor marks do not (`docs/musicxml-support.md`).
+     `S25`-`S27`, `S31` close the easy ones, `C17` the rest.
   2. Trial feedback: decide whether MusicXML stays the default after use
      (`:w`, new documents, projections). `oud convert` still needs an explicit
      output path.
@@ -360,9 +361,38 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
   4. Notation-staff details MusicXML could carry but Oud does not write yet:
      ornaments, fingerings, beams, clefs and key signatures of
      imported staffs (`oud/exports/musicxml_staffs.py`).
-- Acceptance: ornaments, fingerings and text survive the round trip like the
-  rest (default save, native reopen and the lossless core are done, see
-  `DONE.md`).
+- Acceptance: the default save loses nothing without saying so (`S25`), and no
+  Lost row remains in the round-trip table of `docs/musicxml-support.md` for
+  what the model holds. Default save and native reopen are done (`DONE.md`).
+
+### C17. Marks, tuplets, voices and foreign files in the MusicXML model
+
+Why complex: extends `Note`/`Chord`/`Bar` and both file formats; today the
+default save silently drops content (`docs/musicxml-support.md` lists every gap,
+checked against the W3C schema and examples).
+
+- Steps:
+  1. Editor-side marks belong to notes, not to grid columns: slurs, ties,
+     holds, glissandi, ornaments, annotations and highlights
+     (`EditorState.slurs/ties/holds/ornaments/annotations/highlights`, made by
+     `oud/editor/editing/score/notation.py`) become fields on `Note`/`Chord`
+     addressed by onset, with undo. Write and read them in MusicXML (`tied`,
+     `slur`, `ornaments`, `words`) and in TAB (`C15` step 1). Until then `S25`
+     warns on save.
+  2. Tuplet timing in the chord model (actual/normal notes): write and read
+     `time-modification` and TAB `t3` lines; the bar length check uses it.
+  3. Voices: a polyphonic tab bar keeps each note's own duration (a held bass
+     under a moving melody) instead of "until the next onset".
+  4. Foreign standard notation: read every non-tab part of any MusicXML file as
+     imported notation staves (as Oud's own extra parts already are), so a
+     file without tablature opens as a view-only score instead of empty bars.
+  5. Tab techniques (hammer-on, pull-off, slide, bend, harmonic, fingering,
+     tie) as `Note` fields, written and read.
+- Acceptance: the round-trip probe in `docs/musicxml-support.md` (each field
+  written then read) reports no Lost row for what the model holds; the W3C
+  samples open with their notes visible or with a warning that names what was
+  dropped; the schema test (`tests/test_musicxml_schema.py`) still passes.
+- Depends on: `C4`, `C15` step 1.
 
 ---
 
@@ -487,6 +517,108 @@ the complex list with a note instead of widening it.
   tablature part has notes).
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
+
+### S25. Say what a save cannot keep
+
+- Where: `cmd_write` in `oud/editor/services/io/files.py` (the message after a
+  successful write). Editor-side marks (`state.slurs`, `ties`, `holds`,
+  `glisses`, `ornaments`, `annotations`, `highlights`) are never written by
+  either format, and the save says nothing (`docs/musicxml-support.md`).
+- Do: after a successful write, when any of those collections is non-empty,
+  append ` (not saved: 2 slurs, 1 ornament)` to `state.message`, counting each
+  non-empty collection (`len(...)`, singular when 1). Put the counting in a
+  small function in a new module `oud/editor/services/io/dropped.py` returning
+  a `str` (empty when nothing is dropped) so `S26`/`C17` can shrink it later.
+- Acceptance: `tests/test_musicxml_default_save.py` gets tests for a document
+  with a slur and an ornament (built with `set_slur`/`set_ornament` from
+  `oud/editor/editing/score/notation.py`) saved as `.musicxml` and as `.tab`
+  (message names both), and one with no marks (message unchanged).
+
+### S26. Read the bar marks the exporter already writes
+
+- Where: `oud/importers/musicxml.py` (`_parse_measure`); the exporter is
+  `oud/exports/musicxml.py` (`_add_barline`, `_barline_style`,
+  `_add_direction_dynamic`, note `fermata`).
+- Do: read into `Bar`: (1) `bar.fermata = True` when the measure's first note
+  has `notations/fermata`; (2) `bar.dynamic` from
+  `direction/direction-type/dynamics/<mf|f|...>`, or from `words` when the
+  text is not a known dynamic (same names as `_add_direction_dynamic`);
+  (3) `bar.barline` from the right `barline/bar-style`: `light-light` -> `"||"`,
+  `dotted` -> `":"`, `none` -> `" "`, `regular` -> `None`, and
+  `light-heavy` without a `repeat` -> `"|."`. Write `"|."` as `light-heavy`
+  in `_barline_style` (it is written as `regular` today).
+- Acceptance: `tests/test_musicxml_roundtrip.py`: a bar with each of these
+  fields written then read comes back equal, one test per field.
+
+### S27. Volta endings in MusicXML
+
+- Where: `Bar.ending_numbers` (`(1,)`, `(1, 2)`, ...) is neither written nor
+  read (`oud/exports/musicxml.py`, `oud/importers/musicxml.py`).
+- Do: write `<barline location="left"><ending number="1" type="start"/></barline>`
+  on the first bar of a run of bars with the same `ending_numbers`
+  (`number="1,2"` for `(1, 2)`), and `<barline location="right"><ending
+  number="1" type="stop"/></barline>` on the last one; the right barline may
+  already exist (repeat), so add the `ending` element to it. Read both back.
+- Acceptance: a round-trip test for `(1,)`, `(2,)` and `(1, 2)` on runs of one
+  and two bars; `tests/test_musicxml_schema.py` (with the schema) still
+  passes.
+
+### S28. Warn when a MusicXML import drops notes
+
+- Where: `_parse_piece` in `oud/importers/musicxml.py`; `Piece.import_warnings`
+  is shown on open and refuses `oud convert` (see `_validate_piece` in
+  `oud/presentation/cli_convert.py`, so decide the warning text with care: a
+  dropped-notes warning must not stop a conversion of a tab file).
+- Do: count (a) notes in parts that are not the chosen tablature part and (b)
+  notes in the tablature part that have no `string`/`fret`. When the count is
+  above zero, append `"MusicXML: N notes without tablature were not read"`
+  to `piece.import_warnings`; skip the warning for parts Oud wrote itself
+  (`written_by_oud`).
+- Also: `_validate_piece` must treat this warning as informational (still
+  convert), by checking a constant prefix exported from the importer.
+- Acceptance: tests with inline XML: a standard-notation-only score (warning
+  with the note count), a score with a tab part plus a standard part (warning
+  counts the standard notes), a tab-only score (no warning), Oud's own layered
+  file (no warning); `oud convert` of the first still writes its output.
+
+### S29. Do not merge grace notes into chords on MusicXML import
+
+- Where: `_Timeline._note` in `oud/importers/musicxml.py`. A `<grace/>` note has
+  no `duration`, so it lands at the current onset and joins the next chord.
+- Do: skip notes with a `grace` child in the timeline (no onset, no chord) and
+  count them; add `"MusicXML: N grace notes were not read"` to the import
+  warnings (informational, as in `S28`).
+- Acceptance: a whole note preceded by a grace note reads as one chord with one
+  note (it reads as two today); the warning is present.
+
+### S30. Read tuplets as written values
+
+- Where: `_group_timed_notes` and `_rhythm_for_duration` in
+  `oud/importers/musicxml.py` choose the note value from the duration, so
+  three triplet eighths (duration 1/12 of a whole note each) become dotted
+  16ths and a 2/4 bar measures 17/32.
+- Do: when a note has `time-modification`, take the value from its `<type>`
+  and `<dot>` (the written value, an eighth) instead of the duration, and add
+  `"MusicXML: N tuplet groups were read without tuplet timing"` to the import
+  warnings (the wording of `TAB_TRIPLET_WARNING` in `oud/importers/tab.py`).
+  The bar then reads 5/8 for three eighths and a quarter and the status row
+  shows the meter difference; that is the honest result until `C17` step 2.
+- Acceptance: the triplet example above reads as three eighth chords, the bar
+  length is 5/8, the warning is present; a bar without tuplets is unchanged.
+
+### S31. Measure rests for empty bars in MusicXML
+
+- Where: an empty bar is written as a bare `<measure>` (valid, but other
+  programs show nothing); `_rest_chord` in `oud/importers/musicxml.py` turns
+  the first rest of a bar into a chord, including a whole-measure rest.
+- Do: write `<note><rest measure="yes"/><duration>D</duration><voice>1</voice></note>`
+  for an empty bar in the tablature part (D from the bar's meter, as
+  `_append_measure_rest` in `oud/exports/musicxml_staffs.py` already does for
+  notation parts; reuse it instead of copying it); read
+  `rest measure="yes"` as an empty bar (no rest chord).
+- Acceptance: a piece with an empty bar keeps it empty through write and read;
+  a foreign file with a measure rest opens with an empty bar, not a rest
+  chord; the schema test passes.
 
 ## Blocked tasks (need data, tools, a host, or design judgement)
 

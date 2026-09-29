@@ -1,5 +1,25 @@
 # DONE
 
+## MusicXML checked against the W3C schema; repeat start fixed (2026-09-29)
+
+- New `tests/test_musicxml_schema.py` validates Oud's MusicXML with
+  `xmllint --schema` against the W3C 4.1 schema (needs `xmllint` and
+  `MUSICXML_SCHEMA_DIR`; skips otherwise). All output validates; the 11 official
+  examples validate with the same setup. Exported pitches equal tuning plus
+  fret, and the official tablature example reads back exactly.
+- Bug fixed: a start repeat (`.:`, `:|:`) was written into the next measure, so
+  it moved one bar later on every save and reopen. It is now written at the left
+  barline of its own bar, and the reader recognises a bar with both a forward and
+  a backward repeat.
+- Correction to the C16 step 1 entry: that round trip covered chords, rests,
+  meters, tuning, tempo, style and author, not bar-level marks. Endings, barline
+  styles, fermatas, dynamics, keys and system breaks do not round trip, and
+  editor-side slurs, ties, holds, ornaments and annotations are never saved.
+- `docs/musicxml-support.md` records what Oud writes and reads, per field, with
+  the gaps. Tasks: `C17`, `S25` to `S31` in `TODO.md`.
+- Validation: `tests/test_musicxml_roundtrip.py` (repeat markers over three
+  saves; forward repeat at the left of its own measure). Gate: 1,888 passed.
+
 ## S10: the historical-notation matrix (2026-09-29)
 
 - `docs/supported-behavior.md` has a table of historical constructs (mensuration and proportion signs, cut time, repeats and endings, fermatas, tuplets, grace notes, clefs and keys, dots) marked supported, partial or unsupported, with the test that proves each supported row; coloration, ligatures, perfection and alteration, ficta, custos, C clefs, interpreted durations and alternative interpretations are listed as unsupported. Every named test was checked to exist. Rejecting unsupported constructs visibly stays in `C13`.
