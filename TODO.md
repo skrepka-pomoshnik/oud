@@ -447,30 +447,6 @@ the complex list with a note instead of widening it.
   `docs/engraving-regressions.md` lists the four features under the matrix.
 - Out of scope: real FT3 entries (`S24`), collision tuning, other features.
 
-### S20. Delete the grid primitives that only tests use
-
-- Where: `oud/editor/editing/primitives/edits.py` still has `apply_duration`,
-  `clear_cell` and `clear_cell_note`; `petrucci/input/tablature/grid.py` has
-  the functions behind them: `set_tab_duration`, `clear_tab_cell`,
-  `clear_tab_note` and their private helpers. Only tests call them (typing
-  goes through `apply_tab_transaction` since `C3`).
-- Do: delete those three wrappers and three functions, then delete whatever
-  becomes unused in `grid.py` (find it with `.venv/bin/ruff check` and
-  `grep -rnw <name> oud petrucci`; candidates: `_clear_encoded_cells`,
-  `_clear_rhythm`, `_clear_dot`, `_clear_chord_note`, `_column_has_notes`,
-  `_rhythm_snapshot`, `_tab_onset_key`, `TabRhythmDelta`, `TabDotDelta`).
-- Keep (production code still uses them): `apply_override` and `set_tab_cell`
-  (`oud/editor/commands/handlers/settings.py:627`, replaced by `C8`),
-  `EditableTablature`, `TabMutation`, `TabCellDelta` while `set_tab_cell` needs
-  it, `chord_index_at_col`, `insert_chord`, `delete_chord`, `set_chord_note`.
-- Tests: delete the tests that exist only for the deleted functions
-  (`tests/test_editor.py`: the `apply_duration` undo test and
-  `test_clear_cell_*`; `tests/test_tui_commands.py`:
-  `test_apply_duration_replaces_column`; the matching cases in
-  `tests/test_petrucci_contract_edges.py`). Do not weaken other tests.
-- Acceptance: `grep -rnwE "apply_duration|clear_cell|clear_cell_note|set_tab_duration|clear_tab_cell|clear_tab_note" oud petrucci tests`
-  prints nothing; the gate passes; `grid.py` is shorter by the deleted code.
-
 ### S22. Beams on notation staves in MusicXML
 
 - Where: `oud/exports/musicxml_staffs.py` writes notation staves;

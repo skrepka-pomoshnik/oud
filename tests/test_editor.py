@@ -94,15 +94,6 @@ def test_undo_override_removes_cell() -> None:
     assert key not in state.overrides
 
 
-def test_undo_duration_restores_previous() -> None:
-    state = _state()
-    key = (0, 0, 0)
-    edit_ops.apply_duration(state, key, 4)
-    edit_ops.apply_duration(state, key, 8)
-    undo_ops.undo(state, config_path="config.toml")
-    assert state.durations[key] == 4
-
-
 def test_insert_duration_updates_chord_note_type() -> None:
     state = _state()
     chord = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
@@ -251,40 +242,6 @@ def test_redo_restores_override() -> None:
     assert key not in state.overrides
     undo_ops.redo(state, config_path="config.toml")
     assert state.overrides[key] == "a"
-
-
-def test_clear_cell_removes_duration_column() -> None:
-    state = _state()
-    state.durations[(0, 1, 0)] = 8
-    edit_ops.clear_cell(state, 0, 1, 0)
-    assert (0, 1, 0) not in state.durations
-
-
-def test_clear_cell_empty_gap_does_not_delete_nearest_chord_note() -> None:
-    state = _state()
-    state.piece.bars[0].chords = [
-        Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)]),
-    ]
-    edit_ops.clear_cell(state, 0, 0, 1)
-    assert state.piece.bars[0].chords[0].notes == [Note(1, 0, 0)]
-    assert state.undo_stack == []
-
-
-def test_clear_cell_note_records_single_grouped_undo() -> None:
-    state = _state()
-    state.overrides[(0, 0, 0)] = "a"
-    state.durations[(0, 0, 0)] = 4
-    state.dotted.add((0, 0))
-    edit_ops.clear_cell_note(state, 0, 0, 0)
-    assert (0, 0, 0) not in state.overrides
-    assert (0, 0, 0) not in state.durations
-    assert (0, 0) not in state.dotted
-    assert len(state.undo_stack) == 1
-    assert state.undo_stack[-1].kind == "group"
-    undo_ops.undo(state, config_path="config.toml")
-    assert state.overrides[(0, 0, 0)] == "a"
-    assert state.durations[(0, 0, 0)] == 4
-    assert (0, 0) in state.dotted
 
 
 def test_italian_fret_validation() -> None:

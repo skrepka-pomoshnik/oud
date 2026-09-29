@@ -8,10 +8,7 @@ from oud.editor.core.state import EditorState, UndoAction, UndoGroupFrame
 from petrucci.input.tablature.grid import (
     EditableTablature,
     TabMutation,
-    clear_tab_cell,
-    clear_tab_note,
     set_tab_cell,
-    set_tab_duration,
 )
 from petrucci.input.tablature.mutation import (
     TabDocument,
@@ -112,10 +109,6 @@ def apply_override(state: EditorState, key: tuple[int, int, int], ch: str) -> No
     _record_tab_mutation(state, set_tab_cell(_editable_tablature(state), key, ch))
 
 
-def apply_duration(state: EditorState, key: tuple[int, int, int], dur: int) -> None:
-    _record_tab_mutation(state, set_tab_duration(_editable_tablature(state), key, dur))
-
-
 def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -> TabMutationResult:
     """Apply an onset transaction to the bar chords as one undo step."""
 
@@ -141,16 +134,6 @@ def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -
                 ),
             )
     return result
-
-
-def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:
-    with undo_group(state, label="clear-cell"):
-        _record_tab_mutation(state, clear_tab_cell(_editable_tablature(state), (bar, string, col)))
-
-
-def clear_cell_note(state: EditorState, bar: int, string: int, col: int) -> None:
-    with undo_group(state, label="clear-cell-note"):
-        _record_tab_mutation(state, clear_tab_note(_editable_tablature(state), (bar, string, col)))
 
 
 def _editable_tablature(state: EditorState) -> EditableTablature:
@@ -180,24 +163,3 @@ def _record_tab_mutation(state: EditorState, mutation: TabMutation) -> None:
         )
     for delta in mutation.cells:
         record_undo(state, "override", delta.key, delta.before, delta.after)
-    for delta in mutation.rhythms:
-        record_action(
-            state,
-            UndoAction(
-                kind="duration_col",
-                data={
-                    "bar": delta.bar_index,
-                    "col": delta.column,
-                    "prev": dict(delta.before),
-                    "new": dict(delta.after),
-                },
-            ),
-        )
-    for delta in mutation.dots:
-        record_action(
-            state,
-            UndoAction(
-                kind="dotted",
-                data={"key": delta.key, "prev": delta.before, "new": delta.after},
-            ),
-        )
