@@ -31,11 +31,11 @@ def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:
     assert matrix["profiles"] == ["petrucci", "classic"]
     assert matrix["publication_engines"]["baseline"] == "2.26"
     assert matrix["publication_engines"]["compatibility"] == "2.24"
-    assert len(matrix["cases"]) >= 9
-    assert {"fermata", "cut-time", "key-signature"} <= {case["id"] for case in matrix["cases"]}
+    assert len(matrix["cases"]) >= 10
+    assert {"fermata", "cut-time", "key-signature", "tuplet-triplet"} <= {case["id"] for case in matrix["cases"]}
     assert "gerbode-multiverse-registration" in {case["id"] for case in matrix["cases"]}
     case_ids = {case["id"] for case in matrix["cases"]}
-    assert len(matrix["microcases"]) >= 6
+    assert len(matrix["microcases"]) >= 7
     assert len(matrix["upstream_microcases"]) >= 4
     for microcase in matrix["microcases"]:
         assert microcase["case"] in case_ids
