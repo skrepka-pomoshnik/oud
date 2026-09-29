@@ -518,16 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S29. Do not merge grace notes into chords on MusicXML import
-
-- Where: `_Timeline._note` in `oud/importers/musicxml.py`. A `<grace/>` note has
-  no `duration`, so it lands at the current onset and joins the next chord.
-- Do: skip notes with a `grace` child in the timeline (no onset, no chord) and
-  count them; add `"MusicXML: N grace notes were not read"` to the import
-  warnings (informational, as in `S28`).
-- Acceptance: a whole note preceded by a grace note reads as one chord with one
-  note (it reads as two today); the warning is present.
-
 ### S30. Read tuplets as written values
 
 - Where: `_group_timed_notes` and `_rhythm_for_duration` in

@@ -1,5 +1,10 @@
 # DONE
 
+## S29: grace notes no longer merge into chords on MusicXML import (2026-09-29)
+
+- A `<grace/>` note in the tablature part is skipped instead of joining the chord at its onset (a whole note preceded by a grace note read as two notes). The import warns `MusicXML: N grace notes were not read`.
+- Validation: `tests/test_musicxml_import_warnings.py` (one grace note, two).
+
 ## S28: MusicXML import warns when it drops notes (2026-09-29)
 
 - Pitched notes that no string and fret describe (other parts, untabbed staves) are counted in an informational import warning, `MusicXML: N notes without tablature were not read`. Files Oud wrote (their extra parts are read) get no warning. `oud convert` treats `MusicXML: ` warnings as informational and still converts (`is_informational_warning`).
