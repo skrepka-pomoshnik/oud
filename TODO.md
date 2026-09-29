@@ -414,28 +414,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S32. LilyPond tuplets from melody events
-
-- Where: `oud/exports/lilypond/voices/vocal.py` (`_append_imported_events`) writes
-  each `MelodyEvent` as pitch plus written duration and never reads
-  `tuplet_actual`/`tuplet_normal`; no code under `oud/exports/lilypond` mentions
-  a tuplet. `timed_items_duration` in `oud/exports/lilypond/timing.py` adds the
-  written values, so three triplet eighths in a 2/4 bar count as 5/8 and the
-  bar is wrapped in a `\scaleDurations` fudge instead of `\tuplet`.
-- Do: group consecutive events with the same (`tuplet_actual`,
-  `tuplet_normal`) and write them inside `\tuplet A/N { ... }`; make
-  `timed_items_duration` count such an event as its written value times
-  `normal/actual`, so the bar needs no scaling. Check the syntax against
-  LilyPond 2.24 and 2.26 (`\tuplet` exists in both).
-- Then add the missing matrix case `tuplet-triplet` as in `S11`: three eighth
-  events with `tuplet=TupletRatio(3, 2)` and a quarter in 2/4
-  (`tests/engraving_quality_matrix.py`), `lilypond.contains` `["\\tuplet 3/2"]`,
-  `"origin": "oud"`; and set the tuplet row in `docs/supported-behavior.md`
-  back to Supported.
-- Acceptance: a 2/4 bar of a triplet plus a quarter exports with `\tuplet 3/2`
-  and without `\scaleDurations`; a bar without tuplets exports as before; the
-  matrix test has 10 cases.
-
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
 Not suitable for unattended work: each needs something the cloud environment

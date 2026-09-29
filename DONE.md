@@ -1,5 +1,10 @@
 # DONE
 
+## S32: LilyPond tuplets from melody events (2026-09-29)
+
+- Triplets (and other tuplets) in an imported notation staff export as `\\tuplet A/N { ... }` blocks (each block takes up to `actual` consecutive members of one ratio, so two adjacent triplets are two blocks); a tuplet member counts its written value times `normal/actual`, so the bar needs no `\\scaleDurations`. They were plain eighths inside a scaling fudge before. Plain pieces cannot hold tuplets yet (`C17` step 2).
+- Validation: `tests/test_lilypond_tuplets.py` (block, two blocks, untouched bars, duration rule); the new `tuplet-triplet` matrix case (10 cases, 7 microcases). Gate below.
+
 ## S11: engraving matrix cases for fermata, cut time and key signature (2026-09-29)
 
 - The matrix has three source-independent cases (`fermata`, `cut-time`, `key-signature`, marked `"origin": "oud"`) with their builders, microcases, proof roles and LilyPond tokens (`scripts.ufermata`, `\\time 2/2`, `\\key g \\major`); the tokens were taken from real exports, and a wrong token is detected. The profile test accepts an empty `upstream` list only for such cases.

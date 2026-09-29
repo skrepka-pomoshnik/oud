@@ -11,7 +11,7 @@ proof and export assertions from that record.
 
 Cases marked `"origin": "oud"` have no upstream project behind them: they cover
 features Oud supports that the upstream regression families do not isolate
-(currently `fermata`, `cut-time`, and `key-signature`). Their contract is
+(currently `fermata`, `cut-time`, `key-signature`, and `tuplet-triplet`). Their contract is
 what the code emits and lays out today.
 
 LilyPond export uses the `petrucci` profile by default. This profile applies a

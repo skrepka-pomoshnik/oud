@@ -9,7 +9,17 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-from petrucci.core.model import Bar, Chord, LyricEvent, MelodyEvent, Note, Piece
+from petrucci.core.model import (
+    Bar,
+    Chord,
+    ImportedBarContent,
+    ImportedScore,
+    ImportedStaff,
+    LyricEvent,
+    MelodyEvent,
+    Note,
+    Piece,
+)
 from petrucci.core.score import (
     AccidentalDisplay,
     BarlineKind,
@@ -26,6 +36,7 @@ from petrucci.core.score import (
     SpanKind,
     StemDirection,
     TimeSignature,
+    TupletRatio,
     WrittenPitch,
     pitch_from_midi,
 )
@@ -263,7 +274,37 @@ def _key_signature_fixture() -> MatrixFixture:
     )
 
 
+def _tuplet_fixture() -> MatrixFixture:
+    triplet = TupletRatio(3, 2)
+    events = (
+        *tuple(
+            NotationEvent(
+                f"tuplet-{index}",
+                Fraction(index, 12),
+                Fraction(1, 12),
+                EventKind.NOTE,
+                (pitch_from_midi(60 + index),),
+                tuplet=triplet,
+            )
+            for index in range(3)
+        ),
+        _event("tuplet-4", 1, 65),
+    )
+    measure = NotationMeasure("tuplet-measure", 1, events, time_signature=TimeSignature(2, 4))
+    score = NotationScore(id="tuplet", staffs=(NotationStaff(id="tuplet-staff", label="Voice", measures=(measure,)),))
+    melody = [MelodyEvent("c", index, note_type=5, tuplet_actual=3, tuplet_normal=2) for index in range(3)]
+    melody.append(MelodyEvent("f", 3, note_type=4))
+    staff = ImportedStaff(
+        kind="note", label="Voice", bars=[ImportedBarContent(0, melody_events=melody, time_sig="2/4")]
+    )
+    chords = [Chord(4, False, None, [Note(1, 0, 0)]) for _ in range(2)]
+    piece = Piece(title="Tuplet", bars=[Bar(chords=chords, time_sig="2/4")], strings=6)
+    piece.imported_score = ImportedScore("ft3", [staff])
+    return MatrixFixture(score, piece, {"showmelody": "on"}, {}, {}, [], [])
+
+
 _FIXTURE_BUILDERS: dict[str, Callable[[], MatrixFixture]] = {
+    "tuplet-triplet": _tuplet_fixture,
     "fermata": _fermata_fixture,
     "cut-time": _cut_time_fixture,
     "key-signature": _key_signature_fixture,

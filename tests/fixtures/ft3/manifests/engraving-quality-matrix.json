@@ -54,6 +54,14 @@
         "one sharp is drawn as a key signature",
         "the export states G major"
       ]
+    },
+    {
+      "id": "tuplet-export",
+      "case": "tuplet-triplet",
+      "assertions": [
+        "a triplet group gets one bracket over its notes",
+        "the export writes a tuplet block, not scaled durations"
+      ]
     }
   ],
   "upstream_microcases": [
@@ -308,6 +316,24 @@
       },
       "petrucci_contract": ["one sharp lays out as a key signature"],
       "lilypond_contract": ["the key setting exports as a \\key command"],
+      "upstream": []
+    },
+    {
+      "id": "tuplet-triplet",
+      "fixture": "tuplet-triplet",
+      "origin": "oud",
+      "features": ["tuplets"],
+      "proof": {
+        "min_events": 4,
+        "min_staffs": 1,
+        "required_roles": ["notehead", "tuplet"],
+        "max_collisions": 0
+      },
+      "lilypond": {
+        "contains": ["\\tuplet 3/2"]
+      },
+      "petrucci_contract": ["a triplet group gets one bracket that spans its notes"],
+      "lilypond_contract": ["a triplet exports as a tuplet block without scaling the bar"],
       "upstream": []
     }
   ]
