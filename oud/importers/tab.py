@@ -6,6 +6,10 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from oud.importers.tab_syntax import (
+    ITALIAN_SETTING,
+    MILAN_OPTION,
+    OUD_HEADER,
+    WRITTEN_HEADER,
     TabDialect,
     TabSyntax,
     detect_syntax,
@@ -15,7 +19,7 @@ from oud.importers.tab_syntax import (
     read_tuning,
     split_flag,
 )
-from petrucci.core.model import Bar, Chord, Piece
+from petrucci.core.model import Bar, Chord, Piece, SourceText
 
 FLAG_TO_NOTE_TYPE = {
     "W": 2,
@@ -90,6 +94,21 @@ class _BarAccumulator:
     def __post_init__(self) -> None:
         self.current_bar = Bar(time_sig=self.default_time)
 
+    @property
+    def keeps_source(self) -> bool:
+        # Oud's earlier dialect is regenerated on save; only the program's syntax is kept verbatim.
+        return self.syntax.dialect is TabDialect.ORIGINAL
+
+    def carry(self, line: str) -> None:
+        """Keep a line the model does not represent, before the next event of the current bar."""
+
+        self._source().lines.append((len(self.current_bar.chords), line))
+
+    def _source(self) -> SourceText:
+        if self.current_bar.source is None:
+            self.current_bar.source = SourceText()
+        return self.current_bar.source
+
     def set_default_time(self, value: str | None) -> None:
         self.default_time = value
         if self.current_bar.time_sig is None and value:
@@ -97,6 +116,8 @@ class _BarAccumulator:
 
     def set_time_signature(self, line: str, line_no: int) -> None:
         self.current_bar.time_sig = read_time_signature(line, self.syntax)
+        if self.keeps_source:
+            self._source().meter = line
         self._include_line(line_no)
 
     def add_chord(self, line: str, line_no: int) -> bool:
@@ -106,12 +127,17 @@ class _BarAccumulator:
         if chord is None:
             return False
         self.triplets += bool(parts and parts.triplet)
+        # Italian Milan order is not what Oud writes, so such lines are regenerated.
+        if self.keeps_source and not self.syntax.milan:
+            chord.source_text = line
         self.current_bar.chords.append(chord)
         self.current_bar.notes.extend(chord.notes)
         self._include_line(line_no)
         return True
 
-    def break_bar(self, *, reset_note_type: bool = False) -> None:
+    def break_bar(self, *, reset_note_type: bool = False, barline: str | None = None) -> None:
+        if barline is not None and barline.strip() != "b" and self.keeps_source and self.span_start is not None:
+            self._source().barline = barline
         self._finalize_current_bar()
         self.current_bar = Bar(time_sig=self.default_time)
         self.span_start = None
@@ -138,10 +164,23 @@ class _BarAccumulator:
         # (Oud writes one per bar, so empty measures round-trip). Bare `b` lines
         # alone are barline layout and create no bar.
         if self.span_start is None:
+            self._hand_back_carried_lines()
             return
         self.bars.append(self.current_bar)
         if self.span_start is not None and self.span_end is not None:
             self.spans.append((self.span_start, self.span_end))
+
+    def _hand_back_carried_lines(self) -> None:
+        # Lines between a closing barline and the next bar's content belong
+        # after the previous bar's barline when no bar follows.
+        source = self.current_bar.source
+        if source is None or not source.lines or not self.bars:
+            return
+        previous = self.bars[-1]
+        if previous.source is None:
+            previous.source = SourceText()
+        after_barline = len(previous.chords) + 1
+        previous.source.lines.extend((after_barline, line) for _index, line in source.lines)
 
 
 def _parse_time_signature(sig: str) -> str | None:
@@ -228,20 +267,28 @@ def _parse_chord_line(
     return chord, note_type
 
 
-def _apply_title_block(piece: Piece, text: str) -> None:
+def decode_chord_line(line: str, syntax: TabSyntax, last_note_type: int | None) -> Chord | None:
+    """The chord one line gives, as the reader would read it after a chord of ``last_note_type``."""
+
+    chord, _note_type = _parse_chord_line(_chord_line_parts(line, syntax), syntax, last_note_type)
+    return chord
+
+
+def _apply_title_block(piece: Piece, text: str) -> bool:
+    """Fill title, composer or author from a `{…}` block; ``False`` when all were already set."""
+
     if "/" in text and not piece.title and not piece.composer:
         title, composer = text.split("/", 1)
-        title = title.strip()
-        composer = composer.strip()
-        if title:
-            piece.title = title
-        if composer:
-            piece.composer = composer
-        return
+        piece.title = title.strip() or None
+        piece.composer = composer.strip() or None
+        return True
     if not piece.title:
         piece.title = text
-    elif not piece.author:
+        return True
+    if not piece.author:
         piece.author = text
+        return True
+    return False
 
 
 def _bar_range_for_line_span(
@@ -384,7 +431,8 @@ def _segment_end(accumulator: _BarAccumulator, _line: str, _line_no: int) -> boo
 
 
 def _segment_chord(accumulator: _BarAccumulator, line: str, line_no: int) -> bool:
-    accumulator.add_chord(line, line_no)
+    if not accumulator.add_chord(line, line_no) and accumulator.keeps_source:
+        accumulator.carry(line)
     return True
 
 
@@ -426,9 +474,18 @@ class _TabLinesParser:
         self.saw_letters = False
         self.saw_digits = False
         self.saw_end_marker = False
+        self.in_body = False
 
     def consume(self, line_no: int, raw: str) -> None:
         line = raw.rstrip("\n").rstrip("\r")
+        if self.in_body and self.accumulator.keeps_source and _is_carried_body_line(line):
+            self.accumulator.carry(line)
+            return
+        self._consume_line(line_no, line)
+        if not self.in_body and self.accumulator.keeps_source and line.strip() != WRITTEN_HEADER:
+            self.piece.source_header.append(line)
+
+    def _consume_line(self, line_no: int, line: str) -> None:
         handlers = (
             self._consume_blank,
             self._consume_title,
@@ -444,7 +501,8 @@ class _TabLinesParser:
         for handler in handlers:
             if handler(line_no, line):
                 return
-        self._consume_chord(line_no, line)
+        if not self._consume_chord(line_no, line) and self.in_body and self.accumulator.keeps_source:
+            self.accumulator.carry(line)
 
     def finish(self, source_lines: list[str]) -> TabData | None:
         self.accumulator.finish()
@@ -543,12 +601,14 @@ class _TabLinesParser:
     def _consume_bar(self, _line_no: int, line: str) -> bool:
         if not is_barline(line):
             return False
-        self.accumulator.break_bar()
+        self.in_body = True
+        self.accumulator.break_bar(barline=line)
         return True
 
     def _consume_time_signature(self, line_no: int, line: str) -> bool:
         if not line.startswith("S"):
             return False
+        self.in_body = True
         self.accumulator.set_time_signature(line, line_no)
         return True
 
@@ -559,12 +619,65 @@ class _TabLinesParser:
         self.accumulator.break_bar(reset_note_type=True)
         return True
 
-    def _consume_chord(self, line_no: int, line: str) -> None:
+    def _consume_chord(self, line_no: int, line: str) -> bool:
         if not self.accumulator.add_chord(line, line_no):
-            return
+            return False
+        self.in_body = True
         payload = line[1:]
         self.saw_letters |= any("a" <= ch <= "p" for ch in payload)
         self.saw_digits |= any(ch.isdigit() or ch == "x" for ch in payload)
+        return True
+
+
+def _is_carried_body_line(line: str) -> bool:
+    """Text, option, comment and setting lines inside the music; the model has no place for them."""
+
+    text = line.strip()
+    if text.startswith("-tuning "):
+        return False
+    return text.startswith(("{", "$", "-", "%"))
+
+
+_OUD_COMMENT_KEYS = ("tempo", "tuning")
+_DOLLAR_METER_KEYS = ("time", "timesig", "meter")
+
+
+def _header_line_modelled(piece: Piece, line: str) -> bool:
+    text = line.strip()
+    if not text or text in (OUD_HEADER, WRITTEN_HEADER, ITALIAN_SETTING) or text.startswith("-tuning "):
+        return True
+    if text.startswith("{") and text.endswith("}"):
+        return _apply_title_block(piece, text.strip("{}").strip())
+    if text.startswith("#") and _looks_like_hash_header(text):
+        return True
+    key = text[1:].split(":", 1)[0].split("=", 1)[0].strip().lower()
+    return (text.startswith("%") and ":" in text and key in _OUD_COMMENT_KEYS) or (
+        text.startswith("$") and key in _DOLLAR_METER_KEYS
+    )
+
+
+def header_facts(lines: list[str]) -> tuple[object, ...]:
+    """Title, composer, author, tuning and tempo that a header's lines give."""
+
+    parser = _TabLinesParser(6, detect_syntax(lines))
+    for line_no, line in enumerate(lines):
+        parser.consume(line_no, line)
+    piece = parser.piece
+    return (piece.title, piece.composer, piece.author, piece.tuning, piece.tempo)
+
+
+def unmodelled_header_lines(lines: list[str]) -> list[str]:
+    """Header lines the model does not represent, with `-milan` removed (Oud writes the other order)."""
+
+    scratch = Piece()
+    kept: list[str] = []
+    for line in lines:
+        if _header_line_modelled(scratch, line):
+            continue
+        cleaned = " ".join(token for token in line.split() if token != MILAN_OPTION) if line.startswith("-") else line
+        if cleaned.strip() not in ("", "-"):
+            kept.append(cleaned)
+    return kept
 
 
 def parse_tab_text_data(text: str, strings: int = 6) -> TabData | None:

@@ -112,6 +112,21 @@ class LyricEvent:
 
 
 @dataclass
+class SourceText:
+    """Verbatim text of the file a bar was read from, for a writer of the same format.
+
+    ``lines`` holds lines the model does not represent, each with the index of
+    the event it precedes; ``meter`` and ``barline`` are the bar's meter and
+    closing barline as written. A writer reuses them only while the modelled
+    content they describe is unchanged.
+    """
+
+    lines: list[tuple[int, str]] = field(default_factory=list)
+    meter: str | None = None
+    barline: str | None = None
+
+
+@dataclass
 class Bar:
     notes: list[Note] = field(default_factory=list)
     barline: str | None = None
@@ -134,6 +149,7 @@ class Bar:
     lyric_event_rows: list[list[LyricEvent]] = field(default_factory=list)
     editorial_text: list[str] = field(default_factory=list)
     structured_text_rows: list[ImportedTextRow] = field(default_factory=list)
+    source: SourceText | None = None
 
 
 @dataclass
@@ -142,6 +158,8 @@ class Chord:
     dotted: bool
     grid: str | None
     notes: list[Note] = field(default_factory=list)
+    # The chord's line in its source file; written back while it still decodes to this chord.
+    source_text: str | None = None
 
 
 @dataclass
@@ -178,3 +196,5 @@ class Piece:
     tempo: int | None = None
     bars: list[Bar] = field(default_factory=list)
     strings: int = 6
+    # Header lines of the source file the model does not represent, written back by a writer of the same format.
+    source_header: list[str] = field(default_factory=list)

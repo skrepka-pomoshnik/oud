@@ -1,5 +1,28 @@
 # DONE
 
+## C15: TAB saves keep what Oud does not model (2026-09-29)
+
+- Reading a file in the `tab` program's syntax keeps, verbatim: each chord's
+  line (ornaments, fingerings, slurs, `M` music and `T` text on it), lines the
+  model does not represent at their place in the bar (text, `M`/`MG`, keys,
+  fermatas, page and layout commands, comments, options, `$` settings), each
+  bar's closing barline variant and meter spelling, and the header. New model
+  fields: `Chord.source_text`, `Bar.source` (`SourceText`), and
+  `Piece.source_header`.
+- Writing reuses a chord line while it still decodes to the chord (same
+  rhythm and notes, reading `x` after the previous chord), a meter line while it
+  reads as the bar's meter, and the header while title, composer, author,
+  tuning and tempo are unchanged. Edited content is regenerated; an edited
+  chord loses its marks (next C15 step). `-milan` files are regenerated in the
+  default Italian order. `{…}` blocks inside the music no longer overwrite the
+  author.
+- Validation: `tests/test_tab_preservation.py`: a file with comments,
+  options, settings, three title blocks, ornaments, fingerings, grids, a rest,
+  a triplet, text, music lines, clef and key lines and barline variants saves
+  byte-identically after the header, also through the editor; saving twice
+  changes nothing; an edited chord is regenerated while the rest is kept.
+  Gate: 1,852 passed, 126 skipped.
+
 ## FT3 scores with notation staffs are editable (C16) (2026-09-29)
 
 - FT3 scores with tablature and notation staffs (voices, lyrics) open as
