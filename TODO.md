@@ -447,20 +447,6 @@ the complex list with a note instead of widening it.
   `docs/engraving-regressions.md` lists the four features under the matrix.
 - Out of scope: real FT3 entries (`S24`), collision tuning, other features.
 
-### S22. Beams on notation staves in MusicXML
-
-- Where: `oud/exports/musicxml_staffs.py` writes notation staves;
-  `oud/importers/musicxml_staffs.py` reads them back. `MelodyEvent.beam` holds
-  `"start"`, `"continue"`, `"end"` or `None` (FT3 vocal beams).
-- Do: in `_append_note` (after the rhythm elements, before `notations`) write
-  `<beam number="1">begin|continue|end</beam>` for `start|continue|end`
-  (MusicXML's word for `start` is `begin`); in `_melody_event` read
-  `<beam number="1">` back the same way. Ignore beams with other numbers.
-- Acceptance: extend `_layered_piece` and `_staffs` in
-  `tests/test_layered_scores.py` with a beamed pair (`start`, `end`) and a
-  three-note group (`start`, `continue`, `end`); the MusicXML round trip
-  test passes; a note without a beam writes no `<beam>` element.
-
 ### S23. Fingerings and harmonics on notation staves in MusicXML
 
 - Where: same files as `S22`. `MelodyEvent.fingering` is text (usually a

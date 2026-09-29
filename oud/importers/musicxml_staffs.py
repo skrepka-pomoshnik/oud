@@ -89,6 +89,18 @@ def _is_main_event(node: ET.Element) -> bool:
     return _child(node, "chord") is None and _text(_child(node, "voice")) in _FIRST_VOICE
 
 
+_BEAMS = {"begin": "start", "continue": "continue", "end": "end"}
+
+
+def _beam(node: ET.Element) -> str | None:
+    """The primary beam (number 1) of a note in Petrucci's words; other beam levels are not modelled."""
+
+    for beam in _children(node, "beam"):
+        if beam.get("number", "1") == "1":
+            return _BEAMS.get(_text(beam))
+    return None
+
+
 def _melody_event(node: ET.Element, onset: int) -> MelodyEvent:
     modification = _child(node, "time-modification")
     actual = _text(_child(modification, "actual-notes")) if modification is not None else ""
@@ -108,6 +120,7 @@ def _melody_event(node: ET.Element, onset: int) -> MelodyEvent:
         fermata=notations is not None and _child(notations, "fermata") is not None,
         slur_start="start" in slurs,
         slur_end="stop" in slurs,
+        beam=_beam(node),
     )
 
 

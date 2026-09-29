@@ -1,5 +1,10 @@
 # DONE
 
+## S22: beams on notation staves in MusicXML (2026-09-29)
+
+- `MelodyEvent.beam` (`start`, `continue`, `end`) is written as `<beam number="1">begin|continue|end</beam>` (after the rhythm elements, before `notations`, as the schema orders them) and read back; other beam levels are ignored.
+- Validation: the layered-score round trip in `tests/test_layered_scores.py` now has a beamed pair and a three-note group, and a test checks that only beamed notes get a `<beam>`. The schema test validates the result. Gate: 1,921 passed.
+
 ## S20: the grid primitives only tests used are deleted (2026-09-29)
 
 - Deleted `apply_duration`, `clear_cell`, `clear_cell_note` (`oud/editor/editing/primitives/edits.py`), `set_tab_duration`, `clear_tab_cell`, `clear_tab_note` and their helpers, `TabRhythmDelta`, `TabDotDelta` and the dead `rhythms`/`dots` branches of `_record_tab_mutation` (`petrucci/input/tablature/grid.py` went from 290 lines to about 150). Kept: `apply_override`/`set_tab_cell` (used by `:transpose`, replaced by `C8`), the chord helpers, and the undo handlers for `duration`, `duration_col` and `dotted` (replaced by `C5`).

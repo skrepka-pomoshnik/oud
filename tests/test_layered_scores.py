@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -12,6 +13,7 @@ from oud.editor.editing.score.operations import cmd_bar
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import cmd_write
 from oud.editor.services.screen.compose import compose_editor_frame
+from oud.exports.musicxml import musicxml_text
 from petrucci.core.model import (
     Bar,
     Chord,
@@ -40,14 +42,16 @@ def _layered_piece() -> Piece:
                 melody_events=[
                     MelodyEvent("c'", 0, note_type=4, slur_start=True),
                     MelodyEvent("r", 1, note_type=4, is_rest=True, fermata=True),
+                    MelodyEvent("d'", 2, note_type=5, beam="start"),
+                    MelodyEvent("e'", 3, note_type=5, beam="end"),
                 ],
             ),
             ImportedBarContent(
                 1,
                 melody_events=[
-                    MelodyEvent("f#", 0, note_type=5, dotted=True, slur_end=True),
-                    MelodyEvent("bb,", 1, note_type=6),
-                    MelodyEvent("bb,", 2, note_type=4, tie_from_previous=True),
+                    MelodyEvent("f#", 0, note_type=5, dotted=True, slur_end=True, beam="start"),
+                    MelodyEvent("bb,", 1, note_type=6, beam="continue"),
+                    MelodyEvent("bb,", 2, note_type=4, tie_from_previous=True, beam="end"),
                 ],
             ),
         ],
@@ -80,7 +84,7 @@ def _staffs(piece: Piece) -> list[tuple[str, str | None, list[tuple[int, list[ob
                     [
                         (
                             (e.text, e.onset_index, e.note_type, e.dotted, e.is_rest, e.tie_from_previous),
-                            (e.fermata, e.slur_start, e.slur_end),
+                            (e.fermata, e.slur_start, e.slur_end, e.beam),
                         )
                         for e in bar.melody_events
                     ]
@@ -179,3 +183,10 @@ def test_a_solo_piece_has_no_label_over_its_staff() -> None:
     lines = compose_editor_frame(state, height=24, width=80).frame.lines
 
     assert not any(line.startswith("lute") for line in lines)
+
+
+def test_beams_are_written_only_where_there_is_one() -> None:
+    text = musicxml_text(_layered_piece(), {}, {}, 12, settings={"style": "french"})
+    beams = [beam.text for beam in ET.fromstring(text).iter("beam")]  # noqa: S314 - text Oud just wrote
+
+    assert beams == ["begin", "end", "begin", "continue", "end"]
