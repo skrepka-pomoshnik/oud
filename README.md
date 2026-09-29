@@ -1,5 +1,7 @@
 # OUD(1)
 
+![oud editing a lute tablature in the terminal](docs/oud-tui.svg)
+
 ## NAME
 
 `oud` - terminal editor and viewer for lute tablature
