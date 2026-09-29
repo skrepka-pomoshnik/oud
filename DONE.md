@@ -1,5 +1,13 @@
 # DONE
 
+## New .tab files ask on the first write (2026-09-29)
+
+- `oud new.tab` on a missing file opens an empty document titled `new` with no
+  "Missing file" warning. The first `:w` opens the Save As prompt pre-filled with
+  `new.tab`; Enter writes it. Before, the prompt offered `untitled.tab`.
+- Validation: `tests/test_editor_init.py` covers the new document and the
+  pre-filled first write (failed before the change).
+
 ## C3: onset cursor and one edit path (2026-09-29)
 
 - The editor cursor is `(bar, cursor_onset, course)`: an exact `Fraction` onset
