@@ -1,5 +1,10 @@
 # DONE
 
+## S27: volta endings in MusicXML (2026-09-29)
+
+- `Bar.ending_numbers` is written as `<ending number="1, 2" type="start">` on the left barline of the first bar of a run of bars with the same numbers and `type="stop"` on the right barline of the last one, and read back with the volta carried over the bars in between. Adjacent runs with the same numbers are one volta.
+- Validation: `tests/test_musicxml_roundtrip.py` (five run shapes, start and stop positions); the schema test's edge piece now has endings and validates. Gate below.
+
 ## S26: bar marks the exporter writes are read back (2026-09-29)
 
 - Bar fermatas (on the first note), dynamics (`dynamics` or `words`, never the repeat words) and closing barline styles (`||`, `:`, blank, and the final `|.`, which used to be written as a plain barline) now round-trip through MusicXML. A blank barline was also written as a plain one because the value was stripped first.

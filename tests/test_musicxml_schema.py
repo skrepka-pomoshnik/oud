@@ -38,8 +38,8 @@ def _edge_piece() -> Piece:
             Bar(chords=[_chord(4, (1, 0), (7, 0)), _chord(5, (2, 12), dotted=True), _chord(6), _chord(6, (10, 0))]),
             Bar(chords=[_chord(4, (1, 1))], time_sig="3"),
             Bar(),
-            Bar(chords=[_chord(2, (1, 0))], time_sig="6/8", repeat=".:"),
-            Bar(chords=[_chord(9, (1, 0))], time_sig="C|", repeat=":."),
+            Bar(chords=[_chord(2, (1, 0))], time_sig="6/8", repeat=".:", ending_numbers=(1, 2)),
+            Bar(chords=[_chord(9, (1, 0))], time_sig="C|", repeat=":.", ending_numbers=(1, 2)),
         ],
     )
     piece.bars[0].time_sig = "C"

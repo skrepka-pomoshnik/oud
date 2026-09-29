@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import zipfile
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -325,13 +326,32 @@ def _piece_metadata(root: ET.Element) -> tuple[str, str | None]:
     return title, composer
 
 
+def _measure_endings(measure: ET.Element) -> tuple[tuple[int, ...] | None, bool]:
+    """Ending numbers of a volta that starts in this measure, and whether one stops here."""
+
+    starts: tuple[int, ...] | None = None
+    stops = False
+    for barline in _children(measure, "barline"):
+        for ending in _children(barline, "ending"):
+            if ending.get("type") == "start":
+                starts = tuple(int(number) for number in re.findall(r"\d+", ending.get("number") or ""))
+            else:
+                stops = True
+    return starts, stops
+
+
 def _parse_musicxml_part(part: ET.Element) -> tuple[list[Bar], int]:
     bars: list[Bar] = []
     strings = 6
     divisions = 1
+    active: tuple[int, ...] = ()
     for measure in _children(part, "measure"):
         divisions = _measure_divisions(measure, divisions)
         bar, max_string = _parse_measure(measure, divisions)
+        starts, stops = _measure_endings(measure)
+        active = starts if starts is not None else active
+        bar.ending_numbers = active
+        active = () if stops else active
         bars.append(bar)
         strings = max(_staff_lines(measure, strings), max_string)
     return bars, strings

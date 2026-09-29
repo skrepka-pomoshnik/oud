@@ -338,10 +338,42 @@ def _add_note(
     )
 
 
-def _add_barline(measure: Element, *, location: str, style: str, repeat: str | None = None) -> None:
+def _ending_text(numbers: tuple[int, ...]) -> str:
+    return ", ".join(str(number) for number in numbers)
+
+
+def _ending_start(bars: list[Bar], index: int) -> str | None:
+    """Ending numbers when bar ``index`` opens a volta (a run of bars with the same ending numbers)."""
+
+    numbers = bars[index].ending_numbers
+    if not numbers or (index > 0 and bars[index - 1].ending_numbers == numbers):
+        return None
+    return _ending_text(numbers)
+
+
+def _ending_stop(bars: list[Bar], index: int) -> str | None:
+    numbers = bars[index].ending_numbers
+    if not numbers or (index + 1 < len(bars) and bars[index + 1].ending_numbers == numbers):
+        return None
+    return _ending_text(numbers)
+
+
+def _add_barline(
+    measure: Element,
+    *,
+    location: str,
+    style: str | None,
+    repeat: str | None = None,
+    ending: tuple[str, str] | None = None,
+) -> None:
     barline = SubElement(measure, "barline")
     barline.set("location", location)
-    SubElement(barline, "bar-style").text = style
+    if style is not None:
+        SubElement(barline, "bar-style").text = style
+    if ending is not None:
+        ending_node = SubElement(barline, "ending")
+        ending_node.set("number", ending[0])
+        ending_node.set("type", ending[1])
     if repeat is not None:
         repeat_node = SubElement(barline, "repeat")
         repeat_node.set("direction", repeat)
@@ -674,8 +706,16 @@ def _append_musicxml_measure_prefix(
     measure = SubElement(part, "measure", number=str(bar_number))
     repeat = (bar.repeat or "").strip()
     # `.:` and `:|:` put the repeat dots at the left barline of this bar (as FT3 and the renderer do).
-    if repeat in (".:", ":|:"):
-        _add_barline(measure, location="left", style="heavy-light", repeat="forward")
+    forward = repeat in (".:", ":|:")
+    ending_start = _ending_start(piece.bars, bar_number - 1)
+    if forward or ending_start:
+        _add_barline(
+            measure,
+            location="left",
+            style="heavy-light" if forward else None,
+            repeat="forward" if forward else None,
+            ending=(ending_start, "start") if ending_start else None,
+        )
     if repeat:
         _add_repeat_directions(measure, repeat)
     repeat_words = _repeat_words(repeat)
@@ -699,11 +739,19 @@ def _append_musicxml_measure_prefix(
     return measure, repeat
 
 
-def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str) -> None:
+def _finish_musicxml_measure(measure: Element, bar: Bar, repeat: str, ending_stop: str | None) -> None:
     right_repeat = "backward" if repeat in (":.", ":|:") else None
     bar_style = "light-heavy" if right_repeat else _barline_style(bar.barline)
     if repeat or bar.barline:
-        _add_barline(measure, location="right", style=bar_style, repeat=right_repeat)
+        _add_barline(
+            measure,
+            location="right",
+            style=bar_style,
+            repeat=right_repeat,
+            ending=(ending_stop, "stop") if ending_stop else None,
+        )
+    elif ending_stop:
+        _add_barline(measure, location="right", style=None, ending=(ending_stop, "stop"))
 
 
 def _append_musicxml_measure(
@@ -738,7 +786,7 @@ def _append_musicxml_measure(
         dotted=dotted,
         pitch_for_string=pitch_for_string,
     )
-    _finish_musicxml_measure(measure, bar, repeat)
+    _finish_musicxml_measure(measure, bar, repeat, _ending_stop(piece.bars, bar_index))
 
 
 def _musicxml_text(

@@ -148,3 +148,38 @@ def test_a_barline_style_is_read_back(barline: str) -> None:
 def test_a_plain_barline_and_a_repeat_barline_are_not_styles() -> None:
     assert _first_bar_after_round_trip().barline is None
     assert _first_bar_after_round_trip(repeat=":.").barline is None
+
+
+def _endings_after_round_trip(endings: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
+    bars = [Bar(chords=[_chord(4, (1, 0))], ending_numbers=numbers) for numbers in endings]
+    _text, piece = _round_trip(Piece(title="T", bars=bars, strings=6, style="french"))
+    return [bar.ending_numbers for bar in piece.bars]
+
+
+@pytest.mark.parametrize(
+    "endings",
+    [
+        [(), (1,), ()],
+        [(), (1,), (1,), (2,), ()],
+        [(1, 2), (), (2,), (2,)],
+        [(1,), (2,)],
+        [(1,), (2,), (3,)],
+    ],
+    ids=["one bar", "two-bar volta then one bar", "shared then two-bar", "adjacent", "three voltas"],
+)
+def test_volta_endings_round_trip(endings: list[tuple[int, ...]]) -> None:
+    assert _endings_after_round_trip(endings) == endings
+
+
+def test_a_two_bar_volta_starts_on_the_first_bar_and_stops_on_the_second() -> None:
+    bars = [Bar(chords=[_chord(4, (1, 0))], ending_numbers=(1,)) for _ in range(2)]
+    text, _piece = _round_trip(Piece(title="T", bars=bars, strings=6, style="french"))
+    part = ET.fromstring(text).find("part")  # noqa: S314 - text Oud just wrote
+    assert part is not None
+
+    found = [
+        [(b.get("location"), e.get("type"), e.get("number")) for b in m.findall("barline") for e in b.findall("ending")]
+        for m in part.findall("measure")
+    ]
+
+    assert found == [[("left", "start", "1")], [("right", "stop", "1")]]

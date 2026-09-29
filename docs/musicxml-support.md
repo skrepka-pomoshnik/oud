@@ -54,7 +54,7 @@ and a bar-by-bar probe.
 | Time signatures (numeric, `C`, `C\|`, single number) | Supported | |
 | Tuning, tempo, style, author, title, composer | Supported | |
 | Repeat start `.:`, end `:.`, both `:\|:` | Supported | Fixed 2026-09-29: the start repeat was written into the next measure, so it moved one bar later on every save |
-| Volta endings | Lost | Neither written nor read |
+| Volta endings | Supported | Start on the first bar's left barline, stop on the last bar's right barline (added 2026-09-29) |
 | Barline styles (`\|\|`, `\|.`, `:`, blank) | Supported | `\|.` was written as a plain barline until 2026-09-29 |
 | Fermata on a bar | Supported | Written on the first note |
 | Dynamics | Supported | Known dynamics as `dynamics`, other text as `words` |
@@ -79,7 +79,7 @@ content is dropped.
 | Tuplets (`time-modification`) | Wrong | Read as dotted values: three triplet eighths become dotted 16ths and a 2/4 bar measures 17/32 |
 | Grace notes | Wrong | Merged into the main chord, adding a note that is not played with it |
 | Two voices | Partial | Voices merge into chords; a note lasts until the next onset, so a held bass loses its length |
-| Volta endings, keys, segno/coda | Lost | Not read, no warning |
+| Keys, segno/coda | Lost | Not read, no warning |
 | Ties, slurs, hammer-on, pull-off, bend, slide, harmonic, fingering on tab notes | Lost | Not read, no warning |
 | Repeats | Supported | Forward, backward, and both |
 
