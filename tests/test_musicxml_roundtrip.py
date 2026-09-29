@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -117,3 +118,33 @@ def test_a_start_repeat_is_written_at_the_left_of_its_own_measure() -> None:
     assert part is not None
 
     assert [_has_forward_repeat_at_left(measure) for measure in part.findall("measure")] == [False, True, False]
+
+
+def _first_bar_after_round_trip(**fields: Any) -> Bar:
+    bars = [Bar(chords=[_chord(4, (1, 0))], **fields), Bar(chords=[_chord(4, (1, 1))])]
+    _text, piece = _round_trip(Piece(title="T", bars=bars, strings=6, style="french"))
+    return piece.bars[0]
+
+
+def test_a_bar_fermata_is_read_back() -> None:
+    assert _first_bar_after_round_trip(fermata=True).fermata is True
+    assert _first_bar_after_round_trip().fermata is False
+
+
+@pytest.mark.parametrize("dynamic", ["ppp", "mf", "sfz", "fp", "dolce"])
+def test_a_bar_dynamic_is_read_back(dynamic: str) -> None:
+    assert _first_bar_after_round_trip(dynamic=dynamic).dynamic == dynamic
+
+
+def test_repeat_words_are_not_read_as_dynamics() -> None:
+    assert _first_bar_after_round_trip(repeat="DC al Fine").dynamic is None
+
+
+@pytest.mark.parametrize("barline", ["||", ":", " ", "|."])
+def test_a_barline_style_is_read_back(barline: str) -> None:
+    assert _first_bar_after_round_trip(barline=barline).barline == barline
+
+
+def test_a_plain_barline_and_a_repeat_barline_are_not_styles() -> None:
+    assert _first_bar_after_round_trip().barline is None
+    assert _first_bar_after_round_trip(repeat=":.").barline is None

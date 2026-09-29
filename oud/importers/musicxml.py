@@ -248,10 +248,53 @@ def _rest_chord(measure: ET.Element) -> Chord | None:
     return None
 
 
+_BARLINE_STYLES = {"light-light": "||", "dotted": ":", "none": " ", "light-heavy": "|."}
+_DYNAMICS = frozenset({"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "sfz", "fz", "fp"})
+# Words Oud writes for repeat jumps; they are not dynamics.
+_REPEAT_WORDS = frozenset(
+    {"D.C.", "D.S.", "Fine", "Coda", "To Coda", "D.C. al Fine", "D.C. al Coda", "D.S. al Fine", "D.S. al Coda"}
+)
+
+
+def _measure_barline(measure: ET.Element) -> str | None:
+    """The closing barline style; a plain barline, and any barline with repeat dots, is ``None``."""
+
+    for barline in _children(measure, "barline"):
+        if (barline.get("location") or "right") != "right" or _child(barline, "repeat") is not None:
+            continue
+        return _BARLINE_STYLES.get(_text(_child(barline, "bar-style")))
+    return None
+
+
+def _measure_dynamic(measure: ET.Element) -> str | None:
+    for direction in _children(measure, "direction"):
+        direction_type = _child(direction, "direction-type")
+        if direction_type is None:
+            continue
+        dynamics = _child(direction_type, "dynamics")
+        if dynamics is not None:
+            return next((_local(child.tag) for child in dynamics if _local(child.tag) in _DYNAMICS), None)
+        words = _text(_child(direction_type, "words"))
+        if words and words not in _REPEAT_WORDS:
+            return words
+    return None
+
+
+def _measure_fermata(measure: ET.Element) -> bool:
+    """Oud keeps one fermata per bar and writes it on the bar's first note."""
+
+    first = next(iter(_children(measure, "note")), None)
+    notations = _child(first, "notations") if first is not None else None
+    return notations is not None and _child(notations, "fermata") is not None
+
+
 def _parse_measure(measure: ET.Element, divisions: int) -> tuple[Bar, int]:
     bar = Bar()
     bar.time_sig = _measure_time(measure)
     bar.repeat = _measure_repeat(measure)
+    bar.barline = _measure_barline(measure)
+    bar.dynamic = _measure_dynamic(measure)
+    bar.fermata = _measure_fermata(measure)
     notes, rests, measure_end = _timed_notes(measure)
     bar.chords = _group_timed_notes(notes, rests, measure_end, divisions)
     if not bar.chords:

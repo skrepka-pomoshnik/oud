@@ -518,22 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S26. Read the bar marks the exporter already writes
-
-- Where: `oud/importers/musicxml.py` (`_parse_measure`); the exporter is
-  `oud/exports/musicxml.py` (`_add_barline`, `_barline_style`,
-  `_add_direction_dynamic`, note `fermata`).
-- Do: read into `Bar`: (1) `bar.fermata = True` when the measure's first note
-  has `notations/fermata`; (2) `bar.dynamic` from
-  `direction/direction-type/dynamics/<mf|f|...>`, or from `words` when the
-  text is not a known dynamic (same names as `_add_direction_dynamic`);
-  (3) `bar.barline` from the right `barline/bar-style`: `light-light` -> `"||"`,
-  `dotted` -> `":"`, `none` -> `" "`, `regular` -> `None`, and
-  `light-heavy` without a `repeat` -> `"|."`. Write `"|."` as `light-heavy`
-  in `_barline_style` (it is written as `regular` today).
-- Acceptance: `tests/test_musicxml_roundtrip.py`: a bar with each of these
-  fields written then read comes back equal, one test per field.
-
 ### S27. Volta endings in MusicXML
 
 - Where: `Bar.ending_numbers` (`(1,)`, `(1, 2)`, ...) is neither written nor
