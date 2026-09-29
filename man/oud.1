@@ -19,7 +19,7 @@
 .PP
 \fB\fRoud\fB\fR \fB\fRascii\fB\fR \fBINPUT\fR [\fB\-o\fR \fBOUTPUT\fR] [\fB\-\-bars\fR \fBN|START:END\fR] [\fB\-f\fR]
 .PP
-\fB\fRoud\fB\fR \fB\fRconvert\fB\fR \fBINPUT\fR \fBOUTPUT\fR [\fB\-\-input\-format\fR \fBFORMAT\fR] [\fB\-\-format\fR \fBFORMAT\fR] [\fB\-f\fR]
+\fB\fRoud\fB\fR \fB\fRconvert\fB\fR \fBINPUT\fR [\fBOUTPUT\fR] [\fB\-\-input\-format\fR \fBFORMAT\fR] [\fB\-\-format\fR \fBFORMAT\fR] [\fB\-f\fR]
 .PP
 .SH DESCRIPTION
 .PP
@@ -27,9 +27,13 @@
 TAB, FT3, and supported MusicXML/MXL files, provides a compact terminal proof,
 and exports TAB, ASCII, MIDI, LilyPond, PDF, MusicXML, and MXL.\&
 .PP
-FT3 is import\-only.\& A tab\-only FT3 opens as an editable projection and writes
-to a separate TAB file.\& Scores with vocal, notation, or duet material open in
-read\-only viewer mode so unsupported layers cannot disappear on save.\&
+MusicXML is the default save format.\& TAB files (the original \fBtab\fR program'\&s
+format) are read and written in full.\& FT3 is import\-only: a score with
+tablature opens editable, with its notation staves kept aligned and saved to
+MusicXML, and never changes the source.\& Duet scores and scores without
+tablature open in read\-only viewer mode so visible material cannot disappear on
+save.\& A save names the marks it cannot keep; an import names the notes it did
+not read.\&
 .PP
 Text conversion can read from or write to \fB\fR\-\fB\fR.\& MIDI, MXL, and PDF conversion
 require filesystem paths.\& PDF conversion retains the generated LilyPond source
@@ -56,7 +60,8 @@ described under \fBFILES\fR.\&
 .PP
 The \fB\fRtui\fB\fR subcommand opens the interactive editor.\& \fB\fRascii\fB\fR renders a text
 snapshot; \fBINPUT\fR must be a path.\& \fB\fRconvert\fB\fR selects the output format from
-the output suffix unless \fB\fR\-\-format\fB\fR is supplied.\& When either stream endpoint
+the output suffix unless \fB\fR\-\-format\fB\fR is supplied; without \fBOUTPUT\fR it writes
+\fBINPUT\fR with the suffix \fB.\&musicxml\fR.\& When either stream endpoint
 is \fB\fR\-\fB\fR, specify the other format explicitly with \fB\fR\-\-input\-format\fB\fR or
 \fB\fR\-\-format\fB\fR as required.\&
 .PP
@@ -74,8 +79,9 @@ and digits are frets and \fB\fRz\fB\fR enters a rest.\&
 .PP
 \fB\fR:w\fB\fR [\fBPATH\fR]
 .PP
-: Write TAB.\& A first write opens a command prompt prefilled with a sibling or
-default TAB destination.\&
+: Save as MusicXML (\fB.\&musicxml\fR, \fB.\&xml\fR) or TAB (\fB.\&tab\fR), by the suffix.\& A
+first write opens a command prompt prefilled with a sibling or default
+\fB.\&musicxml\fR destination.\&
 .PP
 \fB\fR:e\fB\fR \fBPATH\fR
 .PP

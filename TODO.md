@@ -34,8 +34,7 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 5. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
 6. Publication and source model: `C12`, `C13`, `C14`.
 
-`S` items run in parallel with the `C` chain whenever their dependencies allow;
-S32 needs nothing outside the repository.
+`S` items run in parallel with the `C` chain whenever their dependencies allow.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
