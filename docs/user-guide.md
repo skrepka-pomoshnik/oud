@@ -165,7 +165,7 @@ Durations belong to events and are rendered according to the current flag style 
 ## 6.1 File and session
 
 - `:e <path>` open file
-- `:w [path]` write TAB; new/imported documents prompt for a `.tab` destination (`oud new.tab` on a missing file pre-fills `new.tab`; nothing is written until you confirm)
+- `:w [path]` save; the extension picks the format: `.musicxml`/`.xml` (the default) or `.tab` (the original `tab` program's format, see `docs/tab-format.md`). New and imported documents prompt for a destination: `untitled.musicxml` for a new document, the source name with `.musicxml` for FT3 or TAB, and `name.oud.musicxml` for MusicXML that Oud did not write, so that file is never overwritten by default. `oud new.musicxml` or `oud new.tab` on a missing file pre-fills that name. Nothing is written until you confirm. MusicXML that Oud wrote reopens as a native document and `:w` saves back to it; `.tab` documents keep saving to their `.tab`.
 - `:wa [path]` / `:wascii [path]` write ASCII snapshot/export
 - `:wq`, `:x` write + quit
 - `:q!` force quit
@@ -296,10 +296,10 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 ## 9.1 Edit a TAB or tab-only FT3 projection, export PDF
 
 1. Open: `:e file.ft3`
-2. Check the persistent document label. `FT3 EDIT:choose :w path` is an editable projection awaiting a TAB save target; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
+2. Check the persistent document label. `FT3 EDIT:name.musicxml` is an editable projection with its suggested save target; `FT3 VIEW` is read-only because the score contains layers TAB cannot preserve.
 3. Edit in `insert` mode (`i`).
 4. Check bar rhythm: `:verify`.
-5. Save with `:w`; imported files prompt for an explicit `.tab` destination and leave the FT3 source unchanged.
+5. Save with `:w`; imported files prompt for a destination (MusicXML by default, or `.tab`) and leave the FT3 source unchanged.
 6. Export LilyPond with `:lilypond out.ly` or build PDF with `:pdf`.
 
 ## 9.2 Fast TAB cleanup and reflow

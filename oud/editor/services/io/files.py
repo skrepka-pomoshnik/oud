@@ -11,6 +11,11 @@ from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
 from oud.editor.services.screen.compose import compose_editor_frame
 from oud.exports.export_tab import TabExportError, export_ascii, export_tab_to_file
+from oud.exports.musicxml import export_musicxml
+
+TAB_SUFFIX = ".tab"
+MUSICXML_SUFFIXES = (".musicxml", ".xml")
+SAVE_SUFFIX_ERROR = "Save destination must end in .musicxml, .xml or .tab"
 
 RunFn = Callable[..., subprocess.CompletedProcess[str]]
 WhichFn = Callable[[str], str | None]
@@ -37,7 +42,7 @@ def _confirm_new_target(state: EditorState, path: str) -> bool:
 def request_save_as(state: EditorState, command: str = "w") -> None:
     set_mode(state, Mode.COMMAND)
     state.cmdline = f"{command} {default_write_path(state)}"
-    state.message = "Confirm or edit the .tab destination"
+    state.message = "Confirm or edit the destination (.musicxml or .tab)"
 
 
 def cmd_write(state: EditorState, path: str) -> bool:
@@ -45,26 +50,14 @@ def cmd_write(state: EditorState, path: str) -> bool:
     if state.read_only:
         state.message = "Read-only imported score: TAB write disabled"
         return False
-    if Path(target).suffix.lower() != ".tab":
-        state.notify("TAB destination must end in .tab", MessageLevel.ERROR)
+    suffix = Path(target).suffix.lower()
+    if suffix != TAB_SUFFIX and suffix not in MUSICXML_SUFFIXES:
+        state.notify(SAVE_SUFFIX_ERROR, MessageLevel.ERROR)
         return False
     if not _confirm_new_target(state, target):
         return False
     try:
-        export_tab_to_file(
-            target,
-            state.piece,
-            state.overrides,
-            state.durations,
-            state.bar_width,
-            settings=state.settings,
-            dotted=state.dotted,
-            ornaments=state.ornaments,
-            annotations=state.annotations,
-            slurs=state.slurs,
-            ties=state.ties,
-            holds=state.holds,
-        )
+        _write_document(state, target, tab=suffix == TAB_SUFFIX)
     except (OSError, TabExportError) as exc:
         state.message = f"Write failed: {exc}"
         return False
@@ -72,8 +65,36 @@ def cmd_write(state: EditorState, path: str) -> bool:
     state.modified = False
     state.clean_undo_depth = len(state.undo_stack)
     state.pending_quit = False
-    state.message = f"Wrote TAB {target}"
+    state.message = f"Wrote {'TAB' if suffix == TAB_SUFFIX else 'MusicXML'} {target}"
     return True
+
+
+def _write_document(state: EditorState, target: str, *, tab: bool) -> None:
+    if not tab:
+        export_musicxml(
+            target,
+            state.piece,
+            state.overrides,
+            state.durations,
+            state.bar_width,
+            settings=state.settings,
+            dotted=state.dotted,
+        )
+        return
+    export_tab_to_file(
+        target,
+        state.piece,
+        state.overrides,
+        state.durations,
+        state.bar_width,
+        settings=state.settings,
+        dotted=state.dotted,
+        ornaments=state.ornaments,
+        annotations=state.annotations,
+        slurs=state.slurs,
+        ties=state.ties,
+        holds=state.holds,
+    )
 
 
 def cmd_write_default(state: EditorState, args: str, *, prompt_command: str = "w") -> bool:

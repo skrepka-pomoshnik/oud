@@ -343,16 +343,13 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
   1. Ornaments, fingerings and text in the MusicXML round trip, once `C4`
      moves them into the model (the rest of the round trip is lossless, see
      `DONE.md`).
-  2. Save: `:w name.musicxml` writes MusicXML. New documents default to
-     `untitled.musicxml`, and `oud new.musicxml` pre-fills that name. `.tab`
-     documents keep saving to `.tab`.
-  3. Open: MusicXML that Oud wrote opens as a native document and saves back to
-     itself. Foreign MusicXML stays a projection with Save As to a new name,
-     because Oud keeps only the tablature part.
-- Acceptance: every repo TAB file and fixture survives TAB → MusicXML → Oud
-  with identical chords, meters, tuning, tempo, style and titles; a new
-  document's first `:w` offers `untitled.musicxml`; a foreign MusicXML file is
-  never overwritten without an explicit path.
+  2. Trial feedback: decide whether MusicXML stays the default after use
+     (`:w`, new documents, projections), and whether FT3 scores with layers
+     that TAB cannot hold (today read-only) become editable now that they can
+     be saved as MusicXML. `oud convert` still needs an explicit output path.
+- Acceptance: ornaments, fingerings and text survive the round trip like the
+  rest (default save, native reopen and the lossless core are done, see
+  `DONE.md`).
 
 ---
 

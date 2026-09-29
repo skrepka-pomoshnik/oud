@@ -70,7 +70,7 @@ def test_prompt_modes_show_only_the_prompt_and_message(state: EditorState) -> No
 def test_status_row_anchors_identity_left_and_mode_right(state: EditorState) -> None:
     row = status_row_text(state, duration="4", width=80)
     assert len(row) == 79
-    assert row.startswith("[No Name] [NEW:untitled.tab] bar:1 beat:1/4 str:1 ")
+    assert row.startswith("[No Name] [NEW:untitled.musicxml] bar:1 beat:1/4 str:1 ")
     assert row.endswith("len:4  normal")
 
 

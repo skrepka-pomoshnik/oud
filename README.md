@@ -113,7 +113,7 @@ Casual:
 ## COMMANDS
 
 ```
-:w [path]       write .tab (first write opens a prefilled Save As command)
+:w [path]       save as .musicxml (default) or .tab; first write opens a prefilled Save As
 :wa [path]      export ascii without marking the score saved
 :e <path>       open
 :help           open help in less

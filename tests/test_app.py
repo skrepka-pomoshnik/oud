@@ -122,7 +122,7 @@ def test_status_line_includes_cursor_and_modified(tmp_path) -> None:
     state.modified = True
     line = status_line(state)
     assert "example.ft3*" in line
-    assert "[FT3 EDIT:example.tab]" in line
+    assert "[FT3 EDIT:example.musicxml]" in line
     assert "bar:2" in line
     assert "beat:2/4" in line
     assert "str:3" in line
