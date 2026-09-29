@@ -51,7 +51,7 @@ than one consumer.
 exact onsets. A bar's events are its ordered `Chord` list; a chord without notes
 is a rest. An onset is the sum of the written durations before an event, in whole
 notes from the start of the bar, so `Fraction(3, 8)` is the fourth eighth in any
-meter. `len(bar.chords)` onsets past the last event is the append slot.
+meter. The onset right after the last event is the append slot.
 
 - `NOTE` and `REST` replace the event at the onset, or append at the append slot.
   With `insert=True` they go before the event at the onset instead.
