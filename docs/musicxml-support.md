@@ -67,15 +67,16 @@ and a bar-by-bar probe.
 
 ## Reading files from other programs
 
-All 18 W3C samples load without an error, and none reports a warning, even where
-content is dropped.
+All 18 W3C samples load without an error. Dropped notes are reported as an import
+warning (`MusicXML: N notes without tablature were not read`); it does not stop
+`oud convert`.
 
 | Content | Status | What happens |
 |---|---|---|
 | Tablature part (`string`, `fret`, tuning, `show-frets`) | Supported | Read exactly (`tutorial-tablature.musicxml`) |
 | Standard and TAB staves in one part, or in two parts | Supported | The part or staff with `string`/`fret` notes is the tablature |
-| Standard notation without tablature | Lost | Bars open empty (`tutorial-chopin-prelude`: 27 notes, 0 chords); no warning |
-| Other parts of a multi-part score | Lost | Ignored, no warning (Oud's own extra parts are read) |
+| Standard notation without tablature | Lost | Bars open empty (`tutorial-chopin-prelude`: 27 notes, 0 chords); the import warns with the note count |
+| Other parts of a multi-part score | Lost | Ignored; counted in the warning (Oud's own extra parts are read) |
 | Tuplets (`time-modification`) | Wrong | Read as dotted values: three triplet eighths become dotted 16ths and a 2/4 bar measures 17/32 |
 | Grace notes | Wrong | Merged into the main chord, adding a note that is not played with it |
 | Two voices | Partial | Voices merge into chords; a note lasts until the next onset, so a held bass loses its length |
