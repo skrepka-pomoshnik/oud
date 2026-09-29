@@ -163,3 +163,26 @@ def test_status_message_levels_have_distinct_portable_attributes(state: EditorSt
         MessageLevel.ERROR: A_REVERSE | A_BOLD | A_UNDERLINE,
         MessageLevel.CONFIRM: A_REVERSE | A_DIM,
     }
+
+
+def test_a_long_command_keeps_its_end_visible(state: EditorState) -> None:
+    state.mode = Mode.COMMAND
+    state.cmdline = "w " + "d" * 60 + "0123456789" + "x" * 48
+    row = status_row_text(state)
+
+    assert len(row) == 80
+    assert row == "<" + state.cmdline[-79:]
+
+    state.cmdline += "!"
+    assert status_row_text(state).endswith("x!")
+    assert len(status_row_text(state)) == 80
+
+
+def test_a_long_search_keeps_its_end_visible_and_a_short_command_is_unchanged(state: EditorState) -> None:
+    state.mode = Mode.SEARCH
+    state.searchline = "s" * 100
+    assert status_row_text(state) == "<" + "s" * 79
+
+    state.mode = Mode.COMMAND
+    state.cmdline = "w short"
+    assert status_row_text(state) == ":w short"

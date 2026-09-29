@@ -374,20 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S2. Keep the end of a long command visible
-
-- Where: `prompt_text` in `oud/editor/services/screen/status.py:140` builds
-  the command row as `:` + `state.cmdline`; the row is cut at the screen width,
-  so a long prefilled Save As path hides its end, where typing happens.
-- Do: give `prompt_text` the width (the callers `status_row_text` and
-  `compose_editor_frame` know it). When `:` + text is wider than the width,
-  show `<` followed by the last `width - 1` characters, so the end of the
-  text, where the cursor is, stays visible. Search prompts (`/`) work the same.
-- Acceptance: new tests in `tests/test_editor_status_row.py`: at width 80, a
-  120-character `cmdline` shows its last 79 characters after `<`; typing one
-  more character shows it; a short command is unchanged.
-- Out of scope: moving the cursor inside the line.
-
 ### S3. Lock the shared help text with a test
 
 - Where: the help overlay (`compose.py:49`) and the `less` pager

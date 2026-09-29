@@ -1,5 +1,10 @@
 # DONE
 
+## S2: long prompts keep their end visible (2026-09-29)
+
+- `prompt_text` takes the row width; a command or search prompt wider than the row shows `<` and its last `width - 1` characters, so a long Save As path stays editable at 80 columns. The message is dropped while the prompt overflows.
+- Validation: `tests/test_editor_status_row.py` (120-character command at width 80, one more typed character, long search, short command). Gate: 1,854 passed.
+
 ## C15: TAB saves keep what Oud does not model (2026-09-29)
 
 - Reading a file in the `tab` program's syntax keeps, verbatim: each chord's
