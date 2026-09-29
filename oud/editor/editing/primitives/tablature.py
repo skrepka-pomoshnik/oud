@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from petrucci.input.tablature.mutation import (
+from petrucci.input.tablature.grid import (
     chord_index_at_col,
     delete_chord,
     insert_chord,

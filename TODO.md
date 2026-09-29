@@ -20,41 +20,19 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 
 ## Order of work
 
-1. Editor rebuild for typing: `C2` → `C3` → `C4` → `C5` → `C6`.
+1. Editor rebuild for typing: `C3` → `C4` → `C5` → `C6`.
 2. Note typing: `C7`.
 3. Transposition: `C8`.
 4. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
 5. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow.
-`docs/ui-fix-plan.md` holds the evidence and acceptance for `C2`–`C6` and
+`docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
 ---
 
 ## Complex tasks (owner: Claude)
-
-### C2. Onset-based tablature transaction (UI plan phase 4, model)
-
-Why complex: replaces the canonical tab mutation contract. Today
-`EditableTablature` (`petrucci/input/tablature/mutation.py:92`) holds the
-editor's grid maps, and an onset is `Fraction(cursor_col, bar_width)`, a column
-position rather than a musical time.
-
-- Files: `petrucci/input/tablature/mutation.py`, `input.py`, `policy.py`,
-  `petrucci/core/model.py` (`Bar`, `Chord`, `Note`).
-- Steps:
-  1. Define the editable document as each bar's ordered `Chord` list. Onsets
-     are the cumulative exact `Fraction` durations of earlier chords.
-  2. Support insert, replace, add-note-to-chord, rest, delete, duration, and dot
-     at an exact onset, plus an explicit append slot after the last chord.
-  3. Validate each bar against its own meter (`Bar.time_sig`, falling back to the
-     previous bar's meter), including pickups and meter changes. Overflow is an
-     explicit rejection or an explicit split, never a silent truncation.
-  4. Return typed chord deltas so callers can build undo without grid keys.
-- Acceptance: no `CellKey`, `bar_width`, `durations`, or `dotted` in the
-  mutation contract; property tests for insert/delete/replace round trips; the
-  existing P1.2 operation-sequence fixtures pass unchanged.
 
 ### C3. Onset cursor and one edit path (UI plan phase 4, editor)
 
@@ -69,12 +47,13 @@ user edits.
   1. The cursor becomes (bar, exact onset `Fraction`, course) with an explicit
      append slot. `h`/`l` step between onsets, not justified filler cells.
   2. Route French letters, Italian numbers, bass-course entry (`/`), rests (`z`),
-     dots, durations, replace mode, and delete through the `C2` transaction.
+     dots, durations, replace mode, and delete through `apply_tab_transaction`
+     (`petrucci.input.tablature.mutation`, onsets in whole notes). The Italian
+     path currently writes the grid through `enter_fret`.
   3. Delete `_flatten_chords_to_grid`. Editing an imported bar keeps its chords.
   4. The status beat comes from the onset and the bar's own meter.
 - Acceptance: every keyscript and transaction fixture passes; editing an imported
   bar leaves unedited chords identical; no edit path writes a grid map.
-- Depends on: `C2`.
 
 ### C4. Retire the grid maps and float rhythm (UI plan phase 4, readers)
 

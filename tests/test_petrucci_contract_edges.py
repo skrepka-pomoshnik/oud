@@ -60,21 +60,26 @@ from petrucci.input.note.types import (
     NoteInputTransaction,
     ScorePosition,
 )
-from petrucci.input.tablature.mutation import (
+from petrucci.input.tablature.grid import (
     EditableTablature,
+    chord_index_at_col,
+    clear_tab_cell,
+    clear_tab_note,
+    delete_chord,
+    enter_grid_fret,
+    insert_chord,
+    set_chord_note,
+    set_tab_cell,
+    set_tab_duration,
+)
+from petrucci.input.tablature.mutation import (
+    TabDocument,
+    TabDuration,
     TabEdit,
     TabEditIntent,
     TabEditTransaction,
     TabMutationError,
     TabPosition,
-    chord_index_at_col,
-    clear_tab_cell,
-    clear_tab_note,
-    delete_chord,
-    insert_chord,
-    set_chord_note,
-    set_tab_cell,
-    set_tab_duration,
 )
 from petrucci.terminal.api import GlyphMode, SemanticFrame
 from petrucci.terminal.canvas.framebuffer import Frame
@@ -303,11 +308,16 @@ def test_tablature_contract_edges_preserve_atomic_mutation_state() -> None:
         lambda: TabPosition(-1, Fraction()),
         lambda: TabPosition(0, Fraction(-1)),
         lambda: TabPosition(0, Fraction(), 0),
-        lambda: TabEdit(TabPosition(0, Fraction()), TabEditIntent.REST, duration=3),
+        lambda: TabDuration(3),
         lambda: TabEdit(TabPosition(0, Fraction()), TabEditIntent.NOTE),
         lambda: TabEdit(TabPosition(0, Fraction(), 1), TabEditIntent.NOTE, fret=-1),
         lambda: TabEdit(TabPosition(0, Fraction(), 1), TabEditIntent.REST),
+        lambda: TabEdit(TabPosition(0, Fraction()), TabEditIntent.REST, fret=1),
+        lambda: TabEdit(TabPosition(0, Fraction()), TabEditIntent.DURATION),
+        lambda: TabEdit(TabPosition(0, Fraction(), 1), TabEditIntent.DELETE, insert=True),
         lambda: TabEditTransaction(()),
+        lambda: TabDocument([Bar()], 0),
+        lambda: TabDocument([Bar()], 6, "german"),
         lambda: EditableTablature([Bar()], 0, 12, {}, {}, set()),
         lambda: EditableTablature([Bar()], 6, 0, {}, {}, set()),
         lambda: EditableTablature([Bar()], 6, 12, {}, {}, set(), "german"),
@@ -316,6 +326,9 @@ def test_tablature_contract_edges_preserve_atomic_mutation_state() -> None:
         lambda: set_tab_cell(_tab(), (1, 0, 0), "a"),
         lambda: set_tab_cell(_tab(), (0, 6, 0), "a"),
         lambda: set_tab_cell(_tab(), (0, 0, 12), "a"),
+        lambda: enter_grid_fret(_tab(), (0, 0, 0), -1, duration=4),
+        lambda: enter_grid_fret(_tab(), (0, 0, 0), 99, duration=4),
+        lambda: enter_grid_fret(_tab(style="italian"), (0, 0, 11), 12, duration=4),
     )
     for factory in cases:
         _rejects(TabMutationError, factory)

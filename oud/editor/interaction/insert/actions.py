@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable, Mapping
-from fractions import Fraction
 from types import MappingProxyType
 
 from oud.editor.core.coordinates import cursor_key, string_index
@@ -17,8 +16,8 @@ from oud.editor.core.state import EditorState, UndoAction
 from oud.editor.editing.primitives.edits import (
     apply_duration,
     apply_override,
-    apply_tab_transaction,
     clear_cell_note,
+    enter_fret,
     record_action,
     undo_group,
 )
@@ -39,7 +38,6 @@ from oud.editor.navigation.motions import (
 )
 from oud.editor.navigation.steps import move_left, move_right
 from petrucci.input.tablature.input import REST_OVERRIDE
-from petrucci.input.tablature.mutation import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
 from petrucci.rendering.primitives.utils import (
     chord_slot_positions,
     format_fret,
@@ -273,21 +271,7 @@ def _handle_insert_fret_value(state: EditorState, fret: int) -> bool:
         _snap_cursor_to_chord_slot(state)
         if 0 <= state.cursor_bar < len(state.piece.bars):
             _flatten_chords_to_grid(state, state.cursor_bar)
-        bar = state.cursor_bar
-        string = string_index(state, state.cursor_string)
-        apply_tab_transaction(
-            state,
-            TabEditTransaction(
-                (
-                    TabEdit(
-                        TabPosition(bar, Fraction(state.cursor_col, state.bar_width), string + 1),
-                        TabEditIntent.CHORD,
-                        fret=fret,
-                        duration=state.current_duration,
-                    ),
-                ),
-            ),
-        )
+        enter_fret(state, cursor_key(state), fret, duration=state.current_duration)
     return True
 
 

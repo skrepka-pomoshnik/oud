@@ -1,5 +1,35 @@
 # DONE
 
+## C2: tablature edits at exact onsets (2026-09-29)
+
+- `petrucci.input.tablature.mutation` is now a chord-based contract. A bar's
+  events are its `Chord` list; onsets are whole notes from the bar start, so they
+  are exact in every meter. Before, `TabPosition.onset` was a column divided by
+  the grid width and only matched musical time in 4/4.
+- `TabDocument` (bars, courses, style, default meter) replaces
+  `EditableTablature` in the public API. `TabEdit` takes a typed `TabDuration`
+  (denominator and dot) or `None` to keep an event's duration, and an `insert`
+  flag. Intents: note, chord, rest, delete, and the new duration change.
+- Edits may not lengthen a bar past its effective meter; source bars that
+  already overflow can still be edited without growing. Rejections carry stable
+  codes (`not-an-onset`, `beyond-content`, `no-event`, `missing-duration`,
+  `bar-overflow`, `invalid-fret`, `invalid-position`) and the operation index,
+  and restore every bar. Chord entry keeps the other courses and the edited
+  note's fingerings and ornaments. A duration change clears the source flag
+  marker, which described the old duration.
+- The editor's column-grid primitives moved to `petrucci.input.tablature.grid`
+  and left the top-level `petrucci` exports. The Italian fret key writes the
+  grid through `enter_fret` until C3 moves typing to onsets.
+- Oud's `apply_tab_transaction` applies the new contract to the bar chords and
+  records one undo step.
+- Validation: new contract tests cover appending, onsets in 3/8, replacement
+  with and without a duration, attachment retention, insertion, course and
+  event deletion, note/rest replacement, dotting, per-bar deltas, meter limits,
+  overfull source bars, meter inheritance, rejection codes, and atomicity. The
+  P1.2 fixtures (bass course, repeated chord, attachment retention, mixed undo,
+  deterministic operation sequence) now assert chords and TAB round trips.
+  `./scripts/quality.sh` passes: 1,822 passed, 119 skipped, 95.33% coverage.
+
 ## C1: editor chrome out of Petrucci, typed status row (2026-09-29)
 
 - Completes `C1` (the chrome move is recorded in the entry below).

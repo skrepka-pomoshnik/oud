@@ -1,19 +1,31 @@
-"""Public, source-independent tablature mutation contracts."""
+"""Tablature edits at exact onsets.
+
+A bar's events are its ordered ``Chord`` list; a chord without notes is a rest.
+An event's onset is the sum of the written durations before it, in whole notes
+from the start of the bar. Edits address events by onset, never by display
+column, and a transaction is applied atomically.
+"""
 
 from __future__ import annotations
 
 import copy
-from collections.abc import MutableMapping, MutableSet, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from fractions import Fraction
 from typing import NoReturn
 
 from petrucci.core.model import Bar, Chord, Note
-from petrucci.input.tablature.input import CellKey
-from petrucci.rendering.primitives.utils import chord_slot_positions
+from petrucci.core.music.time import parse_time_signature_value
 
-DotKey = tuple[int, int]
+DENOMINATORS = (1, 2, 4, 8, 16, 32, 64, 128)
+# Chord.note_type encodes a written denominator as log2(denominator) + 2.
+_NOTE_TYPES = {denominator: index + 2 for index, denominator in enumerate(DENOMINATORS)}
+_DENOMINATORS = {note_type: denominator for denominator, note_type in _NOTE_TYPES.items()}
+# Imported chords with an unknown note type are read as quarters, as the renderer does.
+_UNKNOWN_NOTE_TYPE_DENOMINATOR = 4
+FRENCH_FRET_LETTERS = "abcdefghiklmnopqrst"
+STYLES = ("french", "italian")
 
 
 class TabMutationError(ValueError):
@@ -37,13 +49,46 @@ def _reject(code: str, message: str) -> NoReturn:
 
 class TabEditIntent(StrEnum):
     NOTE = "note"
+    """The event at the onset becomes a single note on the course."""
     CHORD = "chord"
+    """Set the course's note in the event at the onset; other courses stay."""
     REST = "rest"
+    """The event at the onset becomes a rest."""
     DELETE = "delete"
+    """Remove the course's note, or the whole event when no course is given.
+
+    An event left without notes is removed, and later events move earlier.
+    """
+    DURATION = "duration"
+    """Change the written duration of the event at the onset."""
+
+
+@dataclass(frozen=True, slots=True)
+class TabDuration:
+    """A written duration: a power-of-two denominator and an optional dot."""
+
+    denominator: int = 4
+    dotted: bool = False
+
+    def __post_init__(self) -> None:
+        if self.denominator not in DENOMINATORS:
+            _reject("invalid-duration", "duration must be a power-of-two denominator from 1 through 128")
+
+    @property
+    def whole_notes(self) -> Fraction:
+        value = Fraction(1, self.denominator)
+        return value * Fraction(3, 2) if self.dotted else value
+
+    @classmethod
+    def of(cls, chord: Chord) -> TabDuration:
+        denominator = _DENOMINATORS.get(chord.note_type, _UNKNOWN_NOTE_TYPE_DENOMINATOR)
+        return cls(denominator, chord.dotted)
 
 
 @dataclass(frozen=True, slots=True)
 class TabPosition:
+    """An event address: bar index, onset in whole notes, and an optional 1-based course."""
+
     bar_index: int
     onset: Fraction
     course: int | None = None
@@ -59,23 +104,37 @@ class TabPosition:
 
 @dataclass(frozen=True, slots=True)
 class TabEdit:
+    """One edit. ``duration=None`` keeps an existing event's duration.
+
+    ``insert`` places a new note or rest before the event at the onset instead of
+    replacing it; later events move by the new event's duration.
+    """
+
     position: TabPosition
     intent: TabEditIntent
     fret: int | None = None
-    duration: int = 4
+    duration: TabDuration | None = None
+    insert: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.intent, TabEditIntent):
             _reject("invalid-operation", "tablature intent must be a TabEditIntent")
-        if self.duration not in {1, 2, 4, 8, 16, 32, 64, 128}:
-            _reject("invalid-duration", "duration must be a power-of-two denominator from 1 through 128")
+        self._validate_fret()
+        if self.intent in {TabEditIntent.REST, TabEditIntent.DURATION} and self.position.course is not None:
+            _reject("invalid-operation", f"{self.intent.value} addresses a whole event, not a course")
+        if self.intent is TabEditIntent.DURATION and self.duration is None:
+            _reject("invalid-operation", "duration change requires a duration")
+        if self.insert and self.intent not in {TabEditIntent.NOTE, TabEditIntent.REST}:
+            _reject("invalid-operation", "only notes and rests can be inserted")
+
+    def _validate_fret(self) -> None:
         needs_note = self.intent in {TabEditIntent.NOTE, TabEditIntent.CHORD}
         if needs_note and (self.position.course is None or self.fret is None):
             _reject("invalid-operation", "note and chord entry require a course and fret")
+        if not needs_note and self.fret is not None:
+            _reject("invalid-operation", f"{self.intent.value} does not take a fret")
         if self.fret is not None and self.fret < 0:
             _reject("invalid-fret", "fret must be non-negative")
-        if self.intent is TabEditIntent.REST and (self.position.course is not None or self.fret is not None):
-            _reject("invalid-operation", "rest entry cannot specify a course or fret")
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,44 +147,19 @@ class TabEditTransaction:
 
 
 @dataclass(slots=True)
-class EditableTablature:
+class TabDocument:
+    """Bars edited in place; ``default_meter`` applies until a bar states its own."""
+
     bars: Sequence[Bar]
     strings: int
-    bar_width: int
-    cells: MutableMapping[CellKey, str]
-    durations: MutableMapping[CellKey, int]
-    dotted: MutableSet[DotKey]
     style: str = "french"
+    default_meter: str | None = None
 
     def __post_init__(self) -> None:
         if self.strings <= 0:
             _reject("invalid-document", "tablature must contain at least one course")
-        if self.bar_width <= 0:
-            _reject("invalid-document", "tablature bar width must be positive")
-        if self.style not in {"french", "italian"}:
+        if self.style not in STYLES:
             _reject("invalid-document", "tablature style must be french or italian")
-
-
-@dataclass(frozen=True, slots=True)
-class TabCellDelta:
-    key: CellKey
-    before: str | None
-    after: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class TabRhythmDelta:
-    bar_index: int
-    column: int
-    before: tuple[tuple[CellKey, int], ...]
-    after: tuple[tuple[CellKey, int], ...]
-
-
-@dataclass(frozen=True, slots=True)
-class TabDotDelta:
-    key: DotKey
-    before: bool
-    after: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,346 +170,205 @@ class TabChordDelta:
 
 
 @dataclass(frozen=True, slots=True)
-class TabMutation:
-    cells: tuple[TabCellDelta, ...] = ()
-    rhythms: tuple[TabRhythmDelta, ...] = ()
-    dots: tuple[TabDotDelta, ...] = ()
-    chords: tuple[TabChordDelta, ...] = ()
-
-    @property
-    def changed(self) -> bool:
-        return bool(self.cells or self.rhythms or self.dots or self.chords)
-
-
-@dataclass(frozen=True, slots=True)
 class TabMutationResult:
-    changes: tuple[TabMutation, ...] = field(default_factory=tuple)
+    """One delta per bar the transaction changed, in bar order."""
+
+    changes: tuple[TabChordDelta, ...] = field(default_factory=tuple)
 
     @property
     def changed(self) -> bool:
-        return any(change.changed for change in self.changes)
+        return bool(self.changes)
 
 
-def chord_index_at_col(bar: Bar, bar_width: int, col: int, *, exact: bool = False) -> int | None:
-    if not bar.chords:
+def event_onsets(bar: Bar) -> tuple[Fraction, ...]:
+    """Onset of every event in ``bar``, in whole notes."""
+
+    onsets: list[Fraction] = []
+    total = Fraction(0)
+    for chord in bar.chords:
+        onsets.append(total)
+        total += TabDuration.of(chord).whole_notes
+    return tuple(onsets)
+
+
+def bar_content_length(bar: Bar) -> Fraction:
+    return sum((TabDuration.of(chord).whole_notes for chord in bar.chords), Fraction(0))
+
+
+def bar_meter_length(document: TabDocument, bar_index: int) -> Fraction | None:
+    """Length of the bar's effective meter in whole notes, or ``None`` when unknown."""
+
+    meter = document.default_meter
+    for bar in document.bars[: bar_index + 1]:
+        meter = bar.time_sig or meter
+    parsed = parse_time_signature_value(meter) if meter else None
+    if parsed is None:
         return None
-    positions = chord_slot_positions(bar, bar_width, 4)
-    for index, (position, _denom, _dot) in enumerate(positions):
-        if position == col:
-            return index
-    if positions:
-        if exact:
-            return None
-        return min(enumerate(positions), key=lambda item: abs(item[1][0] - col))[0]
-    if len(bar.chords) == 1:
-        return 0
-    step = max(1, bar_width // len(bar.chords))
-    return min(len(bar.chords) - 1, max(0, col) // step)
+    beats, unit = parsed
+    return Fraction(beats, unit)
 
 
-def set_chord_note(bar: Bar, bar_width: int, col: int, string: int, fret: int | None) -> bool:
-    index = chord_index_at_col(bar, bar_width, col, exact=fret is None)
-    if index is None:
-        return False
-    chord = bar.chords[index]
-    for note in chord.notes:
-        if note.string != string:
-            continue
-        if fret is None:
-            chord.notes = [item for item in chord.notes if item.string != string]
-            if not chord.notes:
-                bar.chords.pop(index)
-        else:
-            note.fret = fret
-        return True
-    if fret is not None:
-        chord.notes.append(Note(string=string, fret=fret, raw_pos=0))
-        return True
-    return False
+def apply_tab_mutation(document: TabDocument, transaction: TabEditTransaction) -> TabMutationResult:
+    """Apply every edit or none; the error names the rejected operation."""
 
-
-def insert_chord(bar: Bar, bar_width: int, col: int) -> None:
-    note_type = bar.chords[-1].note_type if bar.chords else 4
-    dotted = bar.chords[-1].dotted if bar.chords else False
-    index = chord_index_at_col(bar, bar_width, col)
-    chord = Chord(note_type=note_type, dotted=dotted, grid=None)
-    if index is None:
-        bar.chords.append(chord)
-    else:
-        bar.chords.insert(index, chord)
-
-
-def delete_chord(bar: Bar, bar_width: int, col: int) -> bool:
-    if col < 0 or col >= bar_width:
-        return False
-    index = chord_index_at_col(bar, bar_width, col, exact=True)
-    if index is None:
-        return False
-    bar.chords.pop(index)
-    return True
-
-
-def set_tab_cell(document: EditableTablature, key: CellKey, value: str) -> TabMutation:
-    _validate_cell_key(document, key)
-    if not isinstance(value, str) or not value:
-        _reject("invalid-cell", "tablature cell value must be a non-empty string")
-    before = document.cells.get(key)
-    document.cells[key] = value
-    return TabMutation(cells=(TabCellDelta(key, before, value),))
-
-
-def set_tab_duration(document: EditableTablature, key: CellKey, duration: int) -> TabMutation:
-    _validate_cell_key(document, key)
-    if duration not in {1, 2, 4, 8, 16, 32, 64, 128}:
-        _reject("invalid-duration", "duration must be a power-of-two denominator from 1 through 128")
-    bar_index, _string, column = key
-    before = _rhythm_snapshot(document, bar_index, column)
-    document.durations[key] = duration
-    after = _rhythm_snapshot(document, bar_index, column)
-    return TabMutation(rhythms=(TabRhythmDelta(bar_index, column, before, after),))
-
-
-def clear_tab_cell(document: EditableTablature, key: CellKey) -> TabMutation:
-    _validate_cell_key(document, key)
-    onset_key = _tab_onset_key(document, key)
-    chord = _clear_chord_note(document, onset_key)
-    cells = _clear_encoded_cells(document, onset_key)
-    rhythm = _clear_rhythm(document, onset_key[0], onset_key[2])
-    dot = _clear_dot(document, onset_key[0], onset_key[2])
-    return TabMutation(
-        cells=cells,
-        rhythms=(rhythm,) if rhythm else (),
-        dots=(dot,) if dot else (),
-        chords=(chord,) if chord else (),
-    )
-
-
-def clear_tab_note(document: EditableTablature, key: CellKey) -> TabMutation:
-    _validate_cell_key(document, key)
-    onset_key = _tab_onset_key(document, key)
-    chord = _clear_chord_note(document, onset_key)
-    cells = _clear_encoded_cells(document, onset_key)
-    rhythm = None
-    dot = None
-    if not _column_has_notes(document, onset_key[0], onset_key[2]):
-        rhythm = _clear_rhythm(document, onset_key[0], onset_key[2])
-        dot = _clear_dot(document, onset_key[0], onset_key[2])
-    return TabMutation(
-        cells=cells,
-        rhythms=(rhythm,) if rhythm else (),
-        dots=(dot,) if dot else (),
-        chords=(chord,) if chord else (),
-    )
-
-
-def apply_tab_mutation(document: EditableTablature, transaction: TabEditTransaction) -> TabMutationResult:
-    cell_snapshot = dict(document.cells)
-    duration_snapshot = dict(document.durations)
-    dotted_snapshot = set(document.dotted)
-    chord_snapshots = [copy.deepcopy(bar.chords) for bar in document.bars]
-    changes: list[TabMutation] = []
+    snapshots: dict[int, list[Chord]] = {}
     for index, operation in enumerate(transaction.operations):
         try:
-            changes.extend(_apply_tab_edit(document, operation))
+            _apply(document, operation, snapshots)
         except TabMutationError as exc:
-            _restore_document(document, cell_snapshot, duration_snapshot, dotted_snapshot, chord_snapshots)
+            for bar_index, chords in snapshots.items():
+                document.bars[bar_index].chords = chords
             raise exc.at_operation(index) from exc
-    return TabMutationResult(tuple(changes))
+    changes = (
+        TabChordDelta(bar_index, tuple(before), tuple(copy.deepcopy(document.bars[bar_index].chords)))
+        for bar_index, before in sorted(snapshots.items())
+    )
+    return TabMutationResult(tuple(delta for delta in changes if delta.before != delta.after))
 
 
-def _restore_document(
-    document: EditableTablature,
-    cells: dict[CellKey, str],
-    durations: dict[CellKey, int],
-    dotted: set[DotKey],
-    chords: list[list[Chord]],
-) -> None:
-    document.cells.clear()
-    document.cells.update(cells)
-    document.durations.clear()
-    document.durations.update(durations)
-    document.dotted.clear()
-    for key in dotted:
-        document.dotted.add(key)
-    for bar, bar_chords in zip(document.bars, chords, strict=True):
-        bar.chords = bar_chords
-
-
-def _apply_tab_edit(document: EditableTablature, operation: TabEdit) -> tuple[TabMutation, ...]:
-    column = _column_for_onset(document, operation.position)
-    if operation.intent is TabEditIntent.DELETE:
-        return _delete_at_position(document, operation.position, column)
-    if operation.intent is TabEditIntent.REST:
-        changes = list(_clear_column(document, operation.position.bar_index, column))
-        changes.append(set_tab_duration(document, (operation.position.bar_index, 0, column), operation.duration))
-        return tuple(changes)
-    return _enter_fret(document, operation, column)
-
-
-def _enter_fret(document: EditableTablature, operation: TabEdit, column: int) -> tuple[TabMutation, ...]:
-    course, fret = _required_fret_input(document, operation)
-    changes: list[TabMutation] = []
-    if operation.intent is TabEditIntent.NOTE:
-        changes.extend(_clear_column(document, operation.position.bar_index, column))
-    else:
-        replaced = clear_tab_note(document, (operation.position.bar_index, course - 1, column))
-        if replaced.changed:
-            changes.append(replaced)
-    symbols = _fret_symbols(document.style, fret)
-    if column + len(symbols) > document.bar_width:
-        _reject("bar-overflow", "fret representation extends beyond the bar")
-    for offset, symbol in enumerate(symbols):
-        key = (operation.position.bar_index, course - 1, column + offset)
-        changes.append(set_tab_cell(document, key, symbol))
-    if not _rhythm_snapshot(document, operation.position.bar_index, column):
-        key = (operation.position.bar_index, course - 1, column)
-        changes.append(set_tab_duration(document, key, operation.duration))
-    return tuple(changes)
-
-
-def _required_fret_input(document: EditableTablature, operation: TabEdit) -> tuple[int, int]:
-    course = operation.position.course
-    fret = operation.fret
-    if course is None or fret is None:
-        _reject("invalid-operation", "fret entry requires a course and fret")
-    if course > document.strings:
-        _reject("invalid-position", "course exceeds the document course count")
-    return course, fret
-
-
-def _delete_at_position(document: EditableTablature, position: TabPosition, column: int) -> tuple[TabMutation, ...]:
-    if position.course is None:
-        return _clear_column(document, position.bar_index, column)
-    if position.course > document.strings:
-        _reject("invalid-position", "course exceeds the document course count")
-    return (clear_tab_note(document, (position.bar_index, position.course - 1, column)),)
-
-
-def _clear_column(document: EditableTablature, bar_index: int, column: int) -> tuple[TabMutation, ...]:
-    changes = [clear_tab_note(document, (bar_index, string, column)) for string in range(document.strings)]
-    return tuple(change for change in changes if change.changed)
-
-
-def _column_for_onset(document: EditableTablature, position: TabPosition) -> int:
+def _apply(document: TabDocument, operation: TabEdit, snapshots: dict[int, list[Chord]]) -> None:
+    position = operation.position
     if position.bar_index >= len(document.bars):
         _reject("invalid-position", "bar index is outside the document")
-    scaled = position.onset * document.bar_width
-    if scaled.denominator != 1:
-        _reject("unrepresentable-onset", "onset does not map to the document grid")
-    column = int(scaled)
-    if not 0 <= column < document.bar_width:
-        _reject("invalid-position", "onset is outside the bar")
-    return column
-
-
-def _fret_symbols(style: str, fret: int) -> str:
-    if style == "italian":
-        return str(fret)
-    letters = "abcdefghiklmnopqrst"
-    if fret >= len(letters):
+    if position.course is not None and position.course > document.strings:
+        _reject("invalid-position", "course exceeds the document course count")
+    if operation.fret is not None and document.style == "french" and operation.fret >= len(FRENCH_FRET_LETTERS):
         _reject("invalid-fret", "fret cannot be represented in French tablature")
-    return letters[fret]
+    bar = document.bars[position.bar_index]
+    if position.bar_index not in snapshots:
+        snapshots[position.bar_index] = copy.deepcopy(bar.chords)
+    length_before = bar_content_length(bar)
+    _EDITORS[operation.intent](bar, operation)
+    _check_meter(document, position.bar_index, length_before)
 
 
-def _validate_cell_key(document: EditableTablature, key: CellKey) -> None:
-    bar_index, string_index, column = key
-    if not 0 <= bar_index < len(document.bars):
-        _reject("invalid-position", "bar index is outside the document")
-    if not 0 <= string_index < document.strings:
-        _reject("invalid-position", "string index is outside the document")
-    if not 0 <= column < document.bar_width:
-        _reject("invalid-position", "column is outside the bar")
+def _check_meter(document: TabDocument, bar_index: int, length_before: Fraction) -> None:
+    meter = bar_meter_length(document, bar_index)
+    length = bar_content_length(document.bars[bar_index])
+    # A bar that already overflowed its meter (imported source) may still be edited
+    # as long as the edit does not lengthen it further.
+    if meter is not None and length > meter and length > length_before:
+        _reject("bar-overflow", "edit makes the bar longer than its meter")
 
 
-def _rhythm_snapshot(document: EditableTablature, bar_index: int, column: int) -> tuple[tuple[CellKey, int], ...]:
-    return tuple(
-        sorted((key, value) for key, value in document.durations.items() if key[0] == bar_index and key[2] == column)
-    )
+def _event_index(bar: Bar, onset: Fraction) -> int:
+    """Index of the event at ``onset``; ``len(bar.chords)`` is the append slot."""
+
+    for index, event_onset in enumerate(event_onsets(bar)):
+        if event_onset == onset:
+            return index
+        if event_onset > onset:
+            _reject("not-an-onset", "onset falls inside an event")
+    if onset == bar_content_length(bar):
+        return len(bar.chords)
+    if onset < bar_content_length(bar):
+        _reject("not-an-onset", "onset falls inside an event")
+    _reject("beyond-content", "onset is past the end of the bar's events")
 
 
-def _tab_onset_key(document: EditableTablature, key: CellKey) -> CellKey:
-    bar_index, string_index, column = key
-    if document.style != "italian" or column <= 0 or key in document.durations:
-        return key
-    previous = (bar_index, string_index, column - 1)
-    current_text = document.cells.get(key, "")
-    previous_text = document.cells.get(previous, "")
-    if current_text.isdigit() and previous_text.isdigit() and previous in document.durations:
-        return previous
-    return key
+def _existing_event(bar: Bar, onset: Fraction) -> Chord:
+    index = _event_index(bar, onset)
+    if index == len(bar.chords):
+        _reject("no-event", "no event starts at the onset")
+    return bar.chords[index]
 
 
-def _clear_encoded_cells(document: EditableTablature, key: CellKey) -> tuple[TabCellDelta, ...]:
-    keys = [key]
-    bar_index, string_index, column = key
-    next_key = (bar_index, string_index, column + 1)
-    text = document.cells.get(key, "")
-    continuation = document.cells.get(next_key, "")
-    if (
-        document.style == "italian"
-        and text.isdigit()
-        and continuation.isdigit()
-        and key in document.durations
-        and next_key not in document.durations
-    ):
-        keys.append(next_key)
-    return tuple(
-        TabCellDelta(cell_key, document.cells.pop(cell_key), None) for cell_key in keys if cell_key in document.cells
-    )
+def _new_chord(operation: TabEdit, notes: list[Note]) -> Chord:
+    if operation.duration is None:
+        _reject("missing-duration", "a new event needs a duration")
+    duration = operation.duration
+    return Chord(note_type=_NOTE_TYPES[duration.denominator], dotted=duration.dotted, grid=None, notes=notes)
 
 
-def _clear_rhythm(document: EditableTablature, bar_index: int, column: int) -> TabRhythmDelta | None:
-    before = _rhythm_snapshot(document, bar_index, column)
-    if not before:
-        return None
-    for key, _value in before:
-        document.durations.pop(key, None)
-    return TabRhythmDelta(bar_index, column, before, ())
+def _set_duration(chord: Chord, duration: TabDuration | None) -> None:
+    if duration is None or duration == TabDuration.of(chord):
+        return
+    chord.note_type = _NOTE_TYPES[duration.denominator]
+    chord.dotted = duration.dotted
+    # The source flag marker described the old duration.
+    chord.grid = None
 
 
-def _clear_dot(document: EditableTablature, bar_index: int, column: int) -> TabDotDelta | None:
-    key = (bar_index, column)
-    if key not in document.dotted:
-        return None
-    document.dotted.discard(key)
-    return TabDotDelta(key, True, False)
+def _place(bar: Bar, operation: TabEdit, notes: list[Note]) -> None:
+    index = _event_index(bar, operation.position.onset)
+    if operation.insert or index == len(bar.chords):
+        bar.chords.insert(index, _new_chord(operation, notes))
+        return
+    chord = bar.chords[index]
+    chord.notes = notes
+    _set_duration(chord, operation.duration)
 
 
-def _clear_chord_note(document: EditableTablature, key: CellKey) -> TabChordDelta | None:
-    bar_index, string_index, column = key
-    bar = document.bars[bar_index]
-    if not bar.chords:
-        return None
-    before = tuple(copy.deepcopy(bar.chords))
-    if not set_chord_note(bar, document.bar_width, column, string_index + 1, None):
-        return None
-    return TabChordDelta(bar_index, before, tuple(copy.deepcopy(bar.chords)))
+def _edit_note(bar: Bar, operation: TabEdit) -> None:
+    assert operation.position.course is not None and operation.fret is not None
+    _place(bar, operation, [Note(string=operation.position.course, fret=operation.fret, raw_pos=0)])
 
 
-def _column_has_notes(document: EditableTablature, bar_index: int, column: int) -> bool:
-    if any(bar == bar_index and col == column for bar, _string, col in document.cells):
-        return True
-    bar = document.bars[bar_index]
-    index = chord_index_at_col(bar, document.bar_width, column)
-    return bool(index is not None and bar.chords[index].notes)
+def _edit_rest(bar: Bar, operation: TabEdit) -> None:
+    _place(bar, operation, [])
+
+
+def _edit_chord(bar: Bar, operation: TabEdit) -> None:
+    course, fret = operation.position.course, operation.fret
+    assert course is not None and fret is not None
+    index = _event_index(bar, operation.position.onset)
+    if index == len(bar.chords):
+        bar.chords.append(_new_chord(operation, [Note(string=course, fret=fret, raw_pos=0)]))
+        return
+    chord = bar.chords[index]
+    existing = next((note for note in chord.notes if note.string == course), None)
+    if existing is None:
+        chord.notes.append(Note(string=course, fret=fret, raw_pos=0))
+    else:
+        # Keep the note's fingerings and ornaments; only the fret changes.
+        existing.fret = fret
+    _set_duration(chord, operation.duration)
+
+
+def _edit_delete(bar: Bar, operation: TabEdit) -> None:
+    index = _event_index(bar, operation.position.onset)
+    if index == len(bar.chords):
+        _reject("no-event", "no event starts at the onset")
+    course = operation.position.course
+    chord = bar.chords[index]
+    if course is None:
+        bar.chords.pop(index)
+        return
+    remaining = [note for note in chord.notes if note.string != course]
+    if len(remaining) == len(chord.notes):
+        return
+    if remaining:
+        chord.notes = remaining
+    else:
+        bar.chords.pop(index)
+
+
+def _edit_duration(bar: Bar, operation: TabEdit) -> None:
+    _set_duration(_existing_event(bar, operation.position.onset), operation.duration)
+
+
+_EDITORS = {
+    TabEditIntent.NOTE: _edit_note,
+    TabEditIntent.CHORD: _edit_chord,
+    TabEditIntent.REST: _edit_rest,
+    TabEditIntent.DELETE: _edit_delete,
+    TabEditIntent.DURATION: _edit_duration,
+}
 
 
 __all__ = [
-    "EditableTablature",
-    "TabCellDelta",
+    "DENOMINATORS",
     "TabChordDelta",
-    "TabDotDelta",
+    "TabDocument",
+    "TabDuration",
     "TabEdit",
     "TabEditIntent",
     "TabEditTransaction",
-    "TabMutation",
     "TabMutationError",
     "TabMutationResult",
     "TabPosition",
-    "TabRhythmDelta",
     "apply_tab_mutation",
-    "clear_tab_cell",
-    "clear_tab_note",
-    "set_tab_cell",
-    "set_tab_duration",
+    "bar_content_length",
+    "bar_meter_length",
+    "event_onsets",
 ]
