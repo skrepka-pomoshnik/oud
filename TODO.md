@@ -518,21 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S30. Read tuplets as written values
-
-- Where: `_group_timed_notes` and `_rhythm_for_duration` in
-  `oud/importers/musicxml.py` choose the note value from the duration, so
-  three triplet eighths (duration 1/12 of a whole note each) become dotted
-  16ths and a 2/4 bar measures 17/32.
-- Do: when a note has `time-modification`, take the value from its `<type>`
-  and `<dot>` (the written value, an eighth) instead of the duration, and add
-  `"MusicXML: N tuplet groups were read without tuplet timing"` to the import
-  warnings (the wording of `TAB_TRIPLET_WARNING` in `oud/importers/tab.py`).
-  The bar then reads 5/8 for three eighths and a quarter and the status row
-  shows the meter difference; that is the honest result until `C17` step 2.
-- Acceptance: the triplet example above reads as three eighth chords, the bar
-  length is 5/8, the warning is present; a bar without tuplets is unchanged.
-
 ### S31. Measure rests for empty bars in MusicXML
 
 - Where: an empty bar is written as a bare `<measure>` (valid, but other

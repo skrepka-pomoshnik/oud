@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
 from io import StringIO
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -10,6 +11,7 @@ from oud.exports.musicxml import musicxml_text
 from oud.importers.musicxml import _parse_piece, load_musicxml
 from oud.presentation import cli_convert
 from oud.presentation.cli_convert import CommandStreams, convert_command
+from petrucci.input.tablature.mutation import bar_content_length
 from tests.test_layered_scores import _layered_piece
 
 HEAD = '<score-partwise version="4.0"><part-list>{parts}</part-list>'
@@ -31,9 +33,10 @@ def _part(part_id: str, body: str, divisions: int = 4) -> str:
     )
 
 
-def _score(*parts: tuple[str, str]) -> str:
+def _score(*parts: tuple[str, str], divisions: int = 4) -> str:
     listing = "".join(PART_LIST.format(id=part_id) for part_id, _body in parts)
-    return HEAD.format(parts=listing) + "".join(_part(part_id, body) for part_id, body in parts) + "</score-partwise>"
+    body = "".join(_part(part_id, content, divisions) for part_id, content in parts)
+    return HEAD.format(parts=listing) + body + "</score-partwise>"
 
 
 def _warnings(xml: str) -> list[str]:
@@ -106,3 +109,34 @@ def test_grace_notes_are_counted() -> None:
 
     assert _chords(xml) == [[(1, 0)], [(1, 2)]]
     assert _warnings(xml) == ["MusicXML: 2 grace notes were not read"]
+
+
+TRIPLET = "<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>"
+
+
+def _triplet_bar(groups: int = 1) -> str:
+    eighths = "".join(_note(fret, duration=2, typ="eighth", extra=TRIPLET) for fret in range(3 * groups))
+    return eighths + _note(9, duration=6, typ="quarter")
+
+
+def test_tuplet_notes_are_read_by_their_written_value() -> None:
+    piece = _parse_piece(ET.fromstring(_score(("P1", _triplet_bar()), divisions=6)))  # noqa: S314 - inline test data
+    bar = piece.bars[0]
+
+    assert [(chord.note_type, chord.dotted) for chord in bar.chords] == [(5, False)] * 3 + [(4, False)]
+    assert bar_content_length(bar) == Fraction(5, 8)
+    assert piece.import_warnings == ["MusicXML: 1 tuplet group was read without tuplet timing"]
+
+
+def test_tuplet_groups_are_counted() -> None:
+    xml = _score(("P1", _triplet_bar(2)), divisions=6)
+
+    assert _warnings(xml) == ["MusicXML: 2 tuplet groups were read without tuplet timing"]
+
+
+def test_a_bar_without_tuplets_is_read_from_its_durations() -> None:
+    body = _note(0, duration=6, typ="quarter") + _note(1, duration=3, typ="eighth")
+    piece = _parse_piece(ET.fromstring(_score(("P1", body), divisions=6)))  # noqa: S314 - inline test data
+
+    assert [(chord.note_type, chord.dotted) for chord in piece.bars[0].chords] == [(4, False), (5, False)]
+    assert piece.import_warnings == []

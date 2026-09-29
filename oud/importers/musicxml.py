@@ -17,6 +17,7 @@ class _TimedTabNote:
     duration: int
     string: int
     fret: int
+    written: tuple[int, bool] | None = None  # (note type, dotted) of a tuplet note, from its <type>
 
 
 _RHYTHMS = tuple(
@@ -208,7 +209,8 @@ class _Timeline:
             return
         technical = _technical(node)
         if technical is not None:
-            self.notes.append(_TimedTabNote(onset, duration, technical[0], technical[1]))
+            written = _written_value(node) if _child(node, "time-modification") is not None else None
+            self.notes.append(_TimedTabNote(onset, duration, technical[0], technical[1], written))
 
 
 def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], set[int], int]:
@@ -216,6 +218,14 @@ def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], set[int], in
     for node in measure:
         timeline.read(node)
     return timeline.notes, timeline.rests, timeline.measure_end
+
+
+def _written_value(node: ET.Element) -> tuple[int, bool] | None:
+    """The value a note is written with (an eighth in a triplet), or ``None`` without a usable <type>."""
+
+    if _text(_child(node, "type")).lower() not in _TYPE_TO_DENOM:
+        return None
+    return _note_type(node)
 
 
 def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end: int, divisions: int) -> list[Chord]:
@@ -230,7 +240,8 @@ def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end:
         duration = event_end - onset
         if duration <= 0:
             duration = max((note.duration for note in timed), default=divisions)
-        note_type, dotted = _rhythm_for_duration(duration, divisions)
+        written = next((note.written for note in timed if note.written is not None), None)
+        note_type, dotted = written or _rhythm_for_duration(duration, divisions)
         events.append(
             Chord(
                 note_type=note_type,
@@ -464,6 +475,32 @@ def _grace_notes_warning(count: int) -> str:
     return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} {verb} not read"
 
 
+def _tuplet_group_count(part: ET.Element) -> int:
+    """Tuplet groups among the tablature notes: marked ones, else modified notes over the group size."""
+
+    modified = [
+        note
+        for note in part.iter()
+        if _local(note.tag) == "note" and _child(note, "time-modification") is not None and _technical(note)
+    ]
+    marked = sum(
+        1
+        for note in modified
+        for tuplet in note.iter()
+        if _local(tuplet.tag) == "tuplet" and tuplet.get("type") == "start"
+    )
+    if marked or not modified:
+        return marked
+    modification = _child(modified[0], "time-modification")
+    actual = _text(_child(modification, "actual-notes")) if modification is not None else ""
+    return max(1, len(modified) // int(actual)) if actual.isdigit() and int(actual) else 1
+
+
+def _tuplet_warning(count: int) -> str:
+    noun, verb = ("tuplet group", "was") if count == 1 else ("tuplet groups", "were")
+    return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} {verb} read without tuplet timing"
+
+
 def _dropped_notes_warning(count: int) -> str:
     noun, verb = ("note", "was") if count == 1 else ("notes", "were")
     return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} without tablature {verb} not read"
@@ -475,6 +512,8 @@ def _dropped_content_warnings(root: ET.Element, tab_part: ET.Element) -> list[st
         warnings.append(_dropped_notes_warning(unread))
     if graces := _grace_note_count(tab_part):
         warnings.append(_grace_notes_warning(graces))
+    if tuplets := _tuplet_group_count(tab_part):
+        warnings.append(_tuplet_warning(tuplets))
     return warnings
 
 

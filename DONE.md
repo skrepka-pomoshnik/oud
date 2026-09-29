@@ -1,5 +1,10 @@
 # DONE
 
+## S30: tuplets are read by their written value (2026-09-29)
+
+- A tablature note with `time-modification` takes its value from its `<type>` and `<dot>` instead of its duration. Three triplet eighths were read as dotted 16ths and a 2/4 bar measured 17/32; it now reads three eighths (5/8, so the status row shows the meter difference) and warns `MusicXML: N tuplet groups were read without tuplet timing`. Real tuplet timing is `C17` step 2.
+- Validation: `tests/test_musicxml_import_warnings.py` (one and two groups, bar length, a bar without tuplets unchanged). Gate: 1,921 passed.
+
 ## S29: grace notes no longer merge into chords on MusicXML import (2026-09-29)
 
 - A `<grace/>` note in the tablature part is skipped instead of joining the chord at its onset (a whole note preceded by a grace note read as two notes). The import warns `MusicXML: N grace notes were not read`.
