@@ -351,10 +351,12 @@ def _barline_style(value: str | None) -> str:
     mapping = {
         "|": "regular",
         "||": "light-light",
+        "|.": "light-heavy",
         ":": "dotted",
         " ": "none",
     }
-    return mapping.get((value or "|").strip(), "regular")
+    key = "|" if value is None else (value.strip() or value)  # a blank barline (" ") is `none`
+    return mapping.get(key, "regular")
 
 
 def _append_first_measure_attributes(

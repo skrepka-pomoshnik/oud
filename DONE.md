@@ -1,5 +1,10 @@
 # DONE
 
+## S26: bar marks the exporter writes are read back (2026-09-29)
+
+- Bar fermatas (on the first note), dynamics (`dynamics` or `words`, never the repeat words) and closing barline styles (`||`, `:`, blank, and the final `|.`, which used to be written as a plain barline) now round-trip through MusicXML. A blank barline was also written as a plain one because the value was stripped first.
+- Validation: `tests/test_musicxml_roundtrip.py` (one test per field). The schema test still passes. Gate: 1,904 passed.
+
 ## S25: a save names the marks it cannot keep (2026-09-29)
 
 - After a successful `:w`, the message ends with `(not saved: 1 slur, 1 ornament)` when slurs, ties, holds, glissandi, ornaments, annotations or highlights exist; neither MusicXML nor TAB stores them yet (`C17`). The counting lives in `oud/editor/services/io/dropped.py`.
