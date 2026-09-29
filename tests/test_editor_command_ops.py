@@ -1,15 +1,17 @@
+from fractions import Fraction
+
 from oud.editor.commands.dispatch import (
     cmd_bar,
     cmd_chord,
     cmd_stave,
     paste_bar,
-    row_first_note_col,
+    row_first_note_onset,
     show_help,
     yank_bar,
 )
 from oud.editor.core.state import EditorState
 from oud.editor.editing.primitives.undo import redo, undo
-from petrucci.core.model import Bar, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 
 
 def _state(bars: int = 2) -> EditorState:
@@ -26,11 +28,16 @@ def _state(bars: int = 2) -> EditorState:
     return state
 
 
-def test_row_first_note_col() -> None:
+def test_row_first_note_onset() -> None:
     state = _state()
-    state.overrides[(0, 0, 3)] = "a"
-    state.overrides[(0, 0, 1)] = "b"
-    assert row_first_note_col(state) == 1
+    state.piece.bars[0].chords = [
+        Chord(4, False, None, [Note(2, 0, 0)]),
+        Chord(4, False, None, [Note(1, 1, 0)]),
+        Chord(4, False, None, [Note(1, 0, 0)]),
+    ]
+    assert row_first_note_onset(state) == Fraction(1, 4)
+    state.cursor_string = 3
+    assert row_first_note_onset(state) == 0
 
 
 def test_yank_and_paste_bar() -> None:

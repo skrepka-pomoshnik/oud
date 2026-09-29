@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from contextlib import contextmanager
+from fractions import Fraction
 
 from oud.editor.core.state import EditorState, UndoAction, UndoGroupFrame
 from petrucci.input.tablature.grid import (
@@ -9,7 +10,6 @@ from petrucci.input.tablature.grid import (
     TabMutation,
     clear_tab_cell,
     clear_tab_note,
-    enter_grid_fret,
     set_tab_cell,
     set_tab_duration,
 )
@@ -21,8 +21,8 @@ from petrucci.input.tablature.mutation import (
 )
 
 
-def _cursor_snapshot(state: EditorState) -> tuple[int, int, int]:
-    return (state.cursor_bar, state.cursor_string, state.cursor_col)
+def _cursor_snapshot(state: EditorState) -> tuple[int, int, Fraction]:
+    return (state.cursor_bar, state.cursor_string, state.cursor_onset)
 
 
 def _mark_modified_from_clean_depth(state: EditorState) -> None:
@@ -132,18 +132,15 @@ def apply_tab_transaction(state: EditorState, transaction: TabEditTransaction) -
                 state,
                 UndoAction(
                     kind="chords",
-                    data={"bar": delta.bar_index, "prev": list(delta.before), "new": copy.deepcopy(list(delta.after))},
+                    data={
+                        "bar": delta.bar_index,
+                        "prev": list(delta.before),
+                        "new": copy.deepcopy(list(delta.after)),
+                        "mirror_notes": True,
+                    },
                 ),
             )
     return result
-
-
-def enter_fret(state: EditorState, key: tuple[int, int, int], fret: int, *, duration: int) -> None:
-    """Write one fret into the editor grid, replacing that course's note at the column."""
-
-    with undo_group(state, label="enter-fret"):
-        for mutation in enter_grid_fret(_editable_tablature(state), key, fret, duration=duration):
-            _record_tab_mutation(state, mutation)
 
 
 def clear_cell(state: EditorState, bar: int, string: int, col: int) -> None:

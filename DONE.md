@@ -1,5 +1,31 @@
 # DONE
 
+## C3: onset cursor and one edit path (2026-09-29)
+
+- The editor cursor is `(bar, cursor_onset, course)`: an exact `Fraction` onset
+  in whole notes. Stops are the bar's event onsets plus an append slot when the
+  bar is not full or its meter is unknown. `h`/`l`, note motions, bar motions,
+  row jumps, `:col`, find and search move between stops; `cursor_col` is derived
+  from the drawn layout.
+- New `oud/editor/editing/tab/typing.py` routes French letters, Italian numbers,
+  bass courses, rests, durations, dots, replace mode and delete through
+  `apply_tab_transaction`. A note that would overflow the bar starts the next
+  bar. Each typed note is one undo step; undo restores the onset. Visual delete
+  is one transaction.
+- `_flatten_chords_to_grid`, `enter_fret`, `enter_grid_fret` and the float
+  rhythm module are deleted. Editing an imported bar keeps its chords, dots and
+  flags; `bar.notes` mirrors the chords after every edit.
+- The renderer takes `cursor_event`, so the cursor is exact in dense bars whose
+  grid is wider than the bar. The status beat comes from the onset and the bar's
+  own meter; `len:` shows the event duration (with `.` when dotted).
+- Validation: `tests/test_onset_typing.py` types a bar of sixteen 16ths and a
+  bar of thirty-two 32nds and steps the cursor across every event with strictly
+  increasing drawn columns (fails without `cursor_event`). Motion, keyscript,
+  undo, visual-delete and imported-bar tests were rewritten on onsets. Gate:
+  1,796 passed, 125 skipped, coverage 95.09%.
+- Follow-ups moved to `C4`: layout of incomplete bars against the meter, the
+  obsolete `grid` setting, test-only grid primitives, duet `cursor_event`.
+
 ## C2: tablature edits at exact onsets (2026-09-29)
 
 - `petrucci.input.tablature.mutation` is now a chord-based contract. A bar's

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import copy
+from fractions import Fraction
 from pathlib import Path
 
 from oud.editor.core.state import EditorState, UndoAction
 from oud.editor.editing.primitives.bars import snapshot_bar
-from oud.editor.editing.primitives.edits import apply_override, begin_undo_group, end_undo_group, record_action
+from oud.editor.editing.primitives.edits import (
+    apply_tab_transaction,
+    begin_undo_group,
+    end_undo_group,
+    record_action,
+)
 from oud.editor.editing.primitives.undo import apply_action, redo, undo
 from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.input.tablature.mutation import TabEdit, TabEditIntent, TabEditTransaction, TabPosition
 
 
 def _state() -> EditorState:
@@ -248,23 +256,26 @@ def test_begin_end_undo_group_records_single_stack_entry() -> None:
 
 def test_undo_redo_restore_cursor_position_and_clean_modified_state() -> None:
     state = _state()
+    quarter = Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, 0, 0)])
+    state.piece.bars[1].chords = [copy.deepcopy(quarter) for _ in range(4)]
     state.cursor_bar = 1
     state.cursor_string = 2
-    state.cursor_col = 3
-    apply_override(state, (1, 2, 3), "a")
+    state.cursor_onset = Fraction(3, 4)
+    edit = TabEdit(TabPosition(1, Fraction(3, 4), 3), TabEditIntent.CHORD, fret=2)
+    apply_tab_transaction(state, TabEditTransaction((edit,)))
     state.cursor_bar = 0
     state.cursor_string = 0
-    state.cursor_col = 0
+    state.cursor_onset = Fraction(0)
     assert state.modified is True
 
     undo(state, config_path="config.toml")
 
     assert state.modified is False
-    assert (state.cursor_bar, state.cursor_string, state.cursor_col) == (1, 2, 3)
-    assert (1, 2, 3) not in state.overrides
+    assert (state.cursor_bar, state.cursor_string, state.cursor_onset) == (1, 2, Fraction(3, 4))
+    assert [note.string for note in state.piece.bars[1].chords[3].notes] == [1]
 
     redo(state, config_path="config.toml")
 
     assert state.modified is True
-    assert (state.cursor_bar, state.cursor_string, state.cursor_col) == (1, 2, 3)
-    assert state.overrides[(1, 2, 3)] == "a"
+    assert (state.cursor_bar, state.cursor_string, state.cursor_onset) == (1, 2, Fraction(3, 4))
+    assert [(note.string, note.fret) for note in state.piece.bars[1].chords[3].notes] == [(1, 0), (3, 2)]

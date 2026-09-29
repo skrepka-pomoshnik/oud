@@ -154,6 +154,17 @@ def _first_bar_x(context: SystemRenderContext, system: SystemLayout) -> int:
     return context.left_margin + max(0, (context.usable_width - total_width) // 2)
 
 
+def _cursor_grid_col(context: SystemRenderContext, bar, basics, *, abs_bar: int) -> int | None:
+    """Grid column of the cursor event in a chord bar, or None to scale ``cursor_col``."""
+
+    if abs_bar != context.cursor_bar or context.cursor_event is None or not bar.chords:
+        return None
+    columns = [column for column, _denom, _dot in basics.chord_positions]
+    if context.cursor_event < len(columns):
+        return columns[context.cursor_event]
+    return min(columns[-1] + 1, basics.grid_width - 1)
+
+
 def _render_bar(
     context: SystemRenderContext,
     system: SystemLayout,
@@ -205,6 +216,7 @@ def _render_bar(
         chord_positions_all=basics.chord_positions,
         cursor_bar=context.cursor_bar,
         cursor_col=context.cursor_col,
+        cursor_grid_col=_cursor_grid_col(context, bar, basics, abs_bar=abs_bar),
         default_duration=context.default_duration,
         display_width=layout.display_width,
         dotted=context.dotted,
@@ -252,6 +264,7 @@ def _render_bar(
         cells=basics.cells,
         cursor_bar=context.cursor_bar,
         cursor_col=context.cursor_col,
+        cursor_grid_col=_cursor_grid_col(context, bar, basics, abs_bar=abs_bar),
         cursor_display_maps=context.cursor_display_maps,
         cursor_string=context.cursor_string,
         display_width=layout.display_width,

@@ -58,6 +58,8 @@ class LegacyRenderRequest:
     playback_cache: PlaybackOverlayCache | None
     playback_markers: list[Pair] | None
     cursor_display_maps: dict[int, list[int]] | None
+    # Index of the cursor event in the cursor bar; ``len(chords)`` is the append slot.
+    cursor_event: int | None = None
 
 
 @dataclass(frozen=True)
@@ -364,6 +366,7 @@ class _LegacyRenderer:
             cursor_bar=request.cursor_bar,
             cursor_string=request.cursor_string,
             cursor_col=request.cursor_col,
+            cursor_event=request.cursor_event,
             bar_width=request.bar_width,
             overrides=request.overrides,
             durations=request.durations,

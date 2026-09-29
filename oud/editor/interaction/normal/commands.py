@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oud.editor.commands.dispatch import cmd_bar, cmd_open, paste_bar, row_first_note_col, show_help
+from oud.editor.commands.dispatch import cmd_bar, cmd_open, paste_bar, row_first_note_onset, show_help
 from oud.editor.commands.plugins.operations import enter_plugin_mode
 from oud.editor.commands.query.find import perform_find, repeat_find
 from oud.editor.commands.query.search import (
@@ -15,10 +15,11 @@ from oud.editor.core.feedback.messages import UNSAVED_QUIT
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import clear_insert_transient, enter_insert_mode, enter_replace_mode, set_mode
 from oud.editor.core.state import EditorState, UndoAction
-from oud.editor.editing.primitives.edits import clear_cell, record_action, undo_group
+from oud.editor.editing.primitives.edits import record_action, undo_group
 from oud.editor.editing.primitives.ranges import bar_range_from_cursor, deletable_bar_range_from_cursor
 from oud.editor.editing.primitives.undo import redo, undo
 from oud.editor.editing.score.operations import delete_bar_range, yank_bar_range
+from oud.editor.editing.tab.typing import delete_at_cursor
 from oud.editor.navigation.motions import CursorMotionTarget, apply_motion_target, target_move_right_note
 from oud.editor.services.media.midi import start_midi, stop_midi
 from petrucci.core.music.tuning import parse_bass_strings, tuning_count
@@ -82,10 +83,12 @@ def replace_mode(state: EditorState) -> None:
 
 def delete_notes(state: EditorState) -> None:
     count = consume_count(state)
+    course = string_index(state, state.cursor_string)
     with undo_group(state, label="delete-cell-count"):
-        for _ in range(count):
-            clear_cell(state, state.cursor_bar, string_index(state, state.cursor_string), state.cursor_col)
-            if count > 1 and not _move_after_delete(state):
+        for remaining in range(count - 1, -1, -1):
+            removed = delete_at_cursor(state, course)
+            # A removed event pulls the next one under the cursor.
+            if not remaining or (not removed and not _move_after_delete(state)):
                 break
 
 
@@ -142,7 +145,7 @@ def add_bass_course(state: EditorState) -> None:
 
 
 def row_first_note(state: EditorState) -> None:
-    apply_motion_target(state, CursorMotionTarget(state.cursor_bar, row_first_note_col(state)))
+    apply_motion_target(state, CursorMotionTarget(state.cursor_bar, row_first_note_onset(state)))
 
 
 def find_glyph(state: EditorState, kind: str, char: str) -> None:
@@ -192,6 +195,6 @@ def _move_after_delete(state: EditorState) -> bool:
     target = target_move_right_note(state)
     if target.append_bar:
         return False
-    before = (state.cursor_bar, state.cursor_col, state.cursor_string)
+    before = (state.cursor_bar, state.cursor_onset, state.cursor_string)
     apply_motion_target(state, target)
-    return (state.cursor_bar, state.cursor_col, state.cursor_string) != before
+    return (state.cursor_bar, state.cursor_onset, state.cursor_string) != before

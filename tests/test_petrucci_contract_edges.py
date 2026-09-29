@@ -66,7 +66,6 @@ from petrucci.input.tablature.grid import (
     clear_tab_cell,
     clear_tab_note,
     delete_chord,
-    enter_grid_fret,
     insert_chord,
     set_chord_note,
     set_tab_cell,
@@ -326,9 +325,6 @@ def test_tablature_contract_edges_preserve_atomic_mutation_state() -> None:
         lambda: set_tab_cell(_tab(), (1, 0, 0), "a"),
         lambda: set_tab_cell(_tab(), (0, 6, 0), "a"),
         lambda: set_tab_cell(_tab(), (0, 0, 12), "a"),
-        lambda: enter_grid_fret(_tab(), (0, 0, 0), -1, duration=4),
-        lambda: enter_grid_fret(_tab(), (0, 0, 0), 99, duration=4),
-        lambda: enter_grid_fret(_tab(style="italian"), (0, 0, 11), 12, duration=4),
     )
     for factory in cases:
         _rejects(TabMutationError, factory)

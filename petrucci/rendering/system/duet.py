@@ -251,6 +251,7 @@ def _render_payload(
         cursor_bar=state.cursor_bar,
         cursor_string=request.cursor_string,
         cursor_col=request.cursor_col,
+        cursor_event=None,
         bar_width=request.bar_width,
         overrides=payload.overrides,
         durations=payload.durations,

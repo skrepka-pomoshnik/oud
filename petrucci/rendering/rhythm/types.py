@@ -19,6 +19,7 @@ class RhythmRenderContext:
     chord_positions_all: list[tuple[int, int, bool]]
     cursor_bar: int
     cursor_col: int
+    cursor_grid_col: int | None
     default_duration: int
     display_width: int
     dotted: set[tuple[int, int]]

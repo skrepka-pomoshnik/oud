@@ -167,15 +167,20 @@ passes.
 
 ## Phase 4: edit on onsets through the canonical model
 
-- [ ] The cursor becomes (bar, exact onset `Fraction`, course), with an
+- [x] The cursor becomes (bar, exact onset `Fraction`, course), with an
   explicit append slot. `l`/`h` step between onsets, not justified filler
   cells. The status beat comes from the onset and the bar's own meter.
-- [ ] Route all insert, replace, delete, rest, dot and duration edits through
+  Done: `EditorState.cursor_onset`; `cursor_col` is derived. The renderer takes
+  `cursor_event`, so dense bars (16ths, 32nds) are drawn exactly.
+- [x] Route all insert, replace, delete, rest, dot and duration edits through
   `TabEditTransaction` / `apply_note_input`. The French letter path currently
   bypasses it; only Italian multi-fret uses it.
+  Done: `oud/editor/editing/tab/typing.py`; `x` and visual delete too.
 - [ ] Delete `_flatten_chords_to_grid`, the `overrides`/`durations`/`dotted`
   grid maps and float rhythm. Rhythm checks use `Fraction` and per-bar meters,
   including meter changes.
+  Progress: `_flatten_chords_to_grid` and the float rhythm primitives are gone;
+  the grid maps remain for readers until `C4`.
 - [ ] Replace untyped `UndoAction(kind: str, data: dict)` with typed
   transaction records.
 - [ ] Make TAB save idempotent against its source: unchanged bars must not gain

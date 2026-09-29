@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from oud.editor.core.coordinates import cursor_event
 from oud.editor.core.input.help import help_lines
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
@@ -128,6 +129,7 @@ def _paint_score(
             focused_staff.source_index if not focused_staff.key.startswith("duet-") else None
         ),
         playback_verse=state.playback.verse,
+        cursor_event=cursor_event(state),
     )
     draw_frame_rows(screen, score.snapshot(), set(range(content_height)))
     if show_status:

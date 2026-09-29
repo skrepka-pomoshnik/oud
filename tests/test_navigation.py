@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from oud.editor.core.coordinates import cursor_event
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.normal.actions import handle_normal
 from oud.editor.navigation.cursor_map import (
@@ -9,10 +12,7 @@ from oud.editor.navigation.cursor_map import (
 from oud.editor.navigation.layout import auto_system_bar_plan_with_gaps, dynamic_system_starts
 from oud.editor.navigation.steps import (
     jump_row_visual,
-    move_left,
     move_left_note,
-    move_left_visual,
-    move_right,
     move_right_note,
     move_right_visual,
 )
@@ -26,37 +26,6 @@ def _state() -> EditorState:
     state = EditorState(piece, {"style": "french"})
     state.bar_width = 4
     return state
-
-
-def test_move_left_across_bars() -> None:
-    state = _state()
-    state.cursor_bar = 0
-    state.cursor_col = 0
-    move_left(state)
-    assert state.cursor_bar == 0
-    state.cursor_col = 2
-    move_left(state)
-    assert state.cursor_col == 1
-    state.cursor_bar = 1
-    state.cursor_col = 0
-    move_left(state)
-    assert state.cursor_bar == 0
-    assert state.cursor_col == 3
-
-
-def test_move_right_across_bars_and_extend() -> None:
-    state = _state()
-    state.cursor_bar = 0
-    state.cursor_col = 2
-    move_right(state)
-    assert state.cursor_col == 3
-    move_right(state)
-    assert state.cursor_bar == 1
-    assert state.cursor_col == 0
-    state.cursor_col = 3
-    move_right(state)
-    assert state.cursor_bar == 2
-    assert state.modified is True
 
 
 def test_note_movement_uses_chord_positions() -> None:
@@ -77,35 +46,6 @@ def test_note_movement_uses_chord_positions() -> None:
     assert state.cursor_col == 0
     move_right_note(state)
     assert state.cursor_col == 4
-
-
-def test_note_movement_uses_grid_onset_columns() -> None:
-    state = _state()
-    state.bar_width = 8
-    state.durations[(0, 0, 0)] = 4
-    state.durations[(0, 0, 2)] = 16
-    state.durations[(0, 0, 4)] = 8
-    state.cursor_bar = 0
-    state.cursor_col = 0
-    move_right_note(state)
-    assert state.cursor_col == 2
-    move_right_note(state)
-    assert state.cursor_col == 4
-
-
-def test_note_movement_crosses_bars_by_onset() -> None:
-    state = _state()
-    state.bar_width = 8
-    state.durations[(0, 0, 6)] = 8
-    state.durations[(1, 0, 1)] = 4
-    state.cursor_bar = 0
-    state.cursor_col = 6
-    move_right_note(state)
-    assert state.cursor_bar == 1
-    assert state.cursor_col == 1
-    move_left_note(state)
-    assert state.cursor_bar == 0
-    assert state.cursor_col == 6
 
 
 def test_note_movement_prefers_notes_on_current_string() -> None:
@@ -148,74 +88,7 @@ def test_visual_move_right_skips_duplicate_render_column_in_lachrimae() -> None:
     assert mapping[state.cursor_col] != mapping[dup]
 
 
-def test_visual_move_steps_one_display_cell_and_lands_on_cell_note(
-    monkeypatch,
-) -> None:
-    state = _state()
-    state.cursor_bar = 0
-    state.cursor_string = 0
-    state.cursor_col = 0
-    state.bar_width = 6
-    state.overrides[(0, 0, 1)] = "a"
-
-    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
-    monkeypatch.setattr(
-        "oud.editor.navigation.motions.cursor_display_map_for_bar", lambda _s, _b, _c: [0, 0, 1, 2, 3, 4]
-    )
-
-    # The note at col 1 shares display cell 0 with the cursor; moving right
-    # must advance the drawn cursor to the next display cell instead of
-    # stalling on the hidden duplicate column.
-    move_right_visual(state)
-    assert state.cursor_col == 2
-
-    # Coming back into that display cell lands on its note column.
-    move_left_visual(state)
-    assert state.cursor_col == 1
-
-
-def test_visual_move_left_wraps_at_bar_start(
-    monkeypatch,
-) -> None:
-    state = _state()
-    state.cursor_bar = 1
-    state.cursor_string = 0
-    state.cursor_col = 0
-    state.bar_width = 6
-
-    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
-    monkeypatch.setattr(
-        "oud.editor.navigation.motions.cursor_display_map_for_bar",
-        lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
-    )
-
-    move_left_visual(state)
-
-    assert state.cursor_bar == 0
-    assert state.cursor_col == 5
-
-
-def test_visual_move_left_stops_on_note_inside_duplicate_render_column(
-    monkeypatch,
-) -> None:
-    state = _state()
-    state.cursor_bar = 0
-    state.cursor_string = 0
-    state.cursor_col = 2
-    state.bar_width = 6
-    state.overrides[(0, 0, 1)] = "a"
-
-    monkeypatch.setattr("oud.editor.navigation.motions.bar_content_width_for_cursor", lambda _s, _b: 4)
-    monkeypatch.setattr(
-        "oud.editor.navigation.motions.cursor_display_map_for_bar",
-        lambda _s, _b, _c: [0, 0, 1, 2, 3, 4],
-    )
-
-    move_left_visual(state)
-
-    assert state.cursor_col == 1
-
-
+@pytest.mark.ft3_corpus
 def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     root = Path(__file__).resolve().parents[1]
     state = init_state(
@@ -232,9 +105,7 @@ def test_lachrimae_bar1_second_string_reaches_b_in_four_l_presses() -> None:
     state.cursor_col = 0
     for _ in range(4):
         handle_normal(state, ord("l"))
-    # Visual movement may stop on a real note inside a duplicate render column.
-    # Both raw cols 4 and 5 map to the same visible slot in this layout variant.
-    assert state.cursor_col in (4, 5)
+    assert cursor_event(state) == 4
 
 
 def test_jump_row_visual_keeps_nearest_visual_anchor_in_auto_mode() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -34,18 +35,12 @@ def _quarters(count: int) -> Bar:
     return Bar(chords=[Chord(note_type=4, dotted=False, grid=None, notes=[Note(1, fret, 0)]) for fret in range(count)])
 
 
-def test_cursor_duration_prefers_grid_duration_and_marks_dots(state: EditorState) -> None:
-    state.durations = {(0, 0, 2): 8}
-    state.dotted = {(0, 2)}
-    state.cursor_col = 2
+def test_cursor_duration_is_the_event_duration_or_the_typing_duration(state: EditorState) -> None:
+    state.piece = Piece(title="T", bars=[Bar(chords=[Chord(note_type=5, dotted=True, grid=None, notes=[])])], strings=6)
     assert cursor_duration_text(state) == "8."
-
-
-def test_cursor_duration_falls_back_to_the_chord_at_the_cursor(state: EditorState) -> None:
-    state.piece = Piece(title="T", bars=[_quarters(1)], strings=6)
-    assert cursor_duration_text(state) == "4"
-    state.cursor_col = 5
-    assert cursor_duration_text(state) is None
+    state.cursor_onset = Fraction(3, 16)
+    state.current_duration = 16
+    assert cursor_duration_text(state) == "16"
 
 
 def test_bar_meter_marker_flags_only_bars_that_do_not_fill_their_meter(state: EditorState) -> None:

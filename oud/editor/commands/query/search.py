@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from oud.editor.core.coordinates import string_index
 from oud.editor.core.state import EditorState
-from oud.editor.navigation.motions import CursorMotionTarget, apply_motion_target
+from oud.editor.navigation.motions import apply_motion_target, target_at_column
 from petrucci.rendering.primitives.utils import bar_cells, bar_cells_from_chords
 
 
@@ -74,14 +76,8 @@ def _is_searchable(ch: str) -> bool:
 
 
 def _jump_to(state: EditorState, bar: int, string_actual: int, col: int) -> None:
-    apply_motion_target(
-        state,
-        CursorMotionTarget(
-            max(0, min(bar, len(state.piece.bars) - 1)),
-            max(0, min(col, state.bar_width - 1)),
-            cursor_string=_display_string_for_actual(state, string_actual),
-        ),
-    )
+    target = target_at_column(state, max(0, min(bar, len(state.piece.bars) - 1)), col)
+    apply_motion_target(state, replace(target, cursor_string=_display_string_for_actual(state, string_actual)))
 
 
 def _search_word(state: EditorState, term: str, direction: int) -> bool:
@@ -200,7 +196,7 @@ def repeat_word_search(state: EditorState, reverse: bool) -> bool:
 def jump_match(state: EditorState) -> bool:
     target = target_jump_match(state)
     if target is not None:
-        apply_motion_target(state, CursorMotionTarget(target[0], target[1]))
+        apply_motion_target(state, target_at_column(state, target[0], target[1]))
         return True
     state.message = "No match"
     return False

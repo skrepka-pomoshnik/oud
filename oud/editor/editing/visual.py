@@ -1,11 +1,21 @@
 from __future__ import annotations
 
-from oud.editor.core.coordinates import string_index
+from fractions import Fraction
+
+from oud.editor.core.coordinates import stop_column, string_index
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.session import set_mode
 from oud.editor.core.state import EditorState
-from oud.editor.editing.primitives.edits import clear_cell_note, undo_group
+from oud.editor.editing.primitives.edits import apply_tab_transaction
 from oud.editor.editing.primitives.ranges import BarRange
+from petrucci.input.tablature.mutation import (
+    TabEdit,
+    TabEditIntent,
+    TabEditTransaction,
+    TabMutationError,
+    TabPosition,
+    event_onsets,
+)
 from petrucci.rendering.primitives.utils import bar_cells, bar_cells_from_chords
 
 
@@ -38,10 +48,13 @@ def yank_visual_rows(state: EditorState) -> int:
 def delete_visual_rows(state: EditorState, *, change: bool = False) -> int:
     ranges = _visual_selection_ranges(state)
     count = yank_visual_rows(state)
-    with undo_group(state, label="visual-change" if change else "visual-delete"):
-        for bar_index, actual_string, start_col, end_col in ranges:
-            for col in range(start_col, end_col + 1):
-                clear_cell_note(state, bar_index, actual_string, col)
+    edits = _visual_delete_edits(state, ranges)
+    if edits:
+        try:
+            apply_tab_transaction(state, TabEditTransaction(edits))
+        except TabMutationError as exc:
+            state.message = f"Cannot edit: {exc}"
+            return 0
     if ranges:
         first_bar, first_string, first_col, _end_col = ranges[0]
         state.cursor_bar = first_bar
@@ -156,3 +169,24 @@ def _bar_rows_with_overrides(state: EditorState, bar_index: int) -> list[list[st
                 continue
             rows[s_idx][col] = state.overrides[key]
     return rows
+
+
+def _visual_delete_edits(state: EditorState, ranges: list[tuple[int, int, int, int]]) -> tuple[TabEdit, ...]:
+    """Note deletions for the selected courses, latest onset first within each bar.
+
+    Deleting a bar's last note removes its event and moves later events earlier, so
+    later onsets are edited first while earlier ones still hold their positions.
+    """
+
+    selected: dict[tuple[int, Fraction], set[int]] = {}
+    for bar_index, actual_string, start_col, end_col in ranges:
+        bar = state.piece.bars[bar_index]
+        for onset, chord in zip(event_onsets(bar), bar.chords, strict=True):
+            if not start_col <= stop_column(state, bar_index, onset) <= end_col:
+                continue
+            if any(note.string == actual_string + 1 for note in chord.notes):
+                selected.setdefault((bar_index, onset), set()).add(actual_string + 1)
+    edits: list[TabEdit] = []
+    for (bar_index, onset), courses in sorted(selected.items(), key=lambda item: (item[0][0], -item[0][1])):
+        edits.extend(TabEdit(TabPosition(bar_index, onset, course), TabEditIntent.DELETE) for course in sorted(courses))
+    return tuple(edits)
