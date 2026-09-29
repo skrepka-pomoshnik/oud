@@ -183,3 +183,40 @@ def test_a_two_bar_volta_starts_on_the_first_bar_and_stops_on_the_second() -> No
     ]
 
     assert found == [[("left", "start", "1")], [("right", "stop", "1")]]
+
+
+def test_an_empty_bar_stays_empty_and_is_written_as_a_measure_rest() -> None:
+    bars = [
+        Bar(chords=[_chord(4, (1, 0))], time_sig="3/4"),
+        Bar(),
+        Bar(chords=[_chord(4, (1, 1))]),
+    ]
+    text, piece = _round_trip(Piece(title="T", bars=bars, strings=6, style="french"))
+
+    assert [len(bar.chords) for bar in piece.bars] == [1, 0, 1]
+    part = ET.fromstring(text).find("part")  # noqa: S314 - text Oud just wrote
+    assert part is not None
+    note = part.findall("measure")[1].find("note")
+    assert note is not None
+    rest = note.find("rest")
+    assert rest is not None
+    assert rest.get("measure") == "yes"
+    assert note.findtext("duration") == "1440"  # 3/4 of 4 * 480, inherited from the first bar
+
+
+def test_a_foreign_measure_rest_is_an_empty_bar_not_a_rest_chord() -> None:
+    xml = """<score-partwise version="4.0"><part-list><score-part id="P1"><part-name>x</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+<note><rest measure="yes"/><duration>16</duration></note></measure></part></score-partwise>"""
+    piece = _parse_piece(ET.fromstring(xml))  # noqa: S314 - inline test data
+
+    assert [len(bar.chords) for bar in piece.bars] == [0]
+
+
+def test_a_real_rest_in_a_bar_is_still_a_rest_chord() -> None:
+    xml = """<score-partwise version="4.0"><part-list><score-part id="P1"><part-name>x</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+<note><rest/><duration>4</duration><type>quarter</type></note></measure></part></score-partwise>"""
+    piece = _parse_piece(ET.fromstring(xml))  # noqa: S314 - inline test data
+
+    assert [(c.note_type, c.notes) for c in piece.bars[0].chords] == [(4, [])]

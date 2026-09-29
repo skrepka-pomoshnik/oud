@@ -60,7 +60,7 @@ and a bar-by-bar probe.
 | Dynamics | Supported | Known dynamics as `dynamics`, other text as `words` |
 | Key signature | Lost | Only the piece-level key is written, never a bar's; not read |
 | System breaks | Lost | Neither written nor read |
-| Empty bar | Partial | Written as a bare `<measure>` (valid, but other programs show nothing); read back as an empty bar |
+| Empty bar | Supported | Written as a whole-measure rest (`rest measure="yes"`, in the meter in force); a foreign measure rest also reads as an empty bar |
 | Slurs, ties, holds, ornaments, annotations, highlights | Lost | Editor-side marks: never written, in MusicXML or in `.tab`, and the save says nothing |
 | Tuplets | Lost | No model: not written; the `:tuplet` command only adds a text mark, which is lost too |
 | Notation staves of an imported score | Partial | Pitch, rhythm, rests, ties, lyrics, slurs and fermatas are kept; beams, fingerings, harmonics, ornaments, clefs and keys are not |
@@ -86,6 +86,8 @@ warning (`MusicXML: N notes without tablature were not read`); it does not stop
 
 ## Next steps
 
-`TODO.md` has the work: `C17` (the model marks and the reader for foreign
-files) and easy tasks `S25` to `S31`. The save path should never drop content
-without saying so (`S25`).
+`TODO.md` `C17` holds what is left: editor marks (slurs, ties, holds,
+ornaments, annotations, highlights), tuplet timing, per-note durations in
+polyphony, standard notation from other programs, and tab techniques. Until
+then a save names the marks it cannot keep, and an import names the notes it did
+not read.

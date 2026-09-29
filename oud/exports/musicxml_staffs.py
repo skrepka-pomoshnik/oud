@@ -98,7 +98,7 @@ def _append_measures(
                 SubElement(clef, "line").text = "2"
         bar_events = _events(notes.get(index))
         if not bar_events:
-            _append_measure_rest(measure, bar, divisions)
+            append_measure_rest(measure, _bar_length(bar), divisions)
             continue
         syllables = _syllables(lyrics.get(index))
         for event in bar_events:
@@ -119,13 +119,18 @@ def _syllables(content: ImportedBarContent | None) -> dict[int, list[tuple[int, 
     return syllables
 
 
-def _append_measure_rest(measure: Element, bar: Bar, divisions: int) -> None:
-    beats = parse_time_signature_value(bar.time_sig or "")
-    length = Fraction(beats[0], beats[1]) if beats else Fraction(1)
+def append_measure_rest(measure: Element, length: Fraction, divisions: int) -> None:
+    """A whole-measure rest of ``length`` whole notes."""
+
     note = SubElement(measure, "note")
     SubElement(note, "rest", measure="yes")
     SubElement(note, "duration").text = str(int(length * 4 * divisions))
     SubElement(note, "voice").text = "1"
+
+
+def _bar_length(bar: Bar) -> Fraction:
+    beats = parse_time_signature_value(bar.time_sig or "")
+    return Fraction(beats[0], beats[1]) if beats else Fraction(1)
 
 
 def event_duration(event: MelodyEvent, divisions: int) -> int:
