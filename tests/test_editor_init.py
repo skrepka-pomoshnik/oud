@@ -20,6 +20,16 @@ def test_init_state_missing_path_defaults_to_8_bars(tmp_path: Path) -> None:
     assert len(state.piece.bars) == 8
 
 
+def test_init_state_missing_tab_path_starts_a_new_document(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.toml"
+    missing = tmp_path / "new_piece.tab"
+    state = init_state(str(missing), config_path=str(cfg))
+    assert len(state.piece.bars) == 8
+    assert state.tab_data is None
+    assert state.piece.import_warnings == [f"Missing file: {missing}"]
+    assert not missing.exists()
+
+
 @pytest.mark.ft3_corpus
 def test_init_state_preserves_inferred_ft3_extra_courses() -> None:
     state = init_state("tests/fixtures/ft3/corpus/pavan_01_8C.ft3", config_path="config.toml")

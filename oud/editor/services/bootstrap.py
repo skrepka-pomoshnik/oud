@@ -98,7 +98,8 @@ def init_state(
     state.overrides = overrides
     state.durations = durations
     state.dotted = dotted
-    if path and path.lower().endswith(".tab"):
+    # A missing .tab path is a new document; there is no source text to keep yet.
+    if path and path.lower().endswith(".tab") and Path(path).is_file():
         state.tab_data = load_tab_data(path)
     valid_path = None if invalid_source else path
     configure_document(state, valid_path, forced_read_only=read_only)

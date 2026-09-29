@@ -1,5 +1,17 @@
 # DONE
 
+## Opening a missing `.tab` path no longer crashes (2026-09-29)
+
+- `oud new.tab` raised `FileNotFoundError` at startup because `init_state` read
+  the TAB source text before checking that the file exists. A missing `.tab`
+  now opens as a new document with the same "Missing file" import warning a
+  missing `.ft3` already gives. Whether a named new path should also become the
+  write target is left as a product decision.
+- Validation: regression test
+  `test_init_state_missing_tab_path_starts_a_new_document` failed before the fix
+  and passes after; `./scripts/quality.sh` passes (1,781 passed, 119 skipped,
+  95.22% coverage).
+
 ## Gate passes without the local FT3 corpus (S1, 2026-09-29)
 
 - Added the `ft3_corpus` pytest marker (registered in `pyproject.toml`) and a
