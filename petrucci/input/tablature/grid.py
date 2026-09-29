@@ -8,7 +8,6 @@ overlays. They are retired when editing moves to exact onsets; new code uses
 
 from __future__ import annotations
 
-import copy
 from collections.abc import MutableMapping, MutableSet, Sequence
 from dataclasses import dataclass
 from typing import NoReturn
@@ -52,30 +51,13 @@ class TabCellDelta:
 
 
 @dataclass(frozen=True, slots=True)
-class TabRhythmDelta:
-    bar_index: int
-    column: int
-    before: tuple[tuple[CellKey, int], ...]
-    after: tuple[tuple[CellKey, int], ...]
-
-
-@dataclass(frozen=True, slots=True)
-class TabDotDelta:
-    key: DotKey
-    before: bool
-    after: bool
-
-
-@dataclass(frozen=True, slots=True)
 class TabMutation:
     cells: tuple[TabCellDelta, ...] = ()
-    rhythms: tuple[TabRhythmDelta, ...] = ()
-    dots: tuple[TabDotDelta, ...] = ()
     chords: tuple[TabChordDelta, ...] = ()
 
     @property
     def changed(self) -> bool:
-        return bool(self.cells or self.rhythms or self.dots or self.chords)
+        return bool(self.cells or self.chords)
 
 
 def chord_index_at_col(bar: Bar, bar_width: int, col: int, *, exact: bool = False) -> int | None:
@@ -146,50 +128,6 @@ def set_tab_cell(document: EditableTablature, key: CellKey, value: str) -> TabMu
     return TabMutation(cells=(TabCellDelta(key, before, value),))
 
 
-def set_tab_duration(document: EditableTablature, key: CellKey, duration: int) -> TabMutation:
-    _validate_cell_key(document, key)
-    if duration not in {1, 2, 4, 8, 16, 32, 64, 128}:
-        _reject("invalid-duration", "duration must be a power-of-two denominator from 1 through 128")
-    bar_index, _string, column = key
-    before = _rhythm_snapshot(document, bar_index, column)
-    document.durations[key] = duration
-    after = _rhythm_snapshot(document, bar_index, column)
-    return TabMutation(rhythms=(TabRhythmDelta(bar_index, column, before, after),))
-
-
-def clear_tab_cell(document: EditableTablature, key: CellKey) -> TabMutation:
-    _validate_cell_key(document, key)
-    onset_key = _tab_onset_key(document, key)
-    chord = _clear_chord_note(document, onset_key)
-    cells = _clear_encoded_cells(document, onset_key)
-    rhythm = _clear_rhythm(document, onset_key[0], onset_key[2])
-    dot = _clear_dot(document, onset_key[0], onset_key[2])
-    return TabMutation(
-        cells=cells,
-        rhythms=(rhythm,) if rhythm else (),
-        dots=(dot,) if dot else (),
-        chords=(chord,) if chord else (),
-    )
-
-
-def clear_tab_note(document: EditableTablature, key: CellKey) -> TabMutation:
-    _validate_cell_key(document, key)
-    onset_key = _tab_onset_key(document, key)
-    chord = _clear_chord_note(document, onset_key)
-    cells = _clear_encoded_cells(document, onset_key)
-    rhythm = None
-    dot = None
-    if not _column_has_notes(document, onset_key[0], onset_key[2]):
-        rhythm = _clear_rhythm(document, onset_key[0], onset_key[2])
-        dot = _clear_dot(document, onset_key[0], onset_key[2])
-    return TabMutation(
-        cells=cells,
-        rhythms=(rhythm,) if rhythm else (),
-        dots=(dot,) if dot else (),
-        chords=(chord,) if chord else (),
-    )
-
-
 def _validate_cell_key(document: EditableTablature, key: CellKey) -> None:
     bar_index, string_index, column = key
     if not 0 <= bar_index < len(document.bars):
@@ -200,91 +138,13 @@ def _validate_cell_key(document: EditableTablature, key: CellKey) -> None:
         _reject("invalid-position", "column is outside the bar")
 
 
-def _rhythm_snapshot(document: EditableTablature, bar_index: int, column: int) -> tuple[tuple[CellKey, int], ...]:
-    return tuple(
-        sorted((key, value) for key, value in document.durations.items() if key[0] == bar_index and key[2] == column)
-    )
-
-
-def _tab_onset_key(document: EditableTablature, key: CellKey) -> CellKey:
-    bar_index, string_index, column = key
-    if document.style != "italian" or column <= 0 or key in document.durations:
-        return key
-    previous = (bar_index, string_index, column - 1)
-    current_text = document.cells.get(key, "")
-    previous_text = document.cells.get(previous, "")
-    if current_text.isdigit() and previous_text.isdigit() and previous in document.durations:
-        return previous
-    return key
-
-
-def _clear_encoded_cells(document: EditableTablature, key: CellKey) -> tuple[TabCellDelta, ...]:
-    keys = [key]
-    bar_index, string_index, column = key
-    next_key = (bar_index, string_index, column + 1)
-    text = document.cells.get(key, "")
-    continuation = document.cells.get(next_key, "")
-    if (
-        document.style == "italian"
-        and text.isdigit()
-        and continuation.isdigit()
-        and key in document.durations
-        and next_key not in document.durations
-    ):
-        keys.append(next_key)
-    return tuple(
-        TabCellDelta(cell_key, document.cells.pop(cell_key), None) for cell_key in keys if cell_key in document.cells
-    )
-
-
-def _clear_rhythm(document: EditableTablature, bar_index: int, column: int) -> TabRhythmDelta | None:
-    before = _rhythm_snapshot(document, bar_index, column)
-    if not before:
-        return None
-    for key, _value in before:
-        document.durations.pop(key, None)
-    return TabRhythmDelta(bar_index, column, before, ())
-
-
-def _clear_dot(document: EditableTablature, bar_index: int, column: int) -> TabDotDelta | None:
-    key = (bar_index, column)
-    if key not in document.dotted:
-        return None
-    document.dotted.discard(key)
-    return TabDotDelta(key, True, False)
-
-
-def _clear_chord_note(document: EditableTablature, key: CellKey) -> TabChordDelta | None:
-    bar_index, string_index, column = key
-    bar = document.bars[bar_index]
-    if not bar.chords:
-        return None
-    before = tuple(copy.deepcopy(bar.chords))
-    if not set_chord_note(bar, document.bar_width, column, string_index + 1, None):
-        return None
-    return TabChordDelta(bar_index, before, tuple(copy.deepcopy(bar.chords)))
-
-
-def _column_has_notes(document: EditableTablature, bar_index: int, column: int) -> bool:
-    if any(bar == bar_index and col == column for bar, _string, col in document.cells):
-        return True
-    bar = document.bars[bar_index]
-    index = chord_index_at_col(bar, document.bar_width, column)
-    return bool(index is not None and bar.chords[index].notes)
-
-
 __all__ = [
     "EditableTablature",
     "TabCellDelta",
-    "TabDotDelta",
     "TabMutation",
-    "TabRhythmDelta",
     "chord_index_at_col",
-    "clear_tab_cell",
-    "clear_tab_note",
     "delete_chord",
     "insert_chord",
     "set_chord_note",
     "set_tab_cell",
-    "set_tab_duration",
 ]

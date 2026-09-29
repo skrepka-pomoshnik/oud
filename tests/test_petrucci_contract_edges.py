@@ -63,13 +63,10 @@ from petrucci.input.note.types import (
 from petrucci.input.tablature.grid import (
     EditableTablature,
     chord_index_at_col,
-    clear_tab_cell,
-    clear_tab_note,
     delete_chord,
     insert_chord,
     set_chord_note,
     set_tab_cell,
-    set_tab_duration,
 )
 from petrucci.input.tablature.mutation import (
     TabDocument,
@@ -321,7 +318,6 @@ def test_tablature_contract_edges_preserve_atomic_mutation_state() -> None:
         lambda: EditableTablature([Bar()], 6, 0, {}, {}, set()),
         lambda: EditableTablature([Bar()], 6, 12, {}, {}, set(), "german"),
         lambda: set_tab_cell(_tab(), (0, 0, 0), ""),
-        lambda: set_tab_duration(_tab(), (0, 0, 0), 3),
         lambda: set_tab_cell(_tab(), (1, 0, 0), "a"),
         lambda: set_tab_cell(_tab(), (0, 6, 0), "a"),
         lambda: set_tab_cell(_tab(), (0, 0, 12), "a"),
@@ -330,7 +326,7 @@ def test_tablature_contract_edges_preserve_atomic_mutation_state() -> None:
         _rejects(TabMutationError, factory)
 
 
-def test_tablature_chord_and_clear_edges_report_only_real_changes() -> None:
+def test_tablature_chord_edges_report_only_real_changes() -> None:
     empty = Bar()
     assert chord_index_at_col(empty, 12, 0) is None
     assert not delete_chord(empty, 12, -1)
@@ -342,14 +338,6 @@ def test_tablature_chord_and_clear_edges_report_only_real_changes() -> None:
     assert set_chord_note(empty, 12, 0, 1, None)
     assert empty.chords == []
     assert not delete_chord(empty, 12, 0)
-
-    document = _tab()
-    assert not clear_tab_cell(document, (0, 0, 0)).changed
-    document.cells[(0, 0, 0)] = "a"
-    document.durations[(0, 0, 0)] = 4
-    document.dotted.add((0, 0))
-    assert clear_tab_note(document, (0, 0, 0)).changed
-    assert document.cells == {} and document.durations == {} and document.dotted == set()
 
 
 def test_note_input_value_contracts_expose_stable_error_codes() -> None:

@@ -1,5 +1,10 @@
 # DONE
 
+## S20: the grid primitives only tests used are deleted (2026-09-29)
+
+- Deleted `apply_duration`, `clear_cell`, `clear_cell_note` (`oud/editor/editing/primitives/edits.py`), `set_tab_duration`, `clear_tab_cell`, `clear_tab_note` and their helpers, `TabRhythmDelta`, `TabDotDelta` and the dead `rhythms`/`dots` branches of `_record_tab_mutation` (`petrucci/input/tablature/grid.py` went from 290 lines to about 150). Kept: `apply_override`/`set_tab_cell` (used by `:transpose`, replaced by `C8`), the chord helpers, and the undo handlers for `duration`, `duration_col` and `dotted` (replaced by `C5`).
+- Validation: the tests that existed only for the deleted code are removed; nothing else was weakened. Gate: 1,920 passed.
+
 ## S21: the obsolete grid setting is removed (2026-09-29)
 
 - `grid` was only displayed and saved; nothing read it. It is gone from the defaults, the boolean keys, the settings page and the user guide. An old config with `grid = ...` loads without it, and `:set grid=on` answers `Unknown set key: grid`.
