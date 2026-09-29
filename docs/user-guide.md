@@ -36,6 +36,7 @@ diagnostics. Existing output files are refused unless `-f` is explicit:
 ```bash
 uv run oud ascii score.ft3 --bars 1:8
 uv run oud convert score.ft3 score.musicxml
+uv run oud convert score.tab      # no output path: writes score.musicxml beside the input
 uv run oud convert score.ft3 score.pdf
 printf '%s\n' '-C' 'b' '0a-----' 'e' \
   | uv run oud convert - - --input-format tab --format lilypond
@@ -67,7 +68,7 @@ Set with:
 
 ### Vim profile (core)
 
-- Move: `h j k l` (cell/row step)
+- Move: `h j k l` (event/row step; `h`/`l` also visit the append slot of an unfinished bar)
 - Row jump: `J` / `K` (next/previous rendered row, preserves row offset)
 - Insert: `i` or `Enter`
 - Replace once: `r`
@@ -325,7 +326,7 @@ This should be the single source of truth for tonal default accidentals in FT3 v
 - Some advanced historical symbols/layouts are partial or pending.
 - FT3/JT* are proprietary import formats; support is validated against fixed external manifests rather than every historical producer version.
 - The focused regression manifest and both fixed 75-file samples pass the unresolved-semantics audit without warnings (150 fixed external files total). This is not general FT3 or Fronimo parity; exact source engraving coordinates are reflowed.
-- FT3 is import-only. Tab-only FT3 files expose an editable TAB projection; mixed, vocal, and duet scores are read-only until every visible layer can round-trip.
+- FT3 is import-only. FT3 scores with tablature are editable (notation staves stay aligned and save to MusicXML); duet scores and scores without tablature are read-only until every visible layer can round-trip.
 - The status line always distinguishes the source document from its confirmed TAB write target.
 - Auto layout applies collision widths before justifying, keeps final/manual/capped systems at readable natural widths, and shows a clipped preview only when at least half of the next system fits.
 

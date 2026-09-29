@@ -13,12 +13,15 @@ passes.
 
 ## Root causes
 
-1. **Editing uses a second score model.** The viewer renders `NotationScore`.
-   The editor mutates `Piece.bars[].chords` plus sparse grid maps (`overrides`,
+1. **Editing used a second score model.** The viewer renders `NotationScore`.
+   The editor mutated `Piece.bars[].chords` plus sparse grid maps (`overrides`,
    `durations`, `dotted`, `slurs`, `ties`, `holds`, `glisses`) keyed by
-   `(bar, string, col)` on a fixed `bar_width` grid. The first edit in an
-   imported bar flattens its chords into the grid (`_flatten_chords_to_grid`).
-   Rhythm uses float quarter beats against the global `settings["time"]`.
+   `(bar, string, col)` on a fixed `bar_width` grid, and the first edit in an
+   imported bar flattened its chords into the grid. Since `C3` (2026-09-29)
+   every typing edit goes through the chord transaction at exact onsets and the
+   cursor is an onset. What remains: the grid maps are still read by about 40
+   modules (`C4`), and slurs, ties, holds and ornaments still live in editor
+   state instead of the model (`C17`).
 2. **Petrucci owns editor chrome.** `render_piece` takes about 40 arguments,
    including `cmdline`, `searchline`, plugin rows and mode strings. Petrucci
    builds the status line (`rendering/system/status.py`) and owns the help text.
@@ -150,20 +153,22 @@ passes.
   the left edge; pending keys, duration, and mode end at the right edge; the
   message sits between. Too-narrow rows drop identity, duration, pending keys,
   meter, and position in that order, then cut the message; the mode stays.
-- [ ] Replace the cryptic `M` meter marker with a named diagnostic segment
+- [x] Replace the cryptic `M` meter marker with a named diagnostic segment
   (`meter 5/6`) and show it only in normal mode.
-- [ ] Show one position vocabulary across TAB and FT3 projections (`beat`, not
-  `col`).
-- [ ] Scroll the command prompt horizontally so a long prefilled Save As path
-  stays editable at 80 columns.
+  Done as `meter:<length> of <meter>` (`meter:1/2 of 3/4`); it shows in every
+  mode of the tablature view, not only in normal mode.
+- [x] Show one position vocabulary across TAB and FT3 projections (`beat`, not
+  `col`). `beat:k/n`, or `ev:k/n` for a meter with no beat structure.
+- [x] Scroll the command prompt horizontally so a long prefilled Save As path
+  stays editable at 80 columns. The prompt shows `<` and its end.
 - [x] Move status, prompt, info, notes, plugin and help rendering out of
   `petrucci/rendering/api.py`. Petrucci returns the score frame only, and
   `render_piece` loses its editor-only arguments.
   Done: `oud/editor/services/screen` composes every frame. All 441 frames of a
   baseline (7 documents, 21 modes and states, 3 sizes) are identical in text,
   attributes, playback cache, and cursor maps.
-- [ ] Choose one help surface. The in-app overlay and the `less` pager must at
-  least show identical generated content.
+- [x] Choose one help surface. The in-app overlay and the `less` pager show
+  identical generated content (a test locks it for every key style).
 
 ## Phase 4: edit on onsets through the canonical model
 
@@ -200,5 +205,5 @@ passes.
 
 - [ ] At 120x40 in *Felice fu quel dì*, lute and soprano bars do not share
   horizontal bar positions within a system.
-- [ ] The `lute` staff label overwrites the start of the tablature staff.
-- [ ] The status line says `focus:Tab` while the staff label reads `lute`.
+- [x] The `lute` staff label overwrites the start of the tablature staff.
+- [x] The status line says `focus:Tab` while the staff label reads `lute`.
