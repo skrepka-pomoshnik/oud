@@ -21,10 +21,11 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 ## Order of work
 
 1. Editor rebuild for typing: `C4` → `C5` → `C6`.
-2. Note typing: `C7`.
-3. Transposition: `C8`.
-4. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
-5. Publication and source model: `C12`, `C13`, `C14`.
+2. Full TAB format and the overflow sidecar: `C15` (after `C4`).
+3. Note typing: `C7`.
+4. Transposition: `C8`.
+5. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
+6. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow.
 `docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
@@ -109,16 +110,15 @@ type standard notes at all.
      and have `oud/editor/editing/tab/assignment.py` (`assign_chord_pitches`)
      choose course and fret under the current tuning, with forced-course
      override and visible diagnostics when no assignment exists.
-  2. Decide and document how native TAB stores a notation part. Today
-     `oud/importers/tab.py` and `oud/exports/export_tab.py` have no melody or
-     notation line. **Decision needed from the maintainer before step 3.**
+  2. Notation parts are stored through the `C15` sidecar, never as new syntax
+     inside `.tab` (maintainer decision, 2026-09-29).
   3. Notation-staff typing: the `C3` onset cursor moves onto notation staffs, and
      edits go through `apply_note_input` with the same undo, read-only, and save
      rules as tablature.
 - Acceptance: typed pitches produce the same TAB/MIDI/LilyPond output as the
   equivalent fret entry; notation parts survive save/reopen; keyscript fixtures
   for notes, chords, rests, ties, and lyrics.
-- Depends on: `C6`.
+- Depends on: `C6`, `C15`.
 
 ### C8. Score-aware transposition (P1.3)
 
@@ -277,6 +277,46 @@ Why complex: a new import/export format; experimental, lowest priority.
   not add an SVG backend, make Verovio a required dependency, or advertise MEI
   support until round trips and comparisons pass.
 - Depends on: `C13`.
+
+### C15. Full original TAB format with a warned sidecar for the rest
+
+Why complex: defines the save contract for every document, changes a file format
+boundary, and can silently lose user data if content is dropped.
+
+Maintainer decision (2026-09-29): `.tab` is the original `tab` program format
+(Wayne Cripps) and must be supported fully, with no Oud-only syntax. Content the
+format cannot hold is never dropped silently: the save warns and writes that
+content to a sidecar in a format Oud already reads and writes.
+
+- Files: `oud/importers/tab.py`, `oud/exports/export_tab.py`,
+  `oud/editor/services/io/files.py`, `oud/editor/services/bootstrap.py`,
+  `oud/presentation/cli_convert.py`, `docs/user-guide.md`, new
+  `docs/tab-format.md`.
+- Steps:
+  1. **Needs:** the original `tab` manual and example files (the Dartmouth site
+     is blocked from the agent host; the maintainer supplies a copy or an
+     allowed mirror). Write `docs/tab-format.md`: every directive, flag, note,
+     ornament, fingering, text and header line, each marked supported, partial,
+     or unsupported with a test reference.
+  2. Import and export every construct in that table. Unknown lines are kept
+     verbatim and warned about, never discarded.
+  3. Sidecar: when a save holds content TAB cannot express (notation staffs,
+     lyrics beyond TAB text, Italian frets the format cannot write, anything
+     the table marks unsupported), write `name.tab` plus `name.musicxml`
+     holding that content, and show a warning naming both files and what went
+     to the sidecar. Replace the current `TabExportError` refusal with this.
+     No sidecar is written when TAB holds everything, and a stale one is not
+     left pointing at removed content (delete it only if Oud wrote it).
+  4. Load: opening `name.tab` also reads `name.musicxml` when present and
+     merges it; a sidecar that does not match the TAB (bar count, parts) is
+     reported and opened read-only rather than guessed.
+  5. Same rules for `oud convert` to `.tab`.
+- Acceptance: every repo TAB file and fixture round-trips byte-identically
+  (with `S6`); a fixture per table row; a piece with a notation staff saves to
+  `.tab` + `.musicxml`, warns, and reopens identical; a TAB-only piece writes no
+  sidecar; the original `tab` program (when available locally) renders Oud's
+  `.tab` output without errors (mark as an integration test).
+- Depends on: `C4`, `S6`.
 
 ---
 
