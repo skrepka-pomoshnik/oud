@@ -1,5 +1,25 @@
 # DONE
 
+## S19: fermatas and slurs on notation staves in MusicXML (2026-09-29)
+
+- Notation staves write `<fermata/>` and `<slur type=start|stop>` inside the note's `notations`, and the importer reads them back into `fermata`, `slur_start` and `slur_end`.
+- Validation: the layered-score MusicXML round trip in `tests/test_layered_scores.py` now includes a slur pair and a fermata. Gate: 1,880 passed.
+
+## S8: one label for the tablature staff (2026-09-29)
+
+- `TAB_STAFF_LABEL` (`petrucci/adapters/piece_view.py`) is the single source for the drawn staff label and the focus lane, which used to read `Tab` while the staff read `lute`.
+- Validation: `tests/test_view_focus.py` (status `focus:` equals the drawn label in the viewer); the corpus focus tests use the constant.
+
+## S7: the tablature staff label no longer overwrites the staff (2026-09-29)
+
+- Petrucci's mixed view drew the `lute` label at `max(0, x - 5)`, over the first barline and staff lines. The tab bars are now drawn after the label column the layout already reserves for the tablature staff (lined up with the notation staves above), and the label is drawn inside that column.
+- Validation: `tests/test_layered_scores.py` (staff intact and label in its own column at 80x24 and 120x40; no label on a solo piece).
+
+## S18: oud convert without an output path (2026-09-29)
+
+- `oud convert x.tab` writes `x.musicxml` beside the input. An existing output still needs `--force`. Input `-` needs an explicit output, and a `.musicxml` input is refused (the default output would replace it, even with `--force`).
+- Validation: `tests/test_cli_contract.py` (default output, refusal to overwrite, stdin, same-name input).
+
 ## S5: no col: in the status row (2026-09-29)
 
 - `parse_time_signature_value` reads cut time (`C|`, `c|`, `C/`) as 2/2, so a cut-time bar shows `beat:k/2` (it used to fall back to 4/4 in exports as well). A meter with no beat structure (`3`) shows `ev:<k>/<n>`, the cursor's stop among the bar's stops, instead of `col:`.

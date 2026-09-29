@@ -17,6 +17,7 @@ from petrucci.terminal.canvas.framebuffer import Frame
 from petrucci.terminal.canvas.screen import A_BOLD, A_DIM, A_REVERSE
 from petrucci.terminal.text.lyrics import piece_for_lyric_display
 
+TAB_STAFF_LABEL = "lute"
 _SOURCE_EVENT_ID = re.compile(r":bar:(?P<bar>\d+):event:(?P<onset>\d+):(?P<voice>\d+)$")
 
 _TERMINAL_SCORE_METRICS = LayoutMetrics(
@@ -195,7 +196,7 @@ def _with_tablature_staff(score: NotationScore) -> NotationScore:
         )
         for index, measure in enumerate(source.measures)
     )
-    tab = NotationStaff(id="piece:tab", label="lute", measures=measures)
+    tab = NotationStaff(id="piece:tab", label=TAB_STAFF_LABEL, measures=measures)
     return replace(score, staffs=(*score.staffs, tab))
 
 
@@ -236,6 +237,7 @@ def _draw_tab_system(
     settings: dict[str, str],
     playback: tuple[int, int] | None,
 ) -> None:
+    label_width = _tab_label_width(system)
     for bar_index, box in zip(range(system.measure_start, system.measure_end), system.measure_boxes, strict=True):
         if not 0 <= bar_index < len(piece.bars):
             continue
@@ -243,14 +245,27 @@ def _draw_tab_system(
             canvas,
             bar=piece.bars[bar_index],
             bar_index=bar_index,
-            x=box.x,
+            x=box.x + label_width,
             width=box.width,
             course_top=course_top,
             settings=settings,
             playback=playback,
         )
-    if system.measure_boxes:
-        canvas.put(course_top + 2, max(0, system.measure_boxes[0].x - 5), "lute")
+    if label_width:
+        canvas.put(course_top + 2, 0, TAB_STAFF_LABEL[: label_width - 1])
+
+
+def _tab_label_width(system) -> int:
+    """Width of the label column the layout reserves before the tablature staff, its trailing space included."""
+
+    return next(
+        (
+            element.rect.width
+            for element in system.elements
+            if element.key.source_id == "piece:tab" and element.key.role is ElementRole.STAFF_LABEL
+        ),
+        0,
+    )
 
 
 def _draw_tab_bar(
@@ -613,4 +628,4 @@ def _cursor_display_maps(
     return maps
 
 
-__all__ = ["PieceScoreView", "typeset_piece_score_view"]
+__all__ = ["TAB_STAFF_LABEL", "PieceScoreView", "typeset_piece_score_view"]

@@ -4,11 +4,14 @@ import pytest
 
 from oud.editor.navigation.view.focus import current_view_staff, visible_view_staffs
 from oud.editor.services.bootstrap import init_state
+from oud.editor.services.screen.compose import compose_editor_frame
 from oud.editor.services.screen.status import status_line
 from oud.importers.ft3 import load_ft3
 from petrucci.adapters.duet import duet_bar_mapping
+from petrucci.adapters.piece_view import TAB_STAFF_LABEL
 from petrucci.core.imported import project_imported_staff
-from tests.helpers_keyscript import press_keys
+from tests.helpers_keyscript import keyscript_state, press_keys
+from tests.test_layered_scores import _layered_piece
 
 MIXED_FT3 = "tests/fixtures/ft3/corpus/can_she_excuse.ft3"
 DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
@@ -18,15 +21,25 @@ DUET_FT3 = "tests/fixtures/ft3/corpus/willoughby_duet.ft3"
 def test_mixed_view_staff_focus_cycles_visible_lanes(tmp_path: Path) -> None:
     state = init_state(MIXED_FT3, config_path=str(tmp_path / "config.toml"))
     labels = [staff.label for staff in visible_view_staffs(state.piece)]
-    assert labels[:3] == ["Tab", "Melody", "Lyrics"]
-    assert current_view_staff(state).label == "Tab"
+    assert labels[:3] == [TAB_STAFF_LABEL, "Melody", "Lyrics"]
+    assert current_view_staff(state).label == TAB_STAFF_LABEL
 
     press_keys(state, ["j"])
     assert current_view_staff(state).label == "Melody"
     assert "focus:Melody" in status_line(state)
 
     press_keys(state, ["k"])
-    assert current_view_staff(state).label == "Tab"
+    assert current_view_staff(state).label == TAB_STAFF_LABEL
+
+
+def test_the_focus_label_of_the_tablature_is_the_drawn_staff_label() -> None:
+    state = keyscript_state(piece=_layered_piece(), width=120, height=40, settings_override={"time": "2/4"})
+    state.read_only = True  # the viewer shows `focus:` in its status
+
+    assert current_view_staff(state).label == TAB_STAFF_LABEL
+    assert f"focus:{TAB_STAFF_LABEL}" in status_line(state)
+    lines = compose_editor_frame(state, height=40, width=120).frame.lines
+    assert any(line.startswith(TAB_STAFF_LABEL) for line in lines)
 
 
 @pytest.mark.ft3_corpus
