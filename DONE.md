@@ -1,5 +1,20 @@
 # DONE
 
+## C16 steps 2–3: MusicXML is the default save format (trial) (2026-09-29)
+
+- `:w` picks the format from the extension: `.musicxml`/`.xml` or `.tab`;
+  anything else is refused. New documents offer `untitled.musicxml`; FT3 and
+  TAB projections offer the source name with `.musicxml`; MusicXML that Oud
+  did not write offers `name.oud.musicxml`, so it is never overwritten by
+  default (Oud keeps only its tablature part). `oud new.musicxml` on a missing
+  file pre-fills that name.
+- MusicXML with Oud's software mark reopens (at start or with `:e`) as a native
+  document and `:w` saves back to it. `.tab` documents keep saving to `.tab`.
+  The status label shows `MUSICXML` or `TAB` for the save target.
+- Validation: `tests/test_musicxml_default_save.py` (new document save and
+  native reopen and re-save, missing path, foreign file protection, `:e`, TAB
+  documents, refused suffix). Gate: 1,843 passed, 126 skipped.
+
 ## C16 step 1: lossless MusicXML round trip (2026-09-29)
 
 - MusicXML written by Oud now reads back with identical chords, rests at their

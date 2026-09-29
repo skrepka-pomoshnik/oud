@@ -375,6 +375,18 @@ def _parse_piece(root: ET.Element) -> Piece:
     return piece
 
 
+def musicxml_file_written_by_oud(path: str) -> bool:
+    """Whether an uncompressed MusicXML file carries Oud's software mark; unreadable files do not."""
+
+    if not path.lower().endswith((".musicxml", ".xml")):
+        return False
+    try:
+        root = ET.fromstring(Path(path).read_text(encoding="utf-8"))  # noqa: S314
+    except (OSError, ET.ParseError, UnicodeDecodeError):
+        return False
+    return written_by_oud(root)
+
+
 def load_musicxml(path: str) -> Piece:
     root = ET.fromstring(Path(path).read_text(encoding="utf-8"))  # noqa: S314
     return _parse_piece(root)
