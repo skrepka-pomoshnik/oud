@@ -1,5 +1,10 @@
 # DONE
 
+## S3: the help overlay and the pager share one text (2026-09-29)
+
+- The overlay and the `less` pager both print `help_lines(state)`; a test now locks that for every key style (`vim`, `vim+arrows`, `casual`, `casual+arrows`). No production change was needed.
+- Validation: `tests/test_keymap_table.py::test_the_pager_shows_the_same_help_as_the_overlay`.
+
 ## S2: long prompts keep their end visible (2026-09-29)
 
 - `prompt_text` takes the row width; a command or search prompt wider than the row shows `<` and its last `width - 1` characters, so a long Save As path stays editable at 80 columns. The message is dropped while the prompt overflows.

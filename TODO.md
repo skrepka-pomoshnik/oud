@@ -374,20 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S3. Lock the shared help text with a test
-
-- Where: the help overlay (`compose.py:49`) and the `less` pager
-  (`show_help` in `oud/editor/commands/handlers/misc.py:44`) both print
-  `help_lines(state)` from `oud/editor/core/input/help.py:61`. Only plugin
-  mode differs (it shows `plugins/<name>.txt` in the pager).
-- Do: add a test that, for each key style (`vim`, `vim+arrows`, `casual`,
-  `casual+arrows`; the `keys` setting, see
-  `tests/test_keymap_table.py`), captures the text passed to the fake `less`
-  (`run_fn`, as in `tests/test_tui_commands_exec.py:78`) and compares it with
-  `help_lines(state)`.
-- Acceptance: the new test passes; no production change is expected. If it
-  fails, make the overlay and pager use the same lines.
-
 ### S4. Say what is wrong with a bar's length
 
 - Where: `bar_meter_marker` in `oud/editor/services/screen/rhythm.py` returns
