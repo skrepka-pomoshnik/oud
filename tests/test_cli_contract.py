@@ -105,6 +105,46 @@ def test_convert_refuses_overwrite_until_force_is_explicit(tmp_path: Path) -> No
     assert target.read_text(encoding="utf-8").startswith('\\version "2.26.0"')
 
 
+def test_convert_without_an_output_writes_musicxml_beside_the_input(tmp_path: Path) -> None:
+    source = tmp_path / "piece.tab"
+    _write_tab(source)
+    refused_error = StringIO()
+
+    first = convert_command(str(source), None, "config.toml", streams=CommandStreams(stdout=StringIO()))
+    second = convert_command(
+        str(source),
+        None,
+        "config.toml",
+        streams=CommandStreams(stdout=StringIO(), stderr=refused_error),
+    )
+
+    assert first == 0
+    assert "<score-partwise" in (tmp_path / "piece.musicxml").read_text(encoding="utf-8")
+    assert second == cli_convert.EXIT_OUTPUT
+    assert "refusing to overwrite" in refused_error.getvalue()
+
+
+def test_convert_without_an_output_needs_a_named_input_that_is_not_musicxml(tmp_path: Path) -> None:
+    stdin_error = StringIO()
+    same_error = StringIO()
+    source = tmp_path / "piece.musicxml"
+    source.write_text("<score-partwise/>", encoding="utf-8")
+
+    from_stdin = convert_command("-", None, "config.toml", streams=CommandStreams(stderr=stdin_error))
+    same = convert_command(
+        str(source),
+        None,
+        "config.toml",
+        options=ConvertOptions(overwrite=True),
+        streams=CommandStreams(stderr=same_error),
+    )
+
+    assert (from_stdin, same) == (cli_convert.EXIT_USAGE, cli_convert.EXIT_USAGE)
+    assert "output path is required" in stdin_error.getvalue()
+    assert "would replace the input" in same_error.getvalue()
+    assert source.read_text(encoding="utf-8") == "<score-partwise/>"
+
+
 def test_convert_does_not_create_unselected_output_directories(tmp_path: Path) -> None:
     source = tmp_path / "source.tab"
     missing_directory = tmp_path / "missing" / "out.tab"

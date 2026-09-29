@@ -25,6 +25,7 @@ from oud.settings import DEFAULT_SETTINGS, load_settings
 from petrucci.core.model import Piece
 
 EXIT_USAGE = 2
+DEFAULT_OUTPUT_SUFFIX = ".musicxml"
 EXIT_INPUT = 3
 EXIT_OUTPUT = 4
 EXIT_TOOL = 5
@@ -164,9 +165,20 @@ def resolve_output_format(path: str, explicit: str | None) -> str:
     return resolved
 
 
+def default_output_path(path_in: str) -> str:
+    """`<input stem>.musicxml` beside the input; MusicXML is Oud's default format."""
+
+    if path_in == "-":
+        raise _error(EXIT_USAGE, "an output path is required when input is -")
+    target = Path(path_in).with_suffix(DEFAULT_OUTPUT_SUFFIX)
+    if target == Path(path_in):
+        raise _error(EXIT_USAGE, f"the default output would replace the input {path_in}; name an output path")
+    return str(target)
+
+
 def convert_command(
     path_in: str,
-    path_out: str,
+    path_out: str | None,
     config_path: str,
     *,
     options: ConvertOptions | None = None,
@@ -179,7 +191,7 @@ def convert_command(
     try:
         _execute_convert(
             path_in,
-            path_out,
+            path_out if path_out is not None else default_output_path(path_in),
             config_path,
             options=options,
             stdin=streams.stdin,

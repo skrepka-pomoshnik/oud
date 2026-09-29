@@ -160,7 +160,7 @@ def _slice_for_ascii(state, bars_spec: str | None) -> None:
 
 def _cmd_convert(
     path_in: str,
-    path_out: str,
+    path_out: str | None,
     config_path: str,
     options: ConvertOptions | None = None,
 ) -> int:
@@ -210,7 +210,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_convert.add_argument("input", help="Input .ft3/.tab path")
     p_convert.add_argument(
         "output",
-        help="Output path, or - for a supported text stream",
+        nargs="?",
+        help="Output path, or - for a supported text stream; default: the input name with .musicxml",
     )
     p_convert.add_argument("-f", "--force", action="store_true", help="Replace existing output files")
     p_convert.add_argument(
