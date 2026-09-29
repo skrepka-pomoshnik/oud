@@ -45,7 +45,9 @@ def _apply_piece_metadata(state: EditorState) -> None:
     state.settings["tuning"] = piece.tuning
     tuned_strings = tuning_count(piece.tuning)
     if tuned_strings:
-        piece.strings = tuned_strings
+        # Never hide a course that carries notes: saving writes only piece.strings courses.
+        used = [note.string for bar in piece.bars for chord in bar.chords for note in chord.notes]
+        piece.strings = max([tuned_strings, *used])
 
 
 def _setting_int(settings: dict[str, str], key: str, fallback_key: str) -> int:

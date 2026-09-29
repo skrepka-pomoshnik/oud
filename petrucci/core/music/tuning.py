@@ -65,10 +65,10 @@ def tuning_preset(value: str) -> str | None:
         "renaissance12": "a1b1c2d2e2f2g2c3f3a3d4g4",
         "renaissance13": "g1a1b1c2d2e2f2g2c3f3a3d4g4",
         "guitarlute": "e2a2d3g3b3e4",
-        "guitar": "e4a3d3f+3b2e2",
-        "dminor": "a4b-4c4d4e4f4g4a3d3f3a2d2f2",
-        "sharp": "c4d4e4f+4g4a3d3g3b2d2f+2",
-        "flat": "c4d4e-4f4g4a3d3g3a+2d2f2",
+        "guitar": "e2a2d3f+3b3e4",
+        "dminor": "a1b-1c2d2e2f2g2a2d3f3a3d4f4",
+        "sharp": "c2d2e2f+2g2a2d3g3b3d4f+4",
+        "flat": "c2d2e-2f2g2a2d3g3a+3d4f4",
     }
     aliases = {
         # Common shorthand family aliases.

@@ -5,7 +5,16 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from petrucci.core.model import Bar, Chord, Note, Piece
+from oud.importers.tab_syntax import (
+    TabDialect,
+    TabSyntax,
+    detect_syntax,
+    position_notes,
+    read_positions,
+    read_tuning,
+    split_flag,
+)
+from petrucci.core.model import Bar, Chord, Piece
 
 FLAG_TO_NOTE_TYPE = {
     "W": 2,
@@ -23,6 +32,10 @@ FLAG_TO_NOTE_TYPE = {
 
 TAB_EMPTY_WARNING = "TAB import found no recoverable bars; opened a blank score instead."
 TAB_INCOMPLETE_WARNING = "TAB appears incomplete (missing final 'e'); recovered {bars} bar(s)."
+TAB_TRIPLET_WARNING = (
+    "TAB triplets are read without tuplet timing ({count} group(s)); bar lengths may not match the meter."
+)
+_THICK_BARLINES = frozenset({"B", "B!", "BX", "BL"})
 
 
 @dataclass(slots=True)
@@ -57,11 +70,13 @@ class _ChordLineParts:
     fret_text: str
     dotted: bool
     grid: str | None
+    triplet: bool = False
+    rest: bool = False
 
 
 @dataclass(slots=True)
 class _BarAccumulator:
-    strings: int
+    syntax: TabSyntax
     default_time: str | None = None
     last_note_type: int | None = None
     bars: list[Bar] = field(default_factory=list)
@@ -69,6 +84,7 @@ class _BarAccumulator:
     current_bar: Bar = field(init=False)
     span_start: int | None = None
     span_end: int | None = None
+    triplets: int = 0
 
     def __post_init__(self) -> None:
         self.current_bar = Bar(time_sig=self.default_time)
@@ -83,10 +99,12 @@ class _BarAccumulator:
         self._include_line(line_no)
 
     def add_chord(self, line: str, line_no: int) -> bool:
-        chord, self.last_note_type = _parse_chord_line(line, self.strings, self.last_note_type)
+        parts = _chord_line_parts(line, self.syntax)
+        chord, self.last_note_type = _parse_chord_line(parts, self.syntax, self.last_note_type)
         # A flag over an empty column is a rest; keep it so later onsets keep their time.
         if chord is None:
             return False
+        self.triplets += bool(parts and parts.triplet)
         self.current_bar.chords.append(chord)
         self.current_bar.notes.extend(chord.notes)
         self._include_line(line_no)
@@ -117,21 +135,6 @@ class _BarAccumulator:
         self.bars.append(self.current_bar)
         if self.span_start is not None and self.span_end is not None:
             self.spans.append((self.span_start, self.span_end))
-
-
-def _is_fret_char(ch: str) -> bool:
-    return ch in "abcdefghiklmnopqrst" or ch.isdigit() or ch in {"x", "r", "E"}
-
-
-def _fret_from_char(ch: str, prefer_alt_c: bool) -> int | None:
-    letters = "abcdefghiklmnopqrst"
-    if prefer_alt_c and ch == "r":
-        return 2
-    if ch in letters:
-        return letters.index(ch)
-    if ch.isdigit():
-        return int(ch)
-    return {"x": 10, "r": 2, "E": 4}.get(ch)
 
 
 def _parse_time_signature(sig: str) -> str | None:
@@ -175,48 +178,46 @@ def _normalize_chord_line(line: str) -> str:
     return f"0{line[1:]}"
 
 
-def _chord_line_parts(line: str) -> _ChordLineParts | None:
-    text = _normalize_chord_line(line)
-    grid = "start" if text.startswith("#") else None
-    payload = text.removeprefix("#")
-    if not payload or payload[0].isspace():
+def is_barline(line: str) -> bool:
+    """`b` lines, a thick `B` on its own, and repeat dots around a barline (`.bb.`)."""
+
+    stripped = line.rstrip()
+    if stripped.startswith("b") or stripped in _THICK_BARLINES:
+        return True
+    return stripped.startswith(".") and any(char in "bB" for char in stripped)
+
+
+def _chord_line_parts(line: str, syntax: TabSyntax) -> _ChordLineParts | None:
+    text = _normalize_chord_line(line).rstrip("\n")
+    if not text:
         return None
-    flag = payload[0]
-    payload = payload[1:].removeprefix("!")
-    dotted = payload.startswith(".")
-    payload = payload.removeprefix(".")
-    if payload.startswith("#"):
-        grid = "start"
-        payload = payload[1:]
-    return _ChordLineParts(flag, payload.rstrip("\n"), dotted, grid)
-
-
-def _fret_notes(text: str, strings: int) -> list[Note]:
-    padded = text.ljust(strings)
-    prefer_alt_c = not any(ch in padded for ch in "qst")
-    notes: list[Note] = []
-    for idx, ch in enumerate(padded[:strings]):
-        if not _is_fret_char(ch):
-            continue
-        fret = _fret_from_char(ch, prefer_alt_c)
-        if fret is not None:
-            notes.append(Note(string=idx + 1, fret=fret, raw_pos=0))
-    return notes
+    lead = text[0]
+    if lead == "R":
+        return _ChordLineParts(text[1:2] or "1", "", text[2:3] == ".", None, rest=True)
+    if lead in "#t" and len(text) > 1:
+        return _ChordLineParts(text[1], text[2:], False, "start" if lead == "#" else None, triplet=lead == "t")
+    if lead == "B":
+        return _ChordLineParts("B", text[1:].removeprefix("-"), False, None)
+    modifier = split_flag(text[1:], syntax)
+    if syntax.dialect is TabDialect.OUD_LEGACY and not modifier.text[:1].strip():
+        return None
+    return _ChordLineParts(lead, modifier.text, modifier.dotted, "start" if modifier.grid else None)
 
 
 def _parse_chord_line(
-    line: str,
-    strings: int,
+    parts: _ChordLineParts | None,
+    syntax: TabSyntax,
     last_note_type: int | None,
 ) -> tuple[Chord | None, int | None]:
-    parts = _chord_line_parts(line)
     if parts is None:
         return None, last_note_type
     note_type = _note_type_for_flag(parts.flag, last_note_type)
     if note_type is None:
         return None, last_note_type
     chord = Chord(note_type=note_type, dotted=parts.dotted, grid=parts.grid)
-    chord.notes.extend(_fret_notes(parts.fret_text, strings))
+    positions = read_positions(parts.fret_text, syntax)
+    if not parts.rest and not positions.rest:
+        chord.notes.extend(position_notes(positions, syntax))
     return chord, note_type
 
 
@@ -342,7 +343,7 @@ def _segment_line_kind(line: str) -> str:
                 ("blank", not line),
                 ("invalid", line.startswith(("{", "#", "$"))),
                 ("ignore", line.startswith(("-", "%"))),
-                ("bar", line.startswith("b")),
+                ("bar", is_barline(line)),
                 ("time", line.startswith("S")),
                 ("end", stripped == "e"),
             )
@@ -395,11 +396,11 @@ def _parse_bar_segment_lines(
     lines: list[str],
     *,
     start_line_no: int,
-    strings: int,
+    syntax: TabSyntax,
     default_time: str | None,
     last_note_type: int | None,
 ) -> _BarSegmentParseResult | None:
-    accumulator = _BarAccumulator(strings, default_time=default_time, last_note_type=last_note_type)
+    accumulator = _BarAccumulator(syntax, default_time=default_time, last_note_type=last_note_type)
     for offset, raw in enumerate(lines):
         line_no = start_line_no + offset
         line = raw.rstrip("\n").rstrip("\r")
@@ -411,8 +412,9 @@ def _parse_bar_segment_lines(
 
 
 class _TabLinesParser:
-    def __init__(self, strings: int) -> None:
-        self.accumulator = _BarAccumulator(strings)
+    def __init__(self, strings: int, syntax: TabSyntax) -> None:
+        self.syntax = syntax
+        self.accumulator = _BarAccumulator(syntax)
         self.piece = Piece(title=None, author=None, composer=None, bars=self.accumulator.bars, strings=strings)
         self.saw_letters = False
         self.saw_digits = False
@@ -438,6 +440,10 @@ class _TabLinesParser:
 
     def finish(self, source_lines: list[str]) -> TabData | None:
         self.accumulator.finish()
+        courses = [note.string for bar in self.piece.bars for chord in bar.chords for note in chord.notes]
+        self.piece.strings = max([self.piece.strings, *courses])
+        if self.accumulator.triplets:
+            self.piece.import_warnings.append(TAB_TRIPLET_WARNING.format(count=self.accumulator.triplets))
         if self.saw_letters:
             self.piece.style = "french"
         elif self.saw_digits:
@@ -503,7 +509,8 @@ class _TabLinesParser:
     def _consume_tuning(self, _line_no: int, line: str) -> bool:
         if not line.startswith("-tuning "):
             return False
-        self.piece.tuning = line.split(" ", 1)[1].strip()
+        tuning = line.split(" ", 1)[1].strip()
+        self.piece.tuning = tuning if self.syntax.dialect is TabDialect.OUD_LEGACY else read_tuning(tuning)
         return True
 
     @staticmethod
@@ -511,7 +518,7 @@ class _TabLinesParser:
         return line.startswith(("-", "%"))
 
     def _consume_bar(self, _line_no: int, line: str) -> bool:
-        if not line.startswith("b"):
+        if not is_barline(line):
             return False
         self.accumulator.break_bar()
         return True
@@ -543,7 +550,7 @@ def parse_tab_text_data(text: str, strings: int = 6) -> TabData | None:
 
 def parse_tab_lines_data(lines: list[str], strings: int = 6) -> TabData | None:
     # Format cues inspired by luteconv tab parsing.
-    parser = _TabLinesParser(strings)
+    parser = _TabLinesParser(strings, detect_syntax(lines))
     for line_no, raw in enumerate(lines):
         parser.consume(line_no, raw)
     return parser.finish(lines)
@@ -647,7 +654,7 @@ def reparse_tab_text_delta(
     seg = _parse_bar_segment_lines(
         seg_lines,
         start_line_no=seg_start_line,
-        strings=strings,
+        syntax=detect_syntax(new_lines),
         default_time=seed_default_time,
         last_note_type=seed_last_note_type,
     )

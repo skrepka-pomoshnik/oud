@@ -369,7 +369,7 @@ def _tab_file(tmp_path: Path, body: str) -> Path:
 def test_tab_flag_only_line_imports_as_timed_rest(tmp_path: Path) -> None:
     from oud.importers.tab import load_tab  # noqa: PLC0415
 
-    piece = load_tab(str(_tab_file(tmp_path, "1\n0a-----\n0-c----\n")))
+    piece = load_tab(str(_tab_file(tmp_path, "1\n0a\n0 c\n")))
 
     chords = piece.bars[0].chords
     # Flag 1 is an eighth, 0 a quarter.
