@@ -99,6 +99,10 @@ class EditorState:
         # Keys of an unfinished sequence (`g`, `d`) and an action awaiting its char (`f{c}`).
         self.pending_keys: tuple[int, ...] = ()
         self.pending_action: Action | None = None
+        # An operator (`d`, `y`, `c`) waiting for its motion, with the count typed before it.
+        self.pending_operator: Action | None = None
+        self.operator_count = 1
+        self.last_edit: RepeatableEdit | None = None
         self.last_find: tuple[str, str] | None = None
         self.last_word_search: tuple[str, int] | None = None
         self.marks: dict[str, tuple[int, int, int]] = {}
@@ -329,6 +333,16 @@ class YankedBar:
 class UndoAction:
     kind: str
     data: dict[str, object]
+
+
+@dataclass(frozen=True)
+class RepeatableEdit:
+    """What `.` replays: an edit action, or an operator with its motion."""
+
+    action: Action
+    count: int
+    operator: Action | None = None
+    motion_char: str = ""
 
 
 @dataclass

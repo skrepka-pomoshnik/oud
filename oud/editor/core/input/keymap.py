@@ -86,6 +86,10 @@ class Action(StrEnum):
     INSERT = "insert"
     REPLACE_ONCE = "replace-once"
     REPLACE_MODE = "replace-mode"
+    OPERATOR_DELETE = "operator-delete"
+    OPERATOR_YANK = "operator-yank"
+    OPERATOR_CHANGE = "operator-change"
+    REPEAT_EDIT = "repeat-edit"
     DELETE_NOTE = "delete-note"
     UNDO = "undo"
     REDO = "redo"
@@ -206,6 +210,10 @@ ACTION_SPECS: Mapping[Action, ActionSpec] = MappingProxyType(
         Action.INSERT: _spec(_G.EDIT, "insert mode", mutates=True),
         Action.REPLACE_ONCE: _spec(_G.EDIT, "replace one cell", mutates=True),
         Action.REPLACE_MODE: _spec(_G.EDIT, "replace mode", mutates=True),
+        Action.OPERATOR_DELETE: _spec(_G.EDIT, "delete over a motion; twice cuts [count] bars", mutates=True),
+        Action.OPERATOR_YANK: _spec(_G.EDIT, "copy over a motion; twice copies [count] bars"),
+        Action.OPERATOR_CHANGE: _spec(_G.EDIT, "delete over a motion and insert", mutates=True),
+        Action.REPEAT_EDIT: _spec(_G.EDIT, "repeat the last delete, paste or bar edit", mutates=True),
         Action.DELETE_NOTE: _spec(_G.EDIT, "delete note ([count])", mutates=True),
         Action.UNDO: _spec(_G.EDIT, "undo", mutates=True),
         Action.REDO: _spec(_G.EDIT, "redo", mutates=True),
@@ -390,8 +398,12 @@ _NORMAL_BINDINGS: tuple[Binding, ...] = (
     _bind("X", _A.BAR_DELETE),
     _bind("-", _A.BAR_DELETE),
     _bind("<Del>", _A.BAR_DELETE, style=_CASUAL),
-    _bind("dd", _A.DELETE_BARS, style=_VIM),
-    _bind("yy", _A.YANK_BARS),
+    _bind("d", _A.OPERATOR_DELETE, style=_VIM),
+    _bind("^X", _A.OPERATOR_DELETE, style=_CASUAL),
+    _bind("y", _A.OPERATOR_YANK),
+    _bind("c", _A.OPERATOR_CHANGE),
+    _bind(".", _A.REPEAT_EDIT, style=_VIM),
+    _bind("<F4>", _A.REPEAT_EDIT, style=_CASUAL),
     _bind("p", _A.PASTE_BARS),
     _bind("P", _A.PASTE_BARS_BEFORE),
     _bind("f", _A.FIND_FORWARD),
@@ -400,6 +412,7 @@ _NORMAL_BINDINGS: tuple[Binding, ...] = (
     _bind("T", _A.TILL_BACKWARD),
     _bind(";", _A.FIND_REPEAT),
     _bind(",", _A.FIND_REPEAT_REVERSE, style=_VIM),
+    _bind("\\", _A.FIND_REPEAT_REVERSE, style=_CASUAL),
     _bind("*", _A.WORD_SEARCH_FORWARD),
     _bind("#", _A.WORD_SEARCH_BACKWARD),
     _bind("n", _A.WORD_SEARCH_NEXT),
@@ -567,6 +580,7 @@ _NAMED_KEYS: Mapping[str, tuple[str | None, tuple[int, ...]]] = MappingProxyType
         "<Up>": ("up", ()),
         "<Down>": ("down", ()),
         "<F1>": ("f1", ()),
+        "<F4>": ("f4", ()),
         "<Ins>": ("ic", ()),
         "<Del>": ("dc", ()),
         "<Exit>": ("exit", ()),

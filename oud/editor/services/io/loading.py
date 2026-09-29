@@ -130,6 +130,7 @@ def reset_loaded_file_state(state: EditorState) -> None:
     state.marks.clear()
     state.pending_keys = ()
     state.pending_action = None
+    state.pending_operator = None
     state.count_prefix = ""
     state.visual_anchor = None
     state.modified = False

@@ -10,6 +10,7 @@ class KeyCodes:
     up: int
     down: int
     f1: int
+    f4: int
     ic: int
     dc: int
     enter: int
@@ -28,6 +29,7 @@ DEFAULT_KEYCODES = KeyCodes(
     up=259,
     down=258,
     f1=265,
+    f4=268,
     ic=331,
     dc=330,
     enter=343,

@@ -12,6 +12,7 @@ def keycodes_from_curses() -> KeyCodes:
         up=curses.KEY_UP,
         down=curses.KEY_DOWN,
         f1=getattr(curses, "KEY_F1", 265),
+        f4=getattr(curses, "KEY_F4", 268),
         ic=getattr(curses, "KEY_IC", 331),
         dc=getattr(curses, "KEY_DC", 330),
         enter=getattr(curses, "KEY_ENTER", 10),

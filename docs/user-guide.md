@@ -74,7 +74,9 @@ Set with:
 - Replace once: `r`
 - Delete note: `x` (`[count]x` supported)
 - Undo/redo: `u` / `Ctrl-r`
-- Bar add/remove: `o O` and `+ -`; copy `yy`, paste after/before `p` / `P`
+- Bar add/remove: `o O` and `+ -`; paste after/before `p` / `P`
+- Operators: `d`, `y`, `c` take one motion (`dl`, `d3l`, `y$`, `cw`, `df{c}`) and act on the cells it covers, like a visual selection from the cursor to the target. A count before the operator and one before the motion multiply (`2d2l` is `d4l`). Repeating the operator works on [count] whole bars: `dd` cuts, `yy` copies. `c` deletes and enters insert mode. A find that goes nowhere, `Esc`, or a key that is not a motion cancels the operator.
+- Repeat: `.` repeats the last `x`, bar cut or insert, paste, and delete over a motion; a count before `.` replaces the original count. Inserts and changes are not repeated.
 - Add a configured bass course: `gb` (undoable)
 - Help: `F1` / `gh` (page) or `?` (in less); both show the same text, generated for the active key profile
 - Command: `:`
@@ -100,7 +102,9 @@ creates a new bar.
 - Bar edge: `Home` / `End`; viewport scroll: `PgUp` / `PgDn`
 - Insert/delete bar: `Insert` / `Delete`
 - Undo/redo: `Ctrl-Z` / `Ctrl-Y` (`u` / `Ctrl-R` remain available)
-- Char-find repeat: `;` forward. Reverse repeat is vim-only (`,`), like `dd`; in casual keys `,`/`.` step bars and `[`/`]` jump sections/pages in read-only scores
+- Char-find repeat: `;` forward, `\` reverse (`,` and `.` step bars; `[` / `]` jump sections/pages in read-only scores)
+- Operators: `Ctrl-X` deletes (`Ctrl-X` `Ctrl-X` cuts [count] bars), `y` copies (`yy` copies bars), `c` changes; each takes a motion from the arrows or `w a s d` (`Ctrl-X` `d` deletes the cell to the right). `F4` repeats the last edit, as `.` does in vim.
+- Every vim action has a casual key; `tests/test_normal_actions.py` fails if one is missing.
 - Help: `F1`
 
 ## 5) Entering Notes

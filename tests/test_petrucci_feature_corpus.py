@@ -126,8 +126,12 @@ def _tab_projection_with_meter_in_force(piece: Piece) -> tuple[object, ...]:
     # TAB states a meter only where it changes, so a reopened score carries none on repeated bars.
     meter = None
     bars = []
-    for bar, (_time_sig, chords) in zip(piece.bars, _tab_projection(piece), strict=True):
+    for bar in piece.bars:
         meter = bar.time_sig or meter
+        chords = tuple(
+            (chord.note_type, bool(chord.dotted), tuple(sorted((note.string, note.fret) for note in chord.notes)))
+            for chord in bar.chords
+        )
         bars.append((meter, chords))
     return tuple(bars)
 

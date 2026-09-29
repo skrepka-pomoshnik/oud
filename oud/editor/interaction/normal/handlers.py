@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from types import MappingProxyType
 
 from oud.editor.core.input.keymap import Action
@@ -11,13 +10,8 @@ from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.interaction.normal import commands as cmd
 from oud.editor.interaction.normal import movement as mv
-
-
-@dataclass(frozen=True)
-class ActionInput:
-    key: int
-    char: str = ""
-
+from oud.editor.interaction.normal import operators as ops
+from oud.editor.interaction.normal.action_input import ActionInput
 
 Handler = Callable[[EditorState, ActionInput], bool]
 
@@ -76,6 +70,10 @@ NORMAL_HANDLERS: Mapping[Action, Handler] = MappingProxyType(
         _A.INSERT: _run(cmd.insert),
         _A.REPLACE_ONCE: _run(cmd.replace_once),
         _A.REPLACE_MODE: _run(cmd.replace_mode),
+        _A.OPERATOR_DELETE: _run(lambda state: ops.start_operator(state, _A.OPERATOR_DELETE)),
+        _A.OPERATOR_YANK: _run(lambda state: ops.start_operator(state, _A.OPERATOR_YANK)),
+        _A.OPERATOR_CHANGE: _run(lambda state: ops.start_operator(state, _A.OPERATOR_CHANGE)),
+        _A.REPEAT_EDIT: _run(ops.repeat_last_edit),
         _A.DELETE_NOTE: _run(cmd.delete_notes),
         _A.UNDO: _run(cmd.undo_edit),
         _A.REDO: _run(cmd.redo_edit),

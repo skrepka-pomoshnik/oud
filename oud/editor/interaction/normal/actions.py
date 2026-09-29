@@ -5,7 +5,9 @@ from oud.editor.core.feedback.messages import READ_ONLY_VIEWER
 from oud.editor.core.input.keymap import ACTION_SPECS, Action, keymap_for
 from oud.editor.core.input.modes import VISUAL_MODES, Mode
 from oud.editor.core.state import EditorState
-from oud.editor.interaction.normal.handlers import NORMAL_HANDLERS, ActionInput
+from oud.editor.interaction.normal.action_input import ActionInput
+from oud.editor.interaction.normal.handlers import NORMAL_HANDLERS
+from oud.editor.interaction.normal.operators import apply_operator, cancel_operator, record_edit
 
 _COUNT_DIGITS = frozenset(ord(digit) for digit in "0123456789")
 
@@ -29,7 +31,7 @@ def handle_normal(state: EditorState, key: int) -> bool:
     state.pending_keys = ()
     action = keymap.lookup(sequence)
     if action is None:
-        state.count_prefix = ""
+        cancel_operator(state)
         return True
     return run_action(state, action, ActionInput(key))
 
@@ -46,7 +48,11 @@ def run_action(state: EditorState, action: Action, action_input: ActionInput) ->
         if not spec.keeps_count:
             state.count_prefix = ""
         return True
+    if state.pending_operator is not None:
+        return apply_operator(state, action, action_input)
+    count = int(state.count_prefix or 1)
     running = NORMAL_HANDLERS[action](state, action_input)
+    record_edit(state, action, count)
     state.count_prefix = ""
     return running
 
@@ -63,6 +69,6 @@ def _complete_char_action(state: EditorState, key: int) -> bool:
     action = state.pending_action
     state.pending_action = None
     if action is None or not ord(" ") <= key <= ord("~"):
-        state.count_prefix = ""
+        cancel_operator(state)
         return True
     return run_action(state, action, ActionInput(key, chr(key)))

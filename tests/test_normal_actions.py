@@ -44,10 +44,9 @@ def test_casual_profile_has_every_vim_action(mode: Mode, read_only: bool) -> Non
     def actions(style: KeyStyle) -> set[Action]:
         return {binding.action for binding in active_bindings(KeyProfile(style, False, read_only), mode)}
 
-    missing = actions(KeyStyle.VIM) - actions(KeyStyle.CASUAL)
-    # dd and `,` (reverse find) are vim grammar; casual keeps `,`/`.` for bar steps
-    # and `[`/`]` for sections, so it has no reverse find (docs/ui-fix-plan.md).
-    assert missing <= {Action.DELETE_BARS, Action.FIND_REPEAT_REVERSE}
+    # Casual reaches every vim action with its own keys: `^X` for the delete operator,
+    # `\\` for reverse find (`,`/`.` step bars) and F4 for repeat.
+    assert actions(KeyStyle.VIM) <= actions(KeyStyle.CASUAL)
 
 
 def test_casual_movement_and_bar_step_keys_are_not_shadowed_by_vim_actions() -> None:
