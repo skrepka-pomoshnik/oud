@@ -471,24 +471,6 @@ the complex list with a note instead of widening it.
 - Acceptance: `grep -rnwE "apply_duration|clear_cell|clear_cell_note|set_tab_duration|clear_tab_cell|clear_tab_note" oud petrucci tests`
   prints nothing; the gate passes; `grid.py` is shorter by the deleted code.
 
-### S21. Remove the obsolete `grid` setting
-
-- Where: the `grid` setting no longer affects anything. It is defaulted in
-  `oud/settings.py:124`, listed as a boolean in
-  `oud/editor/commands/handlers/settings.py:44` (`_BOOL_KEYS`), shown on the
-  settings page in `oud/editor/services/screen/pages.py:64`, and named in
-  `docs/user-guide.md:244`. Tests that mention it: `tests/test_tui_commands_exec.py`
-  (lines 40, 110-119, 255).
-- Do: remove it from those places. A user's old config may still contain
-  `grid = ...`; loading it must not fail or warn.
-- Acceptance: `grep -rnw grid oud/settings.py oud/editor docs/user-guide.md`
-  has no hit for the setting; a new test loads a config file with
-  `grid = "on"` and gets normal settings with no `grid` key; `:set grid=on`
-  answers `Unknown set key: grid` (as `:set nosuch=on` does today); the gate
-  passes.
-- Out of scope: the `gridflags` tool, `Chord.grid` (beam grids), and any
-  "grid" in comments about display columns.
-
 ### S22. Beams on notation staves in MusicXML
 
 - Where: `oud/exports/musicxml_staffs.py` writes notation staves;

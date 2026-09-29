@@ -37,7 +37,6 @@ def _state() -> EditorState:
         "fontstyle": "modern",
         "charstyle": "standard",
         "midipatch": "0",
-        "grid": "off",
         "showdur": "off",
         "showextras": "off",
         "showtactus": "off",
@@ -169,14 +168,14 @@ def test_hide_command_toggles_bottom_panel(tmp_path) -> None:
 def test_set_command_supports_vim_style_boolean_tokens(tmp_path) -> None:
     state = _state()
     cfg = str(tmp_path / "cfg.toml")
-    apply_set_command(state, "grid", cfg)
-    assert state.settings["grid"] == "on"
-    apply_set_command(state, "nogrid", cfg)
-    assert state.settings["grid"] == "off"
-    apply_set_command(state, "invgrid", cfg)
-    assert state.settings["grid"] == "on"
-    apply_set_command(state, "grid!", cfg)
-    assert state.settings["grid"] == "off"
+    apply_set_command(state, "showdur", cfg)
+    assert state.settings["showdur"] == "on"
+    apply_set_command(state, "noshowdur", cfg)
+    assert state.settings["showdur"] == "off"
+    apply_set_command(state, "invshowdur", cfg)
+    assert state.settings["showdur"] == "on"
+    apply_set_command(state, "showdur!", cfg)
+    assert state.settings["showdur"] == "off"
 
 
 def test_title_command_updates_piece() -> None:

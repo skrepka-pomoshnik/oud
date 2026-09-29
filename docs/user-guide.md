@@ -241,7 +241,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 ### Commonly used keys
 
 - Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
-- Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`, `grid`
+- Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
 - Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`, `lypapersize=letter|a4`, `lysourceheading=on|off`

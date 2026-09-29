@@ -121,7 +121,6 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "soundfont": "",
     "bassstrings": "",
     "basslabels": "tuning",
-    "grid": "off",
     "showdur": "off",
     "showspans": "off",
     "showtuplets": "off",

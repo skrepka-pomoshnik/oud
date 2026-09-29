@@ -1,5 +1,10 @@
 # DONE
 
+## S21: the obsolete grid setting is removed (2026-09-29)
+
+- `grid` was only displayed and saved; nothing read it. It is gone from the defaults, the boolean keys, the settings page and the user guide. An old config with `grid = ...` loads without it, and `:set grid=on` answers `Unknown set key: grid`.
+- Validation: `tests/test_tui_commands_exec.py::test_the_obsolete_grid_setting_is_gone`; other tests that used `grid` as their example boolean now use `showdur`.
+
 ## S31: measure rests for empty bars in MusicXML (2026-09-29)
 
 - An empty bar in the tablature part is written as `<rest measure="yes"/>` with the duration of the meter in force (its own, else the latest earlier one). A whole-measure rest in any MusicXML file reads as an empty bar, not as a rest chord; a real rest is still a rest chord. `append_measure_rest` in `oud/exports/musicxml_staffs.py` is shared with the notation staves.

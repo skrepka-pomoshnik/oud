@@ -61,7 +61,6 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Contrast:", settings.get("contrast")),
         line("Flagstyle:", settings.get("flagstyle")),
         line("DotPlacement:", settings.get("dotplacement", "afterflag")),
-        line("Grid:", settings.get("grid")),
         line("ShowDur:", settings.get("showdur")),
         line(
             "ShowSpans:",
