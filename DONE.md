@@ -1,5 +1,9 @@
 # DONE
 
+## S10: the historical-notation matrix (2026-09-29)
+
+- `docs/supported-behavior.md` has a table of historical constructs (mensuration and proportion signs, cut time, repeats and endings, fermatas, tuplets, grace notes, clefs and keys, dots) marked supported, partial or unsupported, with the test that proves each supported row; coloration, ligatures, perfection and alteration, ficta, custos, C clefs, interpreted durations and alternative interpretations are listed as unsupported. Every named test was checked to exist. Rejecting unsupported constructs visibly stays in `C13`.
+
 ## S9: companion MIDI checksums (2026-09-29)
 
 - Each companion MIDI reference and audit record carries the file's SHA-256. `python -m scripts.corpus.midi --expect <earlier report>` reads the checksums of an earlier run; a reference whose checksum differs is reported `reference_stale` (`stale companion MIDI: <path>`) and is not compared.

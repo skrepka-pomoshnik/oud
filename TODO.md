@@ -374,13 +374,6 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
-### S10. Document the supported historical-notation matrix
-
-- Add a table to `docs/supported-behavior.md` that lists each historical
-  construct as supported, partial, experimental or unsupported, with the test
-  that proves it. Follow the table format of `docs/tab-format.md`. Enforcement
-  is part of `C13`; this task is documentation only.
-
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
 Not suitable for unattended work: each needs something the cloud environment
