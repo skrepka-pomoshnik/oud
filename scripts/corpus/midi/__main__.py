@@ -21,6 +21,13 @@ def _write_report(path: Path, records: list[AuditRecord]) -> None:
     path.write_text(payload + "\n", encoding="utf-8")
 
 
+def expected_checksums(report: Path) -> dict[str, str]:
+    """Reference checksums recorded by an earlier report, by source URL."""
+
+    records = json.loads(report.read_text(encoding="utf-8"))
+    return {record["source_url"]: record["reference_sha256"] for record in records if record.get("reference_sha256")}
+
+
 def _print_summary(records: list[AuditRecord]) -> None:
     statuses = Counter(record.status for record in records)
     compared = [record for record in records if record.status == "compared"]
@@ -42,6 +49,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report", type=Path, default=Path("downloads/ft3-midi/report.json"))
     parser.add_argument("--jobs", type=int, default=8)
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument(
+        "--expect",
+        type=Path,
+        help="Earlier report whose reference checksums must still match; changed files are reported stale",
+    )
     args = parser.parse_args(argv)
     try:
         records = audit_corpus(
@@ -49,11 +61,12 @@ def main(argv: list[str] | None = None) -> int:
             args.cache,
             jobs=args.jobs,
             refresh=args.refresh,
+            expected=expected_checksums(args.expect) if args.expect else None,
         )
         _write_report(args.report, records)
         _print_summary(records)
         print(f"report={args.report}")
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, KeyError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     return 0

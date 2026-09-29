@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -36,6 +37,7 @@ class AuditRecord:
     status: str
     detail: str | None = None
     comparison: MidiComparison | None = None
+    reference_sha256: str | None = None
 
 
 def _onset_chords(notes: MidiNotes, shift: int = 0) -> tuple[tuple[int, ...], ...]:
@@ -84,7 +86,14 @@ def audit_corpus(
     *,
     jobs: int = 8,
     refresh: bool = False,
+    expected: Mapping[str, str] | None = None,
 ) -> list[AuditRecord]:
+    """Compare companion MIDIs with the exported ones.
+
+    ``expected`` maps a source URL to the SHA-256 recorded by an earlier report;
+    a reference whose checksum differs is reported ``reference_stale`` and not compared.
+    """
+
     reference_root = cache_root / "reference"
     with ThreadPoolExecutor(max_workers=max(1, jobs)) as executor:
         fetched = executor.map(lambda item: fetch_reference(item[0], reference_root, refresh=refresh), items)
@@ -93,11 +102,17 @@ def audit_corpus(
     for source_url, ft3_path in items:
         reference = references[source_url]
         generated_path = generated_cache_path(cache_root / "generated", source_url)
-        records.append(_audit_one(source_url, ft3_path, reference, generated_path))
+        records.append(_audit_one(source_url, ft3_path, reference, generated_path, (expected or {}).get(source_url)))
     return records
 
 
-def _audit_one(source_url: str, ft3_path: Path, reference: ReferenceFetch, generated_path: Path) -> AuditRecord:
+def _audit_one(
+    source_url: str,
+    ft3_path: Path,
+    reference: ReferenceFetch,
+    generated_path: Path,
+    expected_sha256: str | None,
+) -> AuditRecord:
     def record(
         status: str,
         *,
@@ -114,10 +129,13 @@ def _audit_one(source_url: str, ft3_path: Path, reference: ReferenceFetch, gener
             status=status,
             detail=detail,
             comparison=comparison,
+            reference_sha256=reference.sha256,
         )
 
     if reference.status in {"missing", "error"}:
         return record(f"reference_{reference.status}", detail=reference.detail)
+    if expected_sha256 is not None and reference.sha256 != expected_sha256:
+        return record("reference_stale", detail=f"stale companion MIDI: {reference.path}")
     if not ft3_path.exists():
         return record("ft3_missing", detail="local corpus file is absent")
     try:
