@@ -518,19 +518,6 @@ the complex list with a note instead of widening it.
 - Acceptance: extend the layered-score round trip with one fingering and one
   harmonic; the new tab-part test passes.
 
-### S27. Volta endings in MusicXML
-
-- Where: `Bar.ending_numbers` (`(1,)`, `(1, 2)`, ...) is neither written nor
-  read (`oud/exports/musicxml.py`, `oud/importers/musicxml.py`).
-- Do: write `<barline location="left"><ending number="1" type="start"/></barline>`
-  on the first bar of a run of bars with the same `ending_numbers`
-  (`number="1,2"` for `(1, 2)`), and `<barline location="right"><ending
-  number="1" type="stop"/></barline>` on the last one; the right barline may
-  already exist (repeat), so add the `ending` element to it. Read both back.
-- Acceptance: a round-trip test for `(1,)`, `(2,)` and `(1, 2)` on runs of one
-  and two bars; `tests/test_musicxml_schema.py` (with the schema) still
-  passes.
-
 ### S28. Warn when a MusicXML import drops notes
 
 - Where: `_parse_piece` in `oud/importers/musicxml.py`; `Piece.import_warnings`
