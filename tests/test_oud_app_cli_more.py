@@ -163,3 +163,12 @@ def test_cmd_ascii_sets_terminal_size(monkeypatch: pytest.MonkeyPatch) -> None:
     assert oud_app._cmd_ascii("in.ft3", "cfg.toml", None) == 0
     assert state.screen_width == 100
     assert state.screen_height == 50
+
+
+def test_ascii_renders_a_musicxml_file_and_reports_what_it_did_not_read(capsys: pytest.CaptureFixture[str]) -> None:
+    code = oud_app.main(["ascii", "tests/fixtures/musicxml/guitar_study_am.musicxml", "--bars", "1:2"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert captured.out.strip()
+    assert "oud: warning: MusicXML: 1 grace note was not read" in captured.err

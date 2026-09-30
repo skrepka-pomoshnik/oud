@@ -10,6 +10,7 @@ from oud import __version__
 from oud.editor.interaction.dispatch.actions import handle_insert, handle_normal
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.io.files import render_ascii_snapshot
+from oud.importers.musicxml import is_informational_warning
 from oud.presentation.cli_convert import (
     FORMAT_ALIASES,
     ConvertOptions,
@@ -78,8 +79,11 @@ def _cmd_ascii(
 def _ascii_text(path: str, config_path: str, bars: str | None) -> str:
     state = init_state(path, config_path=config_path)
     warnings = getattr(getattr(state, "piece", None), "import_warnings", ())
-    if warnings:
-        raise AsciiInputError(path, warnings)
+    blocking = [warning for warning in warnings if not is_informational_warning(warning)]
+    if blocking:
+        raise AsciiInputError(path, blocking)
+    for warning in warnings:
+        print(f"oud: warning: {warning}", file=sys.stderr)
     _slice_for_ascii(state, bars)
     term = shutil.get_terminal_size((120, 40))
     state.screen_width = max(1, term.columns)
