@@ -98,11 +98,12 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         "Measures must be start/system/every/five",
     ),
     "flagstyle": (
-        {"standard", "italian", "thin", "board", "capirola", "englishgrid", "continental"},
-        "Flagstyle must be standard/italian/thin/board/capirola/englishgrid/continental",
+        {"standard", "italian", "thin", "board", "capirola", "englishgrid", "continental", "guitar"},
+        "Flagstyle must be standard/italian/thin/board/capirola/englishgrid/continental/guitar",
     ),
     "flagstems": ({"single", "double"}, "Flagstems must be single/double"),
     "flaglean": ({"right", "left"}, "Flaglean must be right/left"),
+    "flagplace": ({"above", "below"}, "Flagplace must be above/below"),
     "dotplacement": (
         {"afterflag", "afterstem"},
         "Dotplacement must be afterflag/afterstem",

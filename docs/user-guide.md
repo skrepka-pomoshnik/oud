@@ -246,7 +246,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 ### Commonly used keys
 
 - Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
-- Rendering: `flagstyle`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
+- Rendering: `flagstyle=standard|italian|thin|board|capirola|englishgrid|continental|guitar`, `flagplace=above|below`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
 - Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`, `lypapersize=letter|a4`, `lysourceheading=on|off`
@@ -254,6 +254,8 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
 - Input profile: `keys`
+
+Rhythm signs: the `standard` family of flag styles are lute rhythm signs drawn above the staff. `flagstyle=guitar` draws a stem `|` and `_` marks per flag, and `flagplace=below` hangs the stems and flags under the staff (the stem row touches the staff). A file whose tablature is numeric (any MusicXML tab staff without `show-frets="letters"`) opens with `guitar` and `below`, unless your config already changed those two settings.
 
 Notes:
 - `barsperline=0` means auto.

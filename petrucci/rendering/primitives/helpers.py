@@ -85,6 +85,7 @@ def flag_symbols(style: str, flaglean: str = "right") -> tuple[str, str]:
         "englishgrid": ("|", "-"),
         "continental": ("Γ", "F"),
         "capirola": ("I", "-"),
+        "guitar": ("|", "_"),
     }
     return symbols.get(style, ("|", slash_flag))
 

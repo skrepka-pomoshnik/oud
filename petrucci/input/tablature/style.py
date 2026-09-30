@@ -9,6 +9,7 @@ class TabStylePolicy:
     basslabels: str
     flagstyle: str
     flaglean: str
+    flagplace: str
     flagstems: str
     dotplacement: str
     tiecuestyle: str
@@ -37,6 +38,7 @@ def resolve_tab_style_policy(settings: dict[str, str]) -> TabStylePolicy:
         basslabels=settings.get("basslabels", "tuning"),
         flagstyle=settings.get("flagstyle", "standard"),
         flaglean=settings.get("flaglean", "right"),
+        flagplace=settings.get("flagplace", "above"),
         flagstems=settings.get("flagstems", "single"),
         dotplacement=settings.get("dotplacement", "afterflag"),
         tiecuestyle=settings.get("tiecuestyle", "bracket"),

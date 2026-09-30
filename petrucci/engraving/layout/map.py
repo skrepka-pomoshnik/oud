@@ -29,6 +29,8 @@ class LayoutBlockPolicy:
     show_lyrics: bool = False
     lyric_rows_count: int = 0
     vocal_pos: str = "bottom"
+    # Guitar-style rhythm: stems and flags hang below the staff instead of standing above it.
+    flags_below: bool = False
 
 
 def _alloc_leading_rows(
@@ -78,10 +80,11 @@ def _alloc_bottom_vocal_rows(
     show_melody: bool,
     melody_rows: int,
     lyric_rows: int,
+    rows_below_staff: int = 0,
 ) -> tuple[int | None, tuple[int, ...]]:
     melody = None
     lyric = ()
-    text_base = staff + strings
+    text_base = staff + strings + rows_below_staff
     if show_melody:
         melody = text_base
     if lyric_rows > 0:
@@ -116,6 +119,10 @@ def layout_rows(height: int, strings: int) -> dict[str, int | None]:
     }
 
 
+def _alloc_flag_rows(offset: int, policy: LayoutBlockPolicy) -> tuple[int, int | None]:
+    return offset, offset + 1 if policy.double_stems else None
+
+
 def layout_block_rows(policy: LayoutBlockPolicy) -> dict[str, int | None]:
     leading = _alloc_leading_rows(
         policy.include_meta,
@@ -136,11 +143,17 @@ def layout_block_rows(policy: LayoutBlockPolicy) -> dict[str, int | None]:
             melody_rows=actual_melody_rows,
             lyric_rows=actual_lyric_rows,
         )
-    flag = offset
-    flag2 = offset + 1 if policy.double_stems else None
-    offset += 2 if policy.double_stems else 1
+    flag_rows = 2 if policy.double_stems else 1
+    flag, flag2 = _alloc_flag_rows(offset, policy)
+    if not policy.flags_below:
+        offset += flag_rows
     dur = offset if policy.show_dur else None
     staff = offset + (1 if policy.show_dur else 0)
+    if policy.flags_below:
+        below = staff + policy.strings
+        # The stems touch the staff and the flags hang under them.
+        flag2 = below if policy.double_stems else None
+        flag = below + 1 if policy.double_stems else below
     if policy.vocal_pos != "top":
         melody, lyric_rows = _alloc_bottom_vocal_rows(
             staff=staff,
@@ -148,6 +161,7 @@ def layout_block_rows(policy: LayoutBlockPolicy) -> dict[str, int | None]:
             show_melody=policy.show_melody,
             melody_rows=actual_melody_rows,
             lyric_rows=actual_lyric_rows,
+            rows_below_staff=flag_rows if policy.flags_below else 0,
         )
     lyric = lyric_rows[0] if lyric_rows else None
     return {

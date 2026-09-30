@@ -36,12 +36,22 @@ def _ensure_initial_bars(piece: Piece, settings: dict[str, str]) -> None:
     piece.bars = [Bar() for _ in range(max(1, initial_bars))]
 
 
+def _apply_guitar_rhythm(settings: dict[str, str]) -> None:
+    """Numeric tablature comes from guitar programs: stems and beams below the staff, unless the user chose."""
+
+    for key, guitar_value in (("flagstyle", "guitar"), ("flagplace", "below")):
+        if settings.get(key) == DEFAULT_SETTINGS[key]:
+            settings[key] = guitar_value
+
+
 def _apply_piece_metadata(state: EditorState) -> None:
     piece = state.piece
     if piece.style:
         state.settings["style"] = piece.style
     if piece.fret_labels:
         state.settings["fretlabelmode"] = piece.fret_labels
+    if piece.fret_labels == "numeric":
+        _apply_guitar_rhythm(state.settings)
     if piece.tempo is not None:
         state.settings["tempo"] = str(piece.tempo)
     if not piece.tuning:

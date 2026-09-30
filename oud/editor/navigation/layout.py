@@ -21,6 +21,7 @@ _SYSTEM_LAYOUT_SETTING_KEYS = (
     "chordwrap",
     "showdur",
     "flagredundant",
+    "flagplace",
     "style",
     "frenchc",
     "fretlabelmode",

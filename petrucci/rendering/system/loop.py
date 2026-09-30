@@ -82,6 +82,7 @@ def _system_layout(context: SystemRenderContext, bar_start: int) -> SystemLayout
         show_lyrics=context.show_lyrics,
         lyric_rows_count=context.lyric_rows_count,
         vocal_pos=context.vocal_pos,
+        flags_below=context.style_policy.flagplace == "below",
     )
     rows = layout_block_rows(layout_policy)
     content_height = block_height(layout_policy)

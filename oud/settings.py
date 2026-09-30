@@ -71,6 +71,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "flagstyle": "standard",
     "flagstems": "single",
     "flaglean": "right",
+    "flagplace": "above",
     "dotplacement": "afterflag",
     "tabnotation": "minimal",
     "time": "C",
