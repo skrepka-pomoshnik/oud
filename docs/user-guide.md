@@ -245,7 +245,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 
 ### Commonly used keys
 
-- Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen`
+- Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen` (`0`, the default, fills the terminal width; `N` caps a system at `N` columns)
 - Rendering: `flagstyle=standard|italian|thin|board|capirola|englishgrid|continental|guitar`, `flagplace=above|below`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`

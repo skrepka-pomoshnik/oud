@@ -97,7 +97,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "maxbars": "0",
     "barsperline": "0",
     "chordwrap": "0",
-    "linelen": "80",
+    "linelen": "0",
     "flagredundant": "on",
     "staffthick": "1",
     "fontstyle": "modern",
