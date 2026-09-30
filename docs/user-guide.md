@@ -245,7 +245,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 
 ### Commonly used keys
 
-- Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen` (`0`, the default, fills the terminal width; `N` caps a system at `N` columns)
+- Layout: `spacing`, `layout`, `justify`, `barsperline`, `maxbars`, `maxchords`, `bargap`, `linelen` (`0`, the default, fills the terminal width; `N` caps a system at `N` columns), `sourcebreaks=on|off`
 - Rendering: `flagstyle=standard|italian|thin|board|capirola|englishgrid|continental|guitar`, `flagplace=above|below`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
@@ -258,6 +258,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 Rhythm signs: the `standard` family of flag styles are lute rhythm signs drawn above the staff. `flagstyle=guitar` draws a stem `|` for every note of a half or shorter, with a `_` beam joining the eighths of a beat and `=` joining sixteenths and shorter; a note alone in its beat gets its flag beside the stem, and a dot follows the stem. Every stem is shown (`flagredundant` does not hide repeats in this style). `flagplace=below` hangs the stems and beams under the staff (the stem row touches the staff); `above` puts them over it. Beats are counted from the first note of the bar and quarter-note wide, so compound meters (6/8) group in twos, not threes, and tuplets are grouped by their written value. A file whose tablature is numeric (any MusicXML tab staff without `show-frets="letters"`) opens with `guitar` and `below`, unless your config already changed those two settings.
 
 Notes:
+- `sourcebreaks=on` (default) ends a system where the score file did: a `.tab` file keeps its own lines, so a piece written five bars to a line shows five bars to a line even when more would fit, and a line that ends at such a break is not stretched. `:set sourcebreaks=off` ignores those breaks and fills the terminal width; the breaks stay in the score and are written again on save. Breaks you set with the stave-break commands always apply.
 - `barsperline=0` means auto.
 - `lybarsperline=0` and `lysystemsperpage=0` use the publication planner. Dense
   multi-stanza scores default to four bars per system and two systems per page;

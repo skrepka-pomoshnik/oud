@@ -104,6 +104,7 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
     "flagstems": ({"single", "double"}, "Flagstems must be single/double"),
     "flaglean": ({"right", "left"}, "Flaglean must be right/left"),
     "flagplace": ({"above", "below"}, "Flagplace must be above/below"),
+    "sourcebreaks": ({"on", "off"}, "Sourcebreaks must be on/off"),
     "dotplacement": (
         {"afterflag", "afterstem"},
         "Dotplacement must be afterflag/afterstem",

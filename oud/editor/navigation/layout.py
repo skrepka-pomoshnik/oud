@@ -7,6 +7,7 @@ from petrucci.engraving.layout.spacing import (
     justified_extra_width,
     short_system_bar_floor,
 )
+from petrucci.engraving.layout.systems import source_breaks_enabled
 from petrucci.terminal.view.model import _next_system_start
 
 _SYSTEM_LAYOUT_SETTING_KEYS = (
@@ -22,6 +23,7 @@ _SYSTEM_LAYOUT_SETTING_KEYS = (
     "showdur",
     "flagredundant",
     "flagplace",
+    "sourcebreaks",
     "style",
     "frenchc",
     "fretlabelmode",
@@ -211,10 +213,17 @@ def _dynamic_next_start(
                 current,
                 max(1, next_start - current),
                 state.stave_breaks,
+                honor_bar_breaks=source_breaks_enabled(state.settings),
             )
         return next_start
     bars_per_line = max(1, bars_per_line_limit)
-    return _next_system_start(state.piece.bars, current, bars_per_line, state.stave_breaks)
+    return _next_system_start(
+        state.piece.bars,
+        current,
+        bars_per_line,
+        state.stave_breaks,
+        honor_bar_breaks=source_breaks_enabled(state.settings),
+    )
 
 
 def dynamic_system_starts(state: EditorState, width: int) -> list[int]:
@@ -362,6 +371,7 @@ def auto_system_bar_plan_with_gaps(
         bars_per_line_limit=_auto_bar_limit(state),
         max_chords=max_chords,
         chord_wrap_limit=chord_wrap_limit,
+        honor_bar_breaks=source_breaks_enabled(state.settings),
     )
     justify_system = sum(bar_widths) + sum(gaps) == usable_width
     return _normalize_auto_bar_plan(

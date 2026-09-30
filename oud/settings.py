@@ -98,6 +98,8 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "barsperline": "0",
     "chordwrap": "0",
     "linelen": "0",
+    # "on" ends a system where the score file did (a TAB file keeps its own lines); "off" fills the width.
+    "sourcebreaks": "on",
     "flagredundant": "on",
     "staffthick": "1",
     "fontstyle": "modern",

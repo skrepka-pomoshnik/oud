@@ -53,17 +53,24 @@ class AutoSystemPlanOptions:
     settings: dict[str, str]
 
 
+def source_breaks_enabled(settings: dict[str, str]) -> bool:
+    """Whether the line breaks stored in the score (a TAB file's own lines) end a system."""
+
+    return settings.get("sourcebreaks", "on") == "on"
+
+
 def plan_fixed_system(
     piece: Piece,
     *,
     bar_start: int,
     bars_per_line_limit: int,
     stave_breaks: set[int],
+    honor_bar_breaks: bool = True,
 ) -> SystemPlan:
     bars_per_line = max(1, bars_per_line_limit)
     bar_end = min(
         len(piece.bars),
-        _next_system_start(piece.bars, bar_start, bars_per_line, stave_breaks),
+        _next_system_start(piece.bars, bar_start, bars_per_line, stave_breaks, honor_bar_breaks=honor_bar_breaks),
     )
     return SystemPlan(bar_start, tuple(range(bar_start, bar_end)), (), ())
 
@@ -84,6 +91,7 @@ def plan_auto_system(options: AutoSystemPlanOptions, *, bar_start: int) -> Syste
         bars_per_line_limit=options.bars_per_line_limit,
         max_chords=options.max_chords,
         chord_wrap_limit=options.chord_wrap_limit,
+        honor_bar_breaks=source_breaks_enabled(options.settings),
     )
     justify = sum(bar_widths) + sum(gaps_after) == options.usable_width
     bar_widths = collision_base_bar_widths(

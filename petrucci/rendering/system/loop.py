@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from petrucci.engraving.layout.map import LayoutBlockPolicy, block_height, layout_block_rows
-from petrucci.engraving.layout.systems import AutoSystemPlanOptions, plan_auto_system, plan_fixed_system
+from petrucci.engraving.layout.systems import (
+    AutoSystemPlanOptions,
+    plan_auto_system,
+    plan_fixed_system,
+    source_breaks_enabled,
+)
 from petrucci.input.tablature.policy import system_display_indices_for_bars, visual_row_indices
 from petrucci.rendering.bar.state import (
     prepare_bar_basics,
@@ -61,6 +66,7 @@ def _system_layout(context: SystemRenderContext, bar_start: int) -> SystemLayout
             bar_start=bar_start,
             bars_per_line_limit=context.bars_per_line_limit,
             stave_breaks=context.stave_breaks,
+            honor_bar_breaks=source_breaks_enabled(context.settings),
         )
     display_indices = system_display_indices_for_bars(
         context.piece.bars[bar_start : plan.bar_end],

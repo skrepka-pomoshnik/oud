@@ -90,6 +90,7 @@ class _AutoBarRequest:
     bars_per_line_limit: int
     max_chords: int
     chord_wrap_limit: int
+    honor_bar_breaks: bool = True
 
 
 def _selected_bar_indices(request: _AutoBarRequest) -> tuple[list[int], int, int]:
@@ -118,6 +119,7 @@ def _selected_bar_indices(request: _AutoBarRequest) -> tuple[list[int], int, int
         request.bar_start,
         max(1, per_line),
         request.stave_breaks,
+        honor_bar_breaks=request.honor_bar_breaks,
     )
     end = min(len(request.bars), end)
     return list(range(request.bar_start, end)), end, width_limited
@@ -207,7 +209,7 @@ def _should_justify(
     width_limited: int,
 ) -> bool:
     ended_at_break = bar_end in request.stave_breaks or (
-        bar_end > request.bar_start and request.bars[bar_end - 1].system_break
+        request.honor_bar_breaks and bar_end > request.bar_start and request.bars[bar_end - 1].system_break
     )
     width_limited_end = min(len(request.bars), request.bar_start + width_limited)
     return (
@@ -235,6 +237,7 @@ def auto_bar_plan(
     bars_per_line_limit: int = 0,
     max_chords: int = 0,
     chord_wrap_limit: int = 0,
+    honor_bar_breaks: bool = True,
 ) -> tuple[list[int], list[int], list[int]]:
     request = _AutoBarRequest(
         bars,
@@ -251,6 +254,7 @@ def auto_bar_plan(
         bars_per_line_limit,
         max_chords,
         chord_wrap_limit,
+        honor_bar_breaks,
     )
     indices, bar_end, width_limited = _selected_bar_indices(request)
     widths = _measured_widths(request, indices)

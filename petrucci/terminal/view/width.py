@@ -454,11 +454,18 @@ def _next_system_start(
     start: int,
     per_line: int,
     breaks: set[int],
+    *,
+    honor_bar_breaks: bool = True,
 ) -> int:
+    """First bar of the next system: at a break, or after ``per_line`` bars.
+
+    ``honor_bar_breaks`` follows the line breaks stored on the bars (a TAB file's own lines).
+    """
+
     total = len(bars)
     limit = min(total, start + per_line)
     for idx in range(start, limit):
         next_idx = idx + 1
-        if next_idx in breaks or bars[idx].system_break:
+        if next_idx in breaks or (honor_bar_breaks and bars[idx].system_break):
             return next_idx
     return limit

@@ -416,6 +416,18 @@ checked against the W3C schema and examples).
   `tests/test_musicxml_guitar_study.py` as each gap closes).
 - Depends on: `C4`, `C15` step 1.
 
+### C18. Line breaks written by Oud read back as the file's own
+
+Why complex: needs a format decision. Saving a `.tab` file with no line breaks
+(`triste.tab`) makes Oud write a break every four bars
+(`export_tab._DEFAULT_BARS_PER_SYSTEM`), and reading it back keeps them as if the
+author had chosen them, so with `sourcebreaks=on` (the default) the reopened
+piece never fills the terminal width. Tell Oud's own breaks from authored ones
+(a header note, or write no break where the score had none and let the format's
+line length decide) and check what the original `tab` program does with a long
+line (`docs/tab-format.md`). Acceptance: save and reopen a piece with no breaks
+and it still flows to the width; authored breaks survive.
+
 ---
 
 ## Not complex tasks (open to any contributor)
