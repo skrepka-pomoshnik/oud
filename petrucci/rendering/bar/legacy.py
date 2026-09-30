@@ -228,7 +228,8 @@ def _display_plan(request: LegacyRenderRequest, tuning_text: str) -> _DisplayPla
         melody_rows,
         show_lyrics,
         lyric_rows,
-        settings.get("flagredundant", "on") == "on",
+        # Beams join runs of equal notes, so the guitar style needs every stem.
+        settings.get("flagredundant", "on") == "on" and policy.flagstyle != "guitar",
         policy.reverse_rows,
         base_strings,
         display_indices,

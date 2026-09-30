@@ -402,6 +402,9 @@ checked against the W3C schema and examples).
      Read them as further tablature lines, which needs a second tablature part
      in the model (the same need as duet FT3 scores in `C16` item 3). Seen in
      MuseScore's `testTabs_ref` (three TAB parts, seven notes unread).
+  9. Beam by the meter: the guitar style groups by quarter-note beats, so 6/8
+     groups in twos instead of threes and a triplet splits across beats until
+     step 2 exists. Group by the bar's own meter and tuplet timing.
   8. Draw ties and slurs that cross a bar line; the note marks are kept and
      saved but the renderer takes spans inside one bar only.
 - Acceptance: the round-trip probe in `docs/musicxml-support.md` (each field

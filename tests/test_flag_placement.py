@@ -79,9 +79,9 @@ def test_the_rendered_flags_follow_the_setting() -> None:
     staff_row = next(i for i, line in enumerate(above) if line.lstrip().startswith("e|"))
     below_staff_row = next(i for i, line in enumerate(below) if line.lstrip().startswith("e|"))
 
-    assert any("|_" in line for line in above[:staff_row])
-    assert not any("|_" in line for line in below[:below_staff_row])
-    assert any("|_" in line for line in below[below_staff_row : below_staff_row + 9])
+    assert any("_" in line and "-" not in line for line in above[:staff_row])
+    assert not any("_" in line and "-" not in line for line in below[:below_staff_row])
+    assert any("_" in line and "-" not in line for line in below[below_staff_row : below_staff_row + 9])
 
 
 def test_an_imported_guitar_file_opens_with_guitar_flags_below(tmp_path: Path) -> None:

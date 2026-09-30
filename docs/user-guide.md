@@ -255,7 +255,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
 - Input profile: `keys`
 
-Rhythm signs: the `standard` family of flag styles are lute rhythm signs drawn above the staff. `flagstyle=guitar` draws a stem `|` and `_` marks per flag, and `flagplace=below` hangs the stems and flags under the staff (the stem row touches the staff). A file whose tablature is numeric (any MusicXML tab staff without `show-frets="letters"`) opens with `guitar` and `below`, unless your config already changed those two settings.
+Rhythm signs: the `standard` family of flag styles are lute rhythm signs drawn above the staff. `flagstyle=guitar` draws a stem `|` for every note of a half or shorter, with a `_` beam joining the eighths of a beat and `=` joining sixteenths and shorter; a note alone in its beat gets its flag beside the stem, and a dot follows the stem. Every stem is shown (`flagredundant` does not hide repeats in this style). `flagplace=below` hangs the stems and beams under the staff (the stem row touches the staff); `above` puts them over it. Beats are counted from the first note of the bar and quarter-note wide, so compound meters (6/8) group in twos, not threes, and tuplets are grouped by their written value. A file whose tablature is numeric (any MusicXML tab staff without `show-frets="letters"`) opens with `guitar` and `below`, unless your config already changed those two settings.
 
 Notes:
 - `barsperline=0` means auto.
