@@ -61,7 +61,8 @@ and a bar-by-bar probe.
 | Key signature | Lost | Only the piece-level key is written, never a bar's; not read |
 | System breaks | Lost | Neither written nor read |
 | Empty bar | Supported | Written as a whole-measure rest (`rest measure="yes"`, in the meter in force); a foreign measure rest also reads as an empty bar |
-| Slurs, ties, holds, ornaments, annotations, highlights | Lost | Editor-side marks: never written, in MusicXML or in `.tab`, and the save says nothing |
+| Ties, hammer-on, pull-off, slide, bend, harmonic, left-hand fingering on tab notes | Supported | Fields of the note (`tie`, `technique`, `bend`, `harmonic`). A technique starts on its note and ends on the next note of the same string; the writer adds the `stop`. A tie names both ends. Drawn as ties and slurs when both notes are in one bar; a mark across a bar line is kept but not drawn. A `.tab` save cannot hold them and names them in the message (`not saved: 2 ties, 1 hammer-on`) |
+| Slurs (between any notes), holds, ornaments, annotations, highlights | Lost | Editor-side marks: never written, in MusicXML or in `.tab`; the save names them |
 | Tuplets | Lost | No model: not written; the `:tuplet` command only adds a text mark, which is lost too |
 | Notation staves of an imported score | Partial | Pitch, rhythm, rests, ties, lyrics, slurs, fermatas, beams, fingerings and harmonics are kept; ornaments, clefs and keys are not |
 
@@ -76,12 +77,12 @@ warning (`MusicXML: N notes without tablature were not read`); it does not stop
 | Tablature part (`string`, `fret`, tuning, `show-frets`) | Supported | Read exactly (`tutorial-tablature.musicxml`) |
 | Standard and TAB staves in one part, or in two parts | Supported | The part or staff with `string`/`fret` notes is the tablature |
 | Standard notation without tablature | Lost | Bars open empty (`tutorial-chopin-prelude`: 27 notes, 0 chords); the import warns with the note count |
-| Other parts of a multi-part score | Lost | Ignored; counted in the warning (Oud's own extra parts are read) |
+| Other parts of a multi-part score | Lost | Ignored; the warning counts their untabbed notes (`N notes without tablature`) and, separately, their tablature notes (`N tablature notes of other parts`). Oud's own extra parts are read |
 | Tuplets (`time-modification`) | Partial | Read by their written value (three triplet eighths are three eighths, so the bar reads 5/8 and shows the meter difference); the import warns. It used to read dotted 16ths and measure 17/32 |
 | Grace notes | Lost | Not read (they used to merge into the main chord); the import warns with the count |
 | Two voices | Partial | Voices merge into chords; a note lasts until the next onset, so a held bass loses its length |
 | Keys, segno/coda | Lost | Not read, no warning |
-| Ties, slurs, hammer-on, pull-off, bend, slide, harmonic, fingering on tab notes | Lost | Not read, no warning |
+| Ties, hammer-on, pull-off, slide, bend, harmonic, fingering on tab notes | Supported | Read onto the note; MuseScore's `hammer-on` and `pull-off` directly under `notations` are read too. Slurs between notes are not |
 | Repeats | Supported | Forward, backward, and both |
 
 ## Next steps

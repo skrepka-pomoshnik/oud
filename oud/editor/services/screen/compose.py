@@ -9,6 +9,7 @@ from oud.editor.core.input.help import help_lines
 from oud.editor.core.input.modes import Mode
 from oud.editor.core.state import EditorState
 from oud.editor.navigation.view.focus import current_view_staff
+from oud.editor.services.screen.note_marks import derived_spans
 from oud.editor.services.screen.pages import (
     PLUGIN_HINT,
     info_lines,
@@ -69,6 +70,7 @@ def _paint_page_mode(screen: FrameBuffer, state: EditorState, *, height: int, wi
 
 
 def _ascii_preview_lines(state: EditorState) -> list[str]:
+    note_ties, note_slurs = derived_spans(state.piece.bars, state.bar_width)
     return export_ascii(
         state.piece,
         state.overrides,
@@ -77,8 +79,8 @@ def _ascii_preview_lines(state: EditorState) -> list[str]:
         settings=state.settings,
         ornaments=state.ornaments,
         annotations=state.annotations,
-        slurs=state.slurs,
-        ties=state.ties,
+        slurs=[*state.slurs, *note_slurs],
+        ties=[*state.ties, *note_ties],
         holds=state.holds,
     ).splitlines()
 
@@ -101,6 +103,7 @@ def _paint_score(
     content_height = max(1, height - int(show_status))
     score = FrameBuffer(content_height, width)
     focused_staff = current_view_staff(state)
+    note_ties, note_slurs = derived_spans(state.piece.bars, state.bar_width)
     view = render_piece(
         score,
         state.piece,
@@ -115,8 +118,8 @@ def _paint_score(
         annotations=state.annotations,
         highlights=state.highlights,
         dotted=state.dotted,
-        slurs=state.slurs,
-        ties=state.ties,
+        slurs=[*state.slurs, *note_slurs],
+        ties=[*state.ties, *note_ties],
         holds=state.holds,
         settings=state.settings,
         stave_breaks=state.stave_breaks,

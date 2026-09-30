@@ -19,6 +19,12 @@ class Note:
     ft3_extra_residual: int | None = None
     editorial_brackets: bool = False
     ft3_layout_flags: int | None = None
+    # Tab marks of the note itself. `tie` is "start", "stop" or "continue" (both);
+    # `technique` starts on this note and ends on the next note of the string.
+    tie: str | None = None
+    technique: str | None = None
+    bend: float | None = None
+    harmonic: bool = False
 
 
 @dataclass

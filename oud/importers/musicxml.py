@@ -5,6 +5,7 @@ import zipfile
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
+from typing import TypedDict
 from xml.etree import ElementTree as ET
 
 from oud.importers.musicxml_staffs import read_notation_score
@@ -18,6 +19,11 @@ class _TimedTabNote:
     string: int
     fret: int
     written: tuple[int, bool] | None = None  # (note type, dotted) of a tuplet note, from its <type>
+    tie: str | None = None
+    technique: str | None = None
+    bend: float | None = None
+    harmonic: bool = False
+    fingering: str | None = None
 
 
 _RHYTHMS = tuple(
@@ -101,6 +107,57 @@ def _technical(note_node: ET.Element) -> tuple[int, int] | None:
     if not string_text.isdigit() or not fret_text.isdigit():
         return None
     return int(string_text), int(fret_text)
+
+
+_TECHNIQUES = ("hammer-on", "pull-off")
+
+
+class _NoteMarks(TypedDict, total=False):
+    tie: str | None
+    technique: str
+    bend: float | None
+    harmonic: bool
+    fingering: str | None
+
+
+def _tie_state(note_node: ET.Element) -> str | None:
+    ends = {node.get("type") for node in _children(note_node, "tie")}
+    notations = _child(note_node, "notations")
+    if notations is not None:
+        ends.update(node.get("type") for node in _children(notations, "tied"))
+    if {"start", "stop"} <= ends:
+        return "continue"
+    return next((end for end in ("start", "stop") if end in ends), None)
+
+
+def _bend_semitones(technical: ET.Element) -> float | None:
+    bend = _child(technical, "bend")
+    alter = _text(_child(bend, "bend-alter")) if bend is not None else ""
+    try:
+        return float(alter) if alter else None
+    except ValueError:
+        return None
+
+
+def _note_marks(note_node: ET.Element) -> _NoteMarks:
+    """Ties and tab techniques written on a tablature note; stops of a technique carry no mark."""
+
+    marks: _NoteMarks = {"tie": _tie_state(note_node)}
+    notations = _child(note_node, "notations")
+    technical = _child(notations, "technical") if notations is not None else None
+    if notations is not None and any(node.get("type") == "start" for node in _children(notations, "slide")):
+        marks["technique"] = "slide"
+    # The schema puts hammer-ons and pull-offs in <technical>; MuseScore writes them in <notations>.
+    containers = [node for node in (technical, notations) if node is not None]
+    for name in _TECHNIQUES:
+        if any(node.get("type") == "start" for container in containers for node in _children(container, name)):
+            marks["technique"] = name
+    if technical is None:
+        return marks
+    marks["bend"] = _bend_semitones(technical)
+    marks["harmonic"] = _child(technical, "harmonic") is not None
+    marks["fingering"] = _text(_child(technical, "fingering")) or None
+    return marks
 
 
 def _measure_time(measure: ET.Element) -> str | None:
@@ -212,7 +269,7 @@ class _Timeline:
         technical = _technical(node)
         if technical is not None:
             written = _written_value(node) if _child(node, "time-modification") is not None else None
-            self.notes.append(_TimedTabNote(onset, duration, technical[0], technical[1], written))
+            self.notes.append(_TimedTabNote(onset, duration, technical[0], technical[1], written, **_note_marks(node)))
 
 
 def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], set[int], int]:
@@ -228,6 +285,19 @@ def _written_value(node: ET.Element) -> tuple[int, bool] | None:
     if _text(_child(node, "type")).lower() not in _TYPE_TO_DENOM:
         return None
     return _note_type(node)
+
+
+def _model_note(note: _TimedTabNote) -> Note:
+    return Note(
+        note.string,
+        note.fret,
+        0,
+        left_fingering=note.fingering,
+        tie=note.tie,
+        technique=note.technique,
+        bend=note.bend,
+        harmonic=note.harmonic,
+    )
 
 
 def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end: int, divisions: int) -> list[Chord]:
@@ -249,7 +319,7 @@ def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end:
                 note_type=note_type,
                 dotted=dotted,
                 grid=None,
-                notes=[Note(note.string, note.fret, 0) for note in timed],
+                notes=[_model_note(note) for note in timed],
             )
         )
     return events
@@ -455,14 +525,21 @@ def _sounding_notes(part: ET.Element) -> list[ET.Element]:
     ]
 
 
-def _unread_note_count(root: ET.Element, tab_part: ET.Element) -> int:
+def _unread_note_count(root: ET.Element) -> int:
     """Pitched notes that no string/fret describes: those of other parts and of untabbed staves."""
 
-    count = 0
-    for part in _children(root, "part"):
-        notes = _sounding_notes(part)
-        count += len(notes) if part is not tab_part else sum(_technical(note) is None for note in notes)
-    return count
+    return sum(_technical(note) is None for part in _children(root, "part") for note in _sounding_notes(part))
+
+
+def _other_tab_note_count(root: ET.Element, tab_part: ET.Element) -> int:
+    """Tablature notes of the parts besides the one Oud opened (a second guitar, a bass)."""
+
+    return sum(
+        _technical(note) is not None
+        for part in _children(root, "part")
+        if part is not tab_part
+        for note in _sounding_notes(part)
+    )
 
 
 def _grace_note_count(part: ET.Element) -> int:
@@ -509,10 +586,17 @@ def _dropped_notes_warning(count: int) -> str:
     return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} without tablature {verb} not read"
 
 
+def _other_tab_warning(count: int) -> str:
+    noun, verb = ("tablature note", "was") if count == 1 else ("tablature notes", "were")
+    return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} of other parts {verb} not read"
+
+
 def _dropped_content_warnings(root: ET.Element, tab_part: ET.Element) -> list[str]:
     warnings = []
-    if unread := _unread_note_count(root, tab_part):
+    if unread := _unread_note_count(root):
         warnings.append(_dropped_notes_warning(unread))
+    if other_tab := _other_tab_note_count(root, tab_part):
+        warnings.append(_other_tab_warning(other_tab))
     if graces := _grace_note_count(tab_part):
         warnings.append(_grace_notes_warning(graces))
     if tuplets := _tuplet_group_count(tab_part):

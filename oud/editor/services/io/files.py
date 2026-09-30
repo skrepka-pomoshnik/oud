@@ -80,7 +80,7 @@ def _written_message(state: EditorState, target: str, *, tab: bool, staff_count:
     message = f"Wrote {'TAB' if tab else 'MusicXML'} {target}"
     if staff_count:
         message += f" (tablature and {_staff_text(staff_count)})"
-    dropped = dropped_marks_text(state)
+    dropped = dropped_marks_text(state, tab=tab)
     return f"{message} (not saved: {dropped})" if dropped else message
 
 

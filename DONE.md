@@ -1,5 +1,13 @@
 # DONE
 
+## C17 step 5: ties and tab techniques on notes; vim operators (2026-09-30)
+
+- `Note` carries `tie` (`start`/`stop`/`continue`), `technique` (`hammer-on`, `pull-off`, `slide`, started on the note), `bend` and `harmonic`; MusicXML reads and writes them with the `stop` of a technique added on the next note of the string, reads left-hand `fingering`, and accepts MuseScore's `hammer-on` written under `notations`. Ties and slurs within a bar are drawn from these marks (`oud/editor/services/screen/note_marks.py`). A `.tab` save says `not saved: 2 ties, 1 hammer-on`.
+- Import warnings for files with several tab parts now count their tablature notes separately (`N tablature notes of other parts were not read`); they used to be reported as "without tablature".
+- Found by running the importer over MuseScore's tab test files and the W3C tablature example (kept in the ignored `downloads/musicxml/`): ties, hammer-ons, pull-offs, slides and bends were dropped without a word.
+- Keys: `d`, `y`, `c` take a motion (`dl`, `d3l`, `yf{c}`), doubling cuts or copies bars, `.` repeats the last delete, paste or bar edit. Casual: `Ctrl-X` (delete), `y`, `c`, `\` (reverse find), `F4` (repeat), so every vim action has a casual key (`tests/test_normal_actions.py` enforces it).
+- Validation: `tests/test_musicxml_techniques.py` (11), `tests/test_operators.py` (19); fast suite 2071 passed before this step.
+
 ## S32: LilyPond tuplets from melody events (2026-09-29)
 
 - Triplets (and other tuplets) in an imported notation staff export as `\\tuplet A/N { ... }` blocks (each block takes up to `actual` consecutive members of one ratio, so two adjacent triplets are two blocks); a tuplet member counts its written value times `normal/actual`, so the bar needs no `\\scaleDurations`. They were plain eighths inside a scaling fudge before. Plain pieces cannot hold tuplets yet (`C17` step 2).

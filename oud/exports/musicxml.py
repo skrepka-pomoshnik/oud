@@ -3,11 +3,12 @@ from __future__ import annotations
 import zipfile
 from collections.abc import Sequence
 from fractions import Fraction
+from itertools import pairwise
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from oud.exports.musicxml_staffs import append_measure_rest, append_notation_parts
-from petrucci.core.model import Bar, Piece
+from petrucci.core.model import Bar, Chord, Note, Piece
 from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import default_tuning_pitches
 from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
@@ -267,6 +268,52 @@ def _append_rest_note(
         SubElement(notations, "fermata").text = "normal"
 
 
+_TIE_ENDS: dict[str | None, tuple[str, ...]] = {"start": ("start",), "stop": ("stop",), "continue": ("stop", "start")}
+_TECHNICAL_TECHNIQUES = ("hammer-on", "pull-off")
+_ARPEGGIATED = frozenset({"single", "top"})
+_PLAIN_FINGERINGS = frozenset({"dot1", "dot2", "dot3"})
+
+
+def technique_stops(chords: Sequence[Chord]) -> dict[int, str]:
+    """Where each technique ends: the next chord's note on the same string, keyed by ``id(note)``."""
+
+    stops: dict[int, str] = {}
+    for chord, following in pairwise(chords):
+        for note in chord.notes:
+            if note.technique is None:
+                continue
+            target = next((other for other in following.notes if other.string == note.string), None)
+            if target is not None:
+                stops[id(target)] = note.technique
+    return stops
+
+
+def _append_notations_marks(notations: Element, note_model: object | None, technique_stop: str | None) -> None:
+    for end in _TIE_ENDS.get(getattr(note_model, "tie", None), ()):
+        SubElement(notations, "tied").set("type", end)
+    if getattr(note_model, "technique", None) == "slide":
+        SubElement(notations, "slide").set("type", "start")
+    if technique_stop == "slide":
+        SubElement(notations, "slide").set("type", "stop")
+
+
+def _append_technical_marks(technical: Element, note_model: object, technique_stop: str | None) -> None:
+    for name, kind in ((getattr(note_model, "technique", None), "start"), (technique_stop, "stop")):
+        if name in _TECHNICAL_TECHNIQUES:
+            SubElement(technical, name).set("type", kind)
+    if getattr(note_model, "harmonic", False):
+        SubElement(technical, "harmonic")
+    bend = getattr(note_model, "bend", None)
+    if bend is not None:
+        SubElement(SubElement(technical, "bend"), "bend-alter").text = f"{bend:g}"
+    left_f = getattr(note_model, "left_fingering", None)
+    if left_f:
+        SubElement(technical, "fingering").text = str(left_f)
+    right_f = getattr(note_model, "right_fingering", None)
+    if right_f and right_f not in _PLAIN_FINGERINGS:
+        SubElement(technical, "pluck").text = "p" if right_f == "thumb" else str(right_f)
+
+
 def _append_note_technical(
     xml_note: Element,
     *,
@@ -274,8 +321,10 @@ def _append_note_technical(
     fret: int,
     note_model: object | None,
     fermata: bool,
+    technique_stop: str | None = None,
 ) -> None:
     notations = SubElement(xml_note, "notations")
+    _append_notations_marks(notations, note_model, technique_stop)
     if fermata:
         SubElement(notations, "fermata").text = "normal"
     technical = SubElement(notations, "technical")
@@ -283,14 +332,8 @@ def _append_note_technical(
     SubElement(technical, "fret").text = str(max(0, fret))
     if note_model is None:
         return
-    left_f = getattr(note_model, "left_fingering", None)
-    if left_f:
-        SubElement(technical, "fingering").text = str(left_f)
-    right_f = getattr(note_model, "right_fingering", None)
-    if right_f and right_f not in {"dot1", "dot2", "dot3"}:
-        pluck = "p" if right_f == "thumb" else str(right_f)
-        SubElement(technical, "pluck").text = pluck
-    if getattr(note_model, "arpeggio", None) in {"single", "top"}:
+    _append_technical_marks(technical, note_model, technique_stop)
+    if getattr(note_model, "arpeggio", None) in _ARPEGGIATED:
         SubElement(notations, "arpeggiate")
 
 
@@ -305,6 +348,7 @@ def _add_note(
     chord: bool,
     note_model: object | None = None,
     fermata: bool = False,
+    technique_stop: str | None = None,
 ) -> None:
     string, fret = note
     xml_note = SubElement(measure, "note")
@@ -327,6 +371,8 @@ def _add_note(
         SubElement(pitch, "alter").text = str(alter)
     SubElement(pitch, "octave").text = str(octave)
     SubElement(xml_note, "duration").text = str(duration_units)
+    for end in _TIE_ENDS.get(getattr(note_model, "tie", None), ()):
+        SubElement(xml_note, "tie").set("type", end)
     SubElement(xml_note, "type").text = duration_type
     if dotted:
         SubElement(xml_note, "dot")
@@ -336,6 +382,7 @@ def _add_note(
         fret=fret,
         note_model=note_model,
         fermata=fermata,
+        technique_stop=technique_stop,
     )
 
 
@@ -575,7 +622,8 @@ def _append_musicxml_note_group(
     dotted: bool,
     pitch_for_string: list[int],
     fermata: bool,
-    note_models: Sequence[object] | None = None,
+    note_models: Sequence[Note] | None = None,
+    stops: dict[int, str] | None = None,
 ) -> None:
     if not notes:
         _add_note(
@@ -600,6 +648,7 @@ def _append_musicxml_note_group(
             chord=index > 0,
             note_model=note_models[index] if note_models else None,
             fermata=fermata and index == 0,
+            technique_stop=(stops or {}).get(id(note_models[index])) if note_models else None,
         )
 
 
@@ -609,8 +658,10 @@ def _append_musicxml_chord_notes(
     *,
     pitch_for_string: list[int],
     fermata_pending: bool,
+    next_bar: Bar | None = None,
 ) -> None:
     remaining_fermata = fermata_pending
+    stops = technique_stops([*bar.chords, *(next_bar.chords[:1] if next_bar is not None else [])])
     for chord in bar.chords:
         denom = _note_type_to_denom(chord.note_type)
         _append_musicxml_note_group(
@@ -622,6 +673,7 @@ def _append_musicxml_chord_notes(
             pitch_for_string=pitch_for_string,
             fermata=remaining_fermata,
             note_models=chord.notes,
+            stops=stops,
         )
         remaining_fermata = False
 
@@ -691,6 +743,7 @@ def _append_musicxml_measure_notes(
             bar,
             pitch_for_string=pitch_for_string,
             fermata_pending=bool(bar.fermata),
+            next_bar=piece.bars[bar_index + 1] if bar_index + 1 < len(piece.bars) else None,
         )
         return
     _append_musicxml_override_notes(

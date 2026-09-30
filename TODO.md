@@ -385,8 +385,9 @@ checked against the W3C schema and examples).
   4. Foreign standard notation: read every non-tab part of any MusicXML file as
      imported notation staves (as Oud's own extra parts already are), so a
      file without tablature opens as a view-only score instead of empty bars.
-  5. Tab techniques (hammer-on, pull-off, slide, bend, harmonic, fingering,
-     tie) as `Note` fields, written and read.
+  5. ~~Tab techniques (hammer-on, pull-off, slide, bend, harmonic, fingering,
+     tie) as `Note` fields, written and read.~~ Done (`DONE.md`); still open:
+     a command to set them in the editor, and marks across a bar line.
 - Acceptance: the round-trip probe in `docs/musicxml-support.md` (each field
   written then read) reports no Lost row for what the model holds; the W3C
   samples open with their notes visible or with a warning that names what was
