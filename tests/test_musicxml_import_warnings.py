@@ -18,10 +18,18 @@ HEAD = '<score-partwise version="4.0"><part-list>{parts}</part-list>'
 PART_LIST = '<score-part id="{id}"><part-name>{id}</part-name></score-part>'
 
 
-def _note(fret: int | None = None, *, string: int = 1, extra: str = "", duration: int = 4, typ: str = "quarter") -> str:
+def _note(
+    fret: int | None = None,
+    *,
+    string: int = 1,
+    extra: str = "",
+    duration: int = 4,
+    typ: str = "quarter",
+    step: str = "C",
+) -> str:
     technical = f"<notations><technical><string>{string}</string><fret>{fret}</fret></technical></notations>"
     return (
-        f"<note>{extra}<pitch><step>C</step><octave>4</octave></pitch><duration>{duration}</duration>"
+        f"<note>{extra}<pitch><step>{step}</step><octave>4</octave></pitch><duration>{duration}</duration>"
         f"<type>{typ}</type>{technical if fret is not None else ''}</note>"
     )
 
@@ -50,9 +58,25 @@ def test_a_score_without_tablature_says_its_notes_were_not_read() -> None:
 
 
 def test_notes_of_a_standard_part_beside_a_tablature_part_are_counted() -> None:
-    xml = _score(("P1", _note() + _note()), ("P2", _note(0) + _note(2)))
+    xml = _score(("P1", _note(step="D") + _note(step="D")), ("P2", _note(0) + _note(2)))
 
     assert _warnings(xml) == ["MusicXML: 2 notes without tablature were not read"]
+
+
+def test_a_standard_part_that_repeats_the_tablature_pitches_is_not_counted() -> None:
+    xml = _score(("P1", _note() + _note()), ("P2", _note(0) + _note(2)))
+
+    assert _warnings(xml) == []
+
+
+def test_a_written_octave_transposition_is_undone_before_comparing() -> None:
+    standard = (
+        "<attributes><transpose><chromatic>0</chromatic><octave-change>-1</octave-change></transpose></attributes>"
+    )
+    written_up = "".join(_note().replace("<octave>4</octave>", "<octave>5</octave>") for _ in range(2))
+    xml = _score(("P1", standard + written_up), ("P2", _note(0) + _note(2)))
+
+    assert _warnings(xml) == []
 
 
 def test_one_note_is_worded_in_the_singular() -> None:

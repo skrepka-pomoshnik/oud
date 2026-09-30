@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
@@ -368,11 +369,13 @@ def _measure_dynamic(measure: ET.Element) -> str | None:
 
 
 def _measure_fermata(measure: ET.Element) -> bool:
-    """Oud keeps one fermata per bar and writes it on the bar's first note."""
+    """Oud keeps one fermata per bar and writes it on the bar's first note; other programs put it on any note."""
 
-    first = next(iter(_children(measure, "note")), None)
-    notations = _child(first, "notations") if first is not None else None
-    return notations is not None and _child(notations, "fermata") is not None
+    return any(
+        _child(notations, "fermata") is not None
+        for note in _children(measure, "note")
+        if (notations := _child(note, "notations")) is not None
+    )
 
 
 def _parse_measure(measure: ET.Element, divisions: int) -> tuple[Bar, int]:
@@ -525,10 +528,48 @@ def _sounding_notes(part: ET.Element) -> list[ET.Element]:
     ]
 
 
-def _unread_note_count(root: ET.Element) -> int:
-    """Pitched notes that no string/fret describes: those of other parts and of untabbed staves."""
+_SEMITONES = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+_OCTAVE_SEMITONES = 12
 
-    return sum(_technical(note) is None for part in _children(root, "part") for note in _sounding_notes(part))
+
+def _midi_pitch(note: ET.Element) -> int | None:
+    pitch = _child(note, "pitch")
+    if pitch is None or _text(_child(pitch, "step")) not in _SEMITONES:
+        return None
+    octave, alter = _text(_child(pitch, "octave")), _text(_child(pitch, "alter"))
+    if not octave.lstrip("-").isdigit():
+        return None
+    shift = int(float(alter)) if alter.lstrip("-").replace(".", "", 1).isdigit() else 0
+    return (int(octave) + 1) * _OCTAVE_SEMITONES + _SEMITONES[_text(_child(pitch, "step"))] + shift
+
+
+def _whole_number(text: str) -> int:
+    return int(text) if text.lstrip("-").isdigit() else 0
+
+
+def _part_transposition(part: ET.Element) -> int:
+    """Semitones from written to sounding pitch (a guitar is written an octave above its sound)."""
+
+    transpose = next((node for node in part.iter() if _local(node.tag) == "transpose"), None)
+    if transpose is None:
+        return 0
+    chromatic, octaves = _text(_child(transpose, "chromatic")), _text(_child(transpose, "octave-change"))
+    return _whole_number(chromatic) + _OCTAVE_SEMITONES * _whole_number(octaves)
+
+
+def _unread_note_count(root: ET.Element) -> int:
+    """Notes no string/fret describes, minus those a tablature staff repeats (same bar number and pitch)."""
+
+    tabbed: Counter[tuple[int, int | None]] = Counter()
+    untabbed: Counter[tuple[int, int | None]] = Counter()
+    for part in _children(root, "part"):
+        shift = _part_transposition(part)
+        for index, measure in enumerate(_children(part, "measure")):
+            for note in _sounding_notes(measure):
+                written = _midi_pitch(note)
+                sounding = None if written is None else written + shift
+                (untabbed if _technical(note) is None else tabbed)[(index, sounding)] += 1
+    return sum((untabbed - tabbed).values())
 
 
 def _other_tab_note_count(root: ET.Element, tab_part: ET.Element) -> int:

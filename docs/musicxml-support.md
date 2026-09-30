@@ -56,7 +56,7 @@ and a bar-by-bar probe.
 | Repeat start `.:`, end `:.`, both `:\|:` | Supported | Fixed 2026-09-29: the start repeat was written into the next measure, so it moved one bar later on every save |
 | Volta endings | Supported | Start on the first bar's left barline, stop on the last bar's right barline (added 2026-09-29) |
 | Barline styles (`\|\|`, `\|.`, `:`, blank) | Supported | `\|.` was written as a plain barline until 2026-09-29 |
-| Fermata on a bar | Supported | Written on the first note |
+| Fermata on a bar | Supported | Written on the first note; read from any note of the bar |
 | Dynamics | Supported | Known dynamics as `dynamics`, other text as `words` |
 | Key signature | Lost | Only the piece-level key is written, never a bar's; not read |
 | System breaks | Lost | Neither written nor read |
