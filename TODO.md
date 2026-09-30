@@ -380,18 +380,37 @@ checked against the W3C schema and examples).
      warns on save.
   2. Tuplet timing in the chord model (actual/normal notes): write and read
      `time-modification` and TAB `t3` lines; the bar length check uses it.
+     Seen in `tests/fixtures/musicxml/guitar_study_am.musicxml` bar 7: the
+     triplet reads as three plain eighths and the import warns.
   3. Voices: a polyphonic tab bar keeps each note's own duration (a held bass
-     under a moving melody) instead of "until the next onset".
+     under a moving melody) instead of "until the next onset". Seen in the
+     guitar study: its half-note bass under eighth-note arpeggios imports as
+     eighths, with the bass notes as chord members. This is the largest loss
+     for classical guitar and needs per-note durations in rendering, playback
+     and both writers.
   4. Foreign standard notation: read every non-tab part of any MusicXML file as
      imported notation staves (as Oud's own extra parts already are), so a
      file without tablature opens as a view-only score instead of empty bars.
   5. ~~Tab techniques (hammer-on, pull-off, slide, bend, harmonic, fingering,
      tie) as `Note` fields, written and read.~~ Done (`DONE.md`); still open:
      a command to set them in the editor, and marks across a bar line.
+  6. Grace notes: keep them as short notes before their main note (write and
+     read `grace`, with the slash) instead of dropping them with a warning.
+     Seen in the guitar study bar 7 and in MuseScore's `testGuitarBends_ref`.
+  7. More than one tablature part: a second guitar or a bass part is only
+     counted in a warning (`N tablature notes of other parts were not read`).
+     Read them as further tablature lines, which needs a second tablature part
+     in the model (the same need as duet FT3 scores in `C16` item 3). Seen in
+     MuseScore's `testTabs_ref` (three TAB parts, seven notes unread).
+  8. Draw ties and slurs that cross a bar line; the note marks are kept and
+     saved but the renderer takes spans inside one bar only.
 - Acceptance: the round-trip probe in `docs/musicxml-support.md` (each field
   written then read) reports no Lost row for what the model holds; the W3C
   samples open with their notes visible or with a warning that names what was
-  dropped; the schema test (`tests/test_musicxml_schema.py`) still passes.
+  dropped; the schema test (`tests/test_musicxml_schema.py`) still passes; the
+  guitar study opens with its held bass, grace note and triplet timing intact
+  (update `test_what_is_still_lost_is_named` in
+  `tests/test_musicxml_guitar_study.py` as each gap closes).
 - Depends on: `C4`, `C15` step 1.
 
 ---
