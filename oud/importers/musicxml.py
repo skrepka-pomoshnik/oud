@@ -506,9 +506,10 @@ def _tempo(part: ET.Element) -> int | None:
 def _tab_style(details: ET.Element | None, fields: dict[str, str]) -> str | None:
     if fields.get(_STYLE_FIELD):
         return fields[_STYLE_FIELD]
+    # MusicXML frets are numbers unless the staff says "letters"; Oud's default would show French letters.
     if details is not None and (details.get("show-frets") or "").strip() == "letters":
         return "french"
-    return None
+    return "italian"
 
 
 INFORMATIONAL_WARNING_PREFIX = "MusicXML: "

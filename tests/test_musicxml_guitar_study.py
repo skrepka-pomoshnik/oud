@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
-from oud.importers.musicxml import load_musicxml
+from oud.importers.musicxml import _parse_piece, load_musicxml
 from petrucci.core.model import Piece
 
 STUDY = "tests/fixtures/musicxml/guitar_study_am.musicxml"
@@ -61,3 +62,17 @@ def test_the_fixture_is_licensed_for_the_repository() -> None:
     text = Path(STUDY).read_text(encoding="utf-8")
 
     assert "GPL-3.0-only" in text
+
+
+def test_a_file_without_show_frets_opens_with_fret_numbers() -> None:
+    assert _piece().style == "italian"
+
+
+def test_show_frets_letters_still_opens_as_french() -> None:
+    text = (
+        Path(STUDY)
+        .read_text(encoding="utf-8")
+        .replace('<staff-details number="2">', '<staff-details number="2" show-frets="letters">')
+    )
+
+    assert _parse_piece(ET.fromstring(text)).style == "french"  # noqa: S314 - fixture text edited in memory
