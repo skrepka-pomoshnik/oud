@@ -376,6 +376,7 @@ def export_ascii(
     settings_map = settings or {}
     style = settings_map.get("style") or "french"
     french_c = settings_map.get("frenchc") or "normal"
+    label_mode = settings_map.get("fretlabelmode") or "auto"
     reverse_strings = style == "italian" and (settings_map.get("italianorient") or "normal") == "reverse"
     for b_idx, bar in enumerate(piece.bars):
         cells = (
@@ -386,6 +387,7 @@ def export_ascii(
                 default_duration,
                 style,
                 french_c=french_c,
+                label_mode=label_mode,
             )
             if bar.chords
             else bar_cells(
@@ -394,6 +396,7 @@ def export_ascii(
                 bar_width,
                 style,
                 french_c=french_c,
+                label_mode=label_mode,
             )
         )
         for s_idx in range(piece.strings):

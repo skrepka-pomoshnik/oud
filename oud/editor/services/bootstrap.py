@@ -40,6 +40,8 @@ def _apply_piece_metadata(state: EditorState) -> None:
     piece = state.piece
     if piece.style:
         state.settings["style"] = piece.style
+    if piece.fret_labels:
+        state.settings["fretlabelmode"] = piece.fret_labels
     if piece.tempo is not None:
         state.settings["tempo"] = str(piece.tempo)
     if not piece.tuning:

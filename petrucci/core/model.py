@@ -200,6 +200,8 @@ class Piece:
     tuning_source: str | None = None
     style: str | None = None
     tempo: int | None = None
+    # "numeric" prints every fret as a number; Italian lute tablature prints fret 10 as x.
+    fret_labels: str | None = None
     bars: list[Bar] = field(default_factory=list)
     strings: int = 6
     # Header lines of the source file the model does not represent, written back by a writer of the same format.

@@ -25,6 +25,7 @@ SOFTWARE = "Oud"
 STYLE_FIELD = "oud-style"
 AUTHOR_FIELD = "oud-author"
 TUNING_FIELD = "oud-tuning"
+FRET_LABELS_FIELD = "oud-fret-labels"
 _CUT_TIME = (2, 2)
 _SINGLE_NUMBER_BEAT_TYPE = 4
 
@@ -137,14 +138,19 @@ def _append_tempo(measure: Element, tempo: int) -> None:
     SubElement(direction, "sound", tempo=str(tempo))
 
 
-def _append_identification(root: Element, piece: Piece, style: str, tuning: str) -> None:
+def _append_identification(root: Element, piece: Piece, style: str, tuning: str, fret_labels: str = "") -> None:
     identification = SubElement(root, "identification")
     if piece.composer:
         creator = SubElement(identification, "creator", type="composer")
         creator.text = piece.composer
     encoding = SubElement(identification, "encoding")
     SubElement(encoding, "software").text = SOFTWARE
-    fields = ((STYLE_FIELD, style), (AUTHOR_FIELD, piece.author), (TUNING_FIELD, tuning))
+    fields = (
+        (STYLE_FIELD, style),
+        (AUTHOR_FIELD, piece.author),
+        (TUNING_FIELD, tuning),
+        (FRET_LABELS_FIELD, fret_labels),
+    )
     if not any(value for _name, value in fields):
         return
     miscellaneous = SubElement(identification, "miscellaneous")
@@ -876,7 +882,8 @@ def _musicxml_text(
     root = Element("score-partwise", version="3.1")
     work = SubElement(root, "work")
     SubElement(work, "work-title").text = title
-    _append_identification(root, piece, style, piece.tuning or settings_map.get("tuning", ""))
+    fret_labels = "" if settings_map.get("fretlabelmode", "auto") == "auto" else settings_map["fretlabelmode"]
+    _append_identification(root, piece, style, piece.tuning or settings_map.get("tuning", ""), fret_labels)
     part_list = SubElement(root, "part-list")
     score_part = SubElement(part_list, "score-part", id="P1")
     SubElement(score_part, "part-name").text = "Lute"

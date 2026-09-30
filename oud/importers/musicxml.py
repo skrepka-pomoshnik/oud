@@ -51,6 +51,7 @@ _FIRST_VOICE = ("", "1")
 _STYLE_FIELD = "oud-style"
 _AUTHOR_FIELD = "oud-author"
 _TUNING_FIELD = "oud-tuning"
+_FRET_LABELS_FIELD = "oud-fret-labels"
 _ALTER_SIGNS = {1: "+", -1: "-"}
 OUD_SOFTWARE = "Oud"
 
@@ -512,6 +513,12 @@ def _tab_style(details: ET.Element | None, fields: dict[str, str]) -> str | None
     return "italian"
 
 
+def _foreign_fret_labels(details: ET.Element | None) -> str | None:
+    """Another program's tab prints numbers unless it asks for letters; only lute tablature prints fret 10 as x."""
+
+    return None if details is not None and (details.get("show-frets") or "").strip() == "letters" else "numeric"
+
+
 INFORMATIONAL_WARNING_PREFIX = "MusicXML: "
 
 
@@ -661,6 +668,9 @@ def _parse_piece(root: ET.Element) -> Piece:
     piece.tuning = own_tuning if written_by_oud(root) else own_tuning or _staff_tuning(details)
     piece.tempo = _tempo(part)
     piece.style = _tab_style(details, fields)
+    piece.fret_labels = fields.get(_FRET_LABELS_FIELD) or (
+        None if written_by_oud(root) else _foreign_fret_labels(details)
+    )
     if written_by_oud(root):
         # Oud writes an imported score's notation staffs as further parts.
         piece.imported_score = read_notation_score(root, part)

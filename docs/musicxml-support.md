@@ -74,7 +74,7 @@ warning (`MusicXML: N notes without tablature were not read`); it does not stop
 
 | Content | Status | What happens |
 |---|---|---|
-| Tablature part (`string`, `fret`, tuning, `show-frets`) | Supported | Read exactly (`tutorial-tablature.musicxml`). Frets are numbers (Italian style) unless the staff says `show-frets="letters"`; it used to open in French letters, which read wrongly for guitar |
+| Tablature part (`string`, `fret`, tuning, `show-frets`) | Supported | Read exactly (`tutorial-tablature.musicxml`). Frets are numbers (Italian style, `fretlabelmode=numeric`, so fret 10 is `10` and not the lute `x`) unless the staff says `show-frets="letters"`; it used to open in French letters, which read wrongly for guitar. Oud remembers the numeric mode in its own files (`oud-fret-labels`) |
 | Standard and TAB staves in one part, or in two parts | Supported | The part or staff with `string`/`fret` notes is the tablature |
 | Standard notation without tablature | Lost | Bars open empty (`tutorial-chopin-prelude`: 27 notes, 0 chords); the import warns with the note count |
 | Other parts of a multi-part score | Lost | Ignored; the warning counts their untabbed notes (`N notes without tablature`) and, separately, their tablature notes (`N tablature notes of other parts`). Oud's own extra parts are read |
