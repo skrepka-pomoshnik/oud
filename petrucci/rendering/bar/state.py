@@ -9,7 +9,7 @@ from petrucci.input.tablature.policy import (
     tie_notehead_hidden_cols,
     tie_notehead_parenthesize_cols,
     tie_span_chars,
-    time_cue_side_pad,
+    time_cue_lane,
 )
 from petrucci.rendering.primitives.helpers import apply_overrides
 from petrucci.rendering.primitives.marks import (
@@ -326,7 +326,12 @@ def prepare_bar_layout(
         prev_time_value=previous_time,
         sig_label=metadata.sig_label,
     )
-    draw_pad = pad + _time_cue_pad(metadata.time_value, show_time=show_time, scale_bar=scale_bar)
+    draw_pad = pad + time_cue_lane(
+        metadata.time_value,
+        show_time=show_time,
+        scale_bar=scale_bar,
+        style_mode=context.settings.get("timesigstyle", "symbol"),
+    )
     if bar.chords and not scale_bar and not context.duet_width_lock:
         display_width = max(display_width, _fixed_chord_width(context, system, bar, basics, draw_pad))
     return BarLayout(display_width, scale_bar, pad, draw_pad, show_time)
@@ -342,15 +347,6 @@ def _minimum_chord_width(context: SystemRenderContext, system: SystemLayout, bas
     if context.show_dur and system.rows["dur"] is not None:
         content = max(content, _required_duration_content_width(flags, min_gap=gap))
     return content + context.barpad * 2
-
-
-def _time_cue_pad(time_value: str, *, show_time: bool, scale_bar: bool) -> int:
-    cue_pad = time_cue_side_pad(show_time_cue=show_time, scale_bar=scale_bar)
-    if show_time and not scale_bar:
-        cue_pad = max(cue_pad, time_cue_side_pad(show_time_cue=True, scale_bar=True))
-    if show_time and time_value in {"C|", "c|", "2/2", "O", "o", "3/4"}:
-        cue_pad = max(cue_pad, 3)
-    return cue_pad
 
 
 def _fixed_chord_width(

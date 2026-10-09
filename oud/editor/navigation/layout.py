@@ -391,7 +391,7 @@ def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list
         bar_has_multifret_tokens,
         multifret_event_gap,
         show_time_cue_for_bar,
-        time_cue_side_pad,
+        time_cue_lane,
     )
     from petrucci.rendering.bar.state import resolved_bar_time_value  # noqa: PLC0415
     from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar  # noqa: PLC0415
@@ -432,9 +432,12 @@ def _renderer_min_bar_widths(state: EditorState, bar_indices: list[int]) -> list
             prev_time_value=prev_time,
             sig_label=sig_label,
         )
-        cue_pad_extra = time_cue_side_pad(show_time_cue=show_cue, scale_bar=True)
-        if show_cue and current_time in {"C|", "c|", "2/2", "O", "o", "3/4"}:
-            cue_pad_extra = max(cue_pad_extra, 3)
+        cue_pad_extra = time_cue_lane(
+            current_time,
+            show_time=show_cue,
+            scale_bar=True,
+            style_mode=state.settings.get("timesigstyle", "symbol"),
+        )
         min_widths.append(
             required_auto_display_width_for_bar(
                 bars[abs_bar],

@@ -138,8 +138,8 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         "Beatsnap must be off/soft",
     ),
     "timesigstyle": (
-        {"symbol", "numeric", "fraction"},
-        "Timesigstyle must be symbol/numeric/fraction",
+        {"symbol", "numeric", "fraction", "stacked"},
+        "Timesigstyle must be symbol/numeric/fraction/stacked",
     ),
     "multifretspacing": (
         {"tight", "separated", "collision-safe"},

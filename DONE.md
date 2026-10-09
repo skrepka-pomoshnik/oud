@@ -1,5 +1,9 @@
 # DONE
 
+## Guitar tab readability (2026-10-09)
+
+- `timesigstyle=stacked`: numerator over denominator on two staff lines, with one blank column before the first fret (the single digit used to touch the fret: `- 42`). Imported numeric tab opens with it. One lane rule for the layout, the renderer and the editor's width planner: `petrucci.input.tablature.policy.time_cue_lane`. `tests/test_time_signature_stacked.py`.
+
 ## C17 step 5: ties and tab techniques on notes; vim operators (2026-09-30)
 
 - `Note` carries `tie` (`start`/`stop`/`continue`), `technique` (`hammer-on`, `pull-off`, `slide`, started on the note), `bend` and `harmonic`; MusicXML reads and writes them with the `stop` of a technique added on the next note of the string, reads left-hand `fingering`, and accepts MuseScore's `hammer-on` written under `notations`. Ties and slurs within a bar are drawn from these marks (`oud/editor/services/screen/note_marks.py`). A `.tab` save says `not saved: 2 ties, 1 hammer-on`.

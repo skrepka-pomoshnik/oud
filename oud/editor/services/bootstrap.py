@@ -39,7 +39,7 @@ def _ensure_initial_bars(piece: Piece, settings: dict[str, str]) -> None:
 def _apply_guitar_rhythm(settings: dict[str, str]) -> None:
     """Numeric tablature comes from guitar programs: stems and beams below the staff, unless the user chose."""
 
-    for key, guitar_value in (("flagstyle", "guitar"), ("flagplace", "below")):
+    for key, guitar_value in (("flagstyle", "guitar"), ("flagplace", "below"), ("timesigstyle", "stacked")):
         if settings.get(key) == DEFAULT_SETTINGS[key]:
             settings[key] = guitar_value
 

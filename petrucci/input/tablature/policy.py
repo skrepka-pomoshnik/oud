@@ -228,10 +228,36 @@ def time_sig_inline_rows(
 ) -> list[str]:
     raw = (raw_time_value or "").strip()
     mode = style_mode or "symbol"
+    if mode == "stacked":
+        stacked = _stacked_time_sig_rows(raw or (sig_label or "").strip())
+        if stacked is not None:
+            return stacked
     raw_rows = _raw_time_sig_rows(raw, mode)
     if raw_rows is not None:
         return raw_rows
     return _label_time_sig_rows((sig_label or "").strip(), mode)
+
+
+_STACKED_SYMBOLS = {
+    "C": ("4", "4"),
+    "c": ("4", "4"),
+    "C|": ("2", "2"),
+    "c|": ("2", "2"),
+    "O": ("3", "4"),
+    "o": ("3", "4"),
+}
+
+
+def _stacked_time_sig_rows(value: str) -> list[str] | None:
+    """Numerator over denominator on two staff lines, as a guitar tab shows its meter."""
+
+    pair = _STACKED_SYMBOLS.get(value)
+    if pair is None and "/" in value:
+        left, right = (part.strip() for part in value.split("/", 1))
+        pair = (left, right) if left and right else None
+    if pair is None:
+        return None
+    return [pair[0][:2].rjust(2), pair[1][:2].rjust(2)]
 
 
 def _raw_time_sig_rows(raw: str, mode: str) -> list[str] | None:
@@ -318,6 +344,22 @@ def show_time_cue_for_bar(
     if prev_time_value is None:
         return False
     return prev_time_value != current_time_value
+
+
+# Mensuration signs are two characters wide and need a gap before the first fret.
+_WIDE_TIME_VALUES = frozenset({"C|", "c|", "2/2", "O", "o", "3/4"})
+_WIDE_CUE_LANE = 3
+
+
+def time_cue_lane(time_value: str, *, show_time: bool, scale_bar: bool, style_mode: str = "symbol") -> int:
+    """Columns reserved at the start of a bar for its meter cue (0 when none is shown)."""
+
+    lane = time_cue_side_pad(show_time_cue=show_time, scale_bar=scale_bar)
+    if show_time and not scale_bar:
+        lane = max(lane, time_cue_side_pad(show_time_cue=True, scale_bar=True))
+    if show_time and (time_value in _WIDE_TIME_VALUES or style_mode == "stacked"):
+        lane = max(lane, _WIDE_CUE_LANE)
+    return lane
 
 
 def time_cue_side_pad(*, show_time_cue: bool, scale_bar: bool) -> int:

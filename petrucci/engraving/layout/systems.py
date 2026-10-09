@@ -13,7 +13,7 @@ from petrucci.input.tablature.policy import (
     bar_has_multifret_tokens,
     multifret_event_gap,
     show_time_cue_for_bar,
-    time_cue_side_pad,
+    time_cue_lane,
 )
 from petrucci.rendering.primitives.spacing import required_auto_display_width_for_bar
 from petrucci.terminal.view.model import _infer_time_signature, _next_system_start, _parse_time_signature
@@ -137,9 +137,9 @@ def _minimum_bar_width(options: AutoSystemPlanOptions, bar_index: int, *, justif
         prev_time_value=previous,
         sig_label=signature,
     )
-    cue_pad = time_cue_side_pad(show_time_cue=show_cue, scale_bar=True)
-    if show_cue and time_value in {"C|", "c|", "2/2", "O", "o", "3/4"}:
-        cue_pad = max(cue_pad, 3)
+    cue_pad = time_cue_lane(
+        time_value, show_time=show_cue, scale_bar=True, style_mode=settings.get("timesigstyle", "symbol")
+    )
     compact = options.spacing_fill == "compact"
     event_gap = multifret_event_gap(
         style=settings.get("style", "french"),
