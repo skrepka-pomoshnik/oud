@@ -26,6 +26,9 @@ class Note:
     technique: str | None = None
     bend: float | None = None
     harmonic: bool = False
+    # Whole notes this note rings from its chord's onset when that is longer than the chord (a held bass
+    # under moving notes); None for a note that lasts as long as its chord.
+    sustain: Fraction | None = None
 
 
 @dataclass
@@ -170,6 +173,8 @@ class Chord:
     # A tuplet member sounds ``normal`` of its written value for every ``actual`` played (3 in the time of 2).
     tuplet_actual: int | None = None
     tuplet_normal: int | None = None
+    # The chord symbol written above the event (``Am7``, ``C/G``); the text is kept as written.
+    name: str | None = None
 
     @property
     def tuplet_factor(self) -> Fraction:
@@ -212,6 +217,7 @@ class Piece:
     tuning_source: str | None = None
     style: str | None = None
     tempo: int | None = None
+    capo: int | None = None  # fret the capo sits on; the tab frets are counted from it
     # "numeric" prints every fret as a number; Italian lute tablature prints fret 10 as x.
     fret_labels: str | None = None
     bars: list[Bar] = field(default_factory=list)

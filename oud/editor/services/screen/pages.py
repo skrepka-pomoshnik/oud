@@ -31,6 +31,7 @@ def info_lines(piece: Piece, settings: dict[str, str]) -> list[str]:
         line("Subtitle:", piece.subtitle),
         line("Author:", piece.author),
         line("Composer:", piece.composer),
+        line("Capo:", str(piece.capo) if piece.capo else None),
         line("Arranger:", piece.arranger),
         line("Source key:", piece.key),
         line("Type:", piece.piece_type),

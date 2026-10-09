@@ -381,12 +381,11 @@ checked against the W3C schema and examples).
   2. ~~Tuplet timing in the chord model~~ Done for MusicXML, MIDI, LilyPond and
      the guitar beams (`DONE.md`); open: TAB `t3` lines, rests inside a tuplet
      (they read as plain rests), tuplets in the editor's typing commands.
-  3. Voices: a polyphonic tab bar keeps each note's own duration (a held bass
-     under a moving melody) instead of "until the next onset". Seen in the
-     guitar study: its half-note bass under eighth-note arpeggios imports as
-     eighths, with the bass notes as chord members. This is the largest loss
-     for classical guitar and needs per-note durations in rendering, playback
-     and both writers.
+  3. ~~Voices: a held bass under a moving melody~~ Done for MusicXML, MIDI and
+     the guitar renderer (`Note.sustain`, `DONE.md`); open: the LilyPond tab
+     voice (it writes every note for its chord's length), `.tab` (cannot hold
+     it), and setting or changing a note's length in the editor. Notes with
+     different lengths in one chord are written with the longest.
   4. Foreign standard notation: read every non-tab part of any MusicXML file as
      imported notation staves (as Oud's own extra parts already are), so a
      file without tablature opens as a view-only score instead of empty bars.

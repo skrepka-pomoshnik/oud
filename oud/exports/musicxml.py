@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import re
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from fractions import Fraction
 from itertools import pairwise
 from pathlib import Path
@@ -13,6 +14,7 @@ from petrucci.core.music.time import parse_time_signature_value
 from petrucci.core.music.tuning import default_tuning_pitches
 from petrucci.core.music.tuning import parse_tuning_pitches as _parse_tuning
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
+from petrucci.input.tablature.mutation import DENOMINATORS
 
 MUSICXML_DOCTYPE = (
     '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" '
@@ -520,6 +522,8 @@ def _append_first_measure_attributes(
         if alter:
             SubElement(staff_tuning, "tuning-alter").text = str(alter)
         SubElement(staff_tuning, "tuning-octave").text = str(octave)
+    if piece.capo:
+        SubElement(staff_details, "capo").text = str(piece.capo)
 
 
 def _append_time_change(measure: Element, bar: Bar, settings: dict[str, str]) -> None:
@@ -708,6 +712,155 @@ def _append_musicxml_note_group(
         )
 
 
+_CHORD_SUFFIX_KINDS = {
+    "": "major",
+    "m": "minor",
+    "7": "dominant",
+    "maj7": "major-seventh",
+    "m7": "minor-seventh",
+    "dim": "diminished",
+    "aug": "augmented",
+    "dim7": "diminished-seventh",
+    "m7b5": "half-diminished",
+    "sus4": "suspended-fourth",
+    "sus2": "suspended-second",
+    "6": "major-sixth",
+    "m6": "minor-sixth",
+    "9": "dominant-ninth",
+    "5": "power",
+}
+_CHORD_SYMBOL = re.compile(r"^([A-G])(#|b|##|bb)?(.*?)(?:/([A-G])(#|b|##|bb)?)?$")
+_ALTER_VALUES = {"#": "1", "b": "-1", "##": "2", "bb": "-2"}
+
+
+def _harmony_element(name: str) -> Element:
+    """A <harmony> for a chord symbol such as ``Am7`` or ``C/G``; a suffix it does not know is kept as text."""
+
+    match = _CHORD_SYMBOL.match(name.strip())
+    harmony = Element("harmony")
+    if match is None:
+        SubElement(SubElement(harmony, "root"), "root-step").text = "C"
+        SubElement(harmony, "kind", text=name).text = "other"
+        return harmony
+    root_step, root_alter, suffix, bass_step, bass_alter = match.groups()
+    root = SubElement(harmony, "root")
+    SubElement(root, "root-step").text = root_step
+    if root_alter:
+        SubElement(root, "root-alter").text = _ALTER_VALUES[root_alter]
+    kind = SubElement(harmony, "kind", text=suffix)
+    kind.text = _CHORD_SUFFIX_KINDS.get(suffix, "other")
+    if bass_step:
+        bass = SubElement(harmony, "bass")
+        SubElement(bass, "bass-step").text = bass_step
+        if bass_alter:
+            SubElement(bass, "bass-alter").text = _ALTER_VALUES[bass_alter]
+    return harmony
+
+
+def _chord_units(chord: Chord) -> int:
+    return max(
+        1, round(_duration_units(_note_type_to_denom(chord.note_type), bool(chord.dotted)) * chord.tuplet_factor)
+    )
+
+
+def _append_voice_chords(
+    measure: Element,
+    bar: Bar,
+    *,
+    pitch_for_string: list[int],
+    fermata_pending: bool,
+    stops: dict[int, str],
+    keep: Callable[[Note], bool],
+) -> None:
+    """Write the chords of ``bar`` with the notes ``keep`` accepts; a chord left without notes is a rest."""
+
+    remaining_fermata = fermata_pending
+    marks = tuplet_marks(bar.chords)
+    for chord in bar.chords:
+        denom = _note_type_to_denom(chord.note_type)
+        tuplet = (chord.tuplet_actual, chord.tuplet_normal or 1, marks.get(id(chord))) if chord.tuplet_actual else None
+        notes = [note for note in chord.notes if keep(note)]
+        if chord.name:
+            measure.append(_harmony_element(chord.name))
+        _append_musicxml_note_group(
+            measure,
+            [(note.string, note.fret) for note in notes],
+            duration_units=_chord_units(chord),
+            duration_type=_duration_type(denom),
+            dotted=bool(chord.dotted),
+            pitch_for_string=pitch_for_string,
+            fermata=remaining_fermata,
+            note_models=notes,
+            stops=stops,
+            tuplet=tuplet,
+        )
+        remaining_fermata = False
+
+
+def _note_value(whole_notes: Fraction) -> tuple[int, bool]:
+    """Denominator and dot of the written value closest below ``whole_notes`` (exact when one fits)."""
+
+    candidates = [
+        (Fraction(1, denom) * (Fraction(3, 2) if dotted else 1), denom, dotted)
+        for denom in DENOMINATORS
+        for dotted in (False, True)
+    ]
+    fitting = [item for item in candidates if item[0] <= whole_notes]
+    best = max(fitting, key=lambda item: item[0]) if fitting else min(candidates, key=lambda item: item[0])
+    return best[1], best[2]
+
+
+def _append_shift(measure: Element, name: str, units: int) -> None:
+    SubElement(SubElement(measure, name), "duration").text = str(units)
+
+
+def _label_voice(measure: Element, first: int, voice: str) -> None:
+    """Give every note written since child ``first`` its voice (before its type, after its ties)."""
+
+    for note in list(measure)[first:]:
+        if note.tag != "note":
+            continue
+        voice_node = Element("voice")
+        voice_node.text = voice
+        position = next((index for index, child in enumerate(note) if child.tag == "type"), len(note))
+        note.insert(position, voice_node)
+
+
+def _append_held_voice(
+    measure: Element,
+    bar: Bar,
+    *,
+    pitch_for_string: list[int],
+    stops: dict[int, str],
+) -> None:
+    """Second voice: the notes that outlast their chord, each for its own length."""
+
+    position = onset = 0
+    for chord in bar.chords:
+        held = [note for note in chord.notes if note.sustain is not None]
+        if held:
+            units = max(1, round(max(note.sustain or 0 for note in held) * 4 * DIVISIONS))
+            denom, dotted = _note_value(Fraction(units, 4 * DIVISIONS))
+            if onset > position:
+                _append_shift(measure, "forward", onset - position)
+            elif onset < position:
+                _append_shift(measure, "backup", position - onset)
+            for index, note in enumerate(held):
+                _add_note(
+                    measure,
+                    (note.string, note.fret),
+                    duration_units=units,
+                    duration_type=_duration_type(denom),
+                    dotted=dotted,
+                    pitch_for_string=pitch_for_string,
+                    chord=index > 0,
+                    note_model=note,
+                    technique_stop=stops.get(id(note)),
+                )
+            position = onset + units
+        onset += _chord_units(chord)
+
+
 def _append_musicxml_chord_notes(
     measure: Element,
     bar: Bar,
@@ -716,25 +869,24 @@ def _append_musicxml_chord_notes(
     fermata_pending: bool,
     next_bar: Bar | None = None,
 ) -> None:
-    remaining_fermata = fermata_pending
     stops = technique_stops([*bar.chords, *(next_bar.chords[:1] if next_bar is not None else [])])
-    marks = tuplet_marks(bar.chords)
-    for chord in bar.chords:
-        denom = _note_type_to_denom(chord.note_type)
-        tuplet = (chord.tuplet_actual, chord.tuplet_normal or 1, marks.get(id(chord))) if chord.tuplet_actual else None
-        _append_musicxml_note_group(
-            measure,
-            [(note.string, note.fret) for note in chord.notes],
-            duration_units=max(1, round(_duration_units(denom, bool(chord.dotted)) * chord.tuplet_factor)),
-            duration_type=_duration_type(denom),
-            dotted=bool(chord.dotted),
-            pitch_for_string=pitch_for_string,
-            fermata=remaining_fermata,
-            note_models=chord.notes,
-            stops=stops,
-            tuplet=tuplet,
-        )
-        remaining_fermata = False
+    has_held = any(note.sustain is not None for chord in bar.chords for note in chord.notes)
+    first = len(measure)
+    _append_voice_chords(
+        measure,
+        bar,
+        pitch_for_string=pitch_for_string,
+        fermata_pending=fermata_pending,
+        stops=stops,
+        keep=(lambda note: note.sustain is None) if has_held else (lambda _note: True),
+    )
+    if not has_held:
+        return
+    _label_voice(measure, first, "1")
+    _append_shift(measure, "backup", sum(_chord_units(chord) for chord in bar.chords))
+    second = len(measure)
+    _append_held_voice(measure, bar, pitch_for_string=pitch_for_string, stops=stops)
+    _label_voice(measure, second, "2")
 
 
 def _append_musicxml_override_notes(
@@ -912,7 +1064,8 @@ def _append_musicxml_measure(
         durations=durations,
         style=style,
         dotted=dotted,
-        pitch_for_string=pitch_for_string,
+        # MusicXML pitches are the sounding ones, so a capo raises every string.
+        pitch_for_string=[pitch + (piece.capo or 0) for pitch in pitch_for_string],
         settings=settings,
     )
     _finish_musicxml_measure(measure, bar, repeat, _ending_stop(piece.bars, bar_index))

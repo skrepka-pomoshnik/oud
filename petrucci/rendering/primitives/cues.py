@@ -61,6 +61,41 @@ def _draw_meta(
         safe_addstr(context.stdscr, y, cue_x, " ".join(cue_parts))
 
 
+_MIN_NAME_WIDTH = 2
+
+
+def draw_chord_names(
+    context: SystemRenderContext,
+    system: SystemLayout,
+    *,
+    metadata: BarMetadata,
+    layout: BarLayout,
+    bar,
+    chord_columns: list[tuple[int, int, bool]],
+    grid_map: list[int],
+    bar_x: int,
+    row_start: int,
+) -> None:
+    """Chord symbols on the bar-number row, each at its chord; never over the bar number, its cues or a neighbour."""
+
+    row = system.rows.get("meta")
+    if row is None or not grid_map or not any(chord.name for chord in bar.chords):
+        return
+    cues = " ".join([value for value in (metadata.ending_cue, metadata.repeat_cue) if value] + metadata.sign_cues)
+    reserved = (len(metadata.number) + 1 if metadata.number is not None else 0) + (len(cues) + 1 if cues else 0)
+    next_free = bar_x + reserved
+    limit = bar_x + layout.display_width
+    for chord, (column, _denom, _dot) in zip(bar.chords, chord_columns, strict=False):
+        if not chord.name:
+            continue
+        x = max(next_free, bar_x + layout.draw_pad + grid_map[min(column, len(grid_map) - 1)])
+        name = chord.name[: limit - x]  # a symbol that runs past the bar is cut, not left to spill into the next bar
+        if len(name) < min(len(chord.name), _MIN_NAME_WIDTH):
+            continue
+        safe_addstr(context.stdscr, row_start + row, x, name)
+        next_free = x + len(name) + 1
+
+
 def _draw_named_row(
     context: SystemRenderContext,
     system: SystemLayout,

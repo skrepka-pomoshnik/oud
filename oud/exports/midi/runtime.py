@@ -40,6 +40,7 @@ def export_midi(
     pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
     if len(pitches) < piece.strings:
         pitches.extend(_default_tuning(piece.strings)[len(pitches) :])
+    pitches = [pitch + (piece.capo or 0) for pitch in pitches]  # a capo raises every string
     program = int(settings.get("midipatch", "0") or "0")
     vocal_program = int(
         settings.get("midivocalpatch", str(DEFAULT_VOCAL_PATCH)) or str(DEFAULT_VOCAL_PATCH),

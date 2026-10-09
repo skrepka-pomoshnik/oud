@@ -331,8 +331,35 @@ def _bar_chord_events(
                 strings=strings,
                 durations=durations,
             )
-            events.append((time, duration, col, notes))
+            events.extend(_chord_voice_events(time, duration, col, notes, bar_ticks=_bar_ticks(bar)))
         time += duration
+    return events
+
+
+def _bar_ticks(bar: Bar) -> int:
+    return sum(
+        _tuplet_ticks(_duration_ticks(_note_type_to_denom(chord.note_type) or 4, chord.dotted), chord)
+        for chord in bar.chords
+    )
+
+
+def _chord_voice_events(
+    time: int,
+    duration: int,
+    col: int,
+    notes: list[Note],
+    *,
+    bar_ticks: int,
+) -> list[tuple[int, int, int, list[Note]]]:
+    """A chord as events: its notes for the chord's length, a held note (``sustain``) for its own length."""
+
+    held = [note for note in notes if note.sustain is not None]
+    if not held:
+        return [(time, duration, col, notes)]
+    events = [(time, duration, col, [note for note in notes if note.sustain is None])] if len(held) < len(notes) else []
+    for note in held:
+        ticks = round(float(note.sustain or 0) * 4 * TICKS_PER_QUARTER)
+        events.append((time, max(duration, min(ticks, bar_ticks - time)), col, [note]))
     return events
 
 

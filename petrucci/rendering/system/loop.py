@@ -14,7 +14,7 @@ from petrucci.rendering.bar.state import (
     prepare_bar_marks,
     prepare_bar_metadata,
 )
-from petrucci.rendering.primitives.cues import draw_static_bar_rows
+from petrucci.rendering.primitives.cues import draw_chord_names, draw_static_bar_rows
 from petrucci.rendering.primitives.helpers import safe_addstr
 from petrucci.rendering.rhythm.rows import _render_rhythm_rows
 from petrucci.rendering.staff.rows import _render_staff_and_playback
@@ -258,6 +258,17 @@ def _render_bar(
         scaled_hold_row=scaled.hold,
         scaled_gliss_row=scaled.gliss,
         scaled_tuplet_row=scaled.tuplet,
+    )
+    draw_chord_names(
+        context,
+        system,
+        metadata=metadata,
+        layout=layout,
+        bar=bar,
+        chord_columns=basics.chord_positions,
+        grid_map=grid_map,
+        bar_x=bar_x,
+        row_start=row_start,
     )
     _render_staff_and_playback(
         context.stdscr,

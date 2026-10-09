@@ -174,7 +174,8 @@ def test_ties_and_slurs_from_note_marks_are_drawn() -> None:
 
 
 def test_derived_spans_pair_chords_of_one_bar() -> None:
-    ties, slurs = derived_spans(_marked_piece().bars, 12)
+    spans = derived_spans(_marked_piece().bars, 12)
+    ties, slurs = spans.ties, spans.slurs
 
     assert [span[0] for span in ties] == [0]
     assert [span[0] for span in slurs] == [0]

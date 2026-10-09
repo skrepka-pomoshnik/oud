@@ -56,6 +56,8 @@ and a bar-by-bar probe.
 | Repeat start `.:`, end `:.`, both `:\|:` | Supported | Fixed 2026-09-29: the start repeat was written into the next measure, so it moved one bar later on every save |
 | Volta endings | Supported | Start on the first bar's left barline, stop on the last bar's right barline (added 2026-09-29) |
 | Barline styles (`\|\|`, `\|.`, `:`, blank) | Supported | `\|.` was written as a plain barline until 2026-09-29 |
+| Capo | Supported | `<capo>` read and written; the header shows `Capo N`, MusicXML pitches and MIDI include it |
+| Chord symbols | Supported | `<harmony>` read as the text the file gives (kind text, else its usual suffix: `Am7`, `C/G`) and written back; drawn above the staff at their chord; degrees are not read |
 | Fermata on a bar | Supported | Written on the first note; read from any note of the bar |
 | Dynamics | Supported | Known dynamics as `dynamics`, other text as `words` |
 | Key signature | Lost | Only the piece-level key is written, never a bar's; not read |
@@ -80,7 +82,7 @@ warning (`MusicXML: N notes without tablature were not read`); it does not stop
 | Other parts of a multi-part score | Lost | Ignored; the warning counts their untabbed notes (`N notes without tablature`) and, separately, their tablature notes (`N tablature notes of other parts`). Oud's own extra parts are read |
 | Tuplets (`time-modification`) | Partial | Read by their written value (three triplet eighths are three eighths, so the bar reads 5/8 and shows the meter difference); the import warns. It used to read dotted 16ths and measure 17/32 |
 | Grace notes | Lost | Not read (they used to merge into the main chord); the import warns with the count |
-| Two voices | Partial | Voices merge into chords; a note lasts until the next onset, so a held bass loses its length |
+| Two voices | Supported | A note that rings longer than the event it starts in (a held bass under moving notes) keeps its own length (`Note.sustain`): it is written as a second voice and read back; drawn as `=` along its string; MIDI rings it for its length. Not carried into `.tab` (the save names `held notes`) or the LilyPond tab voice |
 | Keys, segno/coda | Lost | Not read, no warning |
 | Ties, hammer-on, pull-off, slide, bend, harmonic, fingering on tab notes | Supported | Read onto the note; MuseScore's `hammer-on` and `pull-off` directly under `notations` are read too. Slurs between notes are not |
 | Repeats | Supported | Forward, backward, and both |

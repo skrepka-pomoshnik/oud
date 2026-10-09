@@ -8,13 +8,20 @@ by the caller. A mark that leaves its bar is kept in the score but not drawn.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from petrucci.core.model import Bar
-from petrucci.rendering.primitives.utils import chord_positions
+from petrucci.rendering.primitives.spacing import chord_positions_distinct
 
 Span = tuple[int, int, int]
 SLURRED_TECHNIQUES = frozenset({"hammer-on", "pull-off"})
 TIE_STARTS = frozenset({"start", "continue"})
 _DEFAULT_DURATION = 4
+
+
+class DerivedSpans(NamedTuple):
+    ties: list[Span]
+    slurs: list[Span]
 
 
 def _has_marks(bar: Bar) -> bool:
@@ -39,16 +46,16 @@ def _pair_spans(index: int, bar: Bar, columns: list[int]) -> tuple[list[Span], l
     return ties, slurs
 
 
-def derived_spans(bars: list[Bar], bar_width: int) -> tuple[list[Span], list[Span]]:
-    """(ties, slurs) as ``(bar, start column, end column)`` for pairs of chords in the same bar."""
+def derived_spans(bars: list[Bar], bar_width: int) -> DerivedSpans:
+    """Ties and slurs as ``(bar, start column, end column)``, the columns the renderer draws."""
 
-    ties: list[Span] = []
-    slurs: list[Span] = []
+    spans = DerivedSpans([], [])
     for index, bar in enumerate(bars):
         if not _has_marks(bar):
             continue
-        columns = [column for column, _denom, _dot in chord_positions(bar, bar_width, _DEFAULT_DURATION)]
-        bar_ties, bar_slurs = _pair_spans(index, bar, columns)
-        ties.extend(bar_ties)
-        slurs.extend(bar_slurs)
-    return ties, slurs
+        positions, _width = chord_positions_distinct(bar, bar_width, _DEFAULT_DURATION)
+        columns = [column for column, _denom, _dot in positions]
+        ties, slurs = _pair_spans(index, bar, columns)
+        spans.ties.extend(ties)
+        spans.slurs.extend(slurs)
+    return spans

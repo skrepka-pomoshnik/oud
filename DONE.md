@@ -2,6 +2,10 @@
 
 ## Guitar tab readability (2026-10-09)
 
+- Held notes (`C17` step 3): `Note.sustain` keeps how long a note rings when that outlasts its chord (a bass under moving eighths). MusicXML reads it from the note's own duration and writes it as a second voice (`<backup>`, voice 2); MIDI rings it for its length; the guitar renderer draws `=` along its string. `.tab` and the LilyPond tab voice do not carry it (the save names `held notes`). `tests/test_held_notes.py`.
+- Capo and chord symbols: `Piece.capo` from `<staff-details><capo>` (header `Capo 2`, MusicXML pitch and MIDI include it) and `Chord.name` from `<harmony>` (drawn above the staff at its chord, kept as the file spells it, written back). `tests/test_capo_chords.py`.
+- The guitar study now names its chords (Am, Dm, E7).
+
 - Tuplet timing for tablature chords (`C17` step 2): `Chord.tuplet_actual/tuplet_normal` (`tuplet_factor` = normal/actual). A triplet eighth is 1/12 of a whole note in the bar length and onsets (`chord_length`), in the columns (`chord_positions`), in MIDI ticks and in `\tuplet 3/2 { ... }` blocks (shared `tuplet_blocks`, now also used by the vocal staff). MusicXML reads `time-modification` and writes it with `<tuplet type=start|stop>` marks, one group per `actual` members. The "read without tuplet timing" warning is gone. A triplet's three eighths share one beam in the guitar style with its number in the middle (`____3____`).
 - Beams follow the meter: a beam spans a quarter note, or three eighths in 3/8, 6/8, 9/8 and 12/8 (`beat_length`).
 

@@ -67,6 +67,12 @@
       <barline location="left">
         <repeat direction="forward" />
       </barline>
+      <harmony>
+        <root>
+          <root-step>A</root-step>
+        </root>
+        <kind text="m">minor</kind>
+      </harmony>
       <note>
         <pitch>
           <step>A</step>
@@ -338,6 +344,12 @@
       </note>
     </measure>
     <measure number="2">
+      <harmony>
+        <root>
+          <root-step>D</root-step>
+        </root>
+        <kind text="m">minor</kind>
+      </harmony>
       <note>
         <pitch>
           <step>A</step>
@@ -609,6 +621,12 @@
       </note>
     </measure>
     <measure number="3">
+      <harmony>
+        <root>
+          <root-step>E</root-step>
+        </root>
+        <kind text="7">dominant</kind>
+      </harmony>
       <note>
         <pitch>
           <step>G</step>
@@ -884,6 +902,12 @@
       </note>
     </measure>
     <measure number="4">
+      <harmony>
+        <root>
+          <root-step>A</root-step>
+        </root>
+        <kind text="m">minor</kind>
+      </harmony>
       <note>
         <pitch>
           <step>A</step>
@@ -1137,6 +1161,12 @@
       </note>
     </measure>
     <measure number="5">
+      <harmony>
+        <root>
+          <root-step>A</root-step>
+        </root>
+        <kind text="m">minor</kind>
+      </harmony>
       <note>
         <pitch>
           <step>E</step>
@@ -1313,6 +1343,12 @@
       </note>
     </measure>
     <measure number="6">
+      <harmony>
+        <root>
+          <root-step>D</root-step>
+        </root>
+        <kind text="m">minor</kind>
+      </harmony>
       <note>
         <pitch>
           <step>F</step>
@@ -1516,6 +1552,12 @@
       <barline location="left">
         <ending number="1" type="start" />
       </barline>
+      <harmony>
+        <root>
+          <root-step>E</root-step>
+        </root>
+        <kind text="7">dominant</kind>
+      </harmony>
       <note>
         <grace slash="yes" />
         <pitch>
@@ -1806,6 +1848,12 @@
       <barline location="left">
         <ending number="2" type="start" />
       </barline>
+      <harmony>
+        <root>
+          <root-step>A</root-step>
+        </root>
+        <kind text="m">minor</kind>
+      </harmony>
       <note>
         <pitch>
           <step>E</step>

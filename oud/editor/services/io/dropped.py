@@ -7,7 +7,7 @@ from collections import Counter
 from oud.editor.core.state import EditorState
 from petrucci.core.model import Note
 
-_PLURALS = {"hammer-on": "hammer-ons", "pull-off": "pull-offs"}
+_PLURALS = {"hammer-on": "hammer-ons", "pull-off": "pull-offs", "held note": "held notes"}
 # (singular, plural, attribute of EditorState)
 _MARKS = (
     ("slur", "slurs", "slurs"),
@@ -37,6 +37,7 @@ def _note_marks(note: Note) -> tuple[tuple[str, bool], ...]:
         (note.technique or "technique", note.technique is not None),
         ("bend", note.bend is not None),
         ("harmonic", note.harmonic),
+        ("held note", note.sustain is not None),
     )
 
 

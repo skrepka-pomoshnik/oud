@@ -137,6 +137,8 @@ def _render_header(screen: Screen, width: int, piece: Piece) -> None:
     right = clean_text(piece.composer or "")
     if width <= 0:
         return
+    if piece.capo:
+        safe_addstr(screen, 0, 0, f"Capo {piece.capo}"[:width])
     if right:
         right = right[:width]
         right_x = max(0, width - len(right))

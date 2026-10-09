@@ -246,7 +246,11 @@ def _technique_overlay(
 
 
 def _has_technique_marks(bar) -> bool:
-    return any(note.technique or note.bend is not None or note.harmonic for chord in bar.chords for note in chord.notes)
+    return any(
+        note.technique or note.bend is not None or note.harmonic or note.sustain is not None
+        for chord in bar.chords
+        for note in chord.notes
+    )
 
 
 def _draw_staff_row(

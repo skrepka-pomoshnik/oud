@@ -113,6 +113,7 @@ def _technical(note_node: ET.Element) -> tuple[int, int] | None:
 
 
 _TECHNIQUES = ("hammer-on", "pull-off")
+_QUARTERS_PER_WHOLE = 4
 
 
 class _NoteMarks(TypedDict, total=False):
@@ -253,10 +254,15 @@ class _Timeline:
     measure_end: int = 0
     notes: list[_TimedTabNote] = field(default_factory=list)
     rests: set[int] = field(default_factory=set)
+    chord_names: dict[int, str] = field(default_factory=dict)
 
     def read(self, node: ET.Element) -> None:
         tag = _local(node.tag)
-        if tag == "backup":
+        if tag == "harmony":
+            name = _chord_symbol(node)
+            if name:
+                self.chord_names.setdefault(self.cursor, name)
+        elif tag == "backup":
             self.cursor = max(0, self.cursor - _duration_units(node))
         elif tag == "forward":
             self.cursor += _duration_units(node)
@@ -290,11 +296,11 @@ class _Timeline:
             )
 
 
-def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], set[int], int]:
+def _timed_notes(measure: ET.Element) -> _Timeline:
     timeline = _Timeline()
     for node in measure:
         timeline.read(node)
-    return timeline.notes, timeline.rests, timeline.measure_end
+    return timeline
 
 
 def _written_value(node: ET.Element) -> tuple[int, bool] | None:
@@ -305,7 +311,12 @@ def _written_value(node: ET.Element) -> tuple[int, bool] | None:
     return _note_type(node)
 
 
-def _model_note(note: _TimedTabNote) -> Note:
+def _model_note(note: _TimedTabNote, *, event_duration: int, measure_end: int, divisions: int) -> Note:
+    """A note of the event; one that outlasts the event (a held bass) keeps its own length."""
+
+    sustain = None
+    if note.duration > event_duration:
+        sustain = Fraction(min(note.duration, measure_end - note.onset), divisions * _QUARTERS_PER_WHOLE)
     return Note(
         note.string,
         note.fret,
@@ -315,10 +326,57 @@ def _model_note(note: _TimedTabNote) -> Note:
         technique=note.technique,
         bend=note.bend,
         harmonic=note.harmonic,
+        sustain=sustain,
     )
 
 
-def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end: int, divisions: int) -> list[Chord]:
+_CHORD_KINDS = {
+    "major": "",
+    "minor": "m",
+    "dominant": "7",
+    "major-seventh": "maj7",
+    "minor-seventh": "m7",
+    "diminished": "dim",
+    "augmented": "aug",
+    "diminished-seventh": "dim7",
+    "half-diminished": "m7b5",
+    "suspended-fourth": "sus4",
+    "suspended-second": "sus2",
+    "major-sixth": "6",
+    "minor-sixth": "m6",
+    "dominant-ninth": "9",
+    "power": "5",
+}
+_ACCIDENTALS = {"1": "#", "-1": "b", "2": "##", "-2": "bb"}
+
+
+def _pitch_name(node: ET.Element | None, step: str, alter: str) -> str:
+    if node is None:
+        return ""
+    return _text(_child(node, step)) + _ACCIDENTALS.get(_text(_child(node, alter)).split(".")[0], "")
+
+
+def _chord_symbol(harmony: ET.Element) -> str:
+    """The chord symbol of a <harmony> as the file spells it: root, kind text (or its usual suffix) and bass."""
+
+    root = _pitch_name(_child(harmony, "root"), "root-step", "root-alter")
+    kind = _child(harmony, "kind")
+    suffix = (kind.get("text") if kind is not None else None) or _CHORD_KINDS.get(_text(kind), "")
+    bass = _pitch_name(_child(harmony, "bass"), "bass-step", "bass-alter")
+    return f"{root}{suffix}{'/' + bass if bass else ''}" if root else ""
+
+
+def _name_at(names: dict[int, str], onset: int, next_onset: int | None) -> str | None:
+    """The chord symbol written at ``onset``, or between this event and the next one."""
+
+    for at in sorted(names):
+        if at == onset or (at > onset and (next_onset is None or at < next_onset)):
+            return names[at]
+    return None
+
+
+def _group_timed_notes(timeline: _Timeline, divisions: int) -> list[Chord]:
+    notes, rests, measure_end = timeline.notes, timeline.rests, timeline.measure_end
     grouped: dict[int, dict[tuple[int, int], _TimedTabNote]] = {onset: {} for onset in rests}
     for note in notes:
         grouped.setdefault(note.onset, {})[(note.string, note.fret)] = note
@@ -338,9 +396,13 @@ def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end:
                 note_type=note_type,
                 dotted=dotted,
                 grid=None,
-                notes=[_model_note(note) for note in timed],
+                notes=[
+                    _model_note(note, event_duration=duration, measure_end=measure_end, divisions=divisions)
+                    for note in timed
+                ],
                 tuplet_actual=ratio[0] if ratio else None,
                 tuplet_normal=ratio[1] if ratio else None,
+                name=_name_at(timeline.chord_names, onset, onsets[index + 1] if index + 1 < len(onsets) else None),
             )
         )
     return events
@@ -405,8 +467,9 @@ def _parse_measure(measure: ET.Element, divisions: int) -> tuple[Bar, int]:
     bar.barline = _measure_barline(measure)
     bar.dynamic = _measure_dynamic(measure)
     bar.fermata = _measure_fermata(measure)
-    notes, rests, measure_end = _timed_notes(measure)
-    bar.chords = _group_timed_notes(notes, rests, measure_end, divisions)
+    timeline = _timed_notes(measure)
+    notes = timeline.notes
+    bar.chords = _group_timed_notes(timeline, divisions)
     if not bar.chords:
         rest = _rest_chord(measure)
         if rest is not None:
@@ -530,6 +593,11 @@ def _tab_style(details: ET.Element | None, fields: dict[str, str]) -> str | None
     if details is not None and (details.get("show-frets") or "").strip() == "letters":
         return "french"
     return "italian"
+
+
+def _capo(details: ET.Element | None) -> int | None:
+    value = _text(_child(details, "capo")) if details is not None else ""
+    return int(value) if value.isdigit() and int(value) > 0 else None
 
 
 def _foreign_fret_labels(details: ET.Element | None) -> str | None:
@@ -658,6 +726,7 @@ def _parse_piece(root: ET.Element) -> Piece:
     own_tuning = fields.get(_TUNING_FIELD) or None
     piece.tuning = own_tuning if written_by_oud(root) else own_tuning or _staff_tuning(details)
     piece.tempo = _tempo(part)
+    piece.capo = _capo(details)
     piece.style = _tab_style(details, fields)
     piece.fret_labels = fields.get(_FRET_LABELS_FIELD) or (
         None if written_by_oud(root) else _foreign_fret_labels(details)
