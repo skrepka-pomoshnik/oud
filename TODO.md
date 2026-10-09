@@ -378,10 +378,9 @@ checked against the W3C schema and examples).
      addressed by onset, with undo. Write and read them in MusicXML (`tied`,
      `slur`, `ornaments`, `words`) and in TAB (`C15` step 1). Until then `S25`
      warns on save.
-  2. Tuplet timing in the chord model (actual/normal notes): write and read
-     `time-modification` and TAB `t3` lines; the bar length check uses it.
-     Seen in `tests/fixtures/musicxml/guitar_study_am.musicxml` bar 7: the
-     triplet reads as three plain eighths and the import warns.
+  2. ~~Tuplet timing in the chord model~~ Done for MusicXML, MIDI, LilyPond and
+     the guitar beams (`DONE.md`); open: TAB `t3` lines, rests inside a tuplet
+     (they read as plain rests), tuplets in the editor's typing commands.
   3. Voices: a polyphonic tab bar keeps each note's own duration (a held bass
      under a moving melody) instead of "until the next onset". Seen in the
      guitar study: its half-note bass under eighth-note arpeggios imports as
@@ -402,9 +401,6 @@ checked against the W3C schema and examples).
      Read them as further tablature lines, which needs a second tablature part
      in the model (the same need as duet FT3 scores in `C16` item 3). Seen in
      MuseScore's `testTabs_ref` (three TAB parts, seven notes unread).
-  9. Beam by the meter: the guitar style groups by quarter-note beats, so 6/8
-     groups in twos instead of threes and a triplet splits across beats until
-     step 2 exists. Group by the bar's own meter and tuplet timing.
   8. Draw ties and slurs that cross a bar line; the note marks are kept and
      saved but the renderer takes spans inside one bar only.
 - Acceptance: the round-trip probe in `docs/musicxml-support.md` (each field

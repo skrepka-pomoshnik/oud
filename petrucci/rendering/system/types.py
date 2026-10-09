@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Any
 
 from petrucci.rendering.staff.playback import PlaybackOverlayCache
@@ -96,6 +97,7 @@ class BarMetadata:
     time_setting: str
     time_value: str
     beats: int
+    beat_length: Fraction
     sig_label: str
     barline: str
     repeat_cue: str

@@ -29,6 +29,7 @@ from petrucci.input.tablature.mutation import (
     TabMutationError,
     TabPosition,
     bar_content_length,
+    chord_length,
 )
 
 NO_NOTE_TO_REPLACE = "No note to replace"
@@ -108,7 +109,7 @@ def _target_event(state: EditorState) -> tuple[Fraction, Chord] | None:
     index = cursor_event(state)
     if index == len(chords):
         index -= 1
-    onset = sum((TabDuration.of(chord).whole_notes for chord in chords[:index]), Fraction(0))
+    onset = sum((chord_length(chord) for chord in chords[:index]), Fraction(0))
     return onset, chords[index]
 
 

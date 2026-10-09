@@ -24,7 +24,7 @@ from oud.exports.lilypond.common import (
     _split_tuning,
 )
 from oud.exports.lilypond.registration import LilyPondRegistration
-from oud.exports.lilypond.timing import duration_scale, timed_items_duration
+from oud.exports.lilypond.timing import duration_scale, timed_items_duration, tuplet_blocks
 from petrucci.core.model import Bar, Piece
 from petrucci.rendering.primitives.utils import chord_positions, note_type_to_denom
 
@@ -108,7 +108,10 @@ def _append_tab_chord_events(
     slur_ends: set[int],
 ) -> None:
     positions = chord_positions(bar, bar_width, context.default_duration)
-    for chord, (col, _denom, _dot) in zip(bar.chords, positions, strict=False):
+    opens, closes = tuplet_blocks(bar.chords)
+    for index, (chord, (col, _denom, _dot)) in enumerate(zip(bar.chords, positions, strict=False)):
+        if index in opens:
+            body.append(f"  \\tuplet {opens[index][0]}/{opens[index][1]} {{")
         denom = note_type_to_denom(chord.note_type) or context.default_duration
         dur = _duration_token(denom, chord.dotted)
         pitches = _lily_pitches_for_chord_notes(
@@ -130,6 +133,8 @@ def _append_tab_chord_events(
             body.append(f"  {pitches[0]}{dur}{suffix}{extra_suffix}")
         else:
             body.append(f"  <{' '.join(pitches)}>{dur}{suffix}{extra_suffix}")
+        if index in closes:
+            body.append("  }")
 
 
 def _append_tab_override_events(

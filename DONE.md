@@ -2,6 +2,9 @@
 
 ## Guitar tab readability (2026-10-09)
 
+- Tuplet timing for tablature chords (`C17` step 2): `Chord.tuplet_actual/tuplet_normal` (`tuplet_factor` = normal/actual). A triplet eighth is 1/12 of a whole note in the bar length and onsets (`chord_length`), in the columns (`chord_positions`), in MIDI ticks and in `\tuplet 3/2 { ... }` blocks (shared `tuplet_blocks`, now also used by the vocal staff). MusicXML reads `time-modification` and writes it with `<tuplet type=start|stop>` marks, one group per `actual` members. The "read without tuplet timing" warning is gone. A triplet's three eighths share one beam in the guitar style with its number in the middle (`____3____`).
+- Beams follow the meter: a beam spans a quarter note, or three eighths in 3/8, 6/8, 9/8 and 12/8 (`beat_length`).
+
 - Technique marks: a note's hammer-on `h`, pull-off `p`, slide `/` `\\`, bend `b` plus the fret reached (`7b9`) and harmonic `<12>` are drawn after the fret in the free cells before the next note of the string, never over a fret; French tablature skips the letters that are frets (`h`, `p`, `b`) and bends as `^`. `showtechniques=on|off`. `petrucci/rendering/bar/techniques.py`, `tests/test_tab_techniques_render.py`. A scaled bar keeps a two-digit fret in one cell, so the label width is measured on the row.
 - `timesigstyle=stacked`: numerator over denominator on two staff lines, with one blank column before the first fret (the single digit used to touch the fret: `- 42`). Imported numeric tab opens with it. One lane rule for the layout, the renderer and the editor's width planner: `petrucci.input.tablature.policy.time_cue_lane`. `tests/test_time_signature_stacked.py`.
 

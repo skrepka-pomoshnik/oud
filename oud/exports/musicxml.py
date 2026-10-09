@@ -54,6 +54,33 @@ def _duration_units(denom: int, dotted: bool) -> int:
     return (units * 3) // 2 if dotted else units
 
 
+def tuplet_marks(chords: Sequence[Chord]) -> dict[int, str]:
+    """``start`` and ``stop`` of each tuplet group, keyed by ``id(chord)``: runs of equal ratios, ``actual`` long."""
+
+    marks: dict[int, str] = {}
+    run: list[Chord] = []
+    for chord in [*chords, None]:
+        if chord is not None and chord.tuplet_actual and run and _same_ratio(run[0], chord):
+            run.append(chord)
+            continue
+        _mark_run(run, marks)
+        run = [chord] if chord is not None and chord.tuplet_actual else []
+    return marks
+
+
+def _same_ratio(left: Chord, right: Chord) -> bool:
+    return (left.tuplet_actual, left.tuplet_normal) == (right.tuplet_actual, right.tuplet_normal)
+
+
+def _mark_run(run: list[Chord], marks: dict[int, str]) -> None:
+    size = run[0].tuplet_actual or 0 if run else 0
+    for position, chord in enumerate(run):
+        if size and position % size == 0:
+            marks[id(chord)] = "start"
+        if size and position % size == size - 1:
+            marks[id(chord)] = "stop"
+
+
 def _duration_type(denom: int) -> str:
     mapping = {
         1: "whole",
@@ -256,6 +283,14 @@ def _events_for_bar(
     )
 
 
+def _append_time_modification(xml_note: Element, tuplet: tuple[int, int, str | None] | None) -> None:
+    if tuplet is None:
+        return
+    modification = SubElement(xml_note, "time-modification")
+    SubElement(modification, "actual-notes").text = str(tuplet[0])
+    SubElement(modification, "normal-notes").text = str(tuplet[1])
+
+
 def _append_rest_note(
     xml_note: Element,
     *,
@@ -263,15 +298,20 @@ def _append_rest_note(
     duration_type: str,
     dotted: bool,
     fermata: bool,
+    tuplet: tuple[int, int, str | None] | None = None,
 ) -> None:
     SubElement(xml_note, "rest")
     SubElement(xml_note, "duration").text = str(duration_units)
     SubElement(xml_note, "type").text = duration_type
     if dotted:
         SubElement(xml_note, "dot")
-    if fermata:
+    _append_time_modification(xml_note, tuplet)
+    if fermata or (tuplet and tuplet[2]):
         notations = SubElement(xml_note, "notations")
-        SubElement(notations, "fermata").text = "normal"
+        if tuplet and tuplet[2]:
+            SubElement(notations, "tuplet").set("type", tuplet[2])
+        if fermata:
+            SubElement(notations, "fermata").text = "normal"
 
 
 _TIE_ENDS: dict[str | None, tuple[str, ...]] = {"start": ("start",), "stop": ("stop",), "continue": ("stop", "start")}
@@ -328,9 +368,12 @@ def _append_note_technical(
     note_model: object | None,
     fermata: bool,
     technique_stop: str | None = None,
+    tuplet_mark: str | None = None,
 ) -> None:
     notations = SubElement(xml_note, "notations")
     _append_notations_marks(notations, note_model, technique_stop)
+    if tuplet_mark:
+        SubElement(notations, "tuplet").set("type", tuplet_mark)
     if fermata:
         SubElement(notations, "fermata").text = "normal"
     technical = SubElement(notations, "technical")
@@ -355,6 +398,7 @@ def _add_note(
     note_model: object | None = None,
     fermata: bool = False,
     technique_stop: str | None = None,
+    tuplet: tuple[int, int, str | None] | None = None,
 ) -> None:
     string, fret = note
     xml_note = SubElement(measure, "note")
@@ -367,6 +411,7 @@ def _add_note(
             duration_type=duration_type,
             dotted=dotted,
             fermata=fermata,
+            tuplet=tuplet,
         )
         return
     pitch_value = pitch_for_string[string - 1] + max(0, fret)
@@ -382,6 +427,7 @@ def _add_note(
     SubElement(xml_note, "type").text = duration_type
     if dotted:
         SubElement(xml_note, "dot")
+    _append_time_modification(xml_note, tuplet)
     _append_note_technical(
         xml_note,
         string=string,
@@ -389,6 +435,7 @@ def _add_note(
         note_model=note_model,
         fermata=fermata,
         technique_stop=technique_stop,
+        tuplet_mark=tuplet[2] if tuplet else None,
     )
 
 
@@ -630,6 +677,7 @@ def _append_musicxml_note_group(
     fermata: bool,
     note_models: Sequence[Note] | None = None,
     stops: dict[int, str] | None = None,
+    tuplet: tuple[int, int, str | None] | None = None,
 ) -> None:
     if not notes:
         _add_note(
@@ -641,6 +689,7 @@ def _append_musicxml_note_group(
             pitch_for_string=pitch_for_string,
             chord=False,
             fermata=fermata,
+            tuplet=tuplet,
         )
         return
     for index, note in enumerate(notes):
@@ -655,6 +704,7 @@ def _append_musicxml_note_group(
             note_model=note_models[index] if note_models else None,
             fermata=fermata and index == 0,
             technique_stop=(stops or {}).get(id(note_models[index])) if note_models else None,
+            tuplet=tuplet if tuplet is None or index == 0 else (tuplet[0], tuplet[1], None),
         )
 
 
@@ -668,18 +718,21 @@ def _append_musicxml_chord_notes(
 ) -> None:
     remaining_fermata = fermata_pending
     stops = technique_stops([*bar.chords, *(next_bar.chords[:1] if next_bar is not None else [])])
+    marks = tuplet_marks(bar.chords)
     for chord in bar.chords:
         denom = _note_type_to_denom(chord.note_type)
+        tuplet = (chord.tuplet_actual, chord.tuplet_normal or 1, marks.get(id(chord))) if chord.tuplet_actual else None
         _append_musicxml_note_group(
             measure,
             [(note.string, note.fret) for note in chord.notes],
-            duration_units=_duration_units(denom, bool(chord.dotted)),
+            duration_units=max(1, round(_duration_units(denom, bool(chord.dotted)) * chord.tuplet_factor)),
             duration_type=_duration_type(denom),
             dotted=bool(chord.dotted),
             pitch_for_string=pitch_for_string,
             fermata=remaining_fermata,
             note_models=chord.notes,
             stops=stops,
+            tuplet=tuplet,
         )
         remaining_fermata = False
 

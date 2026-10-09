@@ -11,6 +11,7 @@ from petrucci.input.tablature.policy import (
     tie_span_chars,
     time_cue_lane,
 )
+from petrucci.rendering.bar.beams import beat_length
 from petrucci.rendering.primitives.helpers import apply_overrides
 from petrucci.rendering.primitives.marks import (
     _imported_ft3_mark_target_rows,
@@ -107,7 +108,7 @@ def prepare_bar_metadata(
     )
     time_setting = context.settings.get("time", "C")
     time_value = resolved_bar_time_value(context.piece, abs_bar, time_setting, context.default_duration)
-    beats, _unit, sig_label = _parse_time_signature(time_value)
+    beats, unit, sig_label = _parse_time_signature(time_value)
     repeat = bar.repeat or ""
     repeat_glyph = repeat if repeat in {".:", ":.", "."} else ""
     endings = tuple(sorted(set(bar.ending_numbers)))
@@ -117,6 +118,7 @@ def prepare_bar_metadata(
         time_setting=time_setting,
         time_value=time_value,
         beats=beats,
+        beat_length=beat_length(beats, unit),
         sig_label=sig_label,
         barline=bar.barline or "|",
         repeat_cue=repeat if not repeat_glyph else "",

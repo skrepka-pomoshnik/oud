@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Any
 
 from petrucci.terminal.canvas.screen import Screen
@@ -15,6 +16,7 @@ class RhythmRenderContext:
     bar_x: int
     barpad: int
     beats: int
+    beat_length: Fraction
     cells: list[list[str]]
     chord_positions_all: list[tuple[int, int, bool]]
     cursor_bar: int

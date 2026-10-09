@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from fractions import Fraction
 
 
 @dataclass
@@ -166,6 +167,17 @@ class Chord:
     notes: list[Note] = field(default_factory=list)
     # The chord's line in its source file; written back while it still decodes to this chord.
     source_text: str | None = None
+    # A tuplet member sounds ``normal`` of its written value for every ``actual`` played (3 in the time of 2).
+    tuplet_actual: int | None = None
+    tuplet_normal: int | None = None
+
+    @property
+    def tuplet_factor(self) -> Fraction:
+        """``normal/actual`` for a tuplet member, 1 for any other chord."""
+
+        if self.tuplet_actual and self.tuplet_normal:
+            return Fraction(self.tuplet_normal, self.tuplet_actual)
+        return Fraction(1)
 
 
 @dataclass

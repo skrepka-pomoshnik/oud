@@ -181,6 +181,12 @@ class TabMutationResult:
         return bool(self.changes)
 
 
+def chord_length(chord: Chord) -> Fraction:
+    """Length of an event in whole notes: its written value, scaled when it is a tuplet member."""
+
+    return TabDuration.of(chord).whole_notes * chord.tuplet_factor
+
+
 def event_onsets(bar: Bar) -> tuple[Fraction, ...]:
     """Onset of every event in ``bar``, in whole notes."""
 
@@ -188,12 +194,12 @@ def event_onsets(bar: Bar) -> tuple[Fraction, ...]:
     total = Fraction(0)
     for chord in bar.chords:
         onsets.append(total)
-        total += TabDuration.of(chord).whole_notes
+        total += chord_length(chord)
     return tuple(onsets)
 
 
 def bar_content_length(bar: Bar) -> Fraction:
-    return sum((TabDuration.of(chord).whole_notes for chord in bar.chords), Fraction(0))
+    return sum((chord_length(chord) for chord in bar.chords), Fraction(0))
 
 
 def bar_meter_length(document: TabDocument, bar_index: int) -> Fraction | None:
@@ -381,5 +387,6 @@ __all__ = [
     "apply_tab_mutation",
     "bar_content_length",
     "bar_meter_length",
+    "chord_length",
     "event_onsets",
 ]

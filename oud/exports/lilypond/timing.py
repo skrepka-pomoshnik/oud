@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from fractions import Fraction
 from typing import Protocol
 
@@ -49,3 +49,31 @@ def duration_scale(target: Fraction, actual: Fraction) -> Fraction:
     if target <= 0 or actual <= 0:
         return Fraction(1)
     return target / actual
+
+
+def tuplet_blocks(events: Sequence[object]) -> tuple[dict[int, tuple[int, int]], set[int]]:
+    """Where ``\\tuplet`` blocks open and close: a block takes up to ``actual`` consecutive members of one ratio."""
+
+    opens: dict[int, tuple[int, int]] = {}
+    closes: set[int] = set()
+    index = 0
+    while index < len(events):
+        ratio = (getattr(events[index], "tuplet_actual", None), getattr(events[index], "tuplet_normal", None))
+        if not (ratio[0] and ratio[1]):
+            index += 1
+            continue
+        size = 1
+        while (
+            size < ratio[0]
+            and index + size < len(events)
+            and (
+                getattr(events[index + size], "tuplet_actual", None),
+                getattr(events[index + size], "tuplet_normal", None),
+            )
+            == ratio
+        ):
+            size += 1
+        opens[index] = (ratio[0], ratio[1])
+        closes.add(index + size - 1)
+        index += size
+    return opens, closes

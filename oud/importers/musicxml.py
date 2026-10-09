@@ -25,6 +25,7 @@ class _TimedTabNote:
     bend: float | None = None
     harmonic: bool = False
     fingering: str | None = None
+    tuplet: tuple[int, int] | None = None  # (actual, normal) from <time-modification>
 
 
 _RHYTHMS = tuple(
@@ -139,6 +140,18 @@ def _bend_semitones(technical: ET.Element) -> float | None:
         return float(alter) if alter else None
     except ValueError:
         return None
+
+
+def _time_modification(note_node: ET.Element) -> tuple[int, int] | None:
+    """``(actual, normal)`` of a tuplet note, from its <time-modification>."""
+
+    modification = _child(note_node, "time-modification")
+    if modification is None:
+        return None
+    actual, normal = _text(_child(modification, "actual-notes")), _text(_child(modification, "normal-notes"))
+    if not (actual.isdigit() and normal.isdigit() and int(actual) > 0 and int(normal) > 0):
+        return None
+    return int(actual), int(normal)
 
 
 def _note_marks(note_node: ET.Element) -> _NoteMarks:
@@ -270,8 +283,11 @@ class _Timeline:
             return
         technical = _technical(node)
         if technical is not None:
-            written = _written_value(node) if _child(node, "time-modification") is not None else None
-            self.notes.append(_TimedTabNote(onset, duration, technical[0], technical[1], written, **_note_marks(node)))
+            ratio = _time_modification(node)
+            written = _written_value(node) if ratio is not None else None
+            self.notes.append(
+                _TimedTabNote(onset, duration, technical[0], technical[1], written, tuplet=ratio, **_note_marks(node))
+            )
 
 
 def _timed_notes(measure: ET.Element) -> tuple[list[_TimedTabNote], set[int], int]:
@@ -316,12 +332,15 @@ def _group_timed_notes(notes: list[_TimedTabNote], rests: set[int], measure_end:
             duration = max((note.duration for note in timed), default=divisions)
         written = next((note.written for note in timed if note.written is not None), None)
         note_type, dotted = written or _rhythm_for_duration(duration, divisions)
+        ratio = next((note.tuplet for note in timed if note.tuplet is not None), None)
         events.append(
             Chord(
                 note_type=note_type,
                 dotted=dotted,
                 grid=None,
                 notes=[_model_note(note) for note in timed],
+                tuplet_actual=ratio[0] if ratio else None,
+                tuplet_normal=ratio[1] if ratio else None,
             )
         )
     return events
@@ -604,32 +623,6 @@ def _grace_notes_warning(count: int) -> str:
     return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} {verb} not read"
 
 
-def _tuplet_group_count(part: ET.Element) -> int:
-    """Tuplet groups among the tablature notes: marked ones, else modified notes over the group size."""
-
-    modified = [
-        note
-        for note in part.iter()
-        if _local(note.tag) == "note" and _child(note, "time-modification") is not None and _technical(note)
-    ]
-    marked = sum(
-        1
-        for note in modified
-        for tuplet in note.iter()
-        if _local(tuplet.tag) == "tuplet" and tuplet.get("type") == "start"
-    )
-    if marked or not modified:
-        return marked
-    modification = _child(modified[0], "time-modification")
-    actual = _text(_child(modification, "actual-notes")) if modification is not None else ""
-    return max(1, len(modified) // int(actual)) if actual.isdigit() and int(actual) else 1
-
-
-def _tuplet_warning(count: int) -> str:
-    noun, verb = ("tuplet group", "was") if count == 1 else ("tuplet groups", "were")
-    return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} {verb} read without tuplet timing"
-
-
 def _dropped_notes_warning(count: int) -> str:
     noun, verb = ("note", "was") if count == 1 else ("notes", "were")
     return f"{INFORMATIONAL_WARNING_PREFIX}{count} {noun} without tablature {verb} not read"
@@ -648,8 +641,6 @@ def _dropped_content_warnings(root: ET.Element, tab_part: ET.Element) -> list[st
         warnings.append(_other_tab_warning(other_tab))
     if graces := _grace_note_count(tab_part):
         warnings.append(_grace_notes_warning(graces))
-    if tuplets := _tuplet_group_count(tab_part):
-        warnings.append(_tuplet_warning(tuplets))
     return warnings
 
 

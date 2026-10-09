@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from petrucci.core.model import Bar, Note
+import math
+from fractions import Fraction
+
+from petrucci.core.model import Bar, Chord, Note
 from petrucci.input.tablature.policy import fret_label
 
 
@@ -91,6 +94,24 @@ def note_type_to_denom(note_type: int) -> int | None:
     return mapping.get(note_type)
 
 
+def _chord_units(chords: list[Chord], denoms: list[int], dotted: list[bool]) -> list[int]:
+    """Relative length of each event as whole units; a tuplet member is scaled by its ratio exactly."""
+
+    base = max(denoms) * 2
+    if not any(chord.tuplet_actual for chord in chords):
+        units = []
+        for denom, dot in zip(denoms, dotted, strict=False):
+            unit = max(1, base // denom)
+            units.append(max(1, (unit * 3) // 2) if dot else unit)
+        return units
+    exact = [
+        Fraction(base, denom) * (Fraction(3, 2) if dot else 1) * chord.tuplet_factor
+        for chord, denom, dot in zip(chords, denoms, dotted, strict=False)
+    ]
+    scale = math.lcm(*(value.denominator for value in exact))
+    return [max(1, int(value * scale)) for value in exact]
+
+
 def chord_positions(
     bar: Bar,
     bar_width: int,
@@ -105,14 +126,7 @@ def chord_positions(
         dotted.append(bool(chord.dotted))
     if not denoms:
         return []
-    max_denom = max(denoms)
-    base = max_denom * 2
-    units: list[int] = []
-    for denom, dot in zip(denoms, dotted, strict=False):
-        u = max(1, base // denom)
-        if dot:
-            u = max(1, (u * 3) // 2)
-        units.append(u)
+    units = _chord_units(chords, denoms, dotted)
     total = sum(units)
     if total <= 0:
         return []

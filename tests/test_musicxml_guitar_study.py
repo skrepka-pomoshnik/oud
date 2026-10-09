@@ -10,6 +10,7 @@ from oud.editor.services.io.files import render_ascii_snapshot
 from oud.exports.musicxml import export_musicxml
 from oud.importers.musicxml import _parse_piece, load_musicxml
 from petrucci.core.model import Bar, Chord, Note, Piece
+from petrucci.input.tablature.mutation import bar_content_length
 
 STUDY = "tests/fixtures/musicxml/guitar_study_am.musicxml"
 
@@ -55,10 +56,14 @@ def test_the_notation_staff_is_not_reported_as_unread() -> None:
 
 
 def test_what_is_still_lost_is_named() -> None:
-    assert set(_piece().import_warnings) == {
-        "MusicXML: 1 grace note was not read",
-        "MusicXML: 1 tuplet group was read without tuplet timing",
-    }
+    assert set(_piece().import_warnings) == {"MusicXML: 1 grace note was not read"}
+
+
+def test_the_triplet_keeps_its_timing_so_the_bar_adds_up() -> None:
+    bar = _piece().bars[6]
+
+    assert [chord.tuplet_actual for chord in bar.chords if chord.tuplet_actual] == [3, 3, 3]
+    assert bar_content_length(bar) == 1
 
 
 def test_the_fixture_is_licensed_for_the_repository() -> None:

@@ -109,6 +109,12 @@ def _duration_ticks(denom: int, dotted: bool) -> int:
     return ticks
 
 
+def _tuplet_ticks(ticks: int, chord: Chord) -> int:
+    """A tuplet member plays ``normal/actual`` of its written length."""
+
+    return max(1, round(ticks * chord.tuplet_factor))
+
+
 def _default_tuning(strings: int) -> list[int]:
     return default_tuning_pitches(strings)
 
@@ -314,7 +320,7 @@ def _bar_chord_events(
     for chord, col in zip(bar.chords, positions, strict=False):
         denom = _note_type_to_denom(chord.note_type) or default_duration
         is_dotted = chord.dotted or (dotted is not None and (bar_index, col) in dotted)
-        duration = _duration_ticks(denom, is_dotted)
+        duration = _tuplet_ticks(_duration_ticks(denom, is_dotted), chord)
         if chord.notes:
             notes = _apply_overrides(
                 chord.notes,

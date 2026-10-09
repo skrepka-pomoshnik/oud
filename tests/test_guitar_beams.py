@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
+from fractions import Fraction
 from pathlib import Path
 
 from oud.editor.services.bootstrap import init_state
 from oud.editor.services.screen.compose import compose_editor_frame
-from petrucci.rendering.bar.beams import beam_groups, beam_level, guitar_rows
+from petrucci.rendering.bar.beams import beam_groups, beam_level, beat_length, guitar_rows
 from tests.helpers_ft3 import write_galliard
 
 Position = tuple[int, int, bool]
@@ -87,3 +88,12 @@ def test_repeated_durations_keep_every_stem_in_guitar_style(tmp_path: Path) -> N
 
     # With hidden repeats only the changes of duration would keep a stem.
     assert stems.count("|") >= 6
+
+
+def test_a_compound_meter_beams_eighths_in_threes() -> None:
+    six: list[Position] = [(column * 2, 8, False) for column in range(6)]
+
+    assert beat_length(6, 8) == beat_length(3, 8) == beat_length(12, 8) == Fraction(3, 8)
+    assert beat_length(4, 4) == beat_length(3, 4) == beat_length(2, 2) == Fraction(1, 4)
+    assert _cols(beam_groups(six, beat=beat_length(6, 8))) == [[0, 2, 4], [6, 8, 10]]
+    assert _cols(beam_groups(six)) == [[0, 2], [4, 6], [8, 10]]

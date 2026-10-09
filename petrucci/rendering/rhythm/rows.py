@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 from petrucci.rendering.rhythm.chord import render_chord_rhythm
 from petrucci.rendering.rhythm.grid import render_grid_rhythm
 from petrucci.rendering.rhythm.types import RhythmRenderContext
@@ -15,6 +17,7 @@ def _render_rhythm_rows(
     bar_x: int,
     barpad: int,
     beats: int,
+    beat_length: Fraction,
     cells: list[list[str]],
     chord_positions_all: list[tuple[int, int, bool]],
     cursor_bar: int,
@@ -61,6 +64,7 @@ def _render_rhythm_rows(
         bar_x=bar_x,
         barpad=barpad,
         beats=beats,
+        beat_length=beat_length,
         cells=cells,
         chord_positions_all=chord_positions_all,
         cursor_bar=cursor_bar,

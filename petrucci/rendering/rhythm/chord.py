@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 from petrucci.input.tablature.policy import bar_has_multifret_tokens, multifret_event_gap
 from petrucci.rendering.bar.render import build_flag_rows
 from petrucci.rendering.primitives.geometry import (
@@ -91,6 +93,7 @@ def _chord_flag_plan(
             strict=False,
         )
     ]
+    ratios, tuplets = _tuplet_columns(context, flags)
     flag_cells, stem_cells = build_flag_rows(
         flags,
         spacing_mode=context.spacing_mode,
@@ -99,11 +102,31 @@ def _chord_flag_plan(
         barpad=context.barpad,
         flagstyle=context.style_policy.flagstyle,
         flaglean=context.style_policy.flaglean,
+        ratios=ratios,
+        tuplets=tuplets,
+        beat=context.beat_length,
     )
     if context.draw_pad:
         flag_cells = pad_row(flag_cells, context.display_width, context.draw_pad)
         stem_cells = pad_row(stem_cells, context.display_width, context.draw_pad)
     return FlagRowPlan(flag_cells, stem_cells, {}, duration_positions)
+
+
+def _tuplet_columns(
+    context: RhythmRenderContext,
+    flags: list[tuple[int, int, bool]],
+) -> tuple[list[Fraction], list[int]]:
+    """Length factor and tuplet number of the chord behind each flag position (1 and 0 for none)."""
+
+    by_column = {
+        column: chord
+        for (column, _denom, _dot), chord in zip(context.chord_positions_all, context.bar.chords, strict=False)
+    }
+    chords = [by_column.get(column) for column, _denom, _dot in flags]
+    return (
+        [chord.tuplet_factor if chord is not None else Fraction(1) for chord in chords],
+        [(chord.tuplet_actual or 0) if chord is not None else 0 for chord in chords],
+    )
 
 
 def _scaled_chord_plan(
@@ -143,6 +166,7 @@ def _scaled_chord_plan(
         (col, src_to_dest.get(col, _scale_col(col, context.grid_width, content_width)))
         for col, _denom, _dot in ordered_flags
     ]
+    ratios, tuplets = _tuplet_columns(context, ordered_flags)
     flag_cells, stem_cells = build_flag_rows(
         final_flags,
         spacing_mode="fixed",
@@ -154,6 +178,9 @@ def _scaled_chord_plan(
         stem_width=context.style_policy.stem_width,
         dotplacement=context.style_policy.dotplacement,
         min_gap=flag_gap,
+        ratios=ratios,
+        tuplets=tuplets,
+        beat=context.beat_length,
     )
     return FlagRowPlan(
         pad_row(flag_cells, context.display_width, context.draw_pad),

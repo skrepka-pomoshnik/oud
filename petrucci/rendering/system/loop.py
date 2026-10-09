@@ -220,6 +220,7 @@ def _render_bar(
         bar_x=bar_x,
         barpad=context.barpad,
         beats=metadata.beats,
+        beat_length=metadata.beat_length,
         cells=basics.cells,
         chord_positions_all=basics.chord_positions,
         cursor_bar=context.cursor_bar,

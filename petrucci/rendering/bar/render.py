@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 from petrucci.rendering.bar.beams import guitar_rows
 from petrucci.rendering.primitives.helpers import flag_symbols, pad_row
 from petrucci.rendering.primitives.utils import flag_row_style, spread_flag_positions, stem_row_style
@@ -17,9 +19,12 @@ def _rows_for(
     flag: str,
     stem_width: int,
     dotplacement: str,
+    ratios: list[Fraction] | None = None,
+    tuplets: list[int] | None = None,
+    beat: Fraction = Fraction(1, 4),
 ) -> tuple[list[str], list[str]]:
     if flagstyle == GUITAR_FLAG_STYLE:
-        return guitar_rows(positions, width)
+        return guitar_rows(positions, width, ratios, tuplets, beat)
     flag_cells = flag_row_style(
         positions,
         width,
@@ -43,9 +48,23 @@ def build_flag_rows(
     stem_width: int = 1,
     dotplacement: str = "afterflag",
     min_gap: int = 1,
+    ratios: list[Fraction] | None = None,
+    tuplets: list[int] | None = None,
+    beat: Fraction = Fraction(1, 4),
 ) -> tuple[list[str], list[str]]:
+    """Flag and stem rows; ``ratios`` and ``tuplets`` (aligned with ``positions``) serve the guitar style."""
+
     stem, flag = flag_symbols(flagstyle, flaglean)
-    rows = {"flagstyle": flagstyle, "stem": stem, "flag": flag, "stem_width": stem_width, "dotplacement": dotplacement}
+    rows = {
+        "flagstyle": flagstyle,
+        "stem": stem,
+        "flag": flag,
+        "stem_width": stem_width,
+        "dotplacement": dotplacement,
+        "ratios": ratios,
+        "tuplets": tuplets,
+        "beat": beat,
+    }
     if spacing_mode == "fixed":
         clamped = [(max(0, min(bar_width - 1, pos)), denom, dotted) for (pos, denom, dotted) in positions]
         return _rows_for(clamped, bar_width, **rows)

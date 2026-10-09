@@ -143,19 +143,18 @@ def _triplet_bar(groups: int = 1) -> str:
     return eighths + _note(9, duration=6, typ="quarter")
 
 
-def test_tuplet_notes_are_read_by_their_written_value() -> None:
+def test_tuplet_notes_keep_their_written_value_and_their_ratio() -> None:
     piece = _parse_piece(ET.fromstring(_score(("P1", _triplet_bar()), divisions=6)))  # noqa: S314 - inline test data
     bar = piece.bars[0]
 
     assert [(chord.note_type, chord.dotted) for chord in bar.chords] == [(5, False)] * 3 + [(4, False)]
-    assert bar_content_length(bar) == Fraction(5, 8)
-    assert piece.import_warnings == ["MusicXML: 1 tuplet group was read without tuplet timing"]
+    assert [(chord.tuplet_actual, chord.tuplet_normal) for chord in bar.chords] == [(3, 2)] * 3 + [(None, None)]
+    assert bar_content_length(bar) == Fraction(1, 4) + Fraction(1, 4)
+    assert piece.import_warnings == []
 
 
-def test_tuplet_groups_are_counted() -> None:
-    xml = _score(("P1", _triplet_bar(2)), divisions=6)
-
-    assert _warnings(xml) == ["MusicXML: 2 tuplet groups were read without tuplet timing"]
+def test_a_tuplet_no_longer_warns() -> None:
+    assert _warnings(_score(("P1", _triplet_bar(2)), divisions=6)) == []
 
 
 def test_a_bar_without_tuplets_is_read_from_its_durations() -> None:
