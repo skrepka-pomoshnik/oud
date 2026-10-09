@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from petrucci.core.model import Note
 from petrucci.input.tablature.policy import time_sig_inline_rows
+from petrucci.rendering.bar.techniques import overlay_technique_marks
 from petrucci.rendering.primitives.geometry import _scale_chord_row
 from petrucci.rendering.primitives.helpers import pad_row, safe_addstr
-from petrucci.rendering.primitives.marks import _overlay_inline_local_marks_on_display_row
+from petrucci.rendering.primitives.marks import _mapped_mark_column, _overlay_inline_local_marks_on_display_row
+from petrucci.rendering.primitives.spacing import chord_positions_distinct
+from petrucci.rendering.primitives.utils import format_fret
 from petrucci.terminal.canvas.screen import A_BOLD, A_REVERSE, Screen
 from petrucci.terminal.view.model import _inline_bass_row, _scale_col
 
@@ -67,6 +73,14 @@ def render_staff_grid(
 ) -> list[str]:
     rendered: list[str] = []
     cursor_display_index = cursor_string if cursor_string < system_display_strings else None
+    techniques = _technique_overlay(
+        bar,
+        bar_width=bar_width,
+        draw_pad=draw_pad,
+        grid_map=src_to_dest if scale_bar else grid_map,
+        settings=settings,
+        style=style,
+    )
     for display_idx, actual in enumerate(system_visual_indices[:system_display_strings]):
         row_cells, fill_char = _staff_row_cells(
             bar=bar,
@@ -83,6 +97,7 @@ def render_staff_grid(
             scale_bar=scale_bar,
             src_to_dest=src_to_dest,
             style=style,
+            techniques=techniques,
         )
         y = row_start + (rows["staff"] or 0) + display_idx
         row_text = _draw_staff_row(
@@ -157,6 +172,7 @@ def _staff_row_cells(
     scale_bar: bool,
     src_to_dest: dict[int, int],
     style: str,
+    techniques: Callable[[list[str], int], None] | None = None,
 ) -> tuple[list[str], str]:
     source_cells = cells[actual]
     fill_char = "-"
@@ -190,7 +206,47 @@ def _staff_row_cells(
             ann_target_rows=ann_target_rows,
             orn_target_rows=orn_target_rows,
         )
+        if techniques is not None:
+            techniques(row_cells, actual)
     return row_cells, fill_char
+
+
+def _technique_overlay(
+    bar,
+    *,
+    bar_width: int,
+    draw_pad: int,
+    grid_map: dict[int, int] | list[int],
+    settings: dict[str, str],
+    style: str,
+) -> Callable[[list[str], int], None] | None:
+    """Draws a row's technique marks, or ``None`` when the bar has none or they are switched off."""
+
+    if settings.get("showtechniques", "on") != "on" or not _has_technique_marks(bar):
+        return None
+    columns = [column for column, _denom, _dot in chord_positions_distinct(bar, bar_width, 4)[0]]
+    french_c = settings.get("frenchc", "normal")
+    label_mode = settings.get("fretlabelmode", "auto")
+
+    def label_for(note: Note) -> str:
+        return format_fret(style, note.fret, french_c_shape=french_c, label_mode=label_mode)[-2:]
+
+    def overlay(row_cells: list[str], actual: int) -> None:
+        overlay_technique_marks(
+            row_cells,
+            bar_chords=bar.chords,
+            string=actual + 1,
+            columns=columns,
+            to_display=lambda column: draw_pad + _mapped_mark_column(grid_map, column),
+            label_for=label_for,
+            style=style,
+        )
+
+    return overlay
+
+
+def _has_technique_marks(bar) -> bool:
+    return any(note.technique or note.bend is not None or note.harmonic for chord in bar.chords for note in chord.notes)
 
 
 def _draw_staff_row(

@@ -125,6 +125,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "bassstrings": "",
     "basslabels": "tuning",
     "showdur": "off",
+    "showtechniques": "on",
     "showspans": "off",
     "showtuplets": "off",
     "showmelody": "on",
