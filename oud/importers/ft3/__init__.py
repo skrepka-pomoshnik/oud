@@ -23,6 +23,7 @@ from oud.importers.ft3.musical.duration import (
     _normalize_vocal_event_accidentals,
     build_durations,
 )
+from oud.importers.ft3.musical.layout import apply_system_breaks
 from oud.importers.ft3.musical.lyric_scope import apply_ft3_lyric_scopes
 from oud.importers.ft3.musical.tab import (
     _apply_embedded_sections,
@@ -266,6 +267,8 @@ def _parse_body_bars(state: _BodyState) -> None:
             state.imported_chunks.append(_ImportedScoreChunk(bar_index, 0, len(chunk), raw_kind, chunk))
     if state.bar_chunks:
         _apply_embedded_sections(state.bar_chunks, state.parsed_bars)
+        if not state.imported_chunks:  # a score with other staves stores a per-bar value, not a system value
+            apply_system_breaks(state.bar_chunks, state.parsed_bars, _is_tab_bar)
 
 
 def _merge_meta_bar(target: Bar, source: Bar) -> None:

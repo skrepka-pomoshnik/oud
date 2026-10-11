@@ -1,5 +1,12 @@
 # DONE
 
+## System breaks decoded from the FT3 layout tail (2026-10-12)
+
+- Each tab record carries a per-system float after its objects; a change between consecutive records ends a system. `layout.apply_system_breaks` sets `Bar.system_break`, so `sourcebreaks`, `lybarsperline` and `lysystemsperpage` act on Gerbode's own lines.
+- Against the reference PDFs of 311 files: 149 with every break right, 2563 of 3107 breaks found, 68 false. Files with other staves or a value that changes on most bars get no breaks; the planner's defaults for sung scores apply only where the file has none.
+- Tests: `tests/test_ft3_system_breaks.py`, updated `test_ft3.py`, one regenerated curated golden (`almain-11`: render, tab and LilyPond digests; semantics unchanged).
+- Fixed a `gerbode` crash: a stem without a stencil made LilyPond abort (`57_mrs_vaux_jig_8C`).
+
 ## Layout comparison on many FT3 (2026-10-12)
 
 - `scripts/corpus/render_compare.py` typesets files with the gerbode profile (LilyPond 2.26) and measures pages, tablature systems and bars against the reference PDFs; `tests/test_corpus_render_compare.py`.

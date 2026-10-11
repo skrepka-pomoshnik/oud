@@ -129,7 +129,8 @@ The `20`/`40` interpretation is visible in Unquiet Thoughts, Czarna Krowa, and
 La Corambona: `b0 01` closes the first ending and `c0 01` closes the second.
 Earlier `oud` versions incorrectly treated `40` as a system break.
 
-No per-system line-break flag occurs in the bundled logical bar stream.
+No per-system line-break flag occurs in the bar header. Fronimo's system breaks are stored in each record's layout
+tail instead (see "Layout tail" below).
 
 ### Object count and object type
 
@@ -150,6 +151,16 @@ a text object, is read by scanning for notes as before.
 
 String byte `01` occurs 13 times in the 577-file corpus (digits with the digit flag, and a letter with no flag). It
 is read like string byte 8, a bass course; the PDFs have not yet confirmed it.
+
+### Layout tail
+
+**Confirmed (2026-10-12, 311 corpus files whose bar counts match their reference PDFs).** After its objects a tab
+record holds a two-byte object count, a four-byte float and one float (`1.0`) per object. The four-byte value is
+the same for every bar of a system, so a change between two consecutive tab records ends a system
+(`oud/importers/ft3/musical/layout.py` sets `Bar.system_break`). Of the breaks in the reference PDFs the tail finds
+about 82% and 97% of the breaks it reports are real; the rest are neighbouring systems that store the same value.
+A file with other staves (sung text, notation) stores a different value on almost every bar, so no breaks are read
+from it, and neither from a file where fewer than half of the consecutive pairs share a value.
 
 ### Chord header
 
@@ -275,9 +286,9 @@ Passacaglia this recovers:
 Terminal layout forces a new system there; LilyPond emits `\pageBreak` and the
 section marks.
 
-Exact PDF line wrapping and page composition are Fronimo engraving output, not
-logical score records observed in this corpus. `oud` therefore reflows ordinary
-systems for the current terminal width.
+Exact page composition is Fronimo engraving output and is not decoded. System
+breaks are: see "Layout tail" below. `sourcebreaks=off` reflows ordinary systems
+for the current terminal width.
 
 ## 8. Per-Note Extras
 

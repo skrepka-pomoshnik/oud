@@ -378,7 +378,8 @@ def test_real_ft3_ending_flags_match_published_first_and_second_endings() -> Non
     piece = load_ft3("tests/fixtures/ft3/corpus/01_unquiet_thoughts/unquiet_thoughts_T.ft3")
     assert piece.bars[23].ending_numbers == (1,)
     assert piece.bars[24].ending_numbers == (2,)
-    assert not any(bar.system_break for bar in piece.bars)
+    # The reference PDF has systems of 4, 4, 4, 3, 3, 4 and 3 bars; the layout tail finds all but the break after bar 8.
+    assert [index + 1 for index, bar in enumerate(piece.bars) if bar.system_break] == [4, 12, 15, 18, 22]
 
 
 @pytest.mark.ft3_corpus

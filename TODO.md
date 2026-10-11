@@ -423,21 +423,6 @@ line length decide) and check what the original `tab` program does with a long
 line (`docs/tab-format.md`). Acceptance: save and reopen a piece with no breaks
 and it still flows to the width; authored breaks survive.
 
-### C19. Decode Fronimo's system breaks from FT3
-
-Why complex: the gerbode LilyPond profile cannot match Gerbode's pages until
-the file's own system breaks are read. Measured on 311 files whose bar counts
-agree with the reference PDF (`scripts/corpus/render_compare.py` for pages and
-systems, a chord-count greedy planner for the test): no chord capacity
-reproduces the breaks (best: 56 of 311 files with the same system count, 25%
-of systems with the same bar count), so the breaks are stored in the FT3
-layout data, not derived from width. Find them in the record tail (layout
-floats) and set `Bar.system_break` in the importer; `lybarsperline`,
-`lysystemsperpage` and `sourcebreaks` already control them in `:set` and the
-TOML `[settings]` table. Acceptance: on the 60-file sample of
-`render_compare` the system count is within one for 90% of files (16 of 59
-today).
-
 ---
 
 ## Not complex tasks (open to any contributor)

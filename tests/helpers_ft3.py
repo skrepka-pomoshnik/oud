@@ -7,6 +7,7 @@ short original passages, not excerpts from any distributed corpus.
 
 from __future__ import annotations
 
+import struct
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,10 +48,12 @@ def _chord_bytes(item: Ft3Chord) -> bytes:
     return item_count + header + b"".join(_note_bytes(course, fret) for course, fret in item.notes)
 
 
-def ft3_bar(chords: Sequence[Ft3Chord], *, meter: str | None = None) -> bytes:
+def ft3_bar(chords: Sequence[Ft3Chord], *, meter: str | None = None, system: float | None = None) -> bytes:
     """One tablature bar record; ``meter`` is ``"C"`` or ``"n/d"`` for an explicit meter.
 
     Layout as in real files: a 30-byte header, then each object as item count, 4-byte header and 5-byte notes.
+    ``system`` adds the layout tail Fronimo writes: an object count, the float shared by the bars of one system,
+    and one float per object.
     """
 
     header = bytearray(HEADER_SIZE)
@@ -62,7 +65,11 @@ def ft3_bar(chords: Sequence[Ft3Chord], *, meter: str | None = None) -> bytes:
         header[8] = beat_type
         header[9] = beats
     header[28:30] = (len(chords) - 1).to_bytes(2, "little")
-    return bytes(header) + b"".join(_chord_bytes(item) for item in chords)
+    body = bytes(header) + b"".join(_chord_bytes(item) for item in chords)
+    if system is None:
+        return body
+    tail = len(chords).to_bytes(2, "little") + struct.pack("<f", system) + struct.pack("<f", 1.0) * len(chords)
+    return body + tail
 
 
 def ft3_payload(title: str, bars: Sequence[bytes]) -> bytes:

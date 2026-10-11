@@ -138,10 +138,10 @@
         "grace_notes": 0
       },
       "expectations": {
-        "render_sha256": "72b78bcadd2350005e4083d56c9734286e8ddb8ce83bd28b157727c7be7a3c27",
-        "tab_sha256": "58e87b1fcb66e00f65d77a4e12aad111262f0baa48b5668cf6129f3c6a04213a",
+        "render_sha256": "03eae42e3d9bff2aa99b27304404cc79e50169ccd1b4fa6896b1d9d10fac43aa",
+        "tab_sha256": "ffc16f60ad56dcf9d08b7dded1da23b14080a2cba6244311a03f3f7e0c2291ad",
         "tab_projection_sha256": "0ccc3b613fe14e2085929a43953ae404358af4efd63c18f4977404272d6d0a77",
-        "lilypond_sha256": "f6a1cf81730d0748542e333523a8b996badcd715567fdca5f1857e40e776af67",
+        "lilypond_sha256": "1c0e82a53068537a080619a8daa3c55c891706178e2af85a1788094c6b990a55",
         "midi_sha256": "bbc10a30f63a197e75dd9448e8ca957ecc261ec051ac7946684e726e82c79277"
       }
     },

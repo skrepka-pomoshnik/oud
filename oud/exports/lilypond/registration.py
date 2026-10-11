@@ -98,9 +98,10 @@ def _system_breaks(
 ) -> set[int]:
     breaks = _source_system_breaks(piece)
     bars_per_system = _positive_setting(settings, "lybarsperline")
-    if bars_per_system == 0 and dense_lyrics:
+    # The file's own breaks are the author's choice; the planner's defaults only stand in where there are none.
+    if bars_per_system == 0 and dense_lyrics and not breaks:
         bars_per_system = _DENSE_BARS_PER_SYSTEM
-    if bars_per_system == 0 and registered_song:
+    if bars_per_system == 0 and registered_song and not breaks:
         bars_per_system = _SONG_BARS_PER_SYSTEM
     if bars_per_system:
         breaks.update(range(bars_per_system - 1, _source_bar_count(piece) - 1, bars_per_system))
