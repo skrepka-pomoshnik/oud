@@ -12,6 +12,10 @@ GERBODE_SCORE_OVERRIDES = (
     r"    \override BarNumber.stencil = #(make-stencil-boxer 0.1 0.25 ly:text-interface::print)",
     "    barNumberVisibility = #(every-nth-bar-number-visible 5)",
     r"    \override BarNumber.break-visibility = #end-of-line-invisible",
+    # Fronimo starts a line's first chord right after the opening barline or mensuration sign.
+    r"    \override LeftEdge.space-alist.first-note = #'(fixed-space . 0.6)",
+    r"    \override BarLine.space-alist.first-note = #'(fixed-space . 0.6)",
+    r"    \override TimeSignature.space-alist.first-note = #'(fixed-space . 0.8)",
 )
 GERBODE_PAPER_MARKUP = (
     r"  bookTitleMarkup = \markup \fill-line {",
