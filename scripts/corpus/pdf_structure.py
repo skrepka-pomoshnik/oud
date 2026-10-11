@@ -26,6 +26,7 @@ BARLINE_COVERAGE = 0.85  # a barline is dark through at least this share of the 
 SYSTEM_GAP_FACTOR = 2.2  # lines further apart than this many line spacings start a new staff
 MIN_STAFF_LINES = 4
 MAIN_LINES = 6
+STRAY_GAP_FACTOR = 1.35  # a first gap this much wider than the others marks a row that is not a staff line
 FLAG_BAND = 36  # rows above the top line where rhythm flags stand (100 dpi)
 FLAG_BAND_GAP = 4
 MIN_FLAG_INK = 6
@@ -130,7 +131,19 @@ def _staves(centres: list[float]) -> list[list[float]]:
         if centre - staves[-1][-1] > spacing * SYSTEM_GAP_FACTOR:
             staves.append([])
         staves[-1].append(centre)
-    return [staff for staff in staves if len(staff) >= MIN_STAFF_LINES]
+    return [staff for staff in (_trim_stray_top(staff) for staff in staves) if len(staff) >= MIN_STAFF_LINES]
+
+
+def _trim_stray_top(staff: list[float]) -> list[float]:
+    """Drop leading rows (a heavy beam above the staff) whose gap is out of step with the staff's own spacing."""
+
+    while len(staff) > MIN_STAFF_LINES + 1:
+        gaps = [later - earlier for earlier, later in pairwise(staff)]
+        typical = statistics.median(gaps[1:])
+        if gaps[0] <= typical * STRAY_GAP_FACTOR:
+            break
+        staff = staff[1:]
+    return staff
 
 
 def _has_rhythm_ink(width: int, pixels: bytes, top: int, left: int, right: int) -> bool:
