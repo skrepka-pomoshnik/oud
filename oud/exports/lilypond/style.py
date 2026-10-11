@@ -5,7 +5,8 @@ from typing import Literal
 # Measured on Sarge Gerbode's Fronimo PDFs: about eight bars per system, boxed bar numbers every fifth bar,
 # italic serif course letters, thin stems and beams in a row above the staff.
 GERBODE_STAFF_SIZE = 18
-GERBODE_INDENT_MM = 8
+GERBODE_INDENT_MM = 0
+GERBODE_FONT = "EB Garamond"
 GERBODE_SCORE_OVERRIDES = (
     r"    \override BarNumber.font-size = #-3",
     r"    \override BarNumber.stencil = #(make-stencil-boxer 0.1 0.25 ly:text-interface::print)",
@@ -27,9 +28,10 @@ GERBODE_TAB_OVERRIDES = (
     r"    \override StaffSymbol.thickness = #0.7",
     r"    \override BarLine.hair-thickness = #0.9",
     r"    \override BarLine.thick-thickness = #4.0",
-    r"    \override TabNoteHead.font-family = #'roman",
+    r"    \override TabNoteHead.font-family = #'serif",
     r"    \override TabNoteHead.font-shape = #'italic",
     r"    \override TabNoteHead.font-series = #'medium",
+    r"    \override TabNoteHead.font-size = #1.5",
     r"    \override Stem.thickness = #0.7",
     r"    \override Beam.beam-thickness = #0.4",
     "    \\override Beam.damping = #+inf.0",
@@ -78,6 +80,7 @@ def paper_block(settings: dict[str, str]) -> list[str]:
         "  system-system-spacing.minimum-distance = #6",
         "  score-system-spacing.basic-distance = #8",
         "  score-system-spacing.minimum-distance = #6",
+        *(_gerbode_font(settings) if gerbode else ()),
         *(GERBODE_PAPER_MARKUP if gerbode else ("  oddFooterMarkup = ##f", "  evenFooterMarkup = ##f")),
         "}",
     ]
@@ -111,3 +114,12 @@ def tab_staff_overrides(settings: dict[str, str]) -> tuple[str, ...]:
 def hide_repeated_signs(settings: dict[str, str]) -> bool:
     """Gerbode style prints a rhythm sign only where the value changes; ``flagredundant`` controls it."""
     return profile_name(settings) == "gerbode" and settings.get("flagredundant", "on") == "on"
+
+
+def _gerbode_font(settings: dict[str, str]) -> tuple[str, ...]:
+    """Renaissance-style roman face for course letters and text; ``lyfont`` overrides the default family.
+
+    LilyPond falls back to its own face when the family is not installed, so the name is not validated here.
+    """
+    family = (settings.get("lyfont") or GERBODE_FONT).replace('"', "")
+    return (f'  property-defaults.fonts.serif = "{family}"',)

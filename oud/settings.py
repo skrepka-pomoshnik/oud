@@ -105,6 +105,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "fontstyle": "modern",
     "lynoteheads": "classic",
     "lyprofile": "petrucci",
+    "lyfont": "",
     "lilypond": "lilypond-2.26",
     "lilypondversion": "2.26",
     "lybarsperline": "0",

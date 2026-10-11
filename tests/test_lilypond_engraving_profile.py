@@ -116,7 +116,9 @@ def test_gerbode_profile_sets_the_reference_page_and_tab_look(tmp_path: Path) ->
     gerbode = _export_profile(tmp_path, "gerbode", lytabrhythm="full")
 
     assert "#(set-global-staff-size 18)" in gerbode
-    assert "indent = 8\\mm" in gerbode
+    assert "indent = 0\\mm" in gerbode
+    assert 'fonts.serif = "EB Garamond"' in gerbode
+    assert 'fonts.serif = "Cardo"' in _export_profile(tmp_path, "gerbode", lyfont="Cardo")
     assert "every-nth-bar-number-visible 5" in gerbode
     assert "make-stencil-boxer" in gerbode
     assert "\\override TabNoteHead.font-shape = #'italic" in gerbode

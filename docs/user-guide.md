@@ -249,7 +249,7 @@ Read-only scores accept display settings (`scoreview`, `showlyrics`,
 - Rendering: `flagstyle=standard|italian|thin|board|capirola|englishgrid|continental|guitar`, `flagplace=above|below`, `flagstems`, `flagredundant`, `showdur`, `showextras`, `showtactus`
 - Vocal display: `showmelody`, `showlyrics`, `lyricmode=first|current|all`, `lyricverse=N`, `vocalpos`
 - Rendering presets/cues: `tabnotation`, `timesigstyle`, `scoreview=score|staff`
-- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic|gerbode`, `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`, `lypapersize=letter|a4`, `lysourceheading=on|off`
+- Publication: `lilypond`, `lilypondversion=2.26|2.24`, `lyprofile=petrucci|classic|gerbode`, `lyfont=<family>` (gerbode text and course letters; default EB Garamond, LilyPond substitutes its own face when it is missing), `lynoteheads=classic|petrucci`, `lybarsperline`, `lysystemsperpage`, `lytabrhythm=minimal|full`, `lypapersize=letter|a4`, `lysourceheading=on|off`
 - Notation/meta: `style`, `strings`, `time`, `key`, `measures`, `measuresstep`, `countdots`
 - Tuning/view: `tuning`, `bassstrings`, `basslabels`, `showtuning`, `tuninglabels`, `italianorient`, `italianmultifret`, `viewinvert`, `frenchc`
 - Playback: `soundfont`, `midipatch`, `midigate`, `tempo`, `playbackscroll`, `playverses`
