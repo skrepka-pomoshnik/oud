@@ -12,6 +12,17 @@ GERBODE_SCORE_OVERRIDES = (
     "    barNumberVisibility = #(every-nth-bar-number-visible 5)",
     r"    \override BarNumber.break-visibility = #end-of-line-invisible",
 )
+GERBODE_PAPER_MARKUP = (
+    r"  bookTitleMarkup = \markup \fill-line {",
+    r"    \fontsize #5 \fromproperty #'header:title",
+    r"    \fontsize #1 \fromproperty #'header:composer",
+    "  }",
+    r"  oddFooterMarkup = \markup \override #'(baseline-skip . 3.5) \column {",
+    r"    \fontsize #-3 \fromproperty #'header:source",
+    r"    \fontsize #-3 \fromproperty #'header:tagline",
+    "  }",
+    "  evenFooterMarkup = ##f",
+)
 GERBODE_TAB_OVERRIDES = (
     r"    \override StaffSymbol.thickness = #0.7",
     r"    \override BarLine.hair-thickness = #0.9",
@@ -67,8 +78,7 @@ def paper_block(settings: dict[str, str]) -> list[str]:
         "  system-system-spacing.minimum-distance = #6",
         "  score-system-spacing.basic-distance = #8",
         "  score-system-spacing.minimum-distance = #6",
-        "  oddFooterMarkup = ##f",
-        "  evenFooterMarkup = ##f",
+        *(GERBODE_PAPER_MARKUP if gerbode else ("  oddFooterMarkup = ##f", "  evenFooterMarkup = ##f")),
         "}",
     ]
 

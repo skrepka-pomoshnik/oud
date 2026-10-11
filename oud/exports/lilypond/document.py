@@ -15,7 +15,7 @@ from oud.exports.lilypond.common import (
     _piece_has_tab_content,
 )
 from oud.exports.lilypond.registration import build_lilypond_registration
-from oud.exports.lilypond.style import paper_block, score_overrides, tab_staff_overrides
+from oud.exports.lilypond.style import paper_block, profile_name, score_overrides, tab_staff_overrides
 from oud.exports.lilypond.voices.tab import (
     _build_tab_body,
     _tab_staff_with_block,
@@ -255,6 +255,9 @@ def lilypond_text(
         settings.get("lilypondversion", "2.26"),
         include_source_heading=settings.get("lysourceheading", "on") == "on",
     )
+    if profile_name(settings) == "gerbode" and not piece.footnote:
+        # The Gerbode footer prints the tagline; without a footnote LilyPond would fill in its own.
+        header.insert(-1, "  tagline = ##f")
 
     layout: list[str] = [r"\layout {", r"  \context {", r"    \Score"]
     style = settings.get("style") or "french"

@@ -121,6 +121,8 @@ def test_gerbode_profile_sets_the_reference_page_and_tab_look(tmp_path: Path) ->
     assert "make-stencil-boxer" in gerbode
     assert "\\override TabNoteHead.font-shape = #'italic" in gerbode
     assert "\\override Beam.damping = #+inf.0" in gerbode
+    assert "header:source" in gerbode
+    assert "tagline = ##f" in gerbode
     assert "\\autoBeamOff" not in gerbode
 
 
