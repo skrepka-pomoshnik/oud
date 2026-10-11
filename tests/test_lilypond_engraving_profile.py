@@ -82,7 +82,7 @@ def test_quality_matrix_drives_petrucci_and_lilypond_contracts(tmp_path: Path) -
         assert_lilypond_contract(case, source.read_text(encoding="utf-8"))
 
 
-def _export_profile(tmp_path: Path, profile: str) -> str:
+def _export_profile(tmp_path: Path, profile: str, **extra: str) -> str:
     path = tmp_path / f"{profile}.ly"
     piece = Piece(title="Registration proof", bars=[Bar()], strings=6)
     export_lilypond(
@@ -91,7 +91,7 @@ def _export_profile(tmp_path: Path, profile: str) -> str:
         {},
         {},
         12,
-        settings={"lyprofile": profile, "style": "french", "tuning": "g4d4a3f3c3g2"},
+        settings={"lyprofile": profile, "style": "french", "tuning": "g4d4a3f3c3g2", **extra},
     )
     return path.read_text(encoding="utf-8")
 
@@ -110,6 +110,18 @@ def test_petrucci_profile_is_default_and_classic_is_an_escape_hatch(tmp_path: Pa
     assert "oddFooterMarkup = ##f" in petrucci
     assert "#(set-global-staff-size 16)" not in classic
     assert classic.count(r"\paper { indent = 0\mm }") == 1
+
+
+def test_gerbode_profile_sets_the_reference_page_and_tab_look(tmp_path: Path) -> None:
+    gerbode = _export_profile(tmp_path, "gerbode", lytabrhythm="full")
+
+    assert "#(set-global-staff-size 18)" in gerbode
+    assert "indent = 8\\mm" in gerbode
+    assert "every-nth-bar-number-visible 5" in gerbode
+    assert "make-stencil-boxer" in gerbode
+    assert "\\override TabNoteHead.font-shape = #'italic" in gerbode
+    assert "\\override Beam.damping = #+inf.0" in gerbode
+    assert "\\autoBeamOff" not in gerbode
 
 
 def test_lilypond_224_compatibility_source_is_explicit(tmp_path: Path) -> None:

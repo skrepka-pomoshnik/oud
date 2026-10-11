@@ -211,8 +211,8 @@ _ENUM_VALUES: dict[str, tuple[set[str], str]] = {
         "Lynoteheads must be classic/petrucci",
     ),
     "lyprofile": (
-        {"classic", "petrucci"},
-        "Lyprofile must be classic/petrucci",
+        {"classic", "petrucci", "gerbode"},
+        "Lyprofile must be classic/petrucci/gerbode",
     ),
     "lytabrhythm": (
         {"minimal", "full"},

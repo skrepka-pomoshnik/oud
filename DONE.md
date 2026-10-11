@@ -1,5 +1,12 @@
 # DONE
 
+## Gerbode LilyPond profile (2026-10-11)
+
+- `lyprofile=gerbode`: staff size 18, narrow indent, beams on, flat thin beams and stems, italic serif course letters, boxed bar numbers every fifth bar.
+- Checked on Milano 28 rendered with LilyPond 2.26 next to Gerbode's PDF; test `test_gerbode_profile_sets_the_reference_page_and_tab_look`.
+- Open gaps: bass courses drawn as staff lines, no footnote/source footer, beam groups shorter than Fronimo's.
+- Batch 2 (259 new FT3/PDF pairs): 250 bar counts inside the PDF bounds; 9 differ by 1–3 bars.
+
 ## FT3 rests and the reference-PDF harness (2026-10-11)
 
 - FT3 tablature rests are decoded: a record is read as its sequence of objects (item count, 4-byte header, 5-byte notes) and an object with no notes is a rest chord; a rest-only record is a bar. Before, every rest was dropped and so were bars that held only rests, which shifted bar numbers and repeat signs (`sonata_CM_02_minuetto_T` read 53 bars; Gerbode's PDF has 56, and so does Oud now). 98.5% of 32,504 corpus records decode identically, 415 gain rests, 24 gain content, none regress (checked by decoding every record both ways). Records that start with a text object, or do not frame, still use the scanning reader. String byte 1 reads as a bass course.

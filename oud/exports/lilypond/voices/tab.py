@@ -340,7 +340,7 @@ def _tab_option_prefix(settings: dict[str, str]) -> list[str]:
     lines: list[str] = []
     if settings.get("lytabrhythm", settings.get("tabnotation", "minimal")) == "full":
         lines.extend([r"  \tabFullNotation", r"  \stemUp"])
-        if settings.get("lyprofile", "petrucci") != "classic":
+        if settings.get("lyprofile", "petrucci") == "petrucci":
             lines.append(r"  \autoBeamOff")
     if settings.get("tabnotation", "minimal") == "full":
         lines.extend(
