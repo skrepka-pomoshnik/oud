@@ -10,7 +10,7 @@ import pytest
 from oud.exports.lilypond import export_lilypond
 from oud.importers.ft3 import load_ft3
 from oud.settings import DEFAULT_SETTINGS
-from petrucci import Bar, Chord, Note, Piece
+from petrucci import Bar, Piece
 from petrucci.engraving.layout.engine import LayoutViewport, NotationLayoutPolicy, layout_score
 from scripts.corpus.fetch import load_manifest, manifest_paths
 from tests.engraving_quality_matrix import (
@@ -129,18 +129,13 @@ def test_gerbode_profile_sets_the_reference_page_and_tab_look(tmp_path: Path) ->
     assert "\\autoBeamOff" not in gerbode
 
 
-def test_gerbode_profile_prints_a_rhythm_sign_only_where_the_value_changes(tmp_path: Path) -> None:
-    chords = [Chord(4, False, None, [Note(1, 0, 0)]) for _ in range(3)]
-    piece = Piece(title="Signs", bars=[Bar(chords=chords)], strings=6)
-    texts = {}
-    for flagredundant in ("on", "off"):
-        path = tmp_path / f"{flagredundant}.ly"
-        settings = {"lyprofile": "gerbode", "style": "french", "lytabrhythm": "full", "flagredundant": flagredundant}
-        export_lilypond(str(path), piece, {}, {}, 12, settings=settings)
-        texts[flagredundant] = path.read_text(encoding="utf-8")
+def test_gerbode_profile_floats_the_rhythm_row_above_the_staff(tmp_path: Path) -> None:
+    gerbode = _export_profile(tmp_path, "gerbode", lytabrhythm="full")
 
-    assert texts["on"].count("\\once \\omit Stem") == 2
-    assert "\\once \\omit Stem" not in texts["off"]
+    assert "define (detached-stem grob)" in gerbode
+    assert "Stem.stencil = #detached-stem" in gerbode
+    assert "Beam.positions" in gerbode
+    assert "\\autoBeamOff" not in gerbode
 
 
 def test_lilypond_224_compatibility_source_is_explicit(tmp_path: Path) -> None:

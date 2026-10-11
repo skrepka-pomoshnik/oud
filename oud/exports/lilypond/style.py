@@ -17,6 +17,14 @@ GERBODE_SCORE_OVERRIDES = (
     r"    \override BarLine.space-alist.first-note = #'(fixed-space . 0.6)",
     r"    \override TimeSignature.space-alist.first-note = #'(fixed-space . 0.8)",
 )
+GERBODE_STEM_SCHEME = (
+    "#(define (detached-stem grob)",
+    "   (let* ((stil (ly:stem::print grob))",
+    "          (y (ly:stencil-extent stil Y))",
+    "          (x (ly:stencil-extent stil X))",
+    "          (low (max (car y) 5.0)))",
+    "     (if (< low (cdr y)) (ly:round-filled-box x (cons low (cdr y)) 0) point-stencil)))",
+)
 GERBODE_PAPER_MARKUP = (
     r"  bookTitleMarkup = \markup \fill-line {",
     r"    \fontsize #5 \fromproperty #'header:title",
@@ -36,10 +44,14 @@ GERBODE_TAB_OVERRIDES = (
     r"    \override TabNoteHead.font-shape = #'italic",
     r"    \override TabNoteHead.font-series = #'medium",
     r"    \override TabNoteHead.font-size = #1.5",
-    r"    \override Stem.thickness = #0.7",
-    r"    \override Beam.beam-thickness = #0.4",
+    r"    \override Stem.thickness = #0.6",
+    r"    \override Beam.beam-thickness = #0.28",
     "    \\override Beam.damping = #+inf.0",
-    r"    \override Stem.length = #5",
+    # Fronimo's rhythm row floats above the staff: the stem is clipped to the part above the top line
+    # and the beams sit at a fixed height.
+    r"    \override Stem.length = #8",
+    r"    \override Beam.positions = #'(7 . 7)",
+    r"    \override Stem.stencil = #detached-stem",
 )
 
 LilyPondProfile = Literal["classic", "petrucci", "gerbode"]
@@ -115,11 +127,6 @@ def tab_staff_overrides(settings: dict[str, str]) -> tuple[str, ...]:
     )
 
 
-def hide_repeated_signs(settings: dict[str, str]) -> bool:
-    """Gerbode style prints a rhythm sign only where the value changes; ``flagredundant`` controls it."""
-    return profile_name(settings) == "gerbode" and settings.get("flagredundant", "on") == "on"
-
-
 def _gerbode_font(settings: dict[str, str]) -> tuple[str, ...]:
     """Renaissance-style roman face for course letters and text; ``lyfont`` overrides the default family.
 
@@ -127,3 +134,8 @@ def _gerbode_font(settings: dict[str, str]) -> tuple[str, ...]:
     """
     family = (settings.get("lyfont") or GERBODE_FONT).replace('"', "")
     return (f'  property-defaults.fonts.serif = "{family}"',)
+
+
+def scheme_helpers(settings: dict[str, str]) -> tuple[str, ...]:
+    """Scheme definitions the profile's overrides refer to; emitted before the layout block."""
+    return GERBODE_STEM_SCHEME if profile_name(settings) == "gerbode" else ()

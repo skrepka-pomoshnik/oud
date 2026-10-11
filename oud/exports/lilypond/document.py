@@ -15,7 +15,7 @@ from oud.exports.lilypond.common import (
     _piece_has_tab_content,
 )
 from oud.exports.lilypond.registration import build_lilypond_registration
-from oud.exports.lilypond.style import paper_block, profile_name, score_overrides, tab_staff_overrides
+from oud.exports.lilypond.style import paper_block, profile_name, scheme_helpers, score_overrides, tab_staff_overrides
 from oud.exports.lilypond.voices.tab import (
     _build_tab_body,
     _tab_staff_with_block,
@@ -292,6 +292,7 @@ def lilypond_text(
             "",
             *paper_block(settings),
             "",
+            *scheme_helpers(settings),
             *blocks,
             "",
             *layout,
