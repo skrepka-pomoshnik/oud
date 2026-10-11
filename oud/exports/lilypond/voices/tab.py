@@ -24,6 +24,7 @@ from oud.exports.lilypond.common import (
     _split_tuning,
 )
 from oud.exports.lilypond.registration import LilyPondRegistration
+from oud.exports.lilypond.style import voice_overrides
 from oud.exports.lilypond.timing import duration_scale, timed_items_duration, tuplet_blocks
 from petrucci.core.model import Bar, Piece
 from petrucci.rendering.primitives.utils import chord_positions, note_type_to_denom
@@ -339,7 +340,7 @@ def _tab_tuning_prefix(settings: dict[str, str], piece: Piece) -> list[str]:
 def _tab_option_prefix(settings: dict[str, str]) -> list[str]:
     lines: list[str] = []
     if settings.get("lytabrhythm", settings.get("tabnotation", "minimal")) == "full":
-        lines.extend([r"  \tabFullNotation", r"  \stemUp"])
+        lines.extend([r"  \tabFullNotation", r"  \stemUp", *voice_overrides(settings)])
         if settings.get("lyprofile", "petrucci") == "petrucci":
             lines.append(r"  \autoBeamOff")
     if settings.get("tabnotation", "minimal") == "full":

@@ -10,7 +10,7 @@ import pytest
 from oud.exports.lilypond import export_lilypond
 from oud.importers.ft3 import load_ft3
 from oud.settings import DEFAULT_SETTINGS
-from petrucci import Bar, Piece
+from petrucci import Bar, Chord, Note, Piece
 from petrucci.engraving.layout.engine import LayoutViewport, NotationLayoutPolicy, layout_score
 from scripts.corpus.fetch import load_manifest, manifest_paths
 from tests.engraving_quality_matrix import (
@@ -130,10 +130,15 @@ def test_gerbode_profile_sets_the_reference_page_and_tab_look(tmp_path: Path) ->
 
 
 def test_gerbode_profile_floats_the_rhythm_row_above_the_staff(tmp_path: Path) -> None:
-    gerbode = _export_profile(tmp_path, "gerbode", lytabrhythm="full")
+    piece = Piece(title="Row", bars=[Bar(chords=[Chord(4, False, None, [Note(1, 0, 0)])])], strings=6)
+    path = tmp_path / "row.ly"
+    settings = {"lyprofile": "gerbode", "style": "french", "lytabrhythm": "full"}
+    export_lilypond(str(path), piece, {}, {}, 12, settings=settings)
+    gerbode = path.read_text(encoding="utf-8")
 
     assert "define (detached-stem grob)" in gerbode
-    assert "Stem.stencil = #detached-stem" in gerbode
+    assert gerbode.index("\\tabFullNotation") < gerbode.index("Stem.stencil = #detached-stem")
+    assert "\\overrideTimeSignatureSettings 4/4" in gerbode
     assert "Beam.positions" in gerbode
     assert "\\autoBeamOff" not in gerbode
 

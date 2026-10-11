@@ -22,7 +22,7 @@ GERBODE_STEM_SCHEME = (
     "   (let* ((stil (ly:stem::print grob))",
     "          (y (ly:stencil-extent stil Y))",
     "          (x (ly:stencil-extent stil X))",
-    "          (low (max (car y) 5.0)))",
+    "          (low (max (car y) (- (cdr y) 2.4))))",
     "     (if (< low (cdr y)) (ly:round-filled-box x (cons low (cdr y)) 0) point-stencil)))",
 )
 GERBODE_PAPER_MARKUP = (
@@ -44,14 +44,24 @@ GERBODE_TAB_OVERRIDES = (
     r"    \override TabNoteHead.font-shape = #'italic",
     r"    \override TabNoteHead.font-series = #'medium",
     r"    \override TabNoteHead.font-size = #1.5",
-    r"    \override Stem.thickness = #0.6",
-    r"    \override Beam.beam-thickness = #0.28",
+    r"    \override Stem.thickness = #0.5",
+    r"    \override Beam.beam-thickness = #0.16",
+    r"    \override Beam.gap = #0.4",
     "    \\override Beam.damping = #+inf.0",
-    # Fronimo's rhythm row floats above the staff: the stem is clipped to the part above the top line
+    # Fronimo's rhythm row floats above the staff: the stem is clipped to a short stub under the beams
     # and the beams sit at a fixed height.
     r"    \override Stem.length = #8",
-    r"    \override Beam.positions = #'(7 . 7)",
-    r"    \override Stem.stencil = #detached-stem",
+    r"    \override Beam.positions = #'(5.5 . 5.5)",
+)
+# \tabFullNotation resets the stem stencil inside the voice, so this override is emitted after it.
+# Fronimo closes a beam group at every quarter beat, whatever the meter.
+GERBODE_BEAT_METERS = (("2/2", 4), ("4/4", 4), ("3/4", 3), ("3/2", 6), ("6/4", 6), ("2/4", 2))
+GERBODE_VOICE_OVERRIDES = (
+    r"  \override Stem.stencil = #detached-stem",
+    *(
+        rf"  \overrideTimeSignatureSettings {meter} #'(1 . 4) #'({' '.join('1' * beats)}) #'()"
+        for meter, beats in GERBODE_BEAT_METERS
+    ),
 )
 
 LilyPondProfile = Literal["classic", "petrucci", "gerbode"]
@@ -139,3 +149,8 @@ def _gerbode_font(settings: dict[str, str]) -> tuple[str, ...]:
 def scheme_helpers(settings: dict[str, str]) -> tuple[str, ...]:
     """Scheme definitions the profile's overrides refer to; emitted before the layout block."""
     return GERBODE_STEM_SCHEME if profile_name(settings) == "gerbode" else ()
+
+
+def voice_overrides(settings: dict[str, str]) -> tuple[str, ...]:
+    """Overrides that must follow ``\\tabFullNotation`` inside the tab voice."""
+    return GERBODE_VOICE_OVERRIDES if profile_name(settings) == "gerbode" else ()
