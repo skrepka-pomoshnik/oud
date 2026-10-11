@@ -4,8 +4,11 @@ from typing import Literal
 
 # Measured on Sarge Gerbode's Fronimo PDFs: about eight bars per system, boxed bar numbers every fifth bar,
 # italic serif course letters, thin stems and beams in a row above the staff.
-GERBODE_STAFF_SIZE = 18
+# Tab line spacing is 1.5 staff spaces; 21.5pt gives Gerbode's 8.07pt between courses.
+GERBODE_STAFF_SIZE = 21.5
 GERBODE_INDENT_MM = 0
+GERBODE_LEFT_MM = 15.7
+GERBODE_RIGHT_MM = 24.3
 GERBODE_FONT = "EB Garamond"
 GERBODE_SCORE_OVERRIDES = (
     r"    \override BarNumber.font-size = #-3",
@@ -22,8 +25,13 @@ GERBODE_STEM_SCHEME = (
     "   (let* ((stil (ly:stem::print grob))",
     "          (y (ly:stencil-extent stil Y))",
     "          (x (ly:stencil-extent stil X))",
-    "          (low (max (car y) (- (cdr y) 2.4))))",
-    "     (if (< low (cdr y)) (ly:round-filled-box x (cons low (cdr y)) 0) point-stencil)))",
+    "          (heads (ly:grob-array->list (ly:grob-object grob 'note-heads)))",
+    "          (dotted (and (pair? heads) (ly:grob? (ly:grob-object (car heads) 'dot))))",
+    "          (low (max (car y) (- (cdr y) 2.4)))",
+    "          (stub (if (< low (cdr y)) (ly:round-filled-box x (cons low (cdr y)) 0) point-stencil))",
+    "          (dot (ly:stencil-translate (make-circle-stencil 0.24 0 #t)",
+    "                                     (cons (+ (cdr x) 0.7) (- (cdr y) 1.1)))))",
+    "     (if dotted (ly:stencil-add stub dot) stub)))",
 )
 GERBODE_PAPER_MARKUP = (
     r"  bookTitleMarkup = \markup \fill-line {",
@@ -48,6 +56,9 @@ GERBODE_TAB_OVERRIDES = (
     r"    \override Beam.beam-thickness = #0.16",
     r"    \override Beam.gap = #0.4",
     "    \\override Beam.damping = #+inf.0",
+    r"    \override Dots.stencil = ##f",
+    r"    \override TupletBracket.bracket-visibility = ##f",
+    r"    \override TupletNumber.font-size = #-3",
     # Fronimo's rhythm row floats above the staff: the stem is clipped to a short stub under the beams
     # and the beams sit at a fixed height.
     r"    \override Stem.length = #8",
@@ -96,8 +107,8 @@ def paper_block(settings: dict[str, str]) -> list[str]:
         "  ragged-last-bottom = ##t",
         r"  top-margin = 10\mm",
         r"  bottom-margin = 10\mm",
-        r"  left-margin = 12\mm",
-        r"  right-margin = 12\mm",
+        rf"  left-margin = {GERBODE_LEFT_MM if gerbode else 12}\mm",
+        rf"  right-margin = {GERBODE_RIGHT_MM if gerbode else 12}\mm",
         "  top-system-spacing.basic-distance = #8",
         "  top-system-spacing.minimum-distance = #6",
         "  markup-system-spacing.basic-distance = #8",
@@ -154,3 +165,8 @@ def scheme_helpers(settings: dict[str, str]) -> tuple[str, ...]:
 def voice_overrides(settings: dict[str, str]) -> tuple[str, ...]:
     """Overrides that must follow ``\\tabFullNotation`` inside the tab voice."""
     return GERBODE_VOICE_OVERRIDES if profile_name(settings) == "gerbode" else ()
+
+
+def rests_carry_rhythm_signs(settings: dict[str, str]) -> bool:
+    """Fronimo prints a rest as a bare rhythm sign; a hidden note head gives LilyPond the stem and flag to draw."""
+    return profile_name(settings) == "gerbode" and settings.get("lytabrhythm", "full") == "full"

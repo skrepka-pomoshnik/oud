@@ -24,7 +24,7 @@ from oud.exports.lilypond.common import (
     _split_tuning,
 )
 from oud.exports.lilypond.registration import LilyPondRegistration
-from oud.exports.lilypond.style import voice_overrides
+from oud.exports.lilypond.style import rests_carry_rhythm_signs, voice_overrides
 from oud.exports.lilypond.timing import duration_scale, timed_items_duration, tuplet_blocks
 from petrucci.core.model import Bar, Piece
 from petrucci.rendering.primitives.utils import chord_positions, note_type_to_denom
@@ -128,7 +128,10 @@ def _append_tab_chord_events(
             slur_ends=slur_ends,
         )
         extra_suffix = _chord_ft3_markup_suffix(chord, settings)
-        if not pitches:
+        if not pitches and rests_carry_rhythm_signs(settings) and context.source_tuning_lookup:
+            top_course = _midi_to_lilypond(context.source_tuning_lookup[0])
+            body.append(f"  \\once \\omit TabNoteHead {top_course}{dur}")
+        elif not pitches:
             body.append(f"  r{dur}")
         elif len(pitches) == 1:
             body.append(f"  {pitches[0]}{dur}{suffix}{extra_suffix}")

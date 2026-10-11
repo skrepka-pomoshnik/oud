@@ -115,7 +115,7 @@ def test_petrucci_profile_is_default_and_classic_is_an_escape_hatch(tmp_path: Pa
 def test_gerbode_profile_sets_the_reference_page_and_tab_look(tmp_path: Path) -> None:
     gerbode = _export_profile(tmp_path, "gerbode", lytabrhythm="full")
 
-    assert "#(set-global-staff-size 18)" in gerbode
+    assert "#(set-global-staff-size 21.5)" in gerbode
     assert "indent = 0\\mm" in gerbode
     assert 'fonts.serif = "EB Garamond"' in gerbode
     assert 'fonts.serif = "Cardo"' in _export_profile(tmp_path, "gerbode", lyfont="Cardo")
@@ -141,6 +141,22 @@ def test_gerbode_profile_floats_the_rhythm_row_above_the_staff(tmp_path: Path) -
     assert "\\overrideTimeSignatureSettings 4/4" in gerbode
     assert "Beam.positions" in gerbode
     assert "\\autoBeamOff" not in gerbode
+
+
+def test_gerbode_profile_prints_rests_and_dots_as_rhythm_signs(tmp_path: Path) -> None:
+    chords = [Chord(4, True, None, [Note(1, 0, 0)]), Chord(8, False, None, [])]
+    piece = Piece(title="Signs", bars=[Bar(chords=chords)], strings=6)
+    texts = {}
+    for profile in ("gerbode", "petrucci"):
+        path = tmp_path / f"{profile}.ly"
+        settings = {"lyprofile": profile, "style": "french", "lytabrhythm": "full"}
+        export_lilypond(str(path), piece, {}, {}, 12, settings=settings)
+        texts[profile] = path.read_text(encoding="utf-8")
+
+    assert "\\once \\omit TabNoteHead" in texts["gerbode"]
+    assert "\\override Dots.stencil = ##f" in texts["gerbode"]
+    assert "\\once \\omit TabNoteHead" not in texts["petrucci"]
+    assert " r64" in texts["petrucci"]
 
 
 def test_lilypond_224_compatibility_source_is_explicit(tmp_path: Path) -> None:
