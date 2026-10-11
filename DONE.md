@@ -1,5 +1,11 @@
 # DONE
 
+## Layout comparison on many FT3 (2026-10-12)
+
+- `scripts/corpus/render_compare.py` typesets files with the gerbode profile (LilyPond 2.26) and measures pages, tablature systems and bars against the reference PDFs; `tests/test_corpus_render_compare.py`.
+- 60 files of batch 2: 59 compiled, 44 with the reference page count, 16 with a system count within one. Gerbode's system breaks are authored, not derivable from chord counts (TODO C19).
+- One file fails to compile (`57_mrs_vaux_jig_8C`); not yet investigated.
+
 ## Gerbode LilyPond profile (2026-10-11)
 
 - `lyprofile=gerbode`: staff size 18, narrow indent, beams on, flat thin beams and stems, italic serif course letters, boxed bar numbers every fifth bar.
