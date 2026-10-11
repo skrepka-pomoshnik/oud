@@ -25,6 +25,11 @@ LINE_DENSITY = 0.75  # and dark over this share of the extent it covers
 BARLINE_COVERAGE = 0.85  # a barline is dark through at least this share of the staff height
 SYSTEM_GAP_FACTOR = 2.2  # lines further apart than this many line spacings start a new staff
 MIN_STAFF_LINES = 4
+MAIN_LINES = 6
+FLAG_BAND = 36  # rows above the top line where rhythm flags stand (100 dpi)
+FLAG_BAND_GAP = 4
+MIN_FLAG_INK = 6
+BARLINE_MERGE = 14  # pixels at 100 dpi (3.5 mm): no bar is narrower than a double barline with its repeat dots
 PGM_MAGIC = b"P5"
 PGM_HEADER_FIELDS = 3  # width, height, maximum grey value
 MIN_STAFF_CENTRES = 2
@@ -39,10 +44,19 @@ class SystemShape:
     bottom: int
     lines: int
     barlines: tuple[int, ...]
+    flagged: tuple[int, ...] = ()
 
     @property
     def bars(self) -> int:
+        """Spans between barlines: an upper bound, since a meter sign beside a double bar counts as one."""
+
         return max(0, len(self.barlines) - 1)
+
+    @property
+    def bars_with_flags(self) -> int:
+        """Spans that carry rhythm flags: a lower bound, since Fronimo leaves out a flag that repeats."""
+
+        return max(0, len(self.flagged) - 1)
 
 
 @dataclass(frozen=True)
@@ -119,6 +133,26 @@ def _staves(centres: list[float]) -> list[list[float]]:
     return [staff for staff in staves if len(staff) >= MIN_STAFF_LINES]
 
 
+def _has_rhythm_ink(width: int, pixels: bytes, top: int, left: int, right: int) -> bool:
+    """Whether the band above the staff, where the rhythm flags stand, has ink between two barlines."""
+
+    rows = range(max(0, top - FLAG_BAND), max(0, top - FLAG_BAND_GAP))
+    dark = sum(1 for row in rows for column in range(left + 1, right) if pixels[row * width + column] < DARK)
+    return dark >= MIN_FLAG_INK
+
+
+def _bars_with_flags(width: int, pixels: bytes, top: int, barlines: tuple[int, ...]) -> tuple[int, ...]:
+    """Barlines with the spans that hold no rhythm flags (a meter sign beside a double bar) folded away."""
+
+    kept = [barlines[0]] if barlines else []
+    for left, right in pairwise(barlines):
+        if _has_rhythm_ink(width, pixels, top, left, right):
+            kept.append(right)
+        elif kept and right == barlines[-1]:
+            kept[-1] = right  # a closing double barline after the last bar
+    return tuple(kept)
+
+
 def _barlines(width: int, pixels: bytes, top: int, bottom: int) -> tuple[int, ...]:
     height = bottom - top + 1
     needed = height * BARLINE_COVERAGE
@@ -130,8 +164,8 @@ def _barlines(width: int, pixels: bytes, top: int, bottom: int) -> tuple[int, ..
     return tuple(int(centre) for centre in _merge_runs(_close_gaps(columns)))
 
 
-def _close_gaps(columns: list[int], gap: int = 4) -> list[int]:
-    """Fill gaps of a few pixels so a double barline (thin and thick) counts once."""
+def _close_gaps(columns: list[int], gap: int = BARLINE_MERGE) -> list[int]:
+    """Fill small gaps so a double barline, or a barline with repeat dots beside it, counts once."""
 
     filled: list[int] = []
     for column in columns:
@@ -146,7 +180,10 @@ def analyse_bitmap(width: int, height: int, pixels: bytes) -> PageShape:
     systems = []
     for staff in _staves(centres):
         top, bottom = int(staff[0]), int(staff[-1])
-        systems.append(SystemShape(top, bottom, len(staff), _barlines(width, pixels, top, bottom)))
+        # Bass courses add lines below the six main ones; barlines are drawn through the main lines only.
+        main_bottom = int(staff[min(len(staff), MAIN_LINES) - 1])
+        lines = _barlines(width, pixels, top, main_bottom)
+        systems.append(SystemShape(top, bottom, len(staff), lines, _bars_with_flags(width, pixels, top, lines)))
     return PageShape(width, height, tuple(systems))
 
 
@@ -174,7 +211,8 @@ def main(argv: list[str] | None = None) -> int:
     for path in args.pdfs:
         pages = analyse_pdf(path)
         bars = sum(system.bars for page in pages for system in page.systems)
-        print(f"{path.name}: {len(pages)} pages, {bars} bars")
+        low = sum(system.bars_with_flags for page in pages for system in page.systems)
+        print(f"{path.name}: {len(pages)} pages, {low}..{bars} bars")
         for number, page in enumerate(pages, start=1):
             print(f"  page {number}: " + ", ".join(f"{s.bars}b/{s.lines}l" for s in page.systems))
     return 0

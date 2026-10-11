@@ -29,6 +29,7 @@ class FileResult:
     name: str
     oud_bars: int | None
     pdf_bars: int | None
+    pdf_bars_low: int | None
     pages: int
     systems: int
     line_counts: tuple[int, ...]
@@ -36,28 +37,37 @@ class FileResult:
 
     @property
     def agrees(self) -> bool:
-        return self.oud_bars is not None and self.oud_bars == self.pdf_bars
+        """Oud's count lies between the bars carrying flags and all spans between barlines."""
+
+        if self.oud_bars is None or self.pdf_bars is None or self.pdf_bars_low is None:
+            return False
+        return self.pdf_bars_low <= self.oud_bars <= self.pdf_bars
 
 
-def _pdf_summary(pages: list[PageShape]) -> tuple[int, int, tuple[int, ...]]:
+def _pdf_summary(pages: list[PageShape]) -> tuple[int, int, int, tuple[int, ...]]:
     """Bars and systems of the tablature staves (six or more lines); notation staves have four or five."""
 
     staves = [system for page in pages for system in page.systems]
     tab = [system for system in staves if system.lines >= TAB_ONLY_LINES]
-    return sum(system.bars for system in tab), len(tab), tuple(sorted({system.lines for system in staves}))
+    return (
+        sum(system.bars for system in tab),
+        sum(system.bars_with_flags for system in tab),
+        len(tab),
+        tuple(sorted({system.lines for system in staves})),
+    )
 
 
 def compare_entry(ft3: Path, pdf: Path, name: str) -> FileResult:
     try:
         oud_bars: int | None = len(load_ft3(str(ft3)).bars)
     except (OSError, ValueError) as exc:
-        return FileResult(name, None, None, 0, 0, (), f"ft3: {exc}")
+        return FileResult(name, None, None, None, 0, 0, (), f"ft3: {exc}")
     try:
         pages = analyse_pdf(pdf)
     except PdfStructureError as exc:
-        return FileResult(name, oud_bars, None, 0, 0, (), f"pdf: {exc}")
-    pdf_bars, systems, line_counts = _pdf_summary(pages)
-    return FileResult(name, oud_bars, pdf_bars, len(pages), systems, line_counts)
+        return FileResult(name, oud_bars, None, None, 0, 0, (), f"pdf: {exc}")
+    pdf_bars, pdf_low, systems, line_counts = _pdf_summary(pages)
+    return FileResult(name, oud_bars, pdf_bars, pdf_low, len(pages), systems, line_counts)
 
 
 def collect(manifests: list[Path], pdf_dir: Path, *, limit: int) -> list[FileResult]:
@@ -73,11 +83,18 @@ def collect(manifests: list[Path], pdf_dir: Path, *, limit: int) -> list[FileRes
     return results
 
 
+def _distance(result: FileResult) -> int:
+    """How far Oud's count lies outside the measured bounds (positive: the PDF has more bars)."""
+
+    oud, high, low = result.oud_bars or 0, result.pdf_bars or 0, result.pdf_bars_low or 0
+    return high - oud if oud > high else (low - oud if oud < low else 0)
+
+
 def summary(results: list[FileResult]) -> str:
     compared = [result for result in results if result.oud_bars is not None and result.pdf_bars is not None]
     agree = sum(result.agrees for result in compared)
-    differences = Counter((result.pdf_bars or 0) - (result.oud_bars or 0) for result in compared if not result.agrees)
-    lines = [f"{len(results)} pairs, {len(compared)} measured, {agree} with equal bar counts"]
+    differences = Counter(_distance(result) for result in compared if not result.agrees)
+    lines = [f"{len(results)} pairs, {len(compared)} measured, {agree} with a bar count inside the measured bounds"]
     lines.append(
         "difference (pdf - oud) histogram: "
         + ", ".join(f"{key:+d}:{count}" for key, count in sorted(differences.items())[:12])
@@ -86,7 +103,7 @@ def summary(results: list[FileResult]) -> str:
 
 
 def _difference_line(result: FileResult) -> str:
-    detail = f"oud {result.oud_bars}, pdf {result.pdf_bars}, lines {result.line_counts}"
+    detail = f"oud {result.oud_bars}, pdf {result.pdf_bars_low}..{result.pdf_bars}, lines {result.line_counts}"
     return f"  {result.name}: {detail} {result.error or ''}".rstrip()
 
 
