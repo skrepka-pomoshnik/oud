@@ -24,6 +24,7 @@ from oud.exports.lilypond.common import (
     _split_tuning,
 )
 from oud.exports.lilypond.registration import LilyPondRegistration
+from oud.exports.lilypond.style import hide_repeated_signs
 from oud.exports.lilypond.timing import duration_scale, timed_items_duration, tuplet_blocks
 from petrucci.core.model import Bar, Piece
 from petrucci.rendering.primitives.utils import chord_positions, note_type_to_denom
@@ -109,9 +110,16 @@ def _append_tab_chord_events(
 ) -> None:
     positions = chord_positions(bar, bar_width, context.default_duration)
     opens, closes = tuplet_blocks(bar.chords)
+    quiet_repeats = hide_repeated_signs(settings)
+    previous: tuple[int, bool] | None = None
     for index, (chord, (col, _denom, _dot)) in enumerate(zip(bar.chords, positions, strict=False)):
+        sign = (chord.note_type, chord.dotted)
+        hide_sign = quiet_repeats and sign == previous and bool(chord.notes)
+        previous = sign
         if index in opens:
             body.append(f"  \\tuplet {opens[index][0]}/{opens[index][1]} {{")
+        if hide_sign:
+            body.append(r"  \once \omit Stem \once \omit Flag \once \omit Dots")
         denom = note_type_to_denom(chord.note_type) or context.default_duration
         dur = _duration_token(denom, chord.dotted)
         pitches = _lily_pitches_for_chord_notes(
@@ -340,7 +348,7 @@ def _tab_option_prefix(settings: dict[str, str]) -> list[str]:
     lines: list[str] = []
     if settings.get("lytabrhythm", settings.get("tabnotation", "minimal")) == "full":
         lines.extend([r"  \tabFullNotation", r"  \stemUp"])
-        if settings.get("lyprofile", "petrucci") == "petrucci":
+        if settings.get("lyprofile", "petrucci") == "petrucci" or hide_repeated_signs(settings):
             lines.append(r"  \autoBeamOff")
     if settings.get("tabnotation", "minimal") == "full":
         lines.extend(

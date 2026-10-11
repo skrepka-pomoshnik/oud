@@ -106,3 +106,8 @@ def tab_staff_overrides(settings: dict[str, str]) -> tuple[str, ...]:
         r"    \override Stem.thickness = #0.9",
         r"    \override Beam.beam-thickness = #0.48",
     )
+
+
+def hide_repeated_signs(settings: dict[str, str]) -> bool:
+    """Gerbode style prints a rhythm sign only where the value changes; ``flagredundant`` controls it."""
+    return profile_name(settings) == "gerbode" and settings.get("flagredundant", "on") == "on"
