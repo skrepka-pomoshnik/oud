@@ -22,16 +22,18 @@ GERBODE_SCORE_OVERRIDES = (
 )
 GERBODE_STEM_SCHEME = (
     "#(define (detached-stem grob)",
-    "   (let* ((stil (ly:stem::print grob))",
-    "          (y (ly:stencil-extent stil Y))",
-    "          (x (ly:stencil-extent stil X))",
-    "          (heads (ly:grob-array->list (ly:grob-object grob 'note-heads)))",
-    "          (dotted (and (pair? heads) (ly:grob? (ly:grob-object (car heads) 'dot))))",
-    "          (low (max (car y) (- (cdr y) 2.8)))",
-    "          (stub (if (< low (cdr y)) (ly:round-filled-box x (cons low (cdr y)) 0) point-stencil))",
-    "          (dot (ly:stencil-translate (make-circle-stencil 0.24 0 #t)",
-    "                                     (cons (+ (cdr x) 0.7) (- (cdr y) 1.1)))))",
-    "     (if dotted (ly:stencil-add stub dot) stub)))",
+    "   (let ((stil (ly:stem::print grob)))",
+    "     (if (not (ly:stencil? stil))",
+    "         stil",
+    "         (let* ((y (ly:stencil-extent stil Y))",
+    "                (x (ly:stencil-extent stil X))",
+    "                (heads (ly:grob-array->list (ly:grob-object grob 'note-heads)))",
+    "                (dotted (and (pair? heads) (ly:grob? (ly:grob-object (car heads) 'dot))))",
+    "                (low (max (car y) (- (cdr y) 2.8)))",
+    "                (stub (if (< low (cdr y)) (ly:round-filled-box x (cons low (cdr y)) 0) point-stencil))",
+    "                (dot (ly:stencil-translate (make-circle-stencil 0.24 0 #t)",
+    "                                           (cons (+ (cdr x) 0.7) (- (cdr y) 1.1)))))",
+    "           (if dotted (ly:stencil-add stub dot) stub)))))",
 )
 GERBODE_PAPER_MARKUP = (
     r"  bookTitleMarkup = \markup \fill-line {",

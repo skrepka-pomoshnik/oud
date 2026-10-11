@@ -137,6 +137,8 @@ def test_gerbode_profile_floats_the_rhythm_row_above_the_staff(tmp_path: Path) -
     gerbode = path.read_text(encoding="utf-8")
 
     assert "define (detached-stem grob)" in gerbode
+    # A stem without a stencil (an unstemmed note) must pass through, or LilyPond aborts while drawing.
+    assert "(not (ly:stencil? stil))" in gerbode
     assert gerbode.index("\\tabFullNotation") < gerbode.index("Stem.stencil = #detached-stem")
     assert "\\overrideTimeSignatureSettings 4/4" in gerbode
     assert "Beam.positions" in gerbode
