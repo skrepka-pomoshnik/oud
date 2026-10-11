@@ -111,7 +111,7 @@
       "bars": 61,
       "strings": 6,
       "style": null,
-      "tab_chords": 291,
+      "tab_chords": 292,
       "staff_kinds": {
         "comment": 1
       },
@@ -177,7 +177,7 @@
       "bars": 170,
       "strings": 9,
       "style": null,
-      "tab_chords": 1608,
+      "tab_chords": 1611,
       "staff_kinds": {
         "comment": 1
       },
@@ -211,7 +211,7 @@
       "bars": 25,
       "strings": 8,
       "style": null,
-      "tab_chords": 110,
+      "tab_chords": 113,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -243,7 +243,7 @@
       "bars": 151,
       "strings": 6,
       "style": null,
-      "tab_chords": 547,
+      "tab_chords": 549,
       "staff_kinds": {
         "layout": 1
       },
@@ -346,7 +346,7 @@
       "bars": 13,
       "strings": 8,
       "style": null,
-      "tab_chords": 84,
+      "tab_chords": 86,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -398,7 +398,7 @@
       "bars": 50,
       "strings": 8,
       "style": null,
-      "tab_chords": 158,
+      "tab_chords": 160,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -519,7 +519,7 @@
       "bars": 19,
       "strings": 11,
       "style": null,
-      "tab_chords": 229,
+      "tab_chords": 230,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -583,7 +583,7 @@
       "bars": 89,
       "strings": 6,
       "style": null,
-      "tab_chords": 328,
+      "tab_chords": 332,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -734,7 +734,7 @@
       "bars": 54,
       "strings": 6,
       "style": null,
-      "tab_chords": 284,
+      "tab_chords": 286,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -818,7 +818,7 @@
       "bars": 21,
       "strings": 6,
       "style": null,
-      "tab_chords": 139,
+      "tab_chords": 140,
       "staff_kinds": {
         "comment": 1
       },
@@ -870,7 +870,7 @@
       "bars": 21,
       "strings": 12,
       "style": null,
-      "tab_chords": 230,
+      "tab_chords": 234,
       "staff_kinds": {
         "comment": 1
       },
@@ -1104,7 +1104,7 @@
       "bars": 27,
       "strings": 8,
       "style": null,
-      "tab_chords": 117,
+      "tab_chords": 118,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1120,7 +1120,7 @@
       "bars": 126,
       "strings": 6,
       "style": null,
-      "tab_chords": 433,
+      "tab_chords": 436,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1136,7 +1136,7 @@
       "bars": 77,
       "strings": 12,
       "style": null,
-      "tab_chords": 171,
+      "tab_chords": 180,
       "staff_kinds": {
         "comment": 1,
         "layout": 1,
@@ -1224,16 +1224,12 @@
       "title": "sonata_CM_02_minuetto_T.ft3",
       "composer": "Abel",
       "format": "ft3",
-      "bars": 53,
+      "bars": 56,
       "strings": 9,
       "style": null,
-      "tab_chords": 131,
-      "staff_kinds": {
-        "barline": 1,
-        "comment": 1,
-        "note": 1
-      },
-      "notation_events": 1,
+      "tab_chords": 141,
+      "staff_kinds": {},
+      "notation_events": 0,
       "lyrics": 0
     },
     {
@@ -1317,7 +1313,7 @@
       "bars": 32,
       "strings": 10,
       "style": null,
-      "tab_chords": 396,
+      "tab_chords": 397,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1369,7 +1365,7 @@
       "bars": 226,
       "strings": 12,
       "style": null,
-      "tab_chords": 661,
+      "tab_chords": 673,
       "staff_kinds": {
         "comment": 1
       },
@@ -1435,7 +1431,7 @@
       "bars": 23,
       "strings": 12,
       "style": null,
-      "tab_chords": 156,
+      "tab_chords": 157,
       "staff_kinds": {
         "comment": 1
       },
@@ -1487,7 +1483,7 @@
       "bars": 40,
       "strings": 8,
       "style": null,
-      "tab_chords": 171,
+      "tab_chords": 172,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1503,7 +1499,7 @@
       "bars": 40,
       "strings": 8,
       "style": null,
-      "tab_chords": 171,
+      "tab_chords": 172,
       "staff_kinds": {
         "comment": 1,
         "lyrics": 1,
@@ -1539,7 +1535,7 @@
       "bars": 49,
       "strings": 11,
       "style": null,
-      "tab_chords": 169,
+      "tab_chords": 171,
       "staff_kinds": {
         "comment": 1,
         "lyrics": 4,
@@ -1639,7 +1635,7 @@
       "bars": 27,
       "strings": 8,
       "style": null,
-      "tab_chords": 117,
+      "tab_chords": 118,
       "staff_kinds": {
         "comment": 1,
         "lyrics": 1,
@@ -1659,7 +1655,7 @@
       "bars": 48,
       "strings": 6,
       "style": null,
-      "tab_chords": 336,
+      "tab_chords": 337,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1675,7 +1671,7 @@
       "bars": 28,
       "strings": 7,
       "style": null,
-      "tab_chords": 138,
+      "tab_chords": 139,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1787,7 +1783,7 @@
       "bars": 54,
       "strings": 8,
       "style": null,
-      "tab_chords": 275,
+      "tab_chords": 276,
       "staff_kinds": {
         "comment": 1
       },
@@ -1821,7 +1817,7 @@
       "bars": 57,
       "strings": 6,
       "style": null,
-      "tab_chords": 289,
+      "tab_chords": 291,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1905,7 +1901,7 @@
       "bars": 21,
       "strings": 12,
       "style": null,
-      "tab_chords": 230,
+      "tab_chords": 234,
       "staff_kinds": {
         "comment": 1
       },

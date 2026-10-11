@@ -1,5 +1,11 @@
 # DONE
 
+## FT3 rests and the reference-PDF harness (2026-10-11)
+
+- FT3 tablature rests are decoded: a record is read as its sequence of objects (item count, 4-byte header, 5-byte notes) and an object with no notes is a rest chord; a rest-only record is a bar. Before, every rest was dropped and so were bars that held only rests, which shifted bar numbers and repeat signs (`sonata_CM_02_minuetto_T` read 53 bars; Gerbode's PDF has 56, and so does Oud now). 98.5% of 32,504 corpus records decode identically, 415 gain rests, 24 gain content, none regress (checked by decoding every record both ways). Records that start with a text object, or do not frame, still use the scanning reader. String byte 1 reads as a bass course.
+- Fewer phantom staves: the rest records used to become imported "barline" and "comment" staves; the manifests and tests that expected those were updated (`scripts/corpus/refresh_manifest.py` rewrites the decoded counts; 74 fields over 5 manifests; `courant_duet` no longer has a phantom note staff; the Petrucci curated TAB, LilyPond and MIDI digests of the two excerpts that contain rests).
+- Local tools against Gerbode's Fronimo PDFs (untracked `downloads/gerbode/`, never committed): `scripts/corpus/pdfs.py` fetches them in resumable batches of 500, `pdf_structure.py` reads the systems and bars of a rasterised page, `fidelity.py` compares the bar counts with what the importer decodes.
+
 ## Guitar tab readability (2026-10-09)
 
 - Held notes (`C17` step 3): `Note.sustain` keeps how long a note rings when that outlasts its chord (a bass under moving eighths). MusicXML reads it from the note's own duration and writes it as a second voice (`<backup>`, voice 2); MIDI rings it for its length; the guitar renderer draws `=` along its string. `.tab` and the LilyPond tab voice do not carry it (the save names `held notes`). `tests/test_held_notes.py`.

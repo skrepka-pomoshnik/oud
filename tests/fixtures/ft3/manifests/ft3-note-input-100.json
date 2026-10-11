@@ -42,7 +42,7 @@
       "size": 1750,
       "strings": 11,
       "style": null,
-      "tab_chords": 229,
+      "tab_chords": 230,
       "title": "1_suite_18_allemande.ft3",
       "url": "https://browse.lutemusic.org/composers/Froberger/1_suite_18_allemande.ft3"
     },
@@ -57,7 +57,7 @@
       "size": 2584,
       "strings": 6,
       "style": null,
-      "tab_chords": 433,
+      "tab_chords": 436,
       "title": "noe_noe_noe.ft3",
       "url": "https://browse.lutemusic.org/composers/Borrono/noe_noe_noe.ft3"
     },
@@ -222,22 +222,22 @@
       "size": 1909,
       "strings": 6,
       "style": null,
-      "tab_chords": 291,
+      "tab_chords": 292,
       "title": "milano_123_quand_io_penso_al_martir_arcadelt.ft3",
       "url": "https://browse.lutemusic.org/composers/Milano/milano_123_quand_io_penso_al_martir_arcadelt.ft3"
     },
     {
-      "bars": 53,
+      "bars": 56,
       "composer": "Abel",
       "lyrics": 0,
-      "notation_events": 1,
-      "note_staffs": 1,
+      "notation_events": 0,
+      "note_staffs": 0,
       "path": "note-input-100/016/sonata_CM_02_minuetto_T.ft3",
       "sha256": "b1a8e8702e387d9698ac263c3eb29a48fa456b472376ec6e4f275de3c56b9383",
       "size": 1562,
       "strings": 9,
       "style": null,
-      "tab_chords": 131,
+      "tab_chords": 141,
       "title": "sonata_CM_02_minuetto_T.ft3",
       "url": "https://browse.lutemusic.org/composers/Abel/sonata_CM_02_minuetto_T.ft3"
     },
@@ -267,7 +267,7 @@
       "size": 1128,
       "strings": 8,
       "style": null,
-      "tab_chords": 84,
+      "tab_chords": 86,
       "title": "17_consort_4_tudorH.ft3",
       "url": "https://browse.lutemusic.org/composers/TudorH/17_consort_4_tudorH.ft3"
     },
@@ -312,7 +312,7 @@
       "size": 2099,
       "strings": 6,
       "style": null,
-      "tab_chords": 284,
+      "tab_chords": 286,
       "title": "12_precamur.ft3",
       "url": "https://browse.lutemusic.org/composers/White/12_precamur.ft3"
     },
@@ -327,7 +327,7 @@
       "size": 2038,
       "strings": 6,
       "style": null,
-      "tab_chords": 328,
+      "tab_chords": 332,
       "title": "memento_salutis_byrdW.ft3",
       "url": "https://browse.lutemusic.org/composers/Byrd/memento_salutis_byrdW.ft3"
     },
@@ -357,7 +357,7 @@
       "size": 2812,
       "strings": 8,
       "style": null,
-      "tab_chords": 171,
+      "tab_chords": 172,
       "title": "o_felice_01.ft3",
       "url": "https://browse.lutemusic.org/composers/Ortiz/o_felice_01.ft3"
     },
@@ -417,7 +417,7 @@
       "size": 6210,
       "strings": 11,
       "style": null,
-      "tab_chords": 169,
+      "tab_chords": 171,
       "title": "disperate_speranze_S.ft3",
       "url": "https://browse.lutemusic.org/composers/LRossi/disperate_speranze_S.ft3"
     },
@@ -477,7 +477,7 @@
       "size": 1831,
       "strings": 12,
       "style": null,
-      "tab_chords": 230,
+      "tab_chords": 234,
       "title": "prelude_03_theorbo.ft3",
       "url": "https://browse.lutemusic.org/composers/Wilson/prelude_03_theorbo.ft3"
     },
@@ -492,7 +492,7 @@
       "size": 1316,
       "strings": 8,
       "style": null,
-      "tab_chords": 117,
+      "tab_chords": 118,
       "title": "recit_de_la_beaute_T.ft3",
       "url": "https://browse.lutemusic.org/composers/Lully/recit_de_la_beaute_T.ft3"
     },
@@ -597,7 +597,7 @@
       "size": 1976,
       "strings": 10,
       "style": null,
-      "tab_chords": 396,
+      "tab_chords": 397,
       "title": "frescobaldi_toccata.ft3",
       "url": "https://browse.lutemusic.org/composers/Frescobaldi/frescobaldi_toccata.ft3"
     },
@@ -657,7 +657,7 @@
       "size": 6794,
       "strings": 12,
       "style": null,
-      "tab_chords": 171,
+      "tab_chords": 180,
       "title": "la_couperin_trio.ft3",
       "url": "https://browse.lutemusic.org/composers/Forqueray/la_couperin_trio.ft3"
     },
@@ -687,7 +687,7 @@
       "size": 2086,
       "strings": 8,
       "style": null,
-      "tab_chords": 275,
+      "tab_chords": 276,
       "title": "the_entertainer_joplinS.ft3",
       "url": "https://browse.lutemusic.org/composers/Popular/the_entertainer_joplinS.ft3"
     },
@@ -822,7 +822,7 @@
       "size": 1448,
       "strings": 6,
       "style": null,
-      "tab_chords": 139,
+      "tab_chords": 140,
       "title": "30_consort_16_tudorH.ft3",
       "url": "https://browse.lutemusic.org/composers/TudorH/30_consort_16_tudorH.ft3"
     },
@@ -867,7 +867,7 @@
       "size": 2978,
       "strings": 6,
       "style": null,
-      "tab_chords": 547,
+      "tab_chords": 549,
       "title": "quam_terra_pontus_byrdW.ft3",
       "url": "https://browse.lutemusic.org/composers/Byrd/quam_terra_pontus_byrdW.ft3"
     },
@@ -882,7 +882,7 @@
       "size": 1935,
       "strings": 6,
       "style": null,
-      "tab_chords": 289,
+      "tab_chords": 291,
       "title": "dufay-languis.ft3",
       "url": "https://browse.lutemusic.org/composers/Dufay/dufay-languis.ft3"
     },
@@ -897,7 +897,7 @@
       "size": 1617,
       "strings": 8,
       "style": null,
-      "tab_chords": 171,
+      "tab_chords": 172,
       "title": "o_felice_01_T.ft3",
       "url": "https://browse.lutemusic.org/composers/Ortiz/o_felice_01_T.ft3"
     },
@@ -927,7 +927,7 @@
       "size": 5813,
       "strings": 9,
       "style": null,
-      "tab_chords": 1608,
+      "tab_chords": 1611,
       "title": "une_jeune_fillette.ft3",
       "url": "https://browse.lutemusic.org/composers/Bacheler/une_jeune_fillette.ft3"
     },
@@ -987,7 +987,7 @@
       "size": 1833,
       "strings": 12,
       "style": null,
-      "tab_chords": 230,
+      "tab_chords": 234,
       "title": "prelude_03_archlute.ft3",
       "url": "https://browse.lutemusic.org/composers/Wilson/prelude_03_archlute.ft3"
     },
@@ -1002,7 +1002,7 @@
       "size": 2448,
       "strings": 8,
       "style": null,
-      "tab_chords": 117,
+      "tab_chords": 118,
       "title": "recit_de_la_beaute.ft3",
       "url": "https://browse.lutemusic.org/composers/Lully/recit_de_la_beaute.ft3"
     },
@@ -1227,7 +1227,7 @@
       "size": 2200,
       "strings": 6,
       "style": null,
-      "tab_chords": 336,
+      "tab_chords": 337,
       "title": "galliard_wagstaff.ft3",
       "url": "https://browse.lutemusic.org/composers/Pilkington/galliard_wagstaff.ft3"
     },
@@ -1287,7 +1287,7 @@
       "size": 1590,
       "strings": 8,
       "style": null,
-      "tab_chords": 158,
+      "tab_chords": 160,
       "title": "pavan_4_T.ft3",
       "url": "https://browse.lutemusic.org/composers/Holborne/pavan_4_T.ft3"
     },
@@ -1332,7 +1332,7 @@
       "size": 1475,
       "strings": 12,
       "style": null,
-      "tab_chords": 156,
+      "tab_chords": 157,
       "title": "prelude_02_theorbo.ft3",
       "url": "https://browse.lutemusic.org/composers/Wilson/prelude_02_theorbo.ft3"
     },
@@ -1437,7 +1437,7 @@
       "size": 1528,
       "strings": 7,
       "style": null,
-      "tab_chords": 138,
+      "tab_chords": 139,
       "title": "77_mrs_norrishes_delight.ft3",
       "url": "https://browse.lutemusic.org/composers/Dowland/77_mrs_norrishes_delight.ft3"
     },

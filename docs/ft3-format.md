@@ -139,6 +139,18 @@ records use a marker `01 30` through `01 35` at bytes `30..31`.
 
 ## 5. Tablature Objects
 
+### Object sequence and rests
+
+**Confirmed (2026-10-11, bar counts of the reference PDFs).** After the 30-byte header a record is its objects in
+order: a two-byte item count (the first one sits at bytes 30..31), a four-byte chord header, then five bytes per
+note, `count - 1` notes in all. Bytes 28..29 plus one give the number of objects; whatever follows them is a layout
+tail (floats). **An object whose item count is 1 has no notes and is a rest**, with the value and dot of its header;
+a record made only of rests is still a bar. A record whose objects do not frame this way, and one that starts with
+a text object, is read by scanning for notes as before.
+
+String byte `01` occurs 13 times in the 577-file corpus (digits with the digit flag, and a letter with no flag). It
+is read like string byte 8, a bass course; the PDFs have not yet confirmed it.
+
 ### Chord header
 
 **Confirmed subset.** A chord header is four bytes:

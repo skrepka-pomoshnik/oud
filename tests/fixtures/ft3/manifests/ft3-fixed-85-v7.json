@@ -151,7 +151,7 @@
       "bars": 48,
       "strings": 7,
       "style": null,
-      "tab_chords": 200,
+      "tab_chords": 202,
       "staff_kinds": {
         "comment": 1,
         "note": 3
@@ -284,7 +284,7 @@
       "bars": 30,
       "strings": 8,
       "style": null,
-      "tab_chords": 180,
+      "tab_chords": 182,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -574,7 +574,7 @@
       "bars": 27,
       "strings": 6,
       "style": null,
-      "tab_chords": 139,
+      "tab_chords": 143,
       "staff_kinds": {
         "comment": 1
       },
@@ -643,7 +643,7 @@
       "bars": 20,
       "strings": 7,
       "style": null,
-      "tab_chords": 212,
+      "tab_chords": 218,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -813,7 +813,7 @@
       "bars": 116,
       "strings": 6,
       "style": null,
-      "tab_chords": 389,
+      "tab_chords": 390,
       "staff_kinds": {
         "comment": 1
       },
@@ -831,7 +831,7 @@
       "bars": 88,
       "strings": 6,
       "style": null,
-      "tab_chords": 379,
+      "tab_chords": 381,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -863,7 +863,7 @@
       "bars": 61,
       "strings": 7,
       "style": null,
-      "tab_chords": 376,
+      "tab_chords": 380,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1082,7 +1082,7 @@
       "bars": 27,
       "strings": 6,
       "style": null,
-      "tab_chords": 106,
+      "tab_chords": 108,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0
@@ -1390,7 +1390,7 @@
       "bars": 97,
       "strings": 7,
       "style": null,
-      "tab_chords": 685,
+      "tab_chords": 686,
       "staff_kinds": {},
       "notation_events": 0,
       "lyrics": 0

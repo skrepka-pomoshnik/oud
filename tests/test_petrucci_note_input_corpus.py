@@ -106,7 +106,7 @@ def test_public_note_input_reconstructs_all_100_new_gerbode_scores(
         assert entered.score == expected
         tab_event_count += _event_count(expected)
 
-    assert canonical_count == 7
+    assert canonical_count == 6  # the seventh was a phantom staff read from rest records of a tablature-only score
     assert tab_event_count >= 20_000
 
 
@@ -218,7 +218,8 @@ def _tab_note_sequence(piece: Piece, *, score_index: int) -> tuple[NotationScore
                 dict.fromkeys(pitch_from_midi(string_pitches[note.string - 1] + note.fret) for note in chord.notes),
             )
             event_id = f"{measure_id}:event-{chord_index}"
-            event = NotationEvent(event_id, onset, duration.duration, EventKind.NOTE, pitches)
+            kind = EventKind.NOTE if pitches else EventKind.REST  # a chord without notes is a rest
+            event = NotationEvent(event_id, onset, duration.duration, kind, pitches)
             events.append(event)
             operations.extend(_event_operations(staff_id, measure_id, event))
             onset += duration.duration

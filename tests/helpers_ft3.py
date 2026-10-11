@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 RECORD_SEPARATOR = b"\x03\x80"
-HEADER_SIZE = 32
+HEADER_SIZE = 30  # the first object's item count follows directly, at bytes 30..31
 METER_COMMON = 0x01
 METER_EXPLICIT = 0x06
 RHYTHM_CODE_OFFSET = 2  # chord header byte 0 is note_type - 2
@@ -48,7 +48,10 @@ def _chord_bytes(item: Ft3Chord) -> bytes:
 
 
 def ft3_bar(chords: Sequence[Ft3Chord], *, meter: str | None = None) -> bytes:
-    """One tablature bar record; ``meter`` is ``"C"`` or ``"n/d"`` for an explicit meter."""
+    """One tablature bar record; ``meter`` is ``"C"`` or ``"n/d"`` for an explicit meter.
+
+    Layout as in real files: a 30-byte header, then each object as item count, 4-byte header and 5-byte notes.
+    """
 
     header = bytearray(HEADER_SIZE)
     if meter == "C":

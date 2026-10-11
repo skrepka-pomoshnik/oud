@@ -354,14 +354,8 @@ def test_expanded_corpus_preserves_newly_decoded_score_semantics(fixed_pieces: d
     ]
     assert [(note.string, note.fret, note.ft3_extra_residual) for note in mozart_notes] == [(9, 0, None)]
     mozart = by_name["mozart_variations.ft3"]
-    assert mozart.imported_score is not None
-    assert all(staff.kind != "note" for staff in mozart.imported_score.staffs)
-    assert any(
-        row.kind == "control" and row.text.strip() == "'_6"
-        for staff in mozart.imported_score.staffs
-        for bar in staff.bars
-        for row in bar.text_rows
-    )
+    # Rest records are tablature bars; they used to be read as staves that carried layout bytes as "control" text.
+    assert mozart.imported_score is None or all(staff.kind != "note" for staff in mozart.imported_score.staffs)
 
     gesualdo = by_name["gesualdo_gagliarda_4.ft3"]
     assert gesualdo.imported_score is not None
@@ -398,7 +392,7 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
         except PieceAdapterError as exc:
             rejected[_relative(path)] = str(exc)
 
-    assert len(notation) == 49
+    assert len(notation) == 49  # courant_duet no longer has a phantom note staff, so it leaves this subset
     assert rejected == {
         "tests/fixtures/ft3/corpus/note-input-100/028/disperate_speranze_S.ft3": (
             "tie target 'piece:staff:1:bar:12:event:2:0' has no preceding event with a shared pitch"
@@ -407,16 +401,13 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
             "tie target 'piece:staff:0:bar:33:event:2:0' has no preceding event with a shared pitch"
         ),
         "tests/fixtures/ft3/corpus/random-50-v3/041/sonata_CM_01_moderato.ft3": (
-            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+            "tie target 'piece:staff:0:bar:9:event:1:0' has no preceding event with a shared pitch"
         ),
         "tests/fixtures/ft3/corpus/random-63-v4/001/sonata_CM_02_minuetto.ft3": (
-            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
+            "tie target 'piece:staff:0:bar:3:event:0:0' has no preceding event with a shared pitch"
         ),
         "tests/fixtures/ft3/corpus/random-63-v4/012/disperate_speranze_4.ft3": (
             "tie target 'piece:staff:0:bar:7:event:3:0' has no preceding event with a shared pitch"
-        ),
-        "tests/fixtures/ft3/corpus/random-63-v4/037/courant_duet.ft3": (
-            "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
         ),
         "tests/fixtures/ft3/corpus/random-63-v4/040/come_raggio_del_sol_G.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
@@ -440,14 +431,8 @@ def test_random_corpus_demotes_ascii_control_fragments_from_note_staffs(fixed_pi
     by_name = {path.name: fixed_pieces[path] for path in paths}
 
     sonata = by_name["sonata_CM_01_moderato_T.ft3"]
-    assert sonata.imported_score is not None
-    assert all(staff.kind != "note" for staff in sonata.imported_score.staffs)
-    assert any(
-        row.kind == "control" and row.text.strip() == "4"
-        for staff in sonata.imported_score.staffs
-        for bar in staff.bars
-        for row in bar.text_rows
-    )
+    assert sonata.imported_score is None or all(staff.kind != "note" for staff in sonata.imported_score.staffs)
+    assert [len(bar.chords) for bar in sonata.bars[:1]] == [1]  # its first record is a rest bar, not a text staff
 
     semper = by_name["09_semper_dowland_semper_dolens.ft3"]
     assert semper.imported_score is not None

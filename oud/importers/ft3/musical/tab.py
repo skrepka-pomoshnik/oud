@@ -34,6 +34,9 @@ _ASCII_UPPER_MAX = 0x5A
 _ASCII_LOWER_MIN = 0x61
 _ASCII_LOWER_MAX = 0x7A
 _FT3_HEADER_SIZE = 32
+_MAX_OBJECT_ITEMS = 16  # a chord object holds its header and at most this many notes
+_MAX_RHYTHM_CODE = 8
+_BASS_DIGIT_STRING_BYTE = 1  # a bass course written like string byte 8
 _MIN_STANDARD_RECORD_COUNT = 1
 _MAX_STANDARD_RECORD_COUNT = 8
 _MIN_EMBEDDED_SCORE_LETTERS = 24
@@ -53,30 +56,38 @@ def at_next_note(s: int, f: int) -> bool:
     return on_string and (on_fret or on_diapason)
 
 
+def _decode_main_course(string_byte: int, fret_byte: int) -> tuple[int, int]:
+    fret = (
+        fret_byte - _FT3_DIAPASON_BYTE_MIN
+        if _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX
+        else fret_byte - _FT3_FRET_BYTE_MIN
+    )
+    return string_byte - 1, fret
+
+
+def _decode_diapason(fret_byte: int, note_flag: int) -> tuple[int, int] | None:
+    """A bass course (a diapason): a letter is the fret of course 7, a digit names course 8 and up."""
+
+    is_letter = _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX
+    if note_flag == _FT3_NO_NOTE_FLAG and is_letter:
+        return 7, fret_byte - _FT3_DIAPASON_BYTE_MIN
+    if (note_flag & _FT3_DIGIT_FRET_FLAG) and _FT3_FRET_BYTE_MIN <= fret_byte <= _ASCII_DIGIT_BYTE_MAX:
+        return fret_byte - _FT3_FRET_BYTE_MIN + 7, 0
+    if (note_flag & _FT3_SPECIAL_FRET_FLAG) == _FT3_SPECIAL_FRET_FLAG and is_letter:
+        return 8, fret_byte - 0x61
+    return None
+
+
 def _decode_ft3_note_position(
     string_byte: int,
     fret_byte: int,
     note_flag: int,
 ) -> tuple[int, int] | None:
-    if string_byte < _FT3_STRING_BYTE_MAX:
-        fret = (
-            fret_byte - _FT3_DIAPASON_BYTE_MIN
-            if _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX
-            else fret_byte - _FT3_FRET_BYTE_MIN
-        )
-        return string_byte - 1, fret
-
-    if string_byte != _FT3_STRING_BYTE_MAX:
-        return None
-
-    if note_flag == _FT3_NO_NOTE_FLAG and _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX:
-        return 7, fret_byte - _FT3_DIAPASON_BYTE_MIN
-    if (note_flag & _FT3_DIGIT_FRET_FLAG) and _FT3_FRET_BYTE_MIN <= fret_byte <= _ASCII_DIGIT_BYTE_MAX:
-        return fret_byte - _FT3_FRET_BYTE_MIN + 7, 0
-    if (
-        note_flag & _FT3_SPECIAL_FRET_FLAG
-    ) == _FT3_SPECIAL_FRET_FLAG and _FT3_DIAPASON_BYTE_MIN <= fret_byte <= _FT3_DIAPASON_BYTE_MAX:
-        return 8, fret_byte - 0x61
+    # String byte 1 is written like byte 8 in the few places it occurs (13 notes in the 577-file corpus).
+    if string_byte in (_BASS_DIGIT_STRING_BYTE, _FT3_STRING_BYTE_MAX):
+        return _decode_diapason(fret_byte, note_flag)
+    if _FT3_STRING_BYTE_MIN <= string_byte < _FT3_STRING_BYTE_MAX:
+        return _decode_main_course(string_byte, fret_byte)
     return None
 
 
@@ -186,7 +197,57 @@ def _append_ft3_note(bar: Bar, chord: Chord, data: bytes, ptr: int) -> None:
     chord.notes.append(note)
 
 
+def _object_is_sound(data: bytes, cursor: int, items: int) -> bool:
+    """Whether an object at ``cursor`` fits the data and every note in it is one the decoder recognises."""
+
+    end = cursor + 6 + 5 * (items - 1)
+    if not 1 <= items <= _MAX_OBJECT_ITEMS or end > len(data) or data[cursor + 2] > _MAX_RHYTHM_CODE:
+        return False
+    if note_type_to_denominator(data[cursor + 2] + 2) is None:
+        return False
+    for note in range(cursor + 6, end, 5):
+        recognised = at_next_note(data[note], data[note + 1])
+        bass = data[note] == _BASS_DIGIT_STRING_BYTE and _decode_diapason(data[note + 1], data[note + 4]) is not None
+        if not (recognised or bass):
+            return False
+    return True
+
+
+def _parse_object_sequence(bar_data: bytes, bar: Bar, ptr: int, object_count: int) -> bool:
+    """Read the record's objects in order: item count, 4-byte header, then five bytes per note.
+
+    A header with no notes is a rest. Returns False, leaving ``bar`` untouched, when the record does not frame
+    as ``object_count`` sound objects, so that the scanning reader below handles it as before.
+    """
+
+    if ptr != _FT3_HEADER_SIZE:  # a leading text object leaves the scan position between objects
+        return False
+    cursor = ptr - _ITEM_COUNT_PREFIX_SIZE
+    spans: list[tuple[int, int]] = []
+    for _ in range(object_count):
+        if cursor < 0 or cursor + 6 > len(bar_data):
+            return False
+        items = int.from_bytes(bar_data[cursor : cursor + 2], "little")
+        if not _object_is_sound(bar_data, cursor, items):
+            return False
+        spans.append((cursor, items))
+        cursor += 6 + 5 * (items - 1)
+    for start, items in spans:
+        flags = bar_data[start + 3]
+        chord = Chord(note_type=bar_data[start + 2] + 2, dotted=bool(flags & 0x10), grid=_grid_kind(flags))
+        for note in range(start + 6, start + 6 + 5 * (items - 1), 5):
+            _append_ft3_note(bar, chord, bar_data, note)
+        bar.chords.append(chord)
+    return True
+
+
 def _parse_tab_chords(bar_data: bytes, bar: Bar, ptr: int, object_count: int) -> None:
+    if _parse_object_sequence(bar_data, bar, ptr, object_count):
+        return
+    _scan_tab_chords(bar_data, bar, ptr, object_count)
+
+
+def _scan_tab_chords(bar_data: bytes, bar: Bar, ptr: int, object_count: int) -> None:
 
     while ptr + 9 <= len(bar_data):
         if len(bar.chords) >= object_count:
