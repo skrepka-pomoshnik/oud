@@ -9,18 +9,18 @@ These results establish neither complete FT3 decoding nor visual parity with
 Fronimo. In particular, zero residual bits does not prove correct onset,
 pitch, staff mapping or layout interpretation.
 
-The first terminal viewport renders at both 80x24 and 120x40 for 775 files:
-1,550 nonempty views within their bounds. Twelve files are rejected at both
-sizes by the strict notation adapter. Unmatched tie targets occur in
-`disperate_speranze_S`, `come_raggio_del_sol_D`, `sonata_CM_01_moderato`,
-`sonata_CM_02_minuetto`, `disperate_speranze_4`, `rondeau_130` and
-`passacaille_B`. Conflicting durations in a grouped event occur in
-`come_raggio_del_sol_G`, `13_dowlands_adieu_TB`, `almain_BT`,
-`ecce_quam_bonum_BT` and `milano_041_parts`. These remain unsupported canonical
-projections; the audit does not suppress their errors or invent tie targets.
+The first terminal viewport renders at both 80x24 and 120x40 for 785 files:
+1,570 nonempty views within their terminal-cell bounds. Two files are rejected
+at both sizes by the strict notation adapter: `come_raggio_del_sol_G` and
+`milano_041_parts`, both for conflicting grouped durations. Caldara has unequal
+notation/tab record counts; Milano lacks the metadata needed to register its
+three notation staffs. The audit does not suppress these errors or invent tie
+targets. Combining fingering marks count as part of their preceding terminal
+cell, not as additional columns.
 
-The 60-file PDF sample compiles completely: 46 reference page counts match,
-37 exact system counts match, and 42 are within one system. The sample is the
+The previous 60-file PDF sample compiled completely: 46 reference page counts
+matched, 37 exact system counts matched, and 42 were within one system. These
+counts precede the note-tag and lane-mapping corrections. The sample is the
 first 60 locally available pairs in the fixed `batch2.json` order, not a random
 sample or a substitute for inspecting mixed and notation-only scores.
 
@@ -38,6 +38,18 @@ sample or a substitute for inspecting mixed and notation-only scores.
   labels remain explicit overrides.
 - The PDF comparison tool applies a source's declared tuning and style before
   export, rather than applying default settings to every source.
+- Parallel notation lanes can precede or follow tablature. Their mapped voice
+  survives the structured-vocal fallback. Dowland's `13_dowlands_adieu_TB` and
+  Holborne's `almain_BT` and `ecce_quam_bonum_BT` no longer collapse all notation
+  into the final measure. The mapper also accepts Gerbode's documented
+  `instrumentation:` alias for `ensemble:`.
+- Notation attributes are interpreted as a full word: only tag `0x8000` under
+  mask `0xF8000` is grace; courtesy uses the high-word flag. The low-word sign
+  bit no longer invents incoming ties. Seven former strict rejections now adapt.
+- The public note-input API accepts grace groups sharing an onset with a
+  principal note or rest, keeps grace insertion order before the principal,
+  and still rejects timed-event collisions and ambiguous chord targets. The
+  100-score note-input reconstruction test retains exact score equality.
 
 The original course/unison tests failed before the course fix. A high-fret
 fixture reproduced the missing-label warning with both LilyPond 2.24 and 2.26;
@@ -64,11 +76,26 @@ miss barlines crossed by other ink.
 
 ## Remaining reference differences
 
-Validation at this checkpoint: 2,217 tests pass, 23 are skipped, and Petrucci
+Synthetic regressions cover both serialization orders, independent voices,
+separate staffs, padding and ambiguous lane rejection; optional tests use the
+three cached tablature-first scores without fetching or redistributing them.
+The former false-tie rejection subset now adapts 56 scores instead of 49.
+Only Caldara G remains rejected in that fixed subset; Milano parts is in the
+additional preserved download set.
+
+Validation at this checkpoint: 2,263 tests pass, 23 are skipped, and Petrucci
 coverage is 95.52%. Architecture, Ruff lint/format and Ty checks pass. This
 includes warning-free 2.24/2.26 compilation of the original course/high-fret
 microcase. The baseline MusicXML module-size failure was resolved by extracting
 measure marks under the existing `oud.exports.musicxml` import path.
+
+Three additional affected scores compile under LilyPond 2.26. Abel's minuet and
+Holborne's Almain compile without warnings; Caldara's D aria reports two pairs
+of conflicting/discarded `\\mark` events. Inspection of the minuet and Almain
+pages reveals missing grace presentation, incorrect clef/register presentation
+and excess ledger lines. The minuet's generated source contains no grace
+commands despite decoded grace events. Successful compilation is not PDF
+acceptance; the source-clef, pitch/beam-field and grace-export work stays open.
 
 The generated `57_mrs_vaux_jig_8C` page was inspected beside its reference PDF.
 It compiles, but its opening pickup/meter placement, rhythm signs, beam groups,

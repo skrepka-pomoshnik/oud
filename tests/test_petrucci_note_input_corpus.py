@@ -106,7 +106,7 @@ def test_public_note_input_reconstructs_all_100_new_gerbode_scores(
         assert entered.score == expected
         tab_event_count += _event_count(expected)
 
-    assert canonical_count == 6  # the seventh was a phantom staff read from rest records of a tablature-only score
+    assert canonical_count == 8  # Rossi and Caldara now adapt after removing the false tie inference.
     assert tab_event_count >= 20_000
 
 

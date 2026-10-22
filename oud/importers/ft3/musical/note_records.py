@@ -52,19 +52,20 @@ def _structured_pitch_row(value: bytes) -> int:
 _FT3_VOICE_FLAG = 0x0001
 _FT3_ACCIDENTAL_FLAGS = 0x2000 | 0x1000 | 0x0002
 _FT3_EVENT_LAYOUT_FLAGS = 0x0800
+_FT3_NOTATION_TAG_MASK = 0xF8000
+_FT3_GRACE_NOTE_TAG = 0x8000
+_FT3_COURTESY_ACCIDENTAL_WORD_FLAG = 0x8000
 _FT3_NOTE_DURATION_CODES = frozenset((0x32, 0x33, 0x34, 0x35, 0x36))
 _FT3_EVENT_FLAG_MASK = (
     0x8000
     | 0x4000
-    | 0x2000
-    | 0x1000
+    | _FT3_ACCIDENTAL_FLAGS
     | _FT3_EVENT_LAYOUT_FLAGS
     | 0x0100
     | 0x0040
     | 0x0010
     | 0x0008
     | 0x0004
-    | 0x0002
     | _FT3_VOICE_FLAG
 )
 
@@ -107,6 +108,9 @@ def _melody_event_from_ft3(
     source_voice = int(bool(raw_flags & _FT3_VOICE_FLAG)) if voice is None else voice
     event_flags = raw_flags & ~(_FT3_VOICE_FLAG | _FT3_EVENT_LAYOUT_FLAGS)
     source_layout_flags = layout_flags | (raw_flags & _FT3_EVENT_LAYOUT_FLAGS)
+    # These are consecutive halves of a notation attribute word. In particular,
+    # grace is an exact tag, not every sign whose low half contains 0x8000.
+    attribute_tag = (raw_flags | (layout_flags << 16)) & _FT3_NOTATION_TAG_MASK
     is_rest = bool(event_flags & 0x0040)
     return MelodyEvent(
         text="r" if is_rest else _vocal_pitch_token(pitch_row, event_flags),
@@ -119,9 +123,9 @@ def _melody_event_from_ft3(
         fermata=bool(event_flags & 0x0100),
         voice=source_voice,
         ornament=_ft3_standard_ornament(layout_flags),
-        courtesy_accidental=bool(event_flags & 0x8000 and event_flags & _FT3_ACCIDENTAL_FLAGS),
+        courtesy_accidental=bool(layout_flags & _FT3_COURTESY_ACCIDENTAL_WORD_FLAG),
         editorial_brackets=bool(event_flags & 0x4000),
-        tie_from_previous=bool(event_flags & 0x8000 and not event_flags & _FT3_ACCIDENTAL_FLAGS),
+        grace=attribute_tag == _FT3_GRACE_NOTE_TAG,
         ft3_layout_flags=source_layout_flags or None,
     )
 

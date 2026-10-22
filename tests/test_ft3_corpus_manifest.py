@@ -339,11 +339,23 @@ def test_expanded_corpus_preserves_newly_decoded_score_semantics(fixed_pieces: d
     )
 
     sandrin_events = [event for bar in by_name["douce_memoire_song_sandrin.ft3"].bars for event in bar.melody_events]
-    assert sum(event.courtesy_accidental for event in sandrin_events) == 15
+    assert [
+        (bar_index, event.text)
+        for bar_index, bar in enumerate(by_name["douce_memoire_song_sandrin.ft3"].bars)
+        for event in bar.melody_events
+        if event.courtesy_accidental
+    ] == [(31, "d'")]
+    editorial_accidentals = [
+        event
+        for event in sandrin_events
+        if ((event.accidental_flags or 0) | ((event.ft3_layout_flags or 0) << 16)) & 0xF8000 == 0xC8000
+    ]
+    assert len(editorial_accidentals) == 15
 
     lully_events = [event for bar in by_name["recit_de_la_beaute_double.ft3"].bars for event in bar.melody_events]
     assert sum(event.editorial_brackets for event in lully_events) == 2
-    assert sum(event.tie_from_previous for event in lully_events) == 1
+    assert not any(event.tie_from_previous for event in lully_events)
+    assert [event.text for event in lully_events if event.grace] == ["a"]
 
     mozart_notes = [
         note
@@ -392,31 +404,10 @@ def test_fixed_notation_subset_has_explicit_strict_adaptation_outcomes(
         except PieceAdapterError as exc:
             rejected[_relative(path)] = str(exc)
 
-    assert len(notation) == 49  # courant_duet no longer has a phantom note staff, so it leaves this subset
+    assert len(notation) == 56  # Seven false incoming-tie rejections are now decoded from their full attribute tags.
     assert rejected == {
-        "tests/fixtures/ft3/corpus/note-input-100/028/disperate_speranze_S.ft3": (
-            "tie target 'piece:staff:1:bar:12:event:2:0' has no preceding event with a shared pitch"
-        ),
-        "tests/fixtures/ft3/corpus/note-input-100/045/come_raggio_del_sol_D.ft3": (
-            "tie target 'piece:staff:0:bar:33:event:2:0' has no preceding event with a shared pitch"
-        ),
-        "tests/fixtures/ft3/corpus/random-50-v3/041/sonata_CM_01_moderato.ft3": (
-            "tie target 'piece:staff:0:bar:9:event:1:0' has no preceding event with a shared pitch"
-        ),
-        "tests/fixtures/ft3/corpus/random-63-v4/001/sonata_CM_02_minuetto.ft3": (
-            "tie target 'piece:staff:0:bar:3:event:0:0' has no preceding event with a shared pitch"
-        ),
-        "tests/fixtures/ft3/corpus/random-63-v4/012/disperate_speranze_4.ft3": (
-            "tie target 'piece:staff:0:bar:7:event:3:0' has no preceding event with a shared pitch"
-        ),
         "tests/fixtures/ft3/corpus/random-63-v4/040/come_raggio_del_sol_G.ft3": (
             "event group 'piece:staff:0:bar:0:event:0:0' has inconsistent durations"
-        ),
-        "tests/fixtures/ft3/corpus/random-63-v4/043/rondeau_130.ft3": (
-            "tie target 'piece:staff:0:bar:26:event:4:0' has no preceding event with a shared pitch"
-        ),
-        "tests/fixtures/ft3/corpus/random-63-v4/050/passacaille_B.ft3": (
-            "tie target 'piece:staff:0:bar:0:event:0:0' has no preceding event with a shared pitch"
         ),
     }
     assert all(score.staffs for _path, score in notation)

@@ -1,5 +1,35 @@
 # DONE
 
+## FT3 notation attributes, lane mapping and grace entry (2026-10-22)
+
+- Accepted tablature-first and notation-first parallel lanes and Gerbode's
+  `instrumentation:` annotation alias. Preserved the mapped voice through the
+  structured-vocal fallback; regressions exposed its previous reset to voice 0.
+  Dowland/Holborne notation no longer collapses into the last tablature bar.
+- Used official help and static keyboard-handler evidence to distinguish the
+  full grace tag from other signs and the high-word courtesy flag. Removed
+  false incoming ties without weakening canonical validation. Kept source
+  attributes and documented remaining sign/span decoding work with provenance.
+- Fixed the public note-input API for coincident grace groups and principal
+  notes/rests, stable grace ordering, principal chord targeting and ambiguous
+  target rejection. Small regressions failed before the fix; exact canonical
+  reconstruction remains required for the 100-score corpus, now with eight
+  accepted notation scores rather than six.
+- Refreshed only ten derived fields across the 100-score and v6 manifests and
+  corrected Lully's feature inventory from an inferred tie to a grace note.
+  Source hashes and existing render/TAB/LilyPond/MIDI goldens remain unchanged.
+- Audited 787 distinct cached payloads: all load and export LilyPond source;
+  785 render at both 80x24 and 120x40, yielding 1,570 bounded nonempty views.
+  Ten of the previous twelve strict projection failures are resolved. Caldara G
+  and Milano parts still fail grouped-duration validation and remain in TODO.
+- Three affected PDFs compile under LilyPond 2.26; the minuet and Almain have
+  no compiler warnings, while Caldara D has conflicting marks. Inspected pages
+  still show clef/register and grace-export defects, so PDF parity is not claimed.
+- Validation: the full quality gate passes with two workers and file-level
+  grouping: 2,263 passed, 23 skipped, 95.52% Petrucci coverage, 358.49 seconds.
+  Architecture, Ruff lint/format, Ty and the no-tracked-FT3 check pass. External
+  payloads and proprietary application/help files were not redistributed.
+
 ## Gerbode course fidelity and preserved-set audit (2026-10-22)
 
 - Reviewed the updated Gerbode profile, source-break decoder and PDF harness.

@@ -129,9 +129,9 @@ class ScoreDraft:
 
     def insert_event(self, measure: DraftMeasure, event: NotationEvent) -> None:
         index = len(measure.events)
-        key = (event.onset, event.voice)
+        key = (event.onset, event.voice, not event.grace)
         for candidate_index, candidate in enumerate(measure.events):
-            if (candidate.onset, candidate.voice) > key:
+            if (candidate.onset, candidate.voice, not candidate.grace) > key:
                 index = candidate_index
                 break
         measure.events.insert(index, event)

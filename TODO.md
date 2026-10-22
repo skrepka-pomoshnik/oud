@@ -176,6 +176,22 @@ corpus (not redistributable; fetching is blocked in the cloud environment).
   changing the decoder. A clean residual-bit audit does not validate this path.
 - Decode and render German and Spanish/Neapolitan FT3 tablature from real
   fixtures, or reject each unsupported style with a precise visible diagnostic.
+- Finish notation attribute integration using the direct handler evidence in
+  `docs/ft3-source-evidence.md`: editorial-accidental tags, other sign tags,
+  hidden notes/rests and reversed stems still need explicit model, rendering
+  and playback handling. Hidden events retain time but must not sound. Real
+  source spans need decoding; never infer a tie from the sign bit or equal
+  neighboring pitches.
+- Reconcile notation accidental and beam fields with the key-aware pitch
+  normalization. The source keyboard handlers manipulate `0x1000` and
+  `0x2000` for flat/sharp controls and `0x0002/4/8` for beams; the current
+  pitch decoder treats `0x0002` as sharp. Confirm absolute versus key-relative
+  meaning against printed notes and companion MIDI before changing pitches.
+  Also cover the documented double-dot control (`0x0020`) and the full written
+  duration range rather than silently selecting a shorter decodable note run.
+- Extend the semantic audit to the full notation attribute word. The current
+  vocal residual check inspects the low word only; zero residual bits cannot
+  establish that upper-word tags and their semantics are supported.
 - Confirm the remaining notation constructs against real FT3 encodings: TabVoice
   collision precedence, mensural proportions, harmonics, glissandi, and
   notation-staff fingerings. Typed fields, regressions, terminal rendering, and
@@ -193,11 +209,12 @@ onset-chord similarity, 11 best-fit global transpositions, and 22 below 0.50
 similarity. Never treat PPQ, patch, track, or count-in differences as
 pitch/rhythm agreement.
 
-- The 787-file terminal audit on 2026-10-22 rejected 12 notation projections
-  at both 80x24 and 120x40. Resolve their unmatched ties and conflicting grouped
-  durations using source voice/onset evidence; names are in
-  `docs/gerbode-coverage.md`. Do not weaken the canonical validator or silently
-  omit the affected voices to make the viewer accept them.
+- The updated 787-file terminal audit rejects two notation projections at both
+  80x24 and 120x40: `come_raggio_del_sol_G` and `milano_041_parts`. Resolve
+  Caldara's unequal record counts and Milano's missing three-staff metadata
+  using source registration evidence, not invented voices or omitted events.
+  The reference Milano PDF has three separate notation staffs. Keep strict
+  grouped-duration and tie validation; see `docs/gerbode-coverage.md`.
 - First resolve source-tuning metadata for the five transposition-only exact
   sequences, then classify the zero/sparse generated parts and mixed-score
   voice-count differences without inventing source events.
@@ -258,13 +275,20 @@ acceptance harness with tolerance decisions.
   identity.
 - The 2026-10-22 audit loads and exports 787 distinct cached FT3 files without
   residual bits, unknown records or warnings; this is not full visual parity.
-  775 render their first viewport at both terminal sizes; 12 strict notation
-  failures remain under C10. In the final 60-PDF sample, 46 page counts and 37
-  exact system counts match the references (42 are within one system).
+  785 render their first viewport at both terminal sizes; two strict notation
+  failures remain under C10. In the previous 60-PDF sample, before the note-tag
+  and lane-mapping corrections, 46 page counts and 37 exact system counts
+  matched the references (42 were within one system).
   Continue from the reference differences in `docs/gerbode-coverage.md`:
   Vaux's eight-course pickup/meter and rhythm signs, 6/8 beam grouping, bass
   course presentation, then missed authored system/page breaks. Compare notes
   and their course positions before optimizing page-count agreement.
+- Propagate decoded grace notes into LilyPond and playback timing, and preserve
+  source clefs and staff order in mixed exports. The inspected Abel minuet
+  export has no grace commands despite decoded grace events; Holborne's
+  `almain_BT` prints its bass line in treble clef with excessive ledger lines.
+  Caldara's D aria also emits conflicting simultaneous `\\mark` events which
+  LilyPond discards. All three compile, but do not yet pass PDF acceptance.
 - Done when the LilyPond output passes the Gerbode comparison corpus and the
   visual regression cases.
 - Depends on: `S12`.

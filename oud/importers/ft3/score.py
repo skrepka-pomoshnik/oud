@@ -171,7 +171,7 @@ def _map_body_with_tab(
 
 
 def _ensemble_staff_labels(annotations: dict[str, str]) -> list[str]:
-    ensemble = annotations.get("ensemble", "")
+    ensemble = annotations.get("ensemble", annotations.get("instrumentation", ""))
     return [part.split(":", 1)[0].strip() for part in ensemble.split(",") if part.strip()]
 
 
@@ -200,21 +200,28 @@ def _is_note_score_entry(entry: _BodyEntry) -> bool:
     return entry.score_kind in {"note-staff-raw", "note-lyric-raw"}
 
 
+def _parallel_body_runs(entries: list[_BodyEntry]) -> tuple[list[_BodyEntry], list[_BodyEntry]]:
+    """Separate a terminal tab run from notation serialized before or after it."""
+    if entries and entries[0].kind == "tab":
+        tab_end = _entry_run_end(entries, 0, "tab")
+        return entries[:tab_end], entries[tab_end:]
+    tab_start = len(entries)
+    while tab_start > 0 and entries[tab_start - 1].kind == "tab":
+        tab_start -= 1
+    return entries[tab_start:], entries[:tab_start]
+
+
 def _parallel_note_tab_plan(
     entries: list[_BodyEntry],
     annotations: dict[str, str],
 ) -> tuple[list[_BodyEntry], list[_MappedScoreEntry], list[str]] | None:
-    tab_start = len(entries)
-    while tab_start > 0 and entries[tab_start - 1].kind == "tab":
-        tab_start -= 1
-    tab_entries = entries[tab_start:]
-    prefix = entries[:tab_start]
-    if not prefix or not tab_entries:
+    tab_entries, notation_entries = _parallel_body_runs(entries)
+    if not notation_entries or not tab_entries:
         return None
-    note_entries = [entry for entry in prefix if _is_note_score_entry(entry)]
+    note_entries = [entry for entry in notation_entries if _is_note_score_entry(entry)]
     if not note_entries or len(note_entries) % len(tab_entries):
         return None
-    if any(not _is_note_score_entry(entry) and not _is_parallel_score_padding(entry) for entry in prefix):
+    if any(not _is_note_score_entry(entry) and not _is_parallel_score_padding(entry) for entry in notation_entries):
         return None
 
     labels = _notation_staff_labels(annotations)
@@ -231,7 +238,7 @@ def _parallel_note_tab_plan(
         mapped.extend(
             _MappedScoreEntry(bar_index, staff_index, entry, voice_index) for bar_index, entry in enumerate(lane)
         )
-    mapped.extend(_parallel_padding_mappings(prefix, len(tab_entries), voices_per_staff))
+    mapped.extend(_parallel_padding_mappings(notation_entries, len(tab_entries), voices_per_staff))
     return tab_entries, mapped, labels
 
 
@@ -730,6 +737,8 @@ def _prefer_decoded_note_events(
     legacy_events = decode_ft3_vocal_events(payload)
     preferred_events = legacy_events if len(legacy_events) > len(note_events) else note_events
     if preferred_events:
+        if voice_index is not None:
+            preferred_events = [replace(event, voice=voice_index) for event in preferred_events]
         return replace(record, melody_events=preferred_events)
     if raw_kind in {"barline-raw", "note-staff-raw", "note-lyric-raw"}:
         return _demote_heuristic_melody(record)

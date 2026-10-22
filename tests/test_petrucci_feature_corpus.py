@@ -72,6 +72,7 @@ def _features(piece: Piece) -> list[str]:
     flags = {
         "bass_courses": any(note.string > 6 for note in notes),
         "chords": any(len(chord.notes) > 1 for chord in chords),
+        "grace_notes": any(event.grace for event in events),
         "lyrics": any(staff.lyrics for staff in staffs),
         "ornaments": any(note.left_ornament or note.right_ornament for note in notes)
         or any(event.ornament for event in events),
@@ -177,7 +178,7 @@ def test_feature_manifest_is_a_source_honest_fixed_selection() -> None:
         "tests/fixtures/ft3/manifests/ft3-random-75-v2.json",
     ]
     assert sorted(features) == raw["available_features"]
-    assert set(raw["known_gaps"]) == {"grace_notes", "tablature_style_provenance", "tuplets"}
+    assert set(raw["known_gaps"]) == {"ties", "tablature_style_provenance", "tuplets"}
     assert len(raw["excerpts"]) == 4
     for excerpt in raw["excerpts"]:
         key = (excerpt["source_manifest"], excerpt["path"])

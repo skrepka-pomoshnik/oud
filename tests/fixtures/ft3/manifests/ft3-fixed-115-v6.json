@@ -384,8 +384,8 @@
         "lyrics": 1,
         "note": 1
       },
-      "notation_events": 0,
-      "lyrics": 0
+      "notation_events": 128,
+      "lyrics": 63
     },
     {
       "path": "note-input-100/086/pavan_4_T.ft3",
@@ -1541,8 +1541,8 @@
         "lyrics": 4,
         "note": 4
       },
-      "notation_events": 0,
-      "lyrics": 0
+      "notation_events": 483,
+      "lyrics": 527
     },
     {
       "path": "note-input-100/008/divisions_2011.ft3",

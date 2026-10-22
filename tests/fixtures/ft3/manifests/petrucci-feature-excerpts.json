@@ -8,15 +8,15 @@
   "available_features": [
     "bass_courses",
     "chords",
+    "grace_notes",
     "lyrics",
     "ornaments",
     "polyphonic_notation",
     "rests",
-    "tablature",
-    "ties"
+    "tablature"
   ],
   "known_gaps": {
-    "grace_notes": "No grace-note event occurs in the fixed 100-score corpus.",
+    "ties": "Source curved spans still need decoding; the former incoming-tie attribute was a grace-note tag.",
     "tablature_style_provenance": "Every selected fixed-corpus source records a null style, so French or Italian source style cannot be claimed.",
     "tuplets": "No tuplet event occurs in the fixed 100-score corpus."
   },
@@ -155,16 +155,16 @@
       "features": [
         "bass_courses",
         "chords",
+        "grace_notes",
         "lyrics",
         "ornaments",
         "rests",
-        "tablature",
-        "ties"
+        "tablature"
       ],
       "published_score": {
         "url": "https://browse.lutemusic.org/composers/Lully/pdf/recit_de_la_beaute_double.pdf",
         "pages": 2,
-        "comparison": "The opening page prints one vocal staff with lyrics, ornaments, and curved spans above eight-course French-letter tablature; canonical source semantics identify one span as a tie."
+        "comparison": "The opening page prints one vocal staff with lyrics, ornaments, and curved spans above eight-course French-letter tablature. The bar-eight note attribute is a grace tag, not an incoming tie; source curved spans still need decoding."
       },
       "semantics": {
         "bars": 26,
@@ -176,9 +176,9 @@
         "notation_events": 148,
         "notation_rests": 8,
         "lyrics": 29,
-        "ties": 1,
+        "ties": 0,
         "tuplets": 0,
-        "grace_notes": 0
+        "grace_notes": 1
       },
       "expectations": {
         "render_sha256": "467dbd96289658db4407dda89609da50d6f136eadbd0434b0af85d93eb5d2fd6",

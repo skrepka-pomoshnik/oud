@@ -129,7 +129,8 @@ def _enter_note(
     elif operation.chord:
         change = _stack_pitch(draft, operation, pitch)
     else:
-        if events_at(measure, operation.position):
+        grace = operation.style is not None and operation.style.grace
+        if not grace and any(not event.grace for event in events_at(measure, operation.position)):
             raise NoteInputError("event-collision", "an event already exists at the requested onset and voice")
         duration = operation.duration or context.duration
         event_id = draft.reserve_id(operation.event_id, prefix="event")
@@ -190,6 +191,10 @@ def _replace_with_note(draft: ScoreDraft, operation: EnterNote, pitch: WrittenPi
 def _stack_pitch(draft: ScoreDraft, operation: EnterNote, pitch: WrittenPitch) -> NoteInputChange:
     _staff, measure = draft.position(operation.position)
     candidates = events_at(measure, operation.position)
+    if operation.style is not None:
+        candidates = [event for event in candidates if event.grace == operation.style.grace]
+    elif any(not event.grace for event in candidates):
+        candidates = [event for event in candidates if not event.grace]
     if len(candidates) != 1:
         raise NoteInputError("chord-target", "chord entry requires exactly one event at the requested position")
     location = draft.event(candidates[0].id)
@@ -229,7 +234,7 @@ def _enter_rest(
         change = _change_for_location(NoteInputChangeKind.REPLACE_EVENT, location)
         removed_span_changes = _span_removal_changes(location, remove_event_spans(location, event.id))
     else:
-        if events_at(measure, operation.position):
+        if any(not event.grace for event in events_at(measure, operation.position)):
             raise NoteInputError("event-collision", "an event already exists at the requested onset and voice")
         duration = operation.duration or context.duration
         event_id = draft.reserve_id(operation.event_id, prefix="event")
