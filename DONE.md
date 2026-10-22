@@ -1,5 +1,29 @@
 # DONE
 
+## Gerbode course fidelity and preserved-set audit (2026-10-22)
+
+- Reviewed the updated Gerbode profile, source-break decoder and PDF harness.
+  Audited 787 distinct local FT3 payloads: all load and export, with no residual
+  note/vocal bits, unknown records or import warnings; 383 have extra courses.
+- Pinned source courses in LilyPond when source/display tunings match, retained
+  the explicit-retuning contract, and placed durations before note attachments.
+  Equal-pitch notes and chord unisons no longer rely on automatic course choice.
+- Expanded the default French fret alphabet: the cached set contains 66 notes
+  above fret 10 which previously rendered as dots. Regressions reproduced the
+  warning in both LilyPond versions. The corpus comparator now uses source
+  tuning/style. Updated only the four intended LilyPond golden digests.
+- Restored the architecture gate by moving MusicXML measure marks into
+  `oud/exports/musicxml/marks.py`, keeping the `oud.exports.musicxml` API and
+  serialization intact. The oversized exporter was already a baseline failure.
+- Validation: architecture, Ruff lint/format and Ty pass; 2,217 tests pass with
+  23 skips and 95.52% Petrucci coverage. Both LilyPond versions compile the
+  course/unison/fingering/high-fret/bass-course microcase without warnings.
+- All 60 sampled PDFs compile; 46 page counts and 37 exact system counts match
+  (42 are within one). The terminal audit renders 775 files at both 80x24 and
+  120x40 with bounded nonempty output; 12 strict notation rejections remain.
+  See `docs/gerbode-coverage.md`; source pickups, voice/tie registration and
+  visual parity are not marked complete.
+
 ## System breaks decoded from the FT3 layout tail (2026-10-12)
 
 - Each tab record carries a per-system float after its objects; a change between consecutive records ends a system. `layout.apply_system_breaks` sets `Bar.system_break`, so `sourcebreaks`, `lybarsperline` and `lysystemsperpage` act on Gerbode's own lines.

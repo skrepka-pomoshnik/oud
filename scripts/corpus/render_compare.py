@@ -67,7 +67,12 @@ def measure(pages: list[PageShape]) -> Layout:
 def compile_ly(ft3: Path, workdir: Path) -> Path:
     piece = load_ft3(str(ft3))
     source = workdir / "piece.ly"
-    export_lilypond(str(source), piece, {}, {}, 12, settings={**DEFAULT_SETTINGS, **GERBODE_SETTINGS})
+    settings = {**DEFAULT_SETTINGS, **GERBODE_SETTINGS}
+    if piece.tuning:
+        settings["tuning"] = piece.tuning
+    if piece.style:
+        settings["style"] = piece.style
+    export_lilypond(str(source), piece, {}, {}, 12, settings=settings)
     subprocess.run(  # noqa: S603 - fixed argument list, no shell
         [LILYPOND, "-dno-point-and-click", "-o", str(workdir / "piece"), str(source)],
         check=True,

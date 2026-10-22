@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import replace
 
-from petrucci.core.model import Bar, ImportedBarContent, ImportedStaff, Piece
+from petrucci.core.model import Bar, ImportedBarContent, ImportedStaff, Note, Piece
 from petrucci.core.music.tuning import parse_tuning_pitches
 from petrucci.input.tablature.input import editor_event_columns, editor_fret_at
 
@@ -231,6 +231,11 @@ def _duration_token(denom: int, dotted: bool) -> str:
     return token
 
 
+def _timed_tab_pitch(pitch: str, duration: str) -> str:
+    """Place duration before course and fingering attachments on a single note."""
+    return re.sub(r"^([a-z]+[,']*)", rf"\g<1>{duration}", pitch, count=1)
+
+
 def _normalize_tuning_length(pitches: list[int], strings: int) -> list[int]:
     if len(pitches) >= strings:
         return pitches[:]
@@ -247,12 +252,13 @@ def _note_pitch_from_lookup(note, tuning_lookup: list[int]) -> int | None:
 
 
 def _lily_pitches_for_chord_notes(
-    notes: list,
+    notes: list[Note],
     *,
     source_tuning_lookup: list[int],
     settings: dict[str, str],
+    preserve_courses: bool = True,
 ) -> list[str]:
-    pitch_notes: list[tuple[object, int]] = []
+    pitch_notes: list[tuple[Note, int]] = []
     for note in notes:
         pitch = _note_pitch_from_lookup(note, source_tuning_lookup)
         if pitch is not None:
@@ -263,7 +269,8 @@ def _lily_pitches_for_chord_notes(
     for note, pitch in pitch_notes:
         base = _midi_to_lilypond(pitch)
         native = _note_native_lh_fingering_suffix(note, settings) + _note_native_rh_fingering_suffix(note, settings)
-        out.append(base + native)
+        course = f"\\{note.string}" if preserve_courses else ""
+        out.append(base + course + native)
     return out
 
 
@@ -272,13 +279,14 @@ def _lily_pitches_for_override_event(
     *,
     target_tuning_lookup: list[int],
 ) -> list[str]:
-    pitches: list[int] = []
+    pitches: list[str] = []
     for s_idx, fret in notes:
         if 0 <= s_idx < len(target_tuning_lookup):
-            pitches.append(target_tuning_lookup[s_idx] + fret)
+            pitch = _midi_to_lilypond(target_tuning_lookup[s_idx] + fret)
+            pitches.append(f"{pitch}\\{s_idx + 1}")
     if not pitches:
         return []
-    return [_midi_to_lilypond(pitch) for pitch in pitches]
+    return pitches
 
 
 def _span_maps(

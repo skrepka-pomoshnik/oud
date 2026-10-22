@@ -22,6 +22,7 @@ from oud.exports.lilypond.common import (
     _repeat_mark_token,
     _span_maps,
     _split_tuning,
+    _timed_tab_pitch,
 )
 from oud.exports.lilypond.registration import LilyPondRegistration
 from oud.exports.lilypond.style import rests_carry_rhythm_signs, voice_overrides
@@ -119,6 +120,7 @@ def _append_tab_chord_events(
             chord.notes,
             source_tuning_lookup=context.source_tuning_lookup,
             settings=settings,
+            preserve_courses=context.source_tuning_lookup == context.tuning_lookup,
         )
         suffix = _tab_event_suffix(
             col,
@@ -134,7 +136,7 @@ def _append_tab_chord_events(
         elif not pitches:
             body.append(f"  r{dur}")
         elif len(pitches) == 1:
-            body.append(f"  {pitches[0]}{dur}{suffix}{extra_suffix}")
+            body.append(f"  {_timed_tab_pitch(pitches[0], dur)}{suffix}{extra_suffix}")
         else:
             body.append(f"  <{' '.join(pitches)}>{dur}{suffix}{extra_suffix}")
         if index in closes:
@@ -167,7 +169,7 @@ def _append_tab_override_events(
         if not pitches:
             body.append(f"  r{dur}")
         elif len(pitches) == 1:
-            body.append(f"  {pitches[0]}{dur}{suffix}")
+            body.append(f"  {_timed_tab_pitch(pitches[0], dur)}{suffix}")
         else:
             body.append(f"  <{' '.join(pitches)}>{dur}{suffix}")
 

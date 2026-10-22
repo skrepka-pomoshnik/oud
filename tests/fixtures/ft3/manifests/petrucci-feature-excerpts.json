@@ -60,7 +60,7 @@
         "render_sha256": "482c8bf6d55a899e9cd3bbeabdf6ee484531f746b0c6ab92d39499c4299c6d01",
         "tab_sha256": "c6aa8ccf06b4759edffe8445b512dccf215ac79f6bfb261212695c7720cc1e72",
         "tab_projection_sha256": "ba4d3d9461bb82065f772bf7b85604744f7611bbf2bcae4f8cf782c6ea46a493",
-        "lilypond_sha256": "5d9b391ff853b7871790e171b9ef1764af3752eabc1626da26d9dc86466c0205",
+        "lilypond_sha256": "5d1efadfb00826ef5443eb1b9abe8983fc179513ea7908382ce5112ab05d4cce",
         "midi_sha256": "fd578f7f8c84f75d3deb06b09e9e2d7ee632dbe4e712a1bf760e26f1097e8245"
       }
     },
@@ -101,7 +101,7 @@
         "render_sha256": "4c92bd4246bae77401ec5b40ebd42aa6a7f0fede75bbd43b7cbce780961f8b93",
         "tab_sha256": "f99b01c08b1945811f2f8d825685a962eb3d92394f06923417427fa001060f5d",
         "tab_projection_sha256": "86253156357be672359cacc5ae2ce1064e671819ddf9f44d49c0562b2232e3d2",
-        "lilypond_sha256": "f3f3a69ac0d5a81ffcaeca5843a42cdc0010be4b74440a7373855827674c151c",
+        "lilypond_sha256": "ed497c16bedf1ef1fe7065dd3bf987bedd713241e1fd3a27df0ecf981a1a8e20",
         "midi_sha256": "eda9fbbf578e27332b71e88962931b06d25d4614365ea31c45fd779f620d2b1b"
       }
     },
@@ -141,7 +141,7 @@
         "render_sha256": "03eae42e3d9bff2aa99b27304404cc79e50169ccd1b4fa6896b1d9d10fac43aa",
         "tab_sha256": "ffc16f60ad56dcf9d08b7dded1da23b14080a2cba6244311a03f3f7e0c2291ad",
         "tab_projection_sha256": "0ccc3b613fe14e2085929a43953ae404358af4efd63c18f4977404272d6d0a77",
-        "lilypond_sha256": "1c0e82a53068537a080619a8daa3c55c891706178e2af85a1788094c6b990a55",
+        "lilypond_sha256": "04ff44d49ae2da632ac059ec3833da39bc5d30aa51b75a10a49e86533be9c335",
         "midi_sha256": "bbc10a30f63a197e75dd9448e8ca957ecc261ec051ac7946684e726e82c79277"
       }
     },
@@ -184,7 +184,7 @@
         "render_sha256": "467dbd96289658db4407dda89609da50d6f136eadbd0434b0af85d93eb5d2fd6",
         "tab_sha256": "e810afd0a9d3f511fd8537eee3852733a0366c0e6a3e216b729d02433a391f1a",
         "tab_projection_sha256": "d9ff0d9180f587121579549e306a7e7a870ab741130041a3dbda2f0c282e159f",
-        "lilypond_sha256": "6e29a3c512434adcca2c3b1e7440ab7a08f3ad2dbb0a1e1622e8f87b37ef5498",
+        "lilypond_sha256": "2b176e49f1207843fb2e92ce94ea2c8eda1740259acd5cc788ca680137562577",
         "midi_sha256": "6d019acb43696cdb9be0eac8cda47c40b6fc32964ddbf4073b9c59167e4cc80a"
       }
     }

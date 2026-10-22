@@ -271,7 +271,9 @@ def lilypond_text(
     if style == "french":
         labels = _parse_fret_labels(settings.get("fretlabels", "") or "")
         if not labels:
-            labels = ["a", "b", "r", "d", "e", "f", "g", "h", "i", "k", "l"]
+            labels = list("abcdefghiklmnopqrst")
+            # Retain Oud's existing second-fret shape while covering higher frets.
+            labels[2] = "r"
         labels_text = " ".join(f'"{label}"' for label in labels)
         layout.append(f"    fretLabels = #'({labels_text})")
     layout.extend(tab_staff_overrides(settings))

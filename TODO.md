@@ -54,7 +54,7 @@ including rendering, TAB/MusicXML/MIDI export, playback, and verification.
   `oud/editor/editing/score/operations.py`, `petrucci/terminal/view/model.py`,
   `petrucci/rendering/rhythm/grid.py`, `oud/exports/export_tab.py`,
   `oud/editor/editing/transforms.py`, `oud/exports/midi/projection.py`,
-  `oud/exports/musicxml.py`, and the remaining readers found by
+  `oud/exports/musicxml/__init__.py`, and the remaining readers found by
   `grep -rlE "\.overrides|\.durations|\.dotted\b" oud petrucci`.
 - Finding (2026-09-29): in production `overrides` and `dotted` are never
   filled. Every loader returns `{}` for them; typing writes chords. Only these
@@ -169,6 +169,11 @@ algorithm that preserves sounding pitch and produces playable tablature.
 Why complex: reverse engineering without a spec. **Needs** the local Gerbode
 corpus (not redistributable; fetching is blocked in the cloud environment).
 
+- Investigate the opening record of `57_mrs_vaux_jig_8C.ft3`: its first object
+  does not use the ordinary framed item-count layout, so the scanning fallback
+  currently supplies the opening material. Compare its event boundaries,
+  written durations and course positions with the reference pickup before
+  changing the decoder. A clean residual-bit audit does not validate this path.
 - Decode and render German and Spanish/Neapolitan FT3 tablature from real
   fixtures, or reject each unsupported style with a precise visible diagnostic.
 - Confirm the remaining notation constructs against real FT3 encodings: TabVoice
@@ -188,6 +193,11 @@ onset-chord similarity, 11 best-fit global transpositions, and 22 below 0.50
 similarity. Never treat PPQ, patch, track, or count-in differences as
 pitch/rhythm agreement.
 
+- The 787-file terminal audit on 2026-10-22 rejected 12 notation projections
+  at both 80x24 and 120x40. Resolve their unmatched ties and conflicting grouped
+  durations using source voice/onset evidence; names are in
+  `docs/gerbode-coverage.md`. Do not weaken the canonical validator or silently
+  omit the affected voices to make the viewer accept them.
 - First resolve source-tuning metadata for the five transposition-only exact
   sequences, then classify the zero/sparse generated parts and mixed-score
   voice-count differences without inventing source events.
@@ -246,6 +256,15 @@ acceptance harness with tolerance decisions.
   raster-difference thresholds and further public Gerbode mixed scores. Record
   intentional differences from Gerbode/Fronimo output instead of claiming pixel
   identity.
+- The 2026-10-22 audit loads and exports 787 distinct cached FT3 files without
+  residual bits, unknown records or warnings; this is not full visual parity.
+  775 render their first viewport at both terminal sizes; 12 strict notation
+  failures remain under C10. In the final 60-PDF sample, 46 page counts and 37
+  exact system counts match the references (42 are within one system).
+  Continue from the reference differences in `docs/gerbode-coverage.md`:
+  Vaux's eight-course pickup/meter and rhythm signs, 6/8 beam grouping, bass
+  course presentation, then missed authored system/page breaks. Compare notes
+  and their course positions before optimizing page-count agreement.
 - Done when the LilyPond output passes the Gerbode comparison corpus and the
   visual regression cases.
 - Depends on: `S12`.
@@ -344,7 +363,7 @@ unedited lines are done (see `DONE.md`).
 Why complex: changes the save contract of every new document and which files
 Oud may overwrite; a lossy round trip would lose user work on every save.
 
-- Files: `oud/exports/musicxml.py`, `oud/importers/musicxml.py`,
+- Files: `oud/exports/musicxml/__init__.py`, `oud/importers/musicxml.py`,
   `oud/editor/core/document.py`, `oud/editor/services/io/files.py`,
   `oud/editor/services/bootstrap.py`, `docs/user-guide.md`.
 - Steps:
