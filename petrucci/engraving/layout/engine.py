@@ -375,8 +375,11 @@ def layout_score_proportional(
 def clear_layout_cache() -> None:
     """Clear immutable score layouts, primarily for bounded host lifecycle use."""
 
+    from petrucci.engraving.notation.horizontal import clear_measure_geometry_cache  # noqa: PLC0415
+
     _cached_layout_score.cache_clear()
     _cached_proportional_layout_score.cache_clear()
+    clear_measure_geometry_cache()
 
 
 @dataclass(slots=True)

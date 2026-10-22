@@ -1,5 +1,21 @@
 # DONE
 
+## Live score scrolling performance (2026-10-23)
+
+- Reuse immutable terminal role attributes and priorities in finite 64-entry caches; these contain enum
+  policy only, not scores or user text. The follow-up terminal/cache suite passes 38 tests. A controlled
+  Voce old/new comparison preserves all 180 frames and semantic attributes at three terminal sizes.
+- Reuse immutable shared/per-staff measure geometry across proportional viewport origins, bounded at eight
+  scores and 512 measure entries. The existing public `clear_layout_cache()` releases both score-retaining caches.
+- Cache repeated positive duration spellings (128 entries) and short terminal display clusters (128 entries,
+  at most 512 code points each); preserve invalid-duration handling and bypass retention for larger text.
+- Compute the exact projection offset once per viewport and round rational coordinates with integer arithmetic,
+  preserving the existing tie-away-from-zero rule. Voce continues using public layout/projection/typesetting APIs.
+- Validation: Ruff, formatting and Ty pass; the selected score/layout/terminal suite passes 352 tests with one
+  LilyPond feature-corpus golden mismatch. The identical export hash mismatch reproduces in a temporary copy
+  with all five performance-modified modules restored to HEAD, retaining the pre-existing export/lyric work.
+  Focused regressions prove geometry reuse, cleanup and large-text cache bypass.
+
 ## FT3 notation attributes, lane mapping and grace entry (2026-10-22)
 
 - Accepted tablature-first and notation-first parallel lanes and Gerbode's

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from functools import lru_cache
 from typing import NoReturn
 
 from petrucci.engraving.layout.engine import ElementRole, LayoutElement, LayoutViewport, ScoreLayout
@@ -641,10 +642,12 @@ def _ornament_text(value: str, glyphs: _GlyphInventory) -> str:
     }.get(value, "?")
 
 
+@lru_cache(maxsize=64)
 def _role_attr(role: ElementRole | None) -> int:
     return A_DIM if role in {ElementRole.MEASURE_NUMBER, ElementRole.STAFF_LABEL} else 0
 
 
+@lru_cache(maxsize=64)
 def _priority(role: ElementRole) -> int:
     return {
         ElementRole.STAFF: 10,

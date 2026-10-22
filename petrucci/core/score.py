@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from fractions import Fraction
+from functools import lru_cache
 from typing import NoReturn
 
 
@@ -481,6 +482,12 @@ def spell_duration(duration: Fraction) -> DurationSpelling | None:
 
     if not isinstance(duration, Fraction) or duration <= 0:
         return None
+    return _spell_positive_duration(duration)
+
+
+@lru_cache(maxsize=128)
+def _spell_positive_duration(duration: Fraction) -> DurationSpelling | None:
+    # Layout asks for the same small set of written values across many moving viewports.
     for base, base_duration in _DURATION_BASES:
         value = base_duration
         addition = base_duration

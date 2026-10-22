@@ -92,6 +92,7 @@ def project_timeline(score: NotationScore, request: TimelineProjectionRequest) -
     """Project canonical score identity without changing the requested time scale."""
 
     boundaries = score_measure_boundaries(score)
+    column_offset = Fraction(request.preamble_width) - request.origin * request.columns_per_whole
     measures = tuple(
         _project_interval(
             source_id=boundary.measure_id,
@@ -100,6 +101,7 @@ def project_timeline(score: NotationScore, request: TimelineProjectionRequest) -
             start=boundary.start,
             end=boundary.end,
             request=request,
+            column_offset=column_offset,
         )
         for boundary in boundaries
     )
@@ -117,6 +119,7 @@ def project_timeline(score: NotationScore, request: TimelineProjectionRequest) -
                         start=start,
                         end=start + event.duration,
                         request=request,
+                        column_offset=column_offset,
                     ),
                 )
                 event_times[event.id] = start
@@ -128,6 +131,7 @@ def project_timeline(score: NotationScore, request: TimelineProjectionRequest) -
             start=event_times[span.start_event_id],
             end=event_times[span.end_event_id],
             request=request,
+            column_offset=column_offset,
         )
         for staff in score.staffs
         for span in staff.spans
@@ -142,12 +146,9 @@ def round_projection(value: Fraction, rounding: ProjectionRounding) -> int:
         return value.numerator // value.denominator
     if rounding is ProjectionRounding.CEILING:
         return -((-value.numerator) // value.denominator)
-    half = Fraction(1, 2)
-    if value >= 0:
-        rounded = value + half
-        return rounded.numerator // rounded.denominator
-    rounded = -value + half
-    return -(rounded.numerator // rounded.denominator)
+    numerator, denominator = value.numerator, value.denominator
+    magnitude = (2 * abs(numerator) + denominator) // (2 * denominator)
+    return magnitude if numerator >= 0 else -magnitude
 
 
 def _project_interval(
@@ -158,9 +159,10 @@ def _project_interval(
     start: Fraction,
     end: Fraction,
     request: TimelineProjectionRequest,
+    column_offset: Fraction,
 ) -> ProjectedInterval:
-    x_start = request.x_at(start)
-    x_end = request.x_at(end)
+    x_start = column_offset + start * request.columns_per_whole
+    x_end = column_offset + end * request.columns_per_whole
     column_start = round_projection(x_start, request.rounding)
     column_end = round_projection(x_end, request.rounding)
     return ProjectedInterval(

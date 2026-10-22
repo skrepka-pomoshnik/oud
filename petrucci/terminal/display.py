@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass
+from functools import lru_cache
+
+_MAX_CACHED_TEXT_LENGTH = 512
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +18,16 @@ class DisplayCluster:
 def split_display_clusters(text: str) -> tuple[DisplayCluster, ...]:
     """Split text into simple terminal clusters with explicit cell widths."""
 
+    # Glyphs and staff strokes repeat each frame; never retain arbitrarily large input text.
+    return _cached_display_clusters(text) if len(text) <= _MAX_CACHED_TEXT_LENGTH else _split_display_clusters(text)
+
+
+@lru_cache(maxsize=128)
+def _cached_display_clusters(text: str) -> tuple[DisplayCluster, ...]:
+    return _split_display_clusters(text)
+
+
+def _split_display_clusters(text: str) -> tuple[DisplayCluster, ...]:
     clusters: list[DisplayCluster] = []
     join_next = False
     for char in text:

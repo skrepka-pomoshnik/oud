@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from functools import lru_cache
 from typing import NoReturn
 
 from petrucci.core.music.projection import ProjectedInterval, TimelineProjectionRequest, project_timeline
@@ -40,6 +41,12 @@ from petrucci.engraving.notation.types import (
     _SharedOnsetGroup,
 )
 from petrucci.terminal.display import display_width
+
+
+def clear_measure_geometry_cache() -> None:
+    """Release score-retaining caches alongside the public layout cache cleanup."""
+    _shared_measure_geometries.cache_clear()
+    _measure_geometry.cache_clear()
 
 
 def _horizontal_plan(
@@ -165,6 +172,7 @@ def _measure_boxes(
     return tuple(boxes)
 
 
+@lru_cache(maxsize=8)
 def _shared_measure_geometries(
     score: NotationScore,
     *,
@@ -213,6 +221,7 @@ def _shared_measure_geometry(
     )
 
 
+@lru_cache(maxsize=512)
 def _measure_geometry(
     staff: NotationStaff,
     index: int,
