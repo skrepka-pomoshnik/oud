@@ -36,6 +36,7 @@ class AccidentalDisplay(StrEnum):
 
 class Clef(StrEnum):
     TREBLE = "treble"
+    TREBLE_8VB = "treble_8vb"
     BASS = "bass"
 
 

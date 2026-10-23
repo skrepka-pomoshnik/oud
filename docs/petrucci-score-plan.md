@@ -124,12 +124,14 @@ remain natural-width.
 
 ## Supported notation
 
-The canonical score path supports treble and bass staffs, notes, chords, rests,
+The canonical score path supports treble, treble with an 8 below (`Clef.TREBLE_8VB`), and bass staffs, notes, chords, rests,
 whole through 64th durations, dots, stems, flags and beams, ledger lines,
 key-aware accidentals, clef/key/meter changes, barlines and repeats, endings,
 tuplets, grace notes, ties and slurs with system continuations, fermatas,
 dynamics, ornaments, pitch labels, lyrics, measured wrapping, clipping, and
 vertical or horizontal viewport translation.
+
+The octave treble clef projects sounding pitches one octave above their ordinary treble staff positions without changing canonical MIDI values: sounding F3 occupies the usual written F4 position. Written notes and continuous pitch cues use the same projection. Text modes print an 8 below the clef; raster modes draw it beneath the treble shape.
 
 Pretty and safe glyph modes preserve the same event IDs and structural roles.
 Unknown or inconsistent canonical input raises an explicit validation error.

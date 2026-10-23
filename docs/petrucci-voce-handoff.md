@@ -128,7 +128,7 @@ uv run python scripts/rendering/benchmark_flow.py \
 
 Terminal output is an editing proof, not publication engraving. Fixed-scale
 collisions are diagnostics rather than silently nonlinear spacing. The public
-pitch projection currently supports treble and bass clefs. Malformed source
+pitch projection supports treble, octave-down treble (`Clef.TREBLE_8VB`), and bass clefs. Malformed source
 measures, inaccurate pickups, lesson selection, and grading remain consumer-owned.
 
 The optional accompaniment extraction was assessed but is not part of this

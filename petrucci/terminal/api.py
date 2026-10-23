@@ -362,6 +362,10 @@ def _paint_special_element(
         for row in range(element.rect.height):
             _write(canvas, element, y=y + row, text=text)
         return True
+    if role is ElementRole.CLEF and element.value == "treble_8vb":
+        _write(canvas, element, y=y, text=glyphs.treble_clef)
+        _write(canvas, element, y=y + 1, text="8")
+        return True
     if role is ElementRole.TIME_SIGNATURE:
         _paint_time_signature(canvas, element, y=y)
         return True
@@ -563,7 +567,7 @@ def _valued_mark_symbol(element: LayoutElement, glyphs: _GlyphInventory) -> str:
 
 
 def _clef_text(value: str, glyphs: _GlyphInventory) -> str:
-    return glyphs.treble_clef if value == "treble" else glyphs.bass_clef
+    return glyphs.treble_clef if value in {"treble", "treble_8vb"} else glyphs.bass_clef
 
 
 def _vertical_glyph(element: LayoutElement, glyphs: _GlyphInventory) -> str:

@@ -52,7 +52,7 @@ def _supported(element: LayoutElement) -> bool:
         top, separator, bottom = element.value.partition("/")
         return bool(separator and top.isascii() and top.isdigit() and bottom.isascii() and bottom.isdigit())
     if element.key.role is ElementRole.CLEF:
-        return element.value in {"treble", "bass"}
+        return element.value in {"treble", "treble_8vb", "bass"}
     return not (element.key.role is ElementRole.ACCIDENTAL and ":" in element.value)
 
 

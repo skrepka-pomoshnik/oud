@@ -84,7 +84,7 @@ def _key_signature_elements(
 
 def _key_signature_positions(*, clef: Clef, sharp: bool) -> tuple[int, ...]:
     treble = (8, 5, 9, 6, 3, 7, 4) if sharp else (4, 7, 3, 6, 2, 5, 1)
-    if clef is Clef.TREBLE:
+    if clef in {Clef.TREBLE, Clef.TREBLE_8VB}:
         return treble
     return tuple(position - 2 for position in treble)
 

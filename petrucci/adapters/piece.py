@@ -762,7 +762,13 @@ def _explicit_clef(value: str | None) -> Clef | None:
     if value is None or not value.strip():
         return None
     normalized = value.strip().lower()
-    mapping = {"treble": Clef.TREBLE, "g": Clef.TREBLE, "bass": Clef.BASS, "f": Clef.BASS}
+    mapping = {
+        "treble": Clef.TREBLE,
+        "g": Clef.TREBLE,
+        "treble_8vb": Clef.TREBLE_8VB,
+        "bass": Clef.BASS,
+        "f": Clef.BASS,
+    }
     if normalized not in mapping:
         _fail(f"unsupported clef {value!r}")
     return mapping[normalized]

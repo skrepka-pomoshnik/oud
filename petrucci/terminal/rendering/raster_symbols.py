@@ -74,8 +74,10 @@ def notehead(canvas: DotCanvas, element: LayoutElement, x: int, y: int, priority
 
 
 def clef(canvas: DotCanvas, element: LayoutElement, x: int, y: int, priority: int) -> None:
-    if element.value == "treble":
+    if element.value in {"treble", "treble_8vb"}:
         stamp(canvas, element, x=x - 1, y=y - 8, mask=_TREBLE, priority=priority)
+        if element.value == "treble_8vb":
+            stamp(canvas, element, x=x, y=y + 14, mask=_DIGITS["8"], priority=priority)
         return
     stamp(canvas, element, x=x - 1, y=y - 4, mask=_BASS, priority=priority)
     canvas.pixel(x + 5, y - 3, element, priority)

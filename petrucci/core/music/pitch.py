@@ -28,10 +28,18 @@ class PitchProjection:
     rounded_row: int
 
 
+def _bottom_pitch(clef: Clef) -> WrittenPitch:
+    return {
+        Clef.TREBLE: WrittenPitch(PitchStep.E, 4),
+        Clef.TREBLE_8VB: WrittenPitch(PitchStep.E, 3),
+        Clef.BASS: WrittenPitch(PitchStep.G, 2),
+    }[clef]
+
+
 def written_staff_position(pitch: WrittenPitch, clef: Clef) -> int:
     """Return diatonic steps above the active staff's bottom line."""
 
-    bottom = WrittenPitch(PitchStep.E, 4) if clef is Clef.TREBLE else WrittenPitch(PitchStep.G, 2)
+    bottom = _bottom_pitch(clef)
     return _diatonic_number(pitch) - _diatonic_number(bottom)
 
 
@@ -45,7 +53,7 @@ def continuous_staff_position(midi: Fraction, clef: Clef) -> Fraction:
     step = bisect_right(_STEP_SEMITONES, pitch_class) - 1
     lower = _STEP_SEMITONES[step]
     upper = _STEP_SEMITONES[step + 1] if step + 1 < len(_STEP_SEMITONES) else 12
-    bottom = WrittenPitch(PitchStep.E, 4) if clef is Clef.TREBLE else WrittenPitch(PitchStep.G, 2)
+    bottom = _bottom_pitch(clef)
     position = Fraction(octave * 7 + step - _diatonic_number(bottom)) + (pitch_class - lower) / (upper - lower)
     if not -_MAX_PROJECTED_STAFF_POSITION <= position <= _MAX_PROJECTED_STAFF_POSITION:
         return _fail("measured MIDI pitch is outside the supported projection range")
