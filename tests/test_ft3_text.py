@@ -280,3 +280,18 @@ def test_raw_positioned_lyric_rows_prefer_cluster_merges_nearby_lanes() -> None:
         ["Ab-", "sence"],
         ["I", "For", "lov'd", "my"],
     ]
+
+
+def test_refine_ft3_legacy_lyrics_preserves_successive_repeated_syllables() -> None:
+    chunk = _structured_chunk(b"\x08la", b"\x08la")
+    record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
+
+    assert record.lyrics == ["la la"]
+    assert [(event.text, event.onset_index) for event in record.lyric_event_rows[0]] == [("la", 0), ("la", 1)]
+
+
+def test_refine_ft3_legacy_lyrics_preserves_a_outside_a_binary_pitch_prefix() -> None:
+    chunk = _structured_chunk(b"\x05a", b"\x05me")
+    record = refine_ft3_raw_text_record(parse_ft3_text_record(chunk), chunk)
+
+    assert record.lyrics == ["a me"]

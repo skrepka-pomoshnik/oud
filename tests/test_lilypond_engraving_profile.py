@@ -22,6 +22,9 @@ from tests.engraving_quality_matrix import (
 )
 
 MATRIX = MATRIX_PATH
+# Isolated XDG caches trigger cold font/Scheme initialization. Keep the same
+# finite compilation allowance as the corpus PDF renderer, not a warm-start deadline.
+LILYPOND_COMPILE_TIMEOUT = 180
 
 
 def test_engraving_matrix_links_proof_export_and_upstream_invariants() -> None:
@@ -227,7 +230,7 @@ def test_supported_lilypond_engines_compile_without_warnings(
         check=False,
         env=environment,
         text=True,
-        timeout=60,
+        timeout=LILYPOND_COMPILE_TIMEOUT,
     )
 
     assert result.returncode == 0, result.stderr
@@ -278,7 +281,7 @@ def test_curated_ft3_exports_compile_with_lilypond_baseline(tmp_path: Path) -> N
             check=False,
             env=environment,
             text=True,
-            timeout=60,
+            timeout=LILYPOND_COMPILE_TIMEOUT,
         )
         output = f"{result.stdout}\n{result.stderr}".lower()
         assert result.returncode == 0, f"{path}: {result.stderr}"

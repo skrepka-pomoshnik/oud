@@ -93,12 +93,12 @@
       "style": null,
       "tab_chords": 0,
       "staff_kinds": {
+        "comment": 1,
         "layout": 1,
-        "lyrics": 1,
         "note": 1
       },
       "notation_events": 459,
-      "lyrics": 6
+      "lyrics": 0
     },
     {
       "path": "fixed-14-v8/006/milano_065.ft3",
@@ -136,7 +136,7 @@
         "note": 1
       },
       "notation_events": 128,
-      "lyrics": 144
+      "lyrics": 143
     },
     {
       "path": "fixed-14-v8/008/galliard.ft3",
@@ -222,11 +222,10 @@
       "staff_kinds": {
         "comment": 1,
         "layout": 1,
-        "lyrics": 1,
         "note": 1
       },
       "notation_events": 4,
-      "lyrics": 1
+      "lyrics": 0
     },
     {
       "path": "fixed-14-v8/013/milano_122_quanta_belta_arcadelt.ft3",

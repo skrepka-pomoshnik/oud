@@ -6,6 +6,7 @@ from typing import Literal
 # italic serif course letters, thin stems and beams in a row above the staff.
 # Tab line spacing is 1.5 staff spaces; 21.5pt gives Gerbode's 8.07pt between courses.
 GERBODE_STAFF_SIZE = 21.5
+GERBODE_VOCAL_STAFF_SIZE = 18
 GERBODE_INDENT_MM = 0
 GERBODE_LEFT_MM = 15.7
 GERBODE_RIGHT_MM = 24.3
@@ -90,7 +91,7 @@ def profile_name(settings: dict[str, str]) -> LilyPondProfile:
     return "petrucci"
 
 
-def paper_block(settings: dict[str, str]) -> list[str]:
+def paper_block(settings: dict[str, str], *, with_vocals: bool = False) -> list[str]:
     """Build deterministic paper policy independently of score semantics."""
     paper_size = settings.get("lypapersize", "a4")
     if paper_size not in {"a4", "letter"}:
@@ -98,9 +99,11 @@ def paper_block(settings: dict[str, str]) -> list[str]:
     if profile_name(settings) == "classic":
         return [f'#(set-default-paper-size "{paper_size}")', r"\paper { indent = 0\mm }"]
     gerbode = profile_name(settings) == "gerbode"
+    # Leave room for lyric baselines and the detached lute rhythm row.
+    staff_size = GERBODE_VOCAL_STAFF_SIZE if with_vocals else GERBODE_STAFF_SIZE
     return [
         f'#(set-default-paper-size "{paper_size}")',
-        f"#(set-global-staff-size {GERBODE_STAFF_SIZE if gerbode else 16})",
+        f"#(set-global-staff-size {staff_size if gerbode else 16})",
         r"\paper {",
         rf"  indent = {GERBODE_INDENT_MM if gerbode else 22}\mm",
         r"  short-indent = 0\mm",

@@ -1,5 +1,25 @@
 # Gerbode coverage checkpoint, 2026-10-22
 
+## Lyric follow-up, 2026-10-23
+
+The checkpoint below records the earlier audit, not a rerun of the whole
+preserved set. The lyric follow-up re-audited 251 cached metadata-bearing
+scores, preserving source hashes and canonical note counts. Four curated
+TAB, TAB-projection and MIDI hashes also remained unchanged; affected lyric
+counts and terminal/LilyPond baselines were updated.
+
+Caldara, Dowland and Bossinensis underlay was compared with reference PDFs
+across all seven generated pages and terminal proofs at 80x24 and 120x40.
+The three exports compile without warnings with LilyPond 2.26 and 2.24.4;
+the earlier Caldara warning evidence below is historical. See `lyrics.md`
+for the supported decoder boundary and `../TODO.md` for remaining work.
+
+Final validation: 2,284 passed, 23 skipped, zero failures; Petrucci coverage
+95.53%. Ruff lint/format, Ty and architecture checks pass. This does not
+establish full-corpus visual parity or resolve the remaining notation issues.
+
+## Earlier preserved-set audit
+
 The local preserved set currently contains 787 distinct FT3 payloads across
 `tests/fixtures/ft3/corpus/` and `downloads/gerbode/ft3/`, deduplicated by SHA-256.
 All 787 load and generate LilyPond source. The semantic audit finds no residual

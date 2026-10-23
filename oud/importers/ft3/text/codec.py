@@ -7,6 +7,7 @@ from oud.importers.ft3.musical.note_records import (
     decode_ft3_vocal_events,
     ft3_note_record_group_count,
 )
+from oud.importers.ft3.text.packed import decode_packed_lyrics
 from oud.importers.ft3.text.rows import (
     _asciiish_lines,
     _classify_raw_line,
@@ -260,6 +261,9 @@ def _deduplicate_lyric_lines(lyrics: list[str]) -> tuple[list[str], list[list[Ly
 
 
 def parse_ft3_text_record(chunk: bytes) -> FT3TextRecord:
+    packed = decode_packed_lyrics(chunk)
+    if packed is not None:
+        return packed
     tail = chunk[_FT3_HEADER_SIZE:] if len(chunk) > _FT3_HEADER_SIZE else chunk
     structured = _parse_structured_text_record(tail)
     if structured is not None:

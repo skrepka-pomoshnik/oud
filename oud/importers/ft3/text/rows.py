@@ -41,6 +41,7 @@ _FT3_MIN_LONG_TOKEN_LENGTH = 4
 _FT3_MIN_PROSE_LETTERS = 10
 _FT3_MIN_LONG_TOKENS = 2
 _FT3_MIN_PROSE_TOKENS = 4
+_FT3_LEGACY_PITCH_ANCHOR = 5
 
 
 def _empty_text_record() -> FT3TextRecord:
@@ -269,7 +270,7 @@ def _clean_lyric_token(token: str) -> str:
 
 def _trim_leading_single_letter_lyric_noise(tokens: list[str]) -> list[str]:
     trimmed = list(tokens)
-    while len(trimmed) > 1 and len(trimmed[0]) == 1 and trimmed[0].islower() and trimmed[0] not in {"i", "o"}:
+    while len(trimmed) > 1 and len(trimmed[0]) == 1 and trimmed[0].islower() and trimmed[0] not in {"i", "a", "o"}:
         trimmed = trimmed[1:]
     return trimmed
 
@@ -278,7 +279,12 @@ def _trim_leading_single_letter_positioned_noise(
     tokens: list[tuple[int, str]],
 ) -> list[tuple[int, str]]:
     trimmed = list(tokens)
-    while len(trimmed) > 1 and len(trimmed[0][1]) == 1 and trimmed[0][1].islower():
+    while (
+        len(trimmed) > 1
+        and len(trimmed[0][1]) == 1
+        and trimmed[0][1].islower()
+        and trimmed[0][1] not in {"i", "a", "o"}
+    ):
         trimmed = trimmed[1:]
     return trimmed
 
@@ -734,10 +740,41 @@ def _filtered_positioned_lyric_tokens(row: bytes) -> list[tuple[int, str]]:
     ]
 
 
+def _positioned_row_lyrics(row: bytes) -> list[tuple[int, str]]:
+    tokens = _filtered_positioned_lyric_tokens(row)
+    # The legacy binary prefix can expose its pitch at anchor 5 as a letter.
+    # A plain lyric row at that anchor is not evidence of an encoded pitch.
+    if (
+        b"\x00" in row
+        and tokens
+        and tokens[0][0] == _FT3_LEGACY_PITCH_ANCHOR
+        and tokens[0][1] in {"a", "b", "c", "d", "e", "f", "g"}
+    ):
+        tokens = tokens[1:]
+    return _trim_leading_single_letter_positioned_noise(tokens)
+
+
+def _append_positioned_row(
+    rows: list[list[tuple[int, str]]],
+    tokens: list[tuple[int, str]],
+    *,
+    vocal_prefix: bool,
+) -> None:
+    if not tokens:
+        return
+    # Notation-free fallback rows can repeat a singleton at a lane boundary.
+    # With a vocal prefix, matching tokens can belong to separate stanzas;
+    # preserve them for the note-count-aware reconstruction in the codec.
+    if not vocal_prefix and rows and len(rows[-1]) == 1 and len(tokens) > 1 and rows[-1][0] == tokens[0]:
+        tokens = tokens[1:]
+    rows.append(tokens)
+
+
 def _structured_positioned_lyric_rows(
     tail: bytes,
 ) -> list[list[tuple[int, str]]]:
     rows = _split_record_rows(tail)
+    vocal_prefix = bool(rows and _structured_vocal_events(rows[0]))
     classified_rows = [
         (row, classified)
         for row_index, row in enumerate(rows)
@@ -747,15 +784,16 @@ def _structured_positioned_lyric_rows(
     for row, classified in classified_rows:
         if classified.kind not in {"vocal", "lyrics"}:
             continue
-        filtered = _filtered_positioned_lyric_tokens(row)
-        filtered = _trim_leading_single_letter_positioned_noise(filtered)
-        if filtered:
-            positioned_tokens_by_row.append(filtered)
+        _append_positioned_row(
+            positioned_tokens_by_row,
+            _positioned_row_lyrics(row),
+            vocal_prefix=vocal_prefix,
+        )
     return positioned_tokens_by_row
 
 
 def _record_with_verse_rows(record: FT3TextRecord, verse_rows: list[list[str]]) -> FT3TextRecord:
-    normalized_rows = [_collapse_consecutive_duplicate_tokens(tokens) for tokens in verse_rows]
+    normalized_rows = verse_rows
     lyric_lines = [" ".join(tokens).strip() for tokens in normalized_rows if tokens]
     lyric_event_rows: list[list[LyricEvent]] = []
     for verse, tokens in enumerate(normalized_rows):
@@ -826,15 +864,6 @@ def _reconstruct_three_verse_raw_rows(
             cycle_index = (cycle_index + 1) % len(cycle)
     rows = [primary, verse_two, verse_three]
     return rows if sum(1 for row in rows if row) >= _FT3_MIN_LYRIC_ROWS else None
-
-
-def _collapse_consecutive_duplicate_tokens(tokens: list[str]) -> list[str]:
-    out: list[str] = []
-    for token in tokens:
-        if out and out[-1].lower() == token.lower():
-            continue
-        out.append(token)
-    return out
 
 
 def _looks_like_editorial_tokens(tokens: list[str]) -> bool:

@@ -730,14 +730,15 @@ def _lyric_elements(
                 ),
             )
             continue
-        natural_width = max(1, display_width(lyric.text))
+        text = lyric.text.replace("_", " ")
+        natural_width = max(1, display_width(text))
         width = max(1, min(natural_width, right - x + 1))
         lyric_x = x
         elements.append(
             LayoutElement(
                 ElementKey(lyric.id, ElementRole.LYRIC),
                 Rect(lyric_x, rows.lyric_rows[lyric.verse], width),
-                lyric.text,
+                text,
             ),
         )
         if natural_width > width:

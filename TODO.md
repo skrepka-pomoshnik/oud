@@ -2,6 +2,16 @@
 
 Open work only. Completed items live in `DONE.md`.
 
+## Lyric fidelity checkpoint
+
+- Extend the counted lyric-cell decoder to verified extended/multi-byte length
+  encodings, with small synthetic regression fixtures and explicit rejection of
+  unsupported records. See `docs/lyrics.md` for the current decoding boundary.
+- Expand reference-PDF underlay comparisons beyond the validated Caldara,
+  Dowland and Bossinensis benchmarks. Check empty anchors, repeated syllables,
+  stanza identity, elisions, hyphens and extenders across systems; compiler
+  success alone is not evidence of corpus-wide lyric fidelity.
+
 The backlog is split by complexity so that work can be handed out safely:
 
 - **Complex (`C`, owner: Claude).** A task is complex when it does at least one

@@ -608,5 +608,5 @@ def test_export_lilypond_registers_dense_felice_score_like_gerbode(tmp_path) -> 
     assert text.count("\n  \\pageBreak\n") == 2
     assert '\\italic "Intro: Ricercars 1,9,12,14,15,16,18,20"' in text
     assert '\\italic "Coda at end only."' in text
-    assert '"ha" -- "vran" "suo_in" --' in text
-    assert '"ten" -- "to_i" "dol" -- "ci" "pen" -- "sier" "mie" -- "i."' in text
+    assert '"ha" -- "vran" "suo in" --' in text
+    assert '"ten" -- "to i" "dol" -- "ci" "pen" -- "sier" "mie" -- "i."' in text

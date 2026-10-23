@@ -254,6 +254,7 @@ def lilypond_text(
         piece,
         settings.get("lilypondversion", "2.26"),
         include_source_heading=settings.get("lysourceheading", "on") == "on",
+        wrap_footer=profile_name(settings) == "gerbode",
     )
     if profile_name(settings) == "gerbode" and not piece.footnote:
         # The Gerbode footer prints the tagline; without a footnote LilyPond would fill in its own.
@@ -292,7 +293,10 @@ def lilypond_text(
         [
             *header,
             "",
-            *paper_block(settings),
+            *paper_block(
+                settings,
+                with_vocals=bool(_imported_staffs_by_kind(piece, "note")) or _piece_has_melody(piece),
+            ),
             "",
             *scheme_helpers(settings),
             *blocks,

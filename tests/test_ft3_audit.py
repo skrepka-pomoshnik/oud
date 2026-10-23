@@ -19,7 +19,8 @@ def test_ft3_audit_reports_typed_source_records_without_unresolved_values() -> N
     assert willoughby["note_extra_residuals"] == {}
 
     now_o_now = audit_file(Path("tests/fixtures/ft3/corpus/now_o_now.ft3"))
-    assert now_o_now["source_record_kinds"] == {"note": 1, "note-lyrics": 47}
+    # Empty counted cells are notation-only, not evidence of sung text.
+    assert now_o_now["source_record_kinds"] == {"note": 2, "note-lyrics": 46}
     assert now_o_now["unknown_source_records"] == 0
 
 

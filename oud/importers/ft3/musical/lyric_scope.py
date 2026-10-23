@@ -16,6 +16,19 @@ def _final_verse_cue(bar: ImportedBarContent) -> str | None:
     return None
 
 
+def _comment_coda_cues(piece: Piece) -> dict[int, str]:
+    if piece.imported_score is None:
+        return {}
+    return {
+        bar.source_bar_index: match.group(0)
+        for staff in piece.imported_score.staffs
+        if staff.kind == "comment"
+        for bar in staff.bars
+        for text in bar.editorial_text
+        if (match := _FINAL_VERSE_CODA.search(text)) is not None
+    }
+
+
 def _source_phrase_tokens(bar: ImportedBarContent) -> list[str]:
     candidates = [_filtered_structured_lyric_tokens(row.tokens) for row in bar.text_rows]
     return max(candidates, key=len, default=[])
@@ -78,8 +91,9 @@ def _align_staff_final_verse_coda(piece: Piece, staff: ImportedStaff) -> None:
     verse_count = 1
     final_verse_only = False
     note_onsets = _note_onsets_by_bar(piece, staff)
+    comment_cues = _comment_coda_cues(piece)
     for bar in sorted(staff.bars, key=lambda item: item.source_bar_index):
-        cue = _final_verse_cue(bar)
+        cue = _final_verse_cue(bar) or comment_cues.get(bar.source_bar_index)
         if cue is not None:
             final_verse_only = True
             _register_editorial_cue(piece, bar.source_bar_index, cue)

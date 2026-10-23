@@ -479,7 +479,7 @@ def _parse_score_text_record(
     normalized = bytes(32) + payload
     if text_record_cache is not None and payload in text_record_cache:
         return text_record_cache[payload]
-    decoded = parse_ft3_text_record(normalized)
+    decoded = parse_ft3_text_record(chunk)
     annotations = _plain_score_annotations(normalized)
     if _use_plain_score_annotation(decoded, annotations):
         rows = [
@@ -718,7 +718,7 @@ def _decode_raw_text_record(
 ) -> tuple[FT3TextRecord, bytes]:
     payload = chunk[_FT3_SCORE_HEADER_SIZE:] if len(chunk) > _FT3_SCORE_HEADER_SIZE else chunk
     normalized_chunk = bytes(_FT3_SCORE_HEADER_SIZE) + payload
-    record = _parse_score_text_record(normalized_chunk, text_record_cache=text_record_cache)
+    record = _parse_score_text_record(chunk, text_record_cache=text_record_cache)
     raw_text_kinds = {"barline-raw", "note-lyric-raw", "text-score-raw"}
     if raw_kind in raw_text_kinds and record.parse_mode != "structured":
         record = refine_ft3_raw_text_record(record, normalized_chunk)

@@ -1,5 +1,19 @@
 # DONE
 
+## Remove duplicate LilyPond measure labels (2026-10-23)
+
+- Stop emitting manual boxed measure marks alongside LilyPond's automatic
+  bar numbers. Preserve source editorial annotations, including Caldara's
+  separate `(35)` cue.
+- Require the Dowland export to omit manual boxed labels. Refresh three
+  curated LilyPond hashes only after verifying that removing those labels
+  exactly reproduces the new output; retain all other golden evidence.
+- Regenerate the Dowland, Bossinensis and Caldara previews without compiler
+  warnings and inspect all seven PDF pages for the numbering change.
+- Validation: focused tests 26 passed, 8 skipped; full suite 2,286 passed,
+  23 skipped, zero failures, Petrucci coverage 95.52%. Ruff lint/format, Ty
+  and architecture checks pass.
+
 ## Live score scrolling performance (2026-10-23)
 
 - Reuse immutable terminal role attributes and priorities in finite 64-entry caches; these contain enum
@@ -15,6 +29,28 @@
   LilyPond feature-corpus golden mismatch. The identical export hash mismatch reproduces in a temporary copy
   with all five performance-modified modules restored to HEAD, retaining the pre-existing export/lyric work.
   Focused regressions prove geometry reuse, cleanup and large-text cache bypass.
+
+## FT3 lyric fidelity and clean validation (2026-10-23)
+
+- Decode counted lyric cells without treating geometry or music-font controls
+  as sung text. Preserve repeated syllables, empty note anchors, sparse stanza
+  identities, punctuation and explicit editorial directives.
+- Align terminal and LilyPond underlay: display elisions as spaces, retain
+  hyphens across skipped anchors, consume extender anchors and pad missing
+  stanzas without adding lyric slots to rest-only bars.
+- Re-audit 251 cached metadata-bearing scores. Update derived lyric baselines
+  only; preserve source hashes, canonical note counts and all four curated
+  TAB, TAB-projection and MIDI hashes. No source payloads added.
+- Visually inspect all seven benchmark PDF pages against Caldara, Dowland and
+  Bossinensis references, plus terminal proofs at 80x24 and 120x40. All three
+  scores compile without warnings under LilyPond 2.26 and 2.24.4. Use 18-point
+  vocal scores and wrapped, deduplicated source footers.
+- Preserve empty stanza slots when later text exists while filtering
+  noise-only lyric content. Bound isolated cold-cache LilyPond compilation at
+  180 seconds without relaxing output assertions.
+- Validation: focused suite 189 passed, 8 skipped; full suite 2,284 passed,
+  23 skipped, zero failures, Petrucci coverage 95.53%. Ruff lint and formatting,
+  Ty and architecture checks pass. Broader engraving parity remains unfinished.
 
 ## FT3 notation attributes, lane mapping and grace entry (2026-10-22)
 

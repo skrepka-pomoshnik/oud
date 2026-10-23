@@ -317,7 +317,7 @@
         "note": 1
       },
       "notation_events": 116,
-      "lyrics": 225
+      "lyrics": 228
     },
     {
       "path": "note-input-100/037/Mertel_prelude_62.ft3",
@@ -380,12 +380,11 @@
       "style": null,
       "tab_chords": 253,
       "staff_kinds": {
-        "comment": 1,
         "lyrics": 1,
         "note": 1
       },
       "notation_events": 128,
-      "lyrics": 63
+      "lyrics": 97
     },
     {
       "path": "note-input-100/086/pavan_4_T.ft3",
@@ -434,11 +433,12 @@
       "style": null,
       "tab_chords": 161,
       "staff_kinds": {
+        "comment": 1,
         "lyrics": 1,
         "note": 1
       },
       "notation_events": 102,
-      "lyrics": 111
+      "lyrics": 196
     },
     {
       "path": "note-input-100/012/23_chiarenzana_la_madalena.ft3",
@@ -653,7 +653,7 @@
         "note": 1
       },
       "notation_events": 42,
-      "lyrics": 82
+      "lyrics": 83
     },
     {
       "path": "note-input-100/013/fantasie.ft3",
@@ -1140,11 +1140,10 @@
       "staff_kinds": {
         "comment": 1,
         "layout": 1,
-        "lyrics": 2,
         "note": 2
       },
       "notation_events": 717,
-      "lyrics": 78
+      "lyrics": 0
     },
     {
       "path": "note-input-100/053/milano_086.ft3",
@@ -1347,12 +1346,10 @@
       "style": null,
       "tab_chords": 243,
       "staff_kinds": {
-        "comment": 1,
-        "lyrics": 1,
         "note": 1
       },
       "notation_events": 979,
-      "lyrics": 6
+      "lyrics": 0
     },
     {
       "path": "ich_bin_eine_blume_zu_saron_T.ft3",
@@ -1501,12 +1498,10 @@
       "style": null,
       "tab_chords": 172,
       "staff_kinds": {
-        "comment": 1,
-        "lyrics": 1,
         "note": 1
       },
       "notation_events": 328,
-      "lyrics": 6
+      "lyrics": 0
     },
     {
       "path": "note-input-100/056/murcot_s_delight.ft3",
@@ -1537,12 +1532,11 @@
       "style": null,
       "tab_chords": 171,
       "staff_kinds": {
-        "comment": 1,
         "lyrics": 4,
         "note": 4
       },
       "notation_events": 483,
-      "lyrics": 527
+      "lyrics": 467
     },
     {
       "path": "note-input-100/008/divisions_2011.ft3",
@@ -1637,12 +1631,11 @@
       "style": null,
       "tab_chords": 118,
       "staff_kinds": {
-        "comment": 1,
         "lyrics": 1,
         "note": 1
       },
       "notation_events": 81,
-      "lyrics": 31
+      "lyrics": 62
     },
     {
       "path": "note-input-100/082/galliard_wagstaff.ft3",
@@ -1867,12 +1860,11 @@
       "style": null,
       "tab_chords": 0,
       "staff_kinds": {
-        "comment": 1,
         "lyrics": 4,
         "note": 4
       },
       "notation_events": 323,
-      "lyrics": 75
+      "lyrics": 190
     },
     {
       "path": "05_a_fancy.ft3",

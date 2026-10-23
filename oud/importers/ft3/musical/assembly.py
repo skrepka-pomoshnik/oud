@@ -127,13 +127,17 @@ def _decoded_lyric_content(decoded: FT3TextRecord, chunk: bytes) -> tuple[list[s
     matrix = _positioned_lyric_matrix(chunk, decoded.melody_events)
     if matrix is not None:
         return _restore_matrix_source_prefix(matrix, decoded)
-    lyrics = [line for line in decoded.lyrics if _is_meaningful_lyric_line(line)]
+    lyrics = [line if _is_meaningful_lyric_line(line) else "" for line in decoded.lyrics]
     rows = [
         list(row)
-        for row in decoded.lyric_event_rows
         if any(event.extender for event in row) or _is_meaningful_lyric_line(" ".join(event.text for event in row))
+        else []
+        for row in decoded.lyric_event_rows
     ]
-    return lyrics, rows
+    # Blank slots carry stanza identity; filter their contents, not their rows.
+    if not any(lyrics):
+        lyrics = []
+    return (lyrics, rows) if any(lyrics) or any(rows) else ([], [])
 
 
 def _decoded_lyric_text_rows(decoded: FT3TextRecord) -> list[ImportedTextRow]:
@@ -273,7 +277,7 @@ def _matrix_event_text(value: bytes) -> tuple[str, str]:
     source = _matrix_source_text(value)
     starts = source.startswith("-")
     ends = source.endswith("-")
-    text = source.strip("-")
+    text = source.strip("-").strip()
     if starts and ends:
         return text, "middle"
     if starts:
@@ -296,14 +300,16 @@ def _transpose_lyric_columns(
         row: list[LyricEvent] = []
         for onset, value in zip(onsets, values, strict=True):
             text, syllabic = _matrix_event_text(value)
+            extender = bool(text) and set(text) <= {"_"}
             if text:
                 row.append(
                     LyricEvent(
-                        text,
+                        "" if extender else text,
                         onset,
                         verse=verse,
                         syllabic=syllabic,
                         src_pos=source_positions[onset],
+                        extender=extender,
                     ),
                 )
         rows.append(row)

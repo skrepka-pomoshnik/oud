@@ -778,7 +778,7 @@ def _place_lyric_event(
     if event.extender and not event.text:
         cells[start] = "_"
         return start, start
-    text = event.text or ""
+    text = (event.text or "").replace("_", " ")
     if not text:
         return None
     end = min(len(cells) - 1, start + len(text) - 1)

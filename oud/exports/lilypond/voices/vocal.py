@@ -37,13 +37,14 @@ def _lyric_tokens_for_row(row, sung_onsets: tuple[int, ...]) -> list[str]:
             tokens.append("_")
             continue
         if ev.extender:
-            tokens.append("__")
+            # Extender commands draw a line but do not consume a melody note.
+            tokens.extend(("__", "_"))
             continue
         text = (ev.text or "").strip()
         if not text:
             tokens.append("_")
             continue
-        tokens.append(f'"{_escape_lilypond(text)}"')
+        tokens.append(f'"{_escape_lilypond(text.replace("_", " "))}"')
         if ev.syllabic in {"begin", "middle"}:
             tokens.append("--")
     return tokens
@@ -72,15 +73,12 @@ def _append_vocal_events(
 
 
 def _append_vocal_lyrics(lyric_bodies: list[list[str]], bar, sung_onsets: tuple[int, ...]) -> None:
-    rows = getattr(bar, "lyric_event_rows", None) or []
-    if rows:
-        while len(lyric_bodies) < len(rows):
-            lyric_bodies.append([])
-        for idx, row in enumerate(rows):
-            lyric_bodies[idx].extend(_lyric_tokens_for_row(row, sung_onsets))
-        return
-    for row in lyric_bodies:
-        row.extend(["_"] * len(sung_onsets))
+    _extend_imported_lyric_bodies(
+        lyric_bodies,
+        bar,
+        sung_onsets=sung_onsets,
+        prior_event_count=0,
+    )
 
 
 def _append_vocal_bar(
@@ -114,7 +112,8 @@ def _build_vocal_bodies(
     registration: LilyPondRegistration,
 ) -> tuple[list[str], list[list[str]]]:
     melody_body: list[str] = []
-    lyric_bodies: list[list[str]] = []
+    stanza_count = max((max(len(bar.lyric_event_rows), len(bar.lyrics)) for bar in piece.bars), default=0)
+    lyric_bodies: list[list[str]] = [[] for _ in range(stanza_count)]
     current_time_sig = _append_global_prefix(melody_body, piece, settings)
     tuning = settings.get("tuning", "") or piece.tuning or ""
     tuning_pitches = _parse_tuning(tuning) if tuning else _default_tuning(piece.strings)
@@ -273,8 +272,6 @@ def _append_editorial_marks(
     registration: LilyPondRegistration,
     source_bar_index: int,
 ) -> None:
-    if source_bar_index in registration.boxed_bar_number_before:
-        body.append(f'  \\mark \\markup {{ \\box "{source_bar_index + 1}" }}')
     body.extend(
         f'  \\mark \\markup {{ \\italic "{_escape_lilypond(text)}" }}'
         for text in registration.editorial_before[source_bar_index]
@@ -283,7 +280,7 @@ def _append_editorial_marks(
 
 def _pad_lyric_bodies(lyric_bodies: list[list[str]], event_count: int) -> None:
     for row in lyric_bodies:
-        row.extend(["_"] * max(1, event_count))
+        row.extend(["_"] * event_count)
 
 
 def _extend_event_lyric_rows(
@@ -311,14 +308,14 @@ def _extend_raw_lyric_lines(
     while len(lyric_bodies) < len(raw_lines):
         lyric_bodies.append(["_"] * prior_event_count)
     for row_idx, line in enumerate(raw_lines):
-        lyric_bodies[row_idx].extend(_raw_lyric_tokens(line, max(1, event_count)))
+        lyric_bodies[row_idx].extend(_raw_lyric_tokens(line, event_count))
     if len(lyric_bodies) > len(raw_lines):
         _pad_lyric_bodies(lyric_bodies[len(raw_lines) :], event_count)
 
 
 def _extend_imported_lyric_bodies(
     lyric_bodies: list[list[str]],
-    lyric_bar: ImportedBarContent | None,
+    lyric_bar: ImportedBarContent | Bar | None,
     *,
     sung_onsets: tuple[int, ...],
     prior_event_count: int,
@@ -433,11 +430,9 @@ def _vocal_blocks(
     lyric_blocks: list[str] = []
     if show_lyrics:
         for row in lyric_bodies:
-            tokens = [
-                item
-                for index, item in enumerate(row)
-                if item != "--" or (index + 1 < len(row) and row[index + 1] not in {"_", "__", "--"})
-            ]
+            tokens = list(row)
+            if tokens and tokens[-1] == "--":
+                tokens.pop()
             lyric_blocks.append(f'\\new Lyrics \\lyricsto "{voice_name}" {{')
             lyric_blocks.append("  " + " ".join(tokens))
             lyric_blocks.append(r"}")

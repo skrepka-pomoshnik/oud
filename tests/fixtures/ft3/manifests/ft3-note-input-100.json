@@ -349,7 +349,7 @@
     {
       "bars": 40,
       "composer": "Ortiz",
-      "lyrics": 6,
+      "lyrics": 0,
       "notation_events": 328,
       "note_staffs": 1,
       "path": "note-input-100/024/o_felice_01.ft3",
@@ -409,7 +409,7 @@
     {
       "bars": 49,
       "composer": "LRossi",
-      "lyrics": 527,
+      "lyrics": 467,
       "notation_events": 483,
       "note_staffs": 4,
       "path": "note-input-100/028/disperate_speranze_S.ft3",
@@ -514,7 +514,7 @@
     {
       "bars": 15,
       "composer": "Braun",
-      "lyrics": 82,
+      "lyrics": 83,
       "notation_events": 42,
       "note_staffs": 1,
       "path": "note-input-100/035/ave_maria_zart_baroque.ft3",
@@ -649,7 +649,7 @@
     {
       "bars": 77,
       "composer": "Forqueray",
-      "lyrics": 78,
+      "lyrics": 0,
       "notation_events": 717,
       "note_staffs": 2,
       "path": "note-input-100/044/la_couperin_trio.ft3",
@@ -664,7 +664,7 @@
     {
       "bars": 44,
       "composer": "Caldara",
-      "lyrics": 63,
+      "lyrics": 97,
       "notation_events": 128,
       "note_staffs": 1,
       "path": "note-input-100/045/come_raggio_del_sol_D.ft3",
@@ -964,7 +964,7 @@
     {
       "bars": 48,
       "composer": "Simpson",
-      "lyrics": 6,
+      "lyrics": 0,
       "notation_events": 979,
       "note_staffs": 1,
       "path": "note-input-100/065/divisions_P.ft3",
@@ -994,7 +994,7 @@
     {
       "bars": 27,
       "composer": "Lully",
-      "lyrics": 31,
+      "lyrics": 62,
       "notation_events": 81,
       "note_staffs": 1,
       "path": "note-input-100/067/recit_de_la_beaute.ft3",

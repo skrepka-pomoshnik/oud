@@ -15,7 +15,8 @@ def test_can_she_excuse_decodes_registered_two_verse_rows() -> None:
     piece = load_ft3(CAN_SHE_EXCUSE)
 
     assert piece.bars[6].lyrics == ["she proves un-", "she holds from"]
-    assert piece.bars[7].lyrics == ["kind", "me"]
+    # The counted source cells contain literal question marks, not control bytes.
+    assert piece.bars[7].lyrics == ["kind?", "me?"]
     assert piece.bars[9].lyrics == ["fires which van-", "high, so high"]
     assert piece.bars[14].lyrics == ["no fruit I", "can grant- ed"]
 
@@ -43,5 +44,5 @@ def test_can_she_excuse_lilypond_has_registered_lute_publication_policy() -> Non
     assert r"\scaleDurations 2/1" in text
     assert r"\set TabStaff.additionalBassStrings" in text
     assert r"\autoBeamOff" in text
-    assert r'\mark \markup { \box "5" }' in text
+    assert r"\mark \markup { \box" not in text
     assert "  d'4\n  a'4\n  d''4" in text

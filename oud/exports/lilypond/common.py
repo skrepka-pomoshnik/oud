@@ -58,11 +58,13 @@ def _append_header_field(
     value: str | None,
     *,
     single_line: bool = True,
+    wordwrap: bool = False,
 ) -> None:
     if not value:
         return
     rendered = _single_line(value) if single_line else value
-    header.append(f'  {name} = "{_escape_lilypond(rendered)}"')
+    markup = r"\markup \wordwrap-string " if wordwrap else ""
+    header.append(f'  {name} = {markup}"{_escape_lilypond(rendered)}"')
 
 
 def _lilypond_header(
@@ -70,6 +72,7 @@ def _lilypond_header(
     version: str = "2.26",
     *,
     include_source_heading: bool = True,
+    wrap_footer: bool = False,
 ) -> list[str]:
     title = piece.title or "Untitled"
     composer = piece.composer or piece.author or ""
@@ -80,15 +83,17 @@ def _lilypond_header(
         " | ".join(value for value in (piece.piece_type, piece.part) if value) if include_source_heading else None
     )
     source = ", page ".join(value for value in (piece.source, piece.page) if value)
+    if wrap_footer and _single_line(source) == _single_line(piece.footnote):
+        source = ""
     _append_header_field(header, "subtitle", piece.subtitle)
     _append_header_field(header, "composer", composer, single_line=False)
     _append_header_field(header, "poet", piece.author if piece.author != composer else None)
     _append_header_field(header, "arranger", piece.arranger)
     _append_header_field(header, "piece", description)
     _append_header_field(header, "opus", piece.volume if include_source_heading else None)
-    _append_header_field(header, "source", source)
+    _append_header_field(header, "source", source, wordwrap=wrap_footer)
     _append_header_field(header, "copyright", piece.publisher)
-    _append_header_field(header, "tagline", piece.footnote)
+    _append_header_field(header, "tagline", piece.footnote, wordwrap=wrap_footer)
     header.append("}")
     return header
 
