@@ -1,6 +1,4 @@
 exclude AGENTS.md
-exclude DONE.md
-exclude TODO.md
 prune docs
 prune downloads
 prune examples

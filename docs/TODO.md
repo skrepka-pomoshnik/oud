@@ -6,7 +6,7 @@ Open work only. Completed items live in `DONE.md`.
 
 - Extend the counted lyric-cell decoder to verified extended/multi-byte length
   encodings, with small synthetic regression fixtures and explicit rejection of
-  unsupported records. See `docs/lyrics.md` for the current decoding boundary.
+  unsupported records. See `lyrics.md` for the current decoding boundary.
 - Expand reference-PDF underlay comparisons beyond the validated Caldara,
   Dowland and Bossinensis benchmarks. Check empty anchors, repeated syllables,
   stanza identity, elisions, hyphens and extenders across systems; compiler
@@ -41,11 +41,11 @@ passes (`./scripts/quality.sh`) and `DONE.md` records the outcome and evidence.
 2. Formats: `C16` (MusicXML default), `C15` (full TAB with sidecar).
 3. Note typing: `C7`.
 4. Transposition: `C8`.
-5. FT3 fidelity: `C9`, `C10`, `C11` (need the local Gerbode corpus).
+5. FT3 fidelity: `C9`, `C10`, `C11` (validate against the local Gerbode cache).
 6. Publication and source model: `C12`, `C13`, `C14`.
 
 `S` items run in parallel with the `C` chain whenever their dependencies allow.
-`docs/ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
+`ui-fix-plan.md` holds the evidence and acceptance for `C3`–`C6` and
 `S2`–`S8`; tick items there as well.
 
 ---
@@ -176,8 +176,9 @@ algorithm that preserves sounding pitch and produces playable tablature.
 
 ### C9. FT3 decoding gaps (P1.1)
 
-Why complex: reverse engineering without a spec. **Needs** the local Gerbode
-corpus (not redistributable; fetching is blocked in the cloud environment).
+Why complex: reverse engineering without a spec. The local cache contains 787
+nonredistributable Gerbode FT3 files; source acquisition beyond that cache is
+tracked in `S15`.
 
 - Investigate the opening record of `57_mrs_vaux_jig_8C.ft3`: its first object
   does not use the ordinary framed item-count layout, so the scanning fallback
@@ -187,7 +188,7 @@ corpus (not redistributable; fetching is blocked in the cloud environment).
 - Decode and render German and Spanish/Neapolitan FT3 tablature from real
   fixtures, or reject each unsupported style with a precise visible diagnostic.
 - Finish notation attribute integration using the direct handler evidence in
-  `docs/ft3-source-evidence.md`: editorial-accidental tags, other sign tags,
+  `ft3-source-evidence.md`: editorial-accidental tags, other sign tags,
   hidden notes/rests and reversed stems still need explicit model, rendering
   and playback handling. Hidden events retain time but must not sound. Real
   source spans need decoding; never infer a tie from the sign bit or equal
@@ -211,20 +212,22 @@ corpus (not redistributable; fetching is blocked in the cloud environment).
 
 ### C10. Companion-MIDI semantic gaps (P1.1)
 
-Why complex: decoder-versus-source classification across the corpus. **Needs**
-the local corpus and companion MIDIs.
+Why complex: decoder-versus-source classification across the corpus. The local
+FT3 cache has 787 files; companion MIDI evidence is available for only part of
+the set.
 
-The normalized 514-score baseline has 224 exact scores, 420 at or above 0.90
-onset-chord similarity, 11 best-fit global transpositions, and 22 below 0.50
-similarity. Never treat PPQ, patch, track, or count-in differences as
-pitch/rhythm agreement.
+The last recorded comparable MIDI baseline covered 514 scores: 224 exact, 420
+at or above 0.90 onset-chord similarity, 11 best-fit global transpositions,
+and 22 below 0.50 similarity. Refresh this baseline against the current cached
+set before using those counts for triage. Never treat PPQ, patch, track, or
+count-in differences as pitch/rhythm agreement.
 
 - The updated 787-file terminal audit rejects two notation projections at both
   80x24 and 120x40: `come_raggio_del_sol_G` and `milano_041_parts`. Resolve
   Caldara's unequal record counts and Milano's missing three-staff metadata
   using source registration evidence, not invented voices or omitted events.
   The reference Milano PDF has three separate notation staffs. Keep strict
-  grouped-duration and tie validation; see `docs/gerbode-coverage.md`.
+  grouped-duration and tie validation; see `gerbode-coverage.md`.
 - First resolve source-tuning metadata for the five transposition-only exact
   sequences, then classify the zero/sparse generated parts and mixed-score
   voice-count differences without inventing source events.
@@ -258,7 +261,8 @@ pitch/rhythm agreement.
 ### C11. Staff registration in mixed scores (viewer)
 
 Why complex: shared horizontal registration across tablature and notation
-layouts. **Needs** the local corpus.
+layouts; validate the shared barline geometry against cached mixed-source FT3
+scores.
 
 - At 120x40 in *Felice fu quel dì*, lute and soprano bars do not share
   horizontal bar positions within a system.
@@ -289,7 +293,7 @@ acceptance harness with tolerance decisions.
   failures remain under C10. In the previous 60-PDF sample, before the note-tag
   and lane-mapping corrections, 46 page counts and 37 exact system counts
   matched the references (42 were within one system).
-  Continue from the reference differences in `docs/gerbode-coverage.md`:
+  Continue from the reference differences in `gerbode-coverage.md`:
   Vaux's eight-course pickup/meter and rhythm signs, 6/8 beam grouping, bass
   course presentation, then missed authored system/page breaks. Compare notes
   and their course positions before optimizing page-count agreement.
@@ -297,8 +301,9 @@ acceptance harness with tolerance decisions.
   source clefs and staff order in mixed exports. The inspected Abel minuet
   export has no grace commands despite decoded grace events; Holborne's
   `almain_BT` prints its bass line in treble clef with excessive ledger lines.
-  Caldara's D aria also emits conflicting simultaneous `\\mark` events which
-  LilyPond discards. All three compile, but do not yet pass PDF acceptance.
+  Duplicate manual boxed measure labels in the Dowland, Bossinensis and
+  Caldara exports have been removed. The broader PDF acceptance matrix remains
+  open.
 - Done when the LilyPond output passes the Gerbode comparison corpus and the
   visual regression cases.
 - Depends on: `S12`.
@@ -358,7 +363,7 @@ Maintainer decision (2026-09-29): `.tab` is the original `tab` program format
 format cannot hold is never dropped silently: the save warns and writes that
 content to a sidecar in a format Oud already reads and writes.
 
-`docs/tab-format.md` holds the format summary, the reference-parser recipe
+`tab-format.md` holds the format summary, the reference-parser recipe
 (`tab -v` from <https://github.com/mandovinnie/Lute-Tab>), and the support
 table. Every **Lost** and **Partial** row there is a step here. Reading
 without data loss, writing the program's syntax, and verbatim preservation of
@@ -368,11 +373,11 @@ unedited lines are done (see `DONE.md`).
 
 - Files: `oud/importers/tab.py`, `oud/exports/export_tab.py`,
   `oud/editor/services/io/files.py`, `oud/editor/services/io/loading.py`,
-  `oud/presentation/cli_convert.py`, `docs/tab-format.md`.
+  `oud/presentation/cli_convert.py`, `tab-format.md`.
 - Steps:
   1. Keep marks on edited chords: today an edited chord line is written fresh
      and loses its ornaments, fingerings and `M`/`T` text (see
-     `docs/tab-format.md`). Needs the marks in the model (`Note` has ornament
+     `tab-format.md`). Needs the marks in the model (`Note` has ornament
      and fingering fields). Triplets need tuplet timing in the chord model.
   2. Sidecar: when a save holds content TAB cannot express (several notation
      staffs, lyrics beyond `T` text, anything the table marks unsupported),
@@ -399,11 +404,11 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
 
 - Files: `oud/exports/musicxml/__init__.py`, `oud/importers/musicxml.py`,
   `oud/editor/core/document.py`, `oud/editor/services/io/files.py`,
-  `oud/editor/services/bootstrap.py`, `docs/user-guide.md`.
+  `oud/editor/services/bootstrap.py`, `user-guide.md`.
 - Steps:
   1. Round-trip gaps: chords, rests, meters, tuning, tempo, style, author and
      repeats round trip; endings, barline styles, fermatas, dynamics, keys,
-     system breaks and all editor marks do not (`docs/musicxml-support.md`).
+     system breaks and all editor marks do not (`musicxml-support.md`).
      `S25`-`S27`, `S31` close the easy ones, `C17` the rest.
   2. Trial feedback: decide whether MusicXML stays the default after use
      (`:w`, new documents, projections). `oud convert` still needs an explicit
@@ -414,13 +419,13 @@ Oud may overwrite; a lossy round trip would lose user work on every save.
      ornaments, fingerings, beams, clefs and key signatures of
      imported staffs (`oud/exports/musicxml_staffs.py`).
 - Acceptance: the default save loses nothing without saying so (`S25`), and no
-  Lost row remains in the round-trip table of `docs/musicxml-support.md` for
+  Lost row remains in the round-trip table of `musicxml-support.md` for
   what the model holds. Default save and native reopen are done (`DONE.md`).
 
 ### C17. Marks, tuplets, voices and foreign files in the MusicXML model
 
 Why complex: extends `Note`/`Chord`/`Bar` and both file formats; today the
-default save silently drops content (`docs/musicxml-support.md` lists every gap,
+default save silently drops content (`musicxml-support.md` lists every gap,
 checked against the W3C schema and examples).
 
 - Steps:
@@ -455,7 +460,7 @@ checked against the W3C schema and examples).
      MuseScore's `testTabs_ref` (three TAB parts, seven notes unread).
   8. Draw ties and slurs that cross a bar line; the note marks are kept and
      saved but the renderer takes spans inside one bar only.
-- Acceptance: the round-trip probe in `docs/musicxml-support.md` (each field
+- Acceptance: the round-trip probe in `musicxml-support.md` (each field
   written then read) reports no Lost row for what the model holds; the W3C
   samples open with their notes visible or with a warning that names what was
   dropped; the schema test (`tests/test_musicxml_schema.py`) still passes; the
@@ -473,7 +478,7 @@ author had chosen them, so with `sourcebreaks=on` (the default) the reopened
 piece never fills the terminal width. Tell Oud's own breaks from authored ones
 (a header note, or write no break where the score had none and let the format's
 line length decide) and check what the original `tab` program does with a long
-line (`docs/tab-format.md`). Acceptance: save and reopen a piece with no breaks
+line (`tab-format.md`). Acceptance: save and reopen a piece with no breaks
 and it still flows to the width; authored breaks survive.
 
 ---
@@ -496,17 +501,23 @@ How to work an `S` task:
 If a step turns out to need a model or format change, stop and move the task to
 the complex list with a note instead of widening it.
 
+### S12. Dual-engine PDF comparisons for every microcase
+
+- LilyPond 2.24 and 2.26 are installed locally. Extend the curated-FT3
+  comparisons to every shared engraving-matrix microcase. LilyPond 2.26 is
+  authoritative; document 2.24 differences as compatibility limitations.
+
+### S24. Engraving matrix: real FT3 entries
+
+- Add a real FT3 entry (source URL, checksum, expected metadata) to
+  `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` whenever a
+  feature family is promoted from partial support. The source-independent half
+  is `S11`; the cached corpus is available locally.
+
 ## Blocked tasks (need data, tools, a host, or design judgement)
 
 Not suitable for unattended work: each needs something the cloud environment
 does not have, or open-ended judgement.
-
-### S12. Dual-engine PDF comparisons for every microcase
-
-- Extend the curated-FT3 comparisons to every shared engraving-matrix microcase.
-  LilyPond 2.26 is authoritative; document 2.24 differences as compatibility
-  limitations.
-- **Needs** LilyPond 2.24 and 2.26 installed.
 
 ### S13. Typesetting microcases and fixture licensing
 
@@ -537,7 +548,7 @@ Opt-in renderers only; the default ASCII and pretty modes are unaffected.
 
 **Needs** access to lutemusic.org (blocked in the cloud environment).
 
-- Continue the fixed corpus from 514 to at least 1,000 public FT3 files without
+- Continue the fixed corpus from 787 to at least 1,000 public FT3 files without
   repeating random selection at test time. Include solo, duet, mixed vocal,
   vocal-only, polyphonic, multi-section, German, Italian, French, and
   Spanish/Neapolitan examples.
@@ -550,9 +561,9 @@ Opt-in renderers only; the default ASCII and pretty modes are unaffected.
 
 **Needs** access to lutemusic.org.
 
-- Add style-proven French and Italian Gerbode sources plus examples with tuplets
-  and grace notes; the fixed corpora have null style provenance and no instances
-  of those features.
+- Add style-proven French and Italian Gerbode sources. The corpus already has
+  grace-note examples; audit tuplet coverage and source provenance before making
+  claims about those features.
 
 ### S17. macOS terminal acceptance pass
 
@@ -563,13 +574,6 @@ Opt-in renderers only; the default ASCII and pretty modes are unaffected.
   refusal, playback failure/success, PDF failure/success, resize, and reopen.
 - Run real curses cases at 80x24 and 120x40 and retain terminal output on
   failure.
-
-### S24. Engraving matrix: real FT3 entries
-
-- Add a real FT3 entry (source URL, checksum, expected metadata) to
-  `tests/fixtures/ft3/manifests/engraving-quality-matrix.json` whenever a
-  feature family is promoted from partial support. **Needs** the local corpus.
-  The source-independent half is `S11`.
 
 ---
 

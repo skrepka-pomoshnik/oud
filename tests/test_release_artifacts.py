@@ -26,8 +26,13 @@ def test_sdist_content_policy_allows_build_sources_but_rejects_planning_records(
         "oud/presentation/app.py",
         "petrucci/core/score.py",
         "pyproject.toml",
-        "TODO.md",
+        "docs/TODO.md",
+        "docs/DONE.md",
         "examples/score.mid",
     }
 
-    assert invalid_artifact_names(names, wheel=False) == {"TODO.md", "examples/score.mid"}
+    assert invalid_artifact_names(names, wheel=False) == {
+        "docs/DONE.md",
+        "docs/TODO.md",
+        "examples/score.mid",
+    }

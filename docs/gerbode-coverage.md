@@ -12,7 +12,7 @@ Caldara, Dowland and Bossinensis underlay was compared with reference PDFs
 across all seven generated pages and terminal proofs at 80x24 and 120x40.
 The three exports compile without warnings with LilyPond 2.26 and 2.24.4;
 the earlier Caldara warning evidence below is historical. See `lyrics.md`
-for the supported decoder boundary and `../TODO.md` for remaining work.
+for the supported decoder boundary and `TODO.md` for remaining work.
 
 Final validation: 2,284 passed, 23 skipped, zero failures; Petrucci coverage
 95.53%. Ruff lint/format, Ty and architecture checks pass. This does not

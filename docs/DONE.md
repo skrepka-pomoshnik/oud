@@ -1,5 +1,29 @@
 # DONE
 
+## Move project backlog into docs (2026-10-23)
+
+- Move `TODO.md` and `DONE.md` to `docs/`, preserving the existing completion
+  history and uncommitted entries. Update the project contract, internal links,
+  source-distribution rules and release-artifact policy fixture.
+- Refresh stale backlog status: use the 787-score local cache, mark the 514-score
+  MIDI numbers as historical, promote locally actionable S12/S24 work, and remove
+  the resolved duplicate-boxed-label issue. Correct the stale grace-note gap.
+- Validation: searched repository references for old root paths and stale blocker
+  statements. Tests were not run for this documentation and path-only change.
+
+## Add octave-down treble clef for singing practice (2026-10-23)
+
+- Add `Clef.TREBLE_8VB` to canonical flow, written and continuous pitch projection,
+  explicit piece clef adaptation, and terminal rendering. Sounding F3 occupies
+  the usual written F4 position without changing the stored MIDI pitch.
+- Preserve treble key-signature placement. Print the small 8 beneath the clef in
+  text modes and draw it below the clef in the advanced raster renderer.
+- Add failing-first regressions for pitch projection, sounding-pitch preservation,
+  text marker placement and matching raster notehead coordinates.
+- Validation: Ruff lint/format, Ty and architecture checks pass. Four xdist workers
+  run the complete suite: 2,290 passed, 23 skipped, 95.52% Petrucci coverage.
+  Voce also checks score/trace/live-marker alignment with this clef.
+
 ## Remove duplicate LilyPond measure labels (2026-10-23)
 
 - Stop emitting manual boxed measure marks alongside LilyPond's automatic
@@ -103,7 +127,7 @@
 - All 60 sampled PDFs compile; 46 page counts and 37 exact system counts match
   (42 are within one). The terminal audit renders 775 files at both 80x24 and
   120x40 with bounded nonempty output; 12 strict notation rejections remain.
-  See `docs/gerbode-coverage.md`; source pickups, voice/tie registration and
+  See `gerbode-coverage.md`; source pickups, voice/tie registration and
   visual parity are not marked complete.
 
 ## System breaks decoded from the FT3 layout tail (2026-10-12)
@@ -167,7 +191,7 @@
 ## S11: engraving matrix cases for fermata, cut time and key signature (2026-09-29)
 
 - The matrix has three source-independent cases (`fermata`, `cut-time`, `key-signature`, marked `"origin": "oud"`) with their builders, microcases, proof roles and LilyPond tokens (`scripts.ufermata`, `\\time 2/2`, `\\key g \\major`); the tokens were taken from real exports, and a wrong token is detected. The profile test accepts an empty `upstream` list only for such cases.
-- The planned `tuplet-triplet` case was not written: the LilyPond exporter writes no tuplets at all (it scales durations), so the tuplet row of `docs/supported-behavior.md` is now Partial and the case moved to `S32`.
+- The planned `tuplet-triplet` case was not written: the LilyPond exporter writes no tuplets at all (it scales durations), so the tuplet row of `supported-behavior.md` is now Partial and the case moved to `S32`.
 - Validation: `tests/test_lilypond_engraving_profile.py` (9 cases, 6 microcases).
 
 ## S23: fingerings and harmonics on notation staves in MusicXML (2026-09-29)
@@ -240,14 +264,14 @@
   meters, tuning, tempo, style and author, not bar-level marks. Endings, barline
   styles, fermatas, dynamics, keys and system breaks do not round trip, and
   editor-side slurs, ties, holds, ornaments and annotations are never saved.
-- `docs/musicxml-support.md` records what Oud writes and reads, per field, with
+- `musicxml-support.md` records what Oud writes and reads, per field, with
   the gaps. Tasks: `C17`, `S25` to `S31` in `TODO.md`.
 - Validation: `tests/test_musicxml_roundtrip.py` (repeat markers over three
   saves; forward repeat at the left of its own measure). Gate: 1,888 passed.
 
 ## S10: the historical-notation matrix (2026-09-29)
 
-- `docs/supported-behavior.md` has a table of historical constructs (mensuration and proportion signs, cut time, repeats and endings, fermatas, tuplets, grace notes, clefs and keys, dots) marked supported, partial or unsupported, with the test that proves each supported row; coloration, ligatures, perfection and alteration, ficta, custos, C clefs, interpreted durations and alternative interpretations are listed as unsupported. Every named test was checked to exist. Rejecting unsupported constructs visibly stays in `C13`.
+- `supported-behavior.md` has a table of historical constructs (mensuration and proportion signs, cut time, repeats and endings, fermatas, tuplets, grace notes, clefs and keys, dots) marked supported, partial or unsupported, with the test that proves each supported row; coloration, ligatures, perfection and alteration, ficta, custos, C clefs, interpreted durations and alternative interpretations are listed as unsupported. Every named test was checked to exist. Rejecting unsupported constructs visibly stays in `C13`.
 
 ## S9: companion MIDI checksums (2026-09-29)
 
@@ -407,7 +431,7 @@
   from the program's notation and played with inverted octaves; they are now
   scientific pitch.
 - Files Oud wrote (`% Generated by oud`) keep their earlier meaning.
-- `docs/tab-format.md` records the format, Oud's earlier dialect, and the
+- `tab-format.md` records the format, Oud's earlier dialect, and the
   support table.
 - Validation: `tests/test_tab_import_original.py` (16 cases, all failing before
   except the legacy ones), including open → save → reopen of bass courses and
@@ -623,7 +647,7 @@
 ### P0: Petrucci reusable accompaniment data (deferred assessment)
 - [x] Assess an optional pure canonical-score performance projection with stable part/voice/source IDs.
   - Keep MIDI serialization, TiMidity processes, transport, latency, and lesson policy outside Petrucci.
-  - Assessment and prerequisite model gaps are recorded in `docs/petrucci-voce-handoff.md`; implementation is deferred.
+  - Assessment and prerequisite model gaps are recorded in `petrucci-voce-handoff.md`; implementation is deferred.
 
 ### P1.1: Full-score presentation
 - [x] Add explicit `score` and `staff` viewer modes for imported scores.
@@ -739,7 +763,7 @@
   - `gb` adds a bass course (was `gj`).
   - `[`/`]` only jump sections; casual find repeat is `;`.
   - The remaining deliberate exceptions are documented in
-    `docs/ui-fix-plan.md`.
+    `ui-fix-plan.md`.
 - Validation: new regression tests for rest import, render, save/reopen and
   playback, SIGINT at an arbitrary point, prompt/page cancel, player reaping
   and the key-table contracts for all seven table modes. `scripts/quality.sh`
@@ -748,7 +772,7 @@
 ## Editor UI audit: phase 1 fixes and one key table (2026-09-27)
 
 - Audited the editing UI live (tmux at 80x24, 100x30 and 120x40) and recorded
-  every finding with acceptance criteria in `docs/ui-fix-plan.md`.
+  every finding with acceptance criteria in `ui-fix-plan.md`.
 - Fixed:
   - Insert-mode `q` quitting; `q`/`r` are now French frets.
   - The rest key is `z`. Rests use a non-fret marker, so TAB export no longer
@@ -1236,7 +1260,7 @@ Technical change log. Keep short, append newest on top.
 - Closed all five semantic failures in the fixed 75-file expansion. Decoded comma, apostrophe, smile, and caret ornaments; separated standard-note musical/layout fields; preserved chord onsets and source voices; and mapped La Couperin's two notation voices to one 77-bar bass-viol staff. The 75-file audit now has zero residuals, unknown records, or warnings.
 - Manually compared 17th Century Grounds and La Couperin with their published PDFs, bringing the documented FT3/PDF matrix to ten files.
 - Removed all Gerbode FT3 payloads and decoded dumps from the Git index, ignored FT3 suffixes repository-wide, added a CI publication guard, and retained only attribution plus URL/SHA-256 manifests. Added a deterministic fetcher that refuses unsafe URLs, path traversal, checksum drift, and implicit replacement.
-- Expanded FT3 compatibility coverage with a one-time 75-file selection fixed in `tests/fixtures/ft3/manifests/ft3-random-75.json`. All 75 load without crashing; the five semantic failures and Couperin structural warning are bounded by regression tests and recorded in `TODO.md`/`docs/ft3-parity.md`.
+- Expanded FT3 compatibility coverage with a one-time 75-file selection fixed in `tests/fixtures/ft3/manifests/ft3-random-75.json`. All 75 load without crashing; the five semantic failures and Couperin structural warning are bounded by regression tests and recorded in `TODO.md`/`ft3-parity.md`.
 - Removed discarded exponential string-assignment searches from LilyPond pitch emission. The 226-bar Buxtehude fixture exports in about 0.02 seconds instead of 15.1 seconds with byte-identical output; the full coverage gate fell from 7:06 to 3:43.
 - Validation: no tracked FT3 payloads, Ruff, Ruff format, Ty, 1,157 passed with one Darwin-only test skipped on Linux, 85.33% coverage, and 112/112 local corpus files loaded without warnings.
 - Closed the remaining release-usability P0 items: the first 80x24 help page now gives a complete open/create, note entry, undo, safe save, and quit path, backed by an executable first-score regression.
